@@ -260,6 +260,48 @@ describe('viewer interaction roi gestures', () => {
     expect(harness.onCommitRoi).not.toHaveBeenCalled();
   });
 
+  it('activates and edits the topmost screenshot region under the pointer', () => {
+    const harness = createHarness({}, {
+      screenshotRegions: [
+        { id: 'region-1', rect: { x: 10, y: 10, width: 30, height: 30 } },
+        { id: 'region-2', rect: { x: 50, y: 20, width: 30, height: 30 } }
+      ],
+      activeScreenshotRegionId: 'region-1',
+      imageSize: null
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 60, clientY: 30 });
+    dispatchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 70, clientY: 40 });
+
+    expect(harness.onScreenshotSelectionActiveRegionChange).toHaveBeenCalledWith('region-2');
+    expect(harness.onScreenshotSelectionRectChange).toHaveBeenCalledWith({
+      rect: { x: 60, y: 30, width: 30, height: 30 },
+      squareSnapped: false,
+      snapGuide: { x: null, y: null }
+    });
+  });
+
+  it('prefers the active screenshot region when overlapping regions are hit', () => {
+    const harness = createHarness({}, {
+      screenshotRegions: [
+        { id: 'region-1', rect: { x: 10, y: 10, width: 30, height: 30 } },
+        { id: 'region-2', rect: { x: 20, y: 20, width: 30, height: 30 } }
+      ],
+      activeScreenshotRegionId: 'region-1',
+      imageSize: null
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 25, clientY: 25 });
+    dispatchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 35, clientY: 25 });
+
+    expect(harness.onScreenshotSelectionActiveRegionChange).toHaveBeenCalledWith('region-1');
+    expect(harness.onScreenshotSelectionRectChange).toHaveBeenCalledWith({
+      rect: { x: 20, y: 10, width: 30, height: 30 },
+      squareSnapped: false,
+      snapGuide: { x: null, y: null }
+    });
+  });
+
   it('edits screenshot selection in panorama mode instead of orbiting', () => {
     const harness = createHarness({
       viewerMode: 'panorama'
@@ -1036,6 +1078,8 @@ function createHarness(
     imageSize?: { width: number; height: number } | null;
     viewport?: { width: number; height: number };
     screenshotRect?: { x: number; y: number; width: number; height: number } | null;
+    screenshotRegions?: Array<{ id: string; rect: { x: number; y: number; width: number; height: number } }>;
+    activeScreenshotRegionId?: string;
   } = {}
 ) {
   const element = document.createElement('div');
@@ -1090,9 +1134,25 @@ function createHarness(
   const onRoiInteractionState = vi.fn((roiInteraction) => {
     state = { ...state, roiInteraction };
   });
-  let screenshotRect = options.screenshotRect ?? null;
+  let screenshotRegions = options.screenshotRegions
+    ? options.screenshotRegions.map((region) => ({
+      id: region.id,
+      rect: { ...region.rect }
+    }))
+    : null;
+  let activeScreenshotRegionId = options.activeScreenshotRegionId ?? screenshotRegions?.[0]?.id ?? null;
+  let screenshotRect = options.screenshotRect ?? screenshotRegions?.find((region) => region.id === activeScreenshotRegionId)?.rect ?? null;
   const onScreenshotSelectionRectChange = vi.fn((update) => {
     screenshotRect = update.rect;
+    if (screenshotRegions && activeScreenshotRegionId) {
+      screenshotRegions = screenshotRegions.map((region) => region.id === activeScreenshotRegionId
+        ? { ...region, rect: { ...update.rect } }
+        : region);
+    }
+  });
+  const onScreenshotSelectionActiveRegionChange = vi.fn((regionId) => {
+    activeScreenshotRegionId = regionId;
+    screenshotRect = screenshotRegions?.find((region) => region.id === regionId)?.rect ?? screenshotRect;
   });
   const onScreenshotSelectionHandleHover = vi.fn();
   const onScreenshotSelectionResizeActiveChange = vi.fn();
@@ -1118,9 +1178,15 @@ function createHarness(
     onRoiInteractionState,
     getScreenshotSelection: () => ({
       active: screenshotRect !== null,
-      rect: screenshotRect
+      rect: screenshotRect,
+      activeRegionId: activeScreenshotRegionId,
+      regions: screenshotRegions?.map((region) => ({
+        id: region.id,
+        rect: { ...region.rect }
+      }))
     }),
     onScreenshotSelectionRectChange,
+    onScreenshotSelectionActiveRegionChange,
     onScreenshotSelectionHandleHover,
     onScreenshotSelectionResizeActiveChange,
     onScreenshotSelectionSquareSnapChange,
@@ -1144,6 +1210,7 @@ function createHarness(
     onCommitRoi,
     onRoiInteractionState,
     onScreenshotSelectionRectChange,
+    onScreenshotSelectionActiveRegionChange,
     onScreenshotSelectionHandleHover,
     onScreenshotSelectionResizeActiveChange,
     onScreenshotSelectionSquareSnapChange,

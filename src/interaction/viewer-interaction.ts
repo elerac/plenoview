@@ -9,6 +9,7 @@ import type {
   ViewerKeyboardZoomInput,
   ViewerRoiInteractionState,
   ViewportInfo,
+  ViewportRect,
   ViewerState
 } from '../types';
 import { imageToScreen } from './image-geometry';
@@ -44,9 +45,15 @@ import {
   resolveScreenshotSelectionHandle,
   updateScreenshotSelectionRectFromDrag,
   type ScreenshotSelectionDrag,
-  type ScreenshotSelectionEdgeSnapTargets
+  type ScreenshotSelectionEdgeSnapTargets,
+  type ScreenshotSelectionHandle
 } from './screenshot-selection';
-import type { InteractionCallbacks, InteractionDependencies, PointerPosition } from './shared';
+import type {
+  InteractionCallbacks,
+  InteractionDependencies,
+  PointerPosition,
+  ScreenshotSelectionInteractionState
+} from './shared';
 
 export type { InteractionCallbacks, InteractionDependencies } from './shared';
 
@@ -247,25 +254,26 @@ export class ViewerInteraction {
         return;
       }
       this.callbacks.onHoverPixel(null);
-      const handle = screenshotSelection.rect
-        ? resolveScreenshotSelectionHandle(point, screenshotSelection.rect)
-        : null;
-      this.callbacks.onScreenshotSelectionHandleHover?.(handle);
-      if (!screenshotSelection.rect || !handle) {
+      const hit = resolveScreenshotSelectionHit(point, screenshotSelection);
+      this.callbacks.onScreenshotSelectionHandleHover?.(hit?.handle ?? null);
+      if (!hit) {
         return;
       }
 
+      if (hit.regionId) {
+        this.callbacks.onScreenshotSelectionActiveRegionChange?.(hit.regionId);
+      }
       this.dragging = true;
       this.dragMode = 'screenshot';
       this.movedDuringDrag = false;
       this.previousPointer = point;
       this.screenshotDrag = {
-        handle,
+        handle: hit.handle,
         startPoint: point,
-        startRect: screenshotSelection.rect
+        startRect: hit.rect
       };
-      this.callbacks.onScreenshotSelectionResizeActiveChange?.(handle !== 'move');
-      if (handle === 'move') {
+      this.callbacks.onScreenshotSelectionResizeActiveChange?.(hit.handle !== 'move');
+      if (hit.handle === 'move') {
         this.callbacks.onScreenshotSelectionSquareSnapChange?.(false);
       }
       this.element.setPointerCapture(event.pointerId);
@@ -359,10 +367,8 @@ export class ViewerInteraction {
         return;
       }
 
-      const handle = screenshotSelection.rect
-        ? resolveScreenshotSelectionHandle(point, screenshotSelection.rect)
-        : null;
-      this.callbacks.onScreenshotSelectionHandleHover?.(handle);
+      const hit = resolveScreenshotSelectionHit(point, screenshotSelection);
+      this.callbacks.onScreenshotSelectionHandleHover?.(hit?.handle ?? null);
       return;
     }
 
@@ -443,7 +449,7 @@ export class ViewerInteraction {
 
       this.callbacks.onHoverPixel(null);
       this.callbacks.onScreenshotSelectionHandleHover?.(
-        screenshotSelection.rect ? resolveScreenshotSelectionHandle(point, screenshotSelection.rect) : null
+        resolveScreenshotSelectionHit(point, screenshotSelection)?.handle ?? null
       );
       return;
     }
@@ -612,7 +618,7 @@ export class ViewerInteraction {
     if (state.viewerMode === 'panorama') {
       const projectionDiameter = getPanoramaProjectionDiameter(viewport, state.panoramaHfovDeg);
       const halfProjectionDiameter = projectionDiameter * 0.5;
-      return {
+      return withScreenshotRegionSnapTargets({
         centerSnapTarget: {
           x: viewport.width * 0.5,
           y: viewport.height * 0.5
@@ -627,7 +633,7 @@ export class ViewerInteraction {
             viewport.height * 0.5 + halfProjectionDiameter
           ], viewport.height)
         }
-      };
+      }, this.getScreenshotSelection(), viewport);
     }
 
     if (state.viewerMode !== 'image') {
@@ -642,18 +648,87 @@ export class ViewerInteraction {
     const centerTarget = imageToScreen(imageSize.width * 0.5, imageSize.height * 0.5, state, viewport);
     const topLeft = imageToScreen(0, 0, state, viewport);
     const bottomRight = imageToScreen(imageSize.width, imageSize.height, state, viewport);
-    return {
+    return withScreenshotRegionSnapTargets({
       centerSnapTarget: isPointInsideViewport(centerTarget, viewport) ? centerTarget : null,
       edgeSnapTargets: {
         x: filterViewportCoordinates([topLeft.x, bottomRight.x], viewport.width),
         y: filterViewportCoordinates([topLeft.y, bottomRight.y], viewport.height)
       }
-    };
+    }, this.getScreenshotSelection(), viewport);
   }
 
   private getScreenshotSelection() {
     return this.callbacks.getScreenshotSelection?.() ?? { active: false, rect: null };
   }
+}
+
+function resolveScreenshotSelectionHit(
+  point: PointerPosition,
+  selection: ScreenshotSelectionInteractionState
+): { regionId: string | null; rect: ViewportRect; handle: ScreenshotSelectionHandle } | null {
+  const regions = selection.regions?.length
+    ? selection.regions
+    : selection.rect
+      ? [{ id: '', rect: selection.rect }]
+      : [];
+  const activeRegionIndex = selection.activeRegionId
+    ? regions.findIndex((region) => region.id === selection.activeRegionId)
+    : -1;
+  const hitOrder = activeRegionIndex >= 0
+    ? [
+      regions[activeRegionIndex]!,
+      ...regions.filter((_, index) => index !== activeRegionIndex).reverse()
+    ]
+    : [...regions].reverse();
+  for (const region of hitOrder) {
+
+    const handle = resolveScreenshotSelectionHandle(point, region.rect);
+    if (handle) {
+      return {
+        regionId: region.id || null,
+        rect: region.rect,
+        handle
+      };
+    }
+  }
+
+  return null;
+}
+
+function withScreenshotRegionSnapTargets(
+  targets: {
+    centerSnapTarget: PointerPosition | null;
+    edgeSnapTargets: ScreenshotSelectionEdgeSnapTargets | null;
+  },
+  selection: ScreenshotSelectionInteractionState,
+  viewport: ViewportInfo
+): {
+  centerSnapTarget: PointerPosition | null;
+  edgeSnapTargets: ScreenshotSelectionEdgeSnapTargets | null;
+} {
+  const regions = selection.regions ?? [];
+  if (regions.length <= 1) {
+    return targets;
+  }
+
+  const xTargets = [...(targets.edgeSnapTargets?.x ?? [])];
+  const yTargets = [...(targets.edgeSnapTargets?.y ?? [])];
+  for (const region of regions) {
+    if (region.id === selection.activeRegionId) {
+      continue;
+    }
+
+    xTargets.push(region.rect.x, region.rect.x + region.rect.width * 0.5, region.rect.x + region.rect.width);
+    yTargets.push(region.rect.y, region.rect.y + region.rect.height * 0.5, region.rect.y + region.rect.height);
+  }
+
+  return {
+    centerSnapTarget: targets.centerSnapTarget,
+    edgeSnapTargets: {
+      x: filterViewportCoordinates(xTargets, viewport.width),
+      y: filterViewportCoordinates(yTargets, viewport.height)
+    }
+  };
 }
 
 type ViewerKeyboardZoomCallbacks = Pick<

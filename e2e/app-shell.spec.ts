@@ -884,6 +884,67 @@ test('exports image-viewer screenshot reproduction metadata as a zip download', 
   expect(metadata.viewer.viewerMode).toBe('image');
 });
 
+test('exports multiple image-viewer screenshot regions as a zip download', async ({ page }) => {
+  await gotoViewerApp(page);
+  await openGalleryCbox(page);
+
+  const fileMenuButton = page.getByRole('button', { name: 'File', exact: true });
+  const exportScreenshotMenuItem = page.locator('#export-screenshot-button');
+  const selectionOverlay = page.locator('#screenshot-selection-overlay');
+  const selectionBox = page.locator('#screenshot-selection-box');
+  const addRegionButton = page.locator('#screenshot-selection-add-button');
+  const inactiveRegions = page.locator('.screenshot-selection-region-box');
+  const overlayExportButton = page.locator('#screenshot-selection-export-button');
+  const exportDialog = page.locator('#export-dialog-form');
+  const exportSubmitButton = page.locator('#export-dialog-submit-button');
+  const exportFilenameInput = page.locator('#export-filename-input');
+  const exportWidthInput = page.locator('#export-width-input');
+  const exportHeightInput = page.locator('#export-height-input');
+  const regionPreviewCanvases = page.locator('.export-screenshot-region-preview-canvas');
+  const regionSizeLabels = page.locator('.export-screenshot-region-preview-size');
+
+  await fileMenuButton.click();
+  await exportScreenshotMenuItem.click();
+
+  await expect(selectionOverlay).toBeVisible();
+  await addRegionButton.click();
+
+  await expect(inactiveRegions).toHaveCount(1);
+  await expect(selectionBox.locator('.screenshot-selection-region-badge')).toHaveText('2');
+
+  await overlayExportButton.click();
+
+  await expect(exportDialog).toBeVisible();
+  await expect(page.locator('#export-dialog-title')).toHaveText('Export Screenshot Regions');
+  await expect(page.locator('#export-filename-field-label')).toHaveText('Archive');
+  await expect(exportFilenameInput).toHaveValue('cbox_rgb-screenshot.zip');
+  await expect(page.locator('#export-size-field-label')).toHaveText('Scale');
+  await expect(page.locator('#export-width-field-label')).toHaveText('Percent');
+  await expect(exportWidthInput).toHaveValue('100');
+  await expect(exportHeightInput).toBeHidden();
+  await expect(page.locator('#export-preview-status')).toContainText('2 regions selected');
+  await expect(regionPreviewCanvases).toHaveCount(2, { timeout: 30000 });
+  await expect(regionSizeLabels).toHaveCount(2);
+  await expect(regionSizeLabels.nth(0)).toHaveText(/\d+ x \d+ px/);
+  await expect(regionSizeLabels.nth(1)).toHaveText(/\d+ x \d+ px/);
+
+  const downloadPromise = page.waitForEvent('download');
+  await exportSubmitButton.click();
+  const download = await downloadPromise;
+
+  await expect(exportDialog).toBeHidden();
+  await expect(selectionOverlay).toBeHidden();
+  expect(download.suggestedFilename()).toBe('cbox_rgb-screenshot.zip');
+
+  const zipEntries = unzipSync(await readDownloadBytes(download));
+  expect(Object.keys(zipEntries).sort()).toEqual([
+    'cbox_rgb-screenshot.region-01.png',
+    'cbox_rgb-screenshot.region-02.png'
+  ]);
+  expectPngSignature(zipEntries['cbox_rgb-screenshot.region-01.png']);
+  expectPngSignature(zipEntries['cbox_rgb-screenshot.region-02.png']);
+});
+
 test('marks non-viewer chrome inactive while screenshot selection is active', async ({ page }) => {
   await gotoViewerApp(page);
   await openGalleryCbox(page);
@@ -1204,6 +1265,8 @@ test('fits portrait batch export thumbnails inside their preview frames', async 
 
     const previewRect = previewElement.getBoundingClientRect();
     const imageRect = imageElement.getBoundingClientRect();
+    const previewStyle = getComputedStyle(previewElement);
+    const imageStyle = getComputedStyle(imageElement);
     return {
       preview: {
         left: previewRect.left,
@@ -1222,13 +1285,16 @@ test('fits portrait batch export thumbnails inside their preview frames', async 
         height: imageRect.height
       },
       naturalWidth: imageElement.naturalWidth,
-      naturalHeight: imageElement.naturalHeight
+      naturalHeight: imageElement.naturalHeight,
+      previewBackgroundImage: previewStyle.backgroundImage,
+      imageObjectFit: imageStyle.objectFit
     };
   });
 
   expect(geometry.naturalHeight).toBeGreaterThan(geometry.naturalWidth);
-  expect(geometry.image.height).toBeGreaterThan(geometry.image.width);
-  expect(geometry.image.width).toBeLessThan(geometry.preview.width - 8);
+  expect(geometry.imageObjectFit).toBe('contain');
+  expect(geometry.previewBackgroundImage).toBe('none');
+  expect(geometry.image.width).toBeLessThanOrEqual(geometry.preview.width + 1);
   expect(geometry.image.height).toBeLessThanOrEqual(geometry.preview.height + 1);
   expect(geometry.image.left).toBeGreaterThanOrEqual(geometry.preview.left - 1);
   expect(geometry.image.top).toBeGreaterThanOrEqual(geometry.preview.top - 1);

@@ -27,7 +27,8 @@ import {
   type ExportImageBatchRequest,
   type ExportImageBatchTarget,
   type ExportProgressUpdate,
-  type ExportScreenshotRegion
+  type ExportScreenshotRegion,
+  type ExportScreenshotRegionItem
 } from '../types';
 import { bindDialogBackdropDismiss } from './dialog-backdrop';
 import type { ExportImageBatchDialogElements } from './elements';
@@ -68,11 +69,14 @@ interface ExportImageBatchDialogCallbacks {
   ) => Promise<ExportImagePixels>;
   onCancel?: (mode: ExportBatchDialogMode) => void;
   onScreenshotOutputSizeChange?: (size: { width: number; height: number }) => void;
+  onScreenshotOutputScaleChange?: (scale: number) => void;
 }
 
 export interface ExportImageBatchDialogOpenOptions {
   mode?: ExportBatchDialogMode;
   screenshot?: ExportScreenshotRegion;
+  screenshots?: ExportScreenshotRegionItem[];
+  outputScale?: number;
 }
 
 export interface ExportBatchColumn {
@@ -83,11 +87,15 @@ export interface ExportBatchColumn {
 
 interface BatchPreviewJob {
   previewKey: string;
+  cellKey: string;
   file: ExportImageBatchTarget['files'][number];
   channel: ExportImageBatchChannelTarget;
+  screenshot: ExportScreenshotRegionItem | null;
   requestId: number;
   order: number;
 }
+
+type ExportBatchRegionSelection = ExportScreenshotRegionItem | null;
 
 export class ExportImageBatchDialogController implements Disposable {
   private readonly disposables = new DisposableBag();
@@ -97,7 +105,8 @@ export class ExportImageBatchDialogController implements Disposable {
   private exportResource: AsyncResource<void> = idleResource();
   private includeSplitRgbChannels = false;
   private dialogMode: ExportBatchDialogMode = 'image';
-  private screenshotRegion: ExportScreenshotRegion | null = null;
+  private screenshotRegions: ExportScreenshotRegionItem[] = [];
+  private screenshotOutputScale = 1;
   private syncingScreenshotSize = false;
   private restoreFocusTarget: HTMLElement | null = null;
   private abortController: AbortController | null = null;
@@ -247,7 +256,11 @@ export class ExportImageBatchDialogController implements Disposable {
         this.includeSplitRgbChannels = false;
       }
       this.abortPreviewWork({ clearCache: true });
-      this.checkedCellKeys = buildDefaultExportBatchCheckedCells(this.target, this.includeSplitRgbChannels);
+      this.checkedCellKeys = buildDefaultExportBatchCheckedCells(
+        this.target,
+        this.includeSplitRgbChannels,
+        this.getSelectionRegions()
+      );
       this.renderMatrix();
       this.updateStatus();
     }
@@ -260,10 +273,16 @@ export class ExportImageBatchDialogController implements Disposable {
 
     this.restoreFocusTarget = this.elements.fileMenuButton;
     this.dialogMode = options.mode ?? 'image';
-    this.screenshotRegion = this.dialogMode === 'screenshot' && options.screenshot
-      ? cloneScreenshotRegion(options.screenshot)
-      : null;
-    if (this.dialogMode === 'screenshot' && !this.screenshotRegion) {
+    const screenshotRegions = options.screenshots?.length
+      ? options.screenshots
+      : options.screenshot
+        ? [buildScreenshotRegionItem(options.screenshot, 0, 1)]
+        : [];
+    this.screenshotRegions = this.dialogMode === 'screenshot'
+      ? cloneScreenshotRegions(screenshotRegions)
+      : [];
+    this.screenshotOutputScale = options.outputScale ?? 1;
+    if (this.dialogMode === 'screenshot' && this.screenshotRegions.length === 0) {
       this.dialogMode = 'image';
     }
     this.includeSplitRgbChannels = false;
@@ -297,7 +316,8 @@ export class ExportImageBatchDialogController implements Disposable {
     this.setError(null);
     this.elements.exportBatchDialogBackdrop.classList.add('hidden');
     this.dialogMode = 'image';
-    this.screenshotRegion = null;
+    this.screenshotRegions = [];
+    this.screenshotOutputScale = 1;
     this.syncingScreenshotSize = false;
 
     if (restoreFocus) {
@@ -322,11 +342,28 @@ export class ExportImageBatchDialogController implements Disposable {
       ? DEFAULT_SCREENSHOT_BATCH_ARCHIVE_FILENAME
       : target.archiveFilename || DEFAULT_BATCH_ARCHIVE_FILENAME;
     this.elements.exportBatchCompressionInput.value = String(DEFAULT_PNG_COMPRESSION_LEVEL);
-    if (this.dialogMode === 'screenshot' && this.screenshotRegion) {
-      this.elements.exportBatchWidthInput.value = String(this.screenshotRegion.outputWidth);
-      this.elements.exportBatchHeightInput.value = String(this.screenshotRegion.outputHeight);
+    if (this.dialogMode === 'screenshot' && this.screenshotRegions.length > 1) {
+      this.elements.exportBatchSizeFieldLabel.textContent = 'Scale';
+      this.elements.exportBatchWidthFieldLabel.textContent = 'Percent';
+      this.elements.exportBatchHeightFieldLabel.textContent = 'Height';
+      this.elements.exportBatchHeightInput.closest('.app-dialog-inline-field')?.classList.add('hidden');
+      this.elements.exportBatchWidthInput.value = String(Math.max(1, Math.round(this.screenshotOutputScale * 100)));
+      this.elements.exportBatchHeightInput.value = '';
+      this.elements.exportBatchReproductionMetadataCheckbox.checked = false;
+    } else if (this.dialogMode === 'screenshot' && this.screenshotRegions.length === 1) {
+      const region = this.screenshotRegions[0]!;
+      this.elements.exportBatchSizeFieldLabel.textContent = 'Size';
+      this.elements.exportBatchWidthFieldLabel.textContent = 'Width';
+      this.elements.exportBatchHeightFieldLabel.textContent = 'Height';
+      this.elements.exportBatchHeightInput.closest('.app-dialog-inline-field')?.classList.remove('hidden');
+      this.elements.exportBatchWidthInput.value = String(region.outputWidth);
+      this.elements.exportBatchHeightInput.value = String(region.outputHeight);
       this.elements.exportBatchReproductionMetadataCheckbox.checked = false;
     } else {
+      this.elements.exportBatchSizeFieldLabel.textContent = 'Size';
+      this.elements.exportBatchWidthFieldLabel.textContent = 'Width';
+      this.elements.exportBatchHeightFieldLabel.textContent = 'Height';
+      this.elements.exportBatchHeightInput.closest('.app-dialog-inline-field')?.classList.remove('hidden');
       this.elements.exportBatchWidthInput.value = '';
       this.elements.exportBatchHeightInput.value = '';
       this.elements.exportBatchReproductionMetadataCheckbox.checked = false;
@@ -334,7 +371,11 @@ export class ExportImageBatchDialogController implements Disposable {
     if (!targetHasSplitChannelViews(target)) {
       this.includeSplitRgbChannels = false;
     }
-    this.checkedCellKeys = buildDefaultExportBatchCheckedCells(target, this.includeSplitRgbChannels);
+    this.checkedCellKeys = buildDefaultExportBatchCheckedCells(
+      target,
+      this.includeSplitRgbChannels,
+      this.getSelectionRegions()
+    );
     this.renderMatrix();
     this.updateStatus();
   }
@@ -347,6 +388,10 @@ export class ExportImageBatchDialogController implements Disposable {
     this.elements.exportBatchCompressionInput.value = String(DEFAULT_PNG_COMPRESSION_LEVEL);
     this.elements.exportBatchWidthInput.value = '';
     this.elements.exportBatchHeightInput.value = '';
+    this.elements.exportBatchSizeFieldLabel.textContent = 'Size';
+    this.elements.exportBatchWidthFieldLabel.textContent = 'Width';
+    this.elements.exportBatchHeightFieldLabel.textContent = 'Height';
+    this.elements.exportBatchHeightInput.closest('.app-dialog-inline-field')?.classList.remove('hidden');
     this.elements.exportBatchReproductionMetadataCheckbox.checked = false;
     this.elements.exportBatchMatrix.replaceChildren();
     this.includeSplitRgbChannels = false;
@@ -357,10 +402,17 @@ export class ExportImageBatchDialogController implements Disposable {
   }
 
   private applyDialogMode(): void {
-    const screenshot = this.dialogMode === 'screenshot' && this.screenshotRegion !== null;
-    this.elements.exportBatchDialogTitle.textContent = screenshot ? 'Export Screenshot Batch' : 'Export Batch';
+    const screenshot = this.dialogMode === 'screenshot' && this.screenshotRegions.length > 0;
+    const multiRegion = screenshot && this.screenshotRegions.length > 1;
+    this.elements.exportBatchDialogTitle.textContent = multiRegion
+      ? 'Export Screenshot Regions Batch'
+      : screenshot
+        ? 'Export Screenshot Batch'
+        : 'Export Batch';
     this.elements.exportBatchDialogSubtitle.textContent = screenshot
-      ? 'Export selected file and channel screenshots as a ZIP of PNG images.'
+      ? multiRegion
+        ? 'Export selected file, channel, and screenshot region combinations as a ZIP of PNG images.'
+        : 'Export selected file and channel screenshots as a ZIP of PNG images.'
       : 'Export selected file and channel combinations as a ZIP of PNG images.';
     this.elements.exportBatchSizeField.classList.toggle('hidden', !screenshot);
     this.elements.exportBatchReproductionMetadataField.classList.toggle('hidden', !screenshot);
@@ -422,7 +474,11 @@ export class ExportImageBatchDialogController implements Disposable {
     this.updateSelectionActionState();
 
     if (!this.hasValidScreenshotOutputSize()) {
-      this.setStatus('Enter a positive width and height.');
+      this.setStatus(
+        this.dialogMode === 'screenshot' && this.screenshotRegions.length > 1
+          ? 'Enter a positive scale percentage.'
+          : 'Enter a positive width and height.'
+      );
       this.elements.exportBatchDialogSubmitButton.disabled = true;
       return;
     }
@@ -438,32 +494,73 @@ export class ExportImageBatchDialogController implements Disposable {
         this.target,
         this.checkedCellKeys,
         this.includeSplitRgbChannels,
-        this.getScreenshotRegionForRequest()
+        this.getScreenshotRegionsForRequest()
       ).length
       : 0;
   }
 
   private hasValidScreenshotOutputSize(): boolean {
-    return this.dialogMode !== 'screenshot' || this.getScreenshotRegionForRequest() !== null;
+    return this.dialogMode !== 'screenshot' || this.getScreenshotRegionsForRequest() !== null;
   }
 
-  private getScreenshotRegionForRequest(): ExportScreenshotRegion | null {
-    if (this.dialogMode !== 'screenshot' || !this.screenshotRegion) {
+  private getScreenshotRegionsForRequest(): ExportScreenshotRegionItem[] | null {
+    if (this.dialogMode !== 'screenshot' || this.screenshotRegions.length === 0) {
       return null;
     }
 
+    if (this.screenshotRegions.length > 1) {
+      const outputScale = parsePositiveScalePercent(this.elements.exportBatchWidthInput.value);
+      if (outputScale === null) {
+        return null;
+      }
+
+      return this.screenshotRegions.map((region) => ({
+        ...region,
+        rect: { ...region.rect },
+        sourceViewport: { ...region.sourceViewport },
+        outputWidth: Math.max(1, Math.round(region.rect.width * outputScale)),
+        outputHeight: Math.max(1, Math.round(region.rect.height * outputScale))
+      }));
+    }
+
+    const region = this.screenshotRegions[0]!;
     const outputWidth = parsePositiveInteger(this.elements.exportBatchWidthInput.value);
     const outputHeight = parsePositiveInteger(this.elements.exportBatchHeightInput.value);
     if (!outputWidth || !outputHeight) {
       return null;
     }
 
-    return {
-      rect: { ...this.screenshotRegion.rect },
-      sourceViewport: { ...this.screenshotRegion.sourceViewport },
+    return [{
+      ...region,
+      rect: { ...region.rect },
+      sourceViewport: { ...region.sourceViewport },
       outputWidth,
       outputHeight
-    };
+    }];
+  }
+
+  private isMultiRegionScreenshotMode(): boolean {
+    return this.dialogMode === 'screenshot' && this.screenshotRegions.length > 1;
+  }
+
+  private getSelectionRegions(): ExportScreenshotRegionItem[] {
+    return this.isMultiRegionScreenshotMode() ? this.screenshotRegions : [];
+  }
+
+  private getMatrixRegions(): ExportScreenshotRegionItem[] {
+    if (!this.isMultiRegionScreenshotMode()) {
+      return [];
+    }
+
+    return this.getScreenshotRegionsForRequest() ?? this.screenshotRegions;
+  }
+
+  private getSingleScreenshotRegionForRequest(): ExportScreenshotRegionItem | null {
+    if (this.dialogMode !== 'screenshot' || this.isMultiRegionScreenshotMode()) {
+      return null;
+    }
+
+    return this.getScreenshotRegionsForRequest()?.[0] ?? null;
   }
 
   private handleSplitToggle(): void {
@@ -476,7 +573,8 @@ export class ExportImageBatchDialogController implements Disposable {
       this.target,
       this.checkedCellKeys,
       this.includeSplitRgbChannels,
-      nextIncludeSplitRgbChannels
+      nextIncludeSplitRgbChannels,
+      this.getSelectionRegions()
     );
     this.includeSplitRgbChannels = nextIncludeSplitRgbChannels;
     this.abortPreviewWork({ clearCache: true });
@@ -489,7 +587,11 @@ export class ExportImageBatchDialogController implements Disposable {
       return;
     }
 
-    this.checkedCellKeys = buildVisibleExportBatchCellKeys(this.target, this.includeSplitRgbChannels);
+    this.checkedCellKeys = buildVisibleExportBatchCellKeys(
+      this.target,
+      this.includeSplitRgbChannels,
+      this.getSelectionRegions()
+    );
     this.renderMatrix();
     this.updateStatus();
   }
@@ -516,12 +618,15 @@ export class ExportImageBatchDialogController implements Disposable {
 
     const sessionId = input.dataset.sessionId ?? '';
     const columnKey = input.dataset.columnKey ?? '';
+    const regionId = input.dataset.regionId ?? '';
     if (input.dataset.batchToggle === 'row') {
       this.setRowChecked(sessionId, input.checked);
+    } else if (input.dataset.batchToggle === 'region-row') {
+      this.setRegionRowChecked(sessionId, regionId, input.checked);
     } else if (input.dataset.batchToggle === 'column') {
       this.setColumnChecked(columnKey, input.checked);
     } else if (input.dataset.batchToggle === 'cell') {
-      const key = serializeCellKey(sessionId, columnKey);
+      const key = serializeCellKey(sessionId, columnKey, regionId || null);
       if (input.checked) {
         this.checkedCellKeys.add(key);
       } else {
@@ -534,11 +639,29 @@ export class ExportImageBatchDialogController implements Disposable {
   }
 
   private handleScreenshotSizeInput(source: 'width' | 'height'): void {
-    if (this.disposed || this.syncingScreenshotSize || this.dialogMode !== 'screenshot' || !this.screenshotRegion) {
+    if (this.disposed || this.syncingScreenshotSize || this.dialogMode !== 'screenshot' || this.screenshotRegions.length === 0) {
       return;
     }
 
-    const aspectRatio = this.screenshotRegion.rect.width / Math.max(this.screenshotRegion.rect.height, Number.EPSILON);
+    if (this.screenshotRegions.length > 1) {
+      const outputScale = parsePositiveScalePercent(this.elements.exportBatchWidthInput.value);
+      if (outputScale === null) {
+        this.abortPreviewWork({ clearCache: true });
+        this.updateAllPreviewElements();
+        this.updateStatus();
+        return;
+      }
+
+      this.screenshotOutputScale = outputScale;
+      this.callbacks.onScreenshotOutputScaleChange?.(outputScale);
+      this.abortPreviewWork({ clearCache: true, cancelDebounce: false });
+      this.renderMatrix();
+      this.updateStatus();
+      return;
+    }
+
+    const region = this.screenshotRegions[0]!;
+    const aspectRatio = region.rect.width / Math.max(region.rect.height, Number.EPSILON);
     const sourceInput = source === 'width' ? this.elements.exportBatchWidthInput : this.elements.exportBatchHeightInput;
     const targetInput = source === 'width' ? this.elements.exportBatchHeightInput : this.elements.exportBatchWidthInput;
     const sourceValue = parsePositiveInteger(sourceInput.value);
@@ -580,8 +703,32 @@ export class ExportImageBatchDialogController implements Disposable {
       return;
     }
 
+    for (const region of expandSelectionRegions(this.getSelectionRegions())) {
+      for (const channel of getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels)) {
+        const key = serializeCellKey(file.sessionId, getColumnKeyForChannel(channel), region?.id ?? null);
+        if (checked) {
+          this.checkedCellKeys.add(key);
+        } else {
+          this.checkedCellKeys.delete(key);
+        }
+      }
+    }
+  }
+
+  private setRegionRowChecked(sessionId: string, regionId: string, checked: boolean): void {
+    const target = this.target;
+    if (!target || !regionId) {
+      return;
+    }
+
+    const file = target.files.find((item) => item.sessionId === sessionId);
+    const region = this.getSelectionRegions().find((item) => item.id === regionId) ?? null;
+    if (!file || !region) {
+      return;
+    }
+
     for (const channel of getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels)) {
-      const key = serializeCellKey(file.sessionId, getColumnKeyForChannel(channel));
+      const key = serializeCellKey(file.sessionId, getColumnKeyForChannel(channel), region.id);
       if (checked) {
         this.checkedCellKeys.add(key);
       } else {
@@ -601,11 +748,13 @@ export class ExportImageBatchDialogController implements Disposable {
         continue;
       }
 
-      const key = serializeCellKey(file.sessionId, columnKey);
-      if (checked) {
-        this.checkedCellKeys.add(key);
-      } else {
-        this.checkedCellKeys.delete(key);
+      for (const region of expandSelectionRegions(this.getSelectionRegions())) {
+        const key = serializeCellKey(file.sessionId, columnKey, region?.id ?? null);
+        if (checked) {
+          this.checkedCellKeys.add(key);
+        } else {
+          this.checkedCellKeys.delete(key);
+        }
       }
     }
   }
@@ -641,6 +790,7 @@ export class ExportImageBatchDialogController implements Disposable {
   private createMatrixHeader(columns: ExportBatchColumn[], target: ExportImageBatchTarget): HTMLTableSectionElement {
     const thead = document.createElement('thead');
     const row = document.createElement('tr');
+    const selectionRegions = this.getSelectionRegions();
 
     const fileHeading = document.createElement('th');
     fileHeading.className = 'export-batch-file-cell';
@@ -648,17 +798,32 @@ export class ExportImageBatchDialogController implements Disposable {
     fileHeading.textContent = 'File';
     row.append(fileHeading);
 
+    if (selectionRegions.length > 1) {
+      const regionHeading = document.createElement('th');
+      regionHeading.className = 'export-batch-region-cell';
+      regionHeading.scope = 'col';
+      regionHeading.textContent = 'Region';
+      row.append(regionHeading);
+    }
+
     for (const column of columns) {
       const th = document.createElement('th');
       th.className = 'export-batch-channel-cell';
       th.scope = 'col';
 
       const enabledCellCount = target.files.reduce((count, file) => {
-        return count + (findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key) ? 1 : 0);
+        const channel = findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key);
+        return count + (channel ? expandSelectionRegions(selectionRegions).length : 0);
       }, 0);
       const checkedCellCount = target.files.reduce((count, file) => {
         const channel = findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key);
-        return count + (channel && this.checkedCellKeys.has(serializeCellKey(file.sessionId, column.key)) ? 1 : 0);
+        if (!channel) {
+          return count;
+        }
+
+        return count + expandSelectionRegions(selectionRegions).reduce((innerCount, region) => (
+          innerCount + (this.checkedCellKeys.has(serializeCellKey(file.sessionId, column.key, region?.id ?? null)) ? 1 : 0)
+        ), 0);
       }, 0);
 
       const label = document.createElement('label');
@@ -688,27 +853,37 @@ export class ExportImageBatchDialogController implements Disposable {
 
   private createMatrixBody(columns: ExportBatchColumn[], target: ExportImageBatchTarget): HTMLTableSectionElement {
     const tbody = document.createElement('tbody');
+    const regions = this.getMatrixRegions();
+    const rowRegions: ExportBatchRegionSelection[] = regions.length > 1 ? regions : [null];
 
     for (const file of target.files) {
-      const row = document.createElement('tr');
-      row.append(this.createFileHeader(file, columns));
-
-      for (const column of columns) {
-        const td = document.createElement('td');
-        td.className = 'export-batch-channel-cell';
-        const channel = findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key);
-        if (channel) {
-          td.append(this.createCellToggle(file, column.key, channel));
-        } else {
-          const disabled = document.createElement('span');
-          disabled.className = 'export-batch-cell-disabled';
-          disabled.textContent = '-';
-          td.append(disabled);
+      for (const [regionIndex, region] of rowRegions.entries()) {
+        const row = document.createElement('tr');
+        if (regionIndex === 0) {
+          row.append(this.createFileHeader(file, columns, rowRegions));
         }
-        row.append(td);
-      }
 
-      tbody.append(row);
+        if (region) {
+          row.append(this.createRegionHeader(file, columns, region));
+        }
+
+        for (const column of columns) {
+          const td = document.createElement('td');
+          td.className = 'export-batch-channel-cell';
+          const channel = findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key);
+          if (channel) {
+            td.append(this.createCellToggle(file, column.key, channel, region));
+          } else {
+            const disabled = document.createElement('span');
+            disabled.className = 'export-batch-cell-disabled';
+            disabled.textContent = '-';
+            td.append(disabled);
+          }
+          row.append(td);
+        }
+
+        tbody.append(row);
+      }
     }
 
     return tbody;
@@ -716,15 +891,19 @@ export class ExportImageBatchDialogController implements Disposable {
 
   private createFileHeader(
     file: ExportImageBatchTarget['files'][number],
-    columns: ExportBatchColumn[]
+    columns: ExportBatchColumn[],
+    regions: ExportBatchRegionSelection[] = [null]
   ): HTMLTableCellElement {
     const th = document.createElement('th');
     th.className = 'export-batch-file-cell';
-    th.scope = 'row';
+    th.scope = regions.length > 1 ? 'rowgroup' : 'row';
+    if (regions.length > 1) {
+      th.rowSpan = regions.length;
+    }
 
-    const enabledKeys = columns
+    const enabledKeys = regions.flatMap((region) => columns
       .filter((column) => findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key))
-      .map((column) => serializeCellKey(file.sessionId, column.key));
+      .map((column) => serializeCellKey(file.sessionId, column.key, region?.id ?? null)));
     const checkedCount = enabledKeys.reduce((count, key) => count + (this.checkedCellKeys.has(key) ? 1 : 0), 0);
 
     const label = document.createElement('label');
@@ -743,34 +922,88 @@ export class ExportImageBatchDialogController implements Disposable {
     return th;
   }
 
+  private createRegionHeader(
+    file: ExportImageBatchTarget['files'][number],
+    columns: ExportBatchColumn[],
+    region: ExportScreenshotRegionItem
+  ): HTMLTableCellElement {
+    const th = document.createElement('th');
+    th.className = 'export-batch-region-cell';
+    th.scope = 'row';
+
+    const enabledKeys = columns
+      .filter((column) => findChannelForColumn(getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels), column.key))
+      .map((column) => serializeCellKey(file.sessionId, column.key, region.id));
+    const checkedCount = enabledKeys.reduce((count, key) => count + (this.checkedCellKeys.has(key) ? 1 : 0), 0);
+
+    const label = document.createElement('label');
+    label.className = 'export-batch-region-toggle';
+    label.title = `${formatRegionToken(region)} - ${formatOutputSize(region.outputWidth, region.outputHeight)}`;
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.dataset.batchToggle = 'region-row';
+    input.dataset.sessionId = file.sessionId;
+    input.dataset.regionId = region.id;
+    input.checked = enabledKeys.length > 0 && checkedCount === enabledKeys.length;
+    input.indeterminate = checkedCount > 0 && checkedCount < enabledKeys.length;
+    input.disabled = enabledKeys.length === 0;
+
+    const text = document.createElement('span');
+    text.className = 'export-batch-region-label';
+    text.textContent = formatRegionToken(region);
+
+    const size = document.createElement('span');
+    size.className = 'export-batch-region-size';
+    size.textContent = formatOutputSize(region.outputWidth, region.outputHeight);
+
+    label.append(input, text, size);
+    th.append(label);
+    return th;
+  }
+
   private createCellToggle(
     file: ExportImageBatchTarget['files'][number],
     columnKey: string,
-    channel: ExportImageBatchChannelTarget
+    channel: ExportImageBatchChannelTarget,
+    region: ExportBatchRegionSelection = null
   ): HTMLLabelElement {
     const label = document.createElement('label');
     label.className = 'export-batch-cell-toggle';
-    label.title = channel.label;
+    label.title = region ? `${formatRegionToken(region)} ${channel.label}` : channel.label;
 
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.dataset.batchToggle = 'cell';
     input.dataset.sessionId = file.sessionId;
     input.dataset.columnKey = columnKey;
-    input.checked = this.checkedCellKeys.has(serializeCellKey(file.sessionId, columnKey));
+    if (region) {
+      input.dataset.regionId = region.id;
+    }
+    input.checked = this.checkedCellKeys.has(serializeCellKey(file.sessionId, columnKey, region?.id ?? null));
 
-    label.append(input, this.createCellPreview(file, columnKey, channel));
+    label.append(input, this.createCellPreview(file, columnKey, channel, region));
     return label;
   }
 
   private createCellPreview(
     file: ExportImageBatchTarget['files'][number],
     columnKey: string,
-    _channel: ExportImageBatchChannelTarget
+    _channel: ExportImageBatchChannelTarget,
+    region: ExportBatchRegionSelection = null
   ): HTMLElement {
-    const previewKey = serializeCellKey(file.sessionId, columnKey);
+    const previewKey = this.createPreviewKey(file.sessionId, columnKey, region);
     const { dataUrl, isPending } = this.getPreviewPresentation(previewKey);
     return createBatchCellPreview(previewKey, dataUrl, isPending);
+  }
+
+  private createPreviewKey(
+    sessionId: string,
+    columnKey: string,
+    region: ExportBatchRegionSelection = null
+  ): string {
+    const cellKey = serializeCellKey(sessionId, columnKey, region?.id ?? null);
+    return region ? serializeBatchRegionPreviewKey(cellKey, region) : cellKey;
   }
 
   private queueVisiblePreviews(columns: ExportBatchColumn[], target: ExportImageBatchTarget): void {
@@ -779,15 +1012,26 @@ export class ExportImageBatchDialogController implements Disposable {
     }
 
     let queued = false;
+    const regions = this.getMatrixRegions();
+    const rowRegions: ExportBatchRegionSelection[] = regions.length > 1 ? regions : [null];
     for (const file of target.files) {
       const visibleChannels = getVisibleBatchChannels(file.channels, this.includeSplitRgbChannels);
-      for (const column of columns) {
-        const channel = findChannelForColumn(visibleChannels, column.key);
-        if (!channel) {
-          continue;
-        }
+      for (const region of rowRegions) {
+        for (const column of columns) {
+          const channel = findChannelForColumn(visibleChannels, column.key);
+          if (!channel) {
+            continue;
+          }
 
-        queued = this.queuePreviewJob(serializeCellKey(file.sessionId, column.key), file, channel) || queued;
+          const previewKey = this.createPreviewKey(file.sessionId, column.key, region);
+          queued = this.queuePreviewJob(
+            previewKey,
+            serializeCellKey(file.sessionId, column.key, region?.id ?? null),
+            file,
+            channel,
+            region ?? this.getSingleScreenshotRegionForRequest()
+          ) || queued;
+        }
       }
     }
 
@@ -798,8 +1042,10 @@ export class ExportImageBatchDialogController implements Disposable {
 
   private queuePreviewJob(
     previewKey: string,
+    cellKey: string,
     file: ExportImageBatchTarget['files'][number],
-    channel: ExportImageBatchChannelTarget
+    channel: ExportImageBatchChannelTarget,
+    screenshot: ExportScreenshotRegionItem | null
   ): boolean {
     if (
       this.disposed ||
@@ -815,8 +1061,10 @@ export class ExportImageBatchDialogController implements Disposable {
     this.previewResourcesByKey.set(previewKey, pendingResource(previewKey, requestId));
     this.previewJobsByKey.set(previewKey, {
       previewKey,
+      cellKey,
       file,
       channel,
+      screenshot,
       requestId,
       order: this.previewJobSequence
     });
@@ -944,8 +1192,7 @@ export class ExportImageBatchDialogController implements Disposable {
   }
 
   private createPreviewRequest(job: BatchPreviewJob): ExportImageBatchPreviewRequest | null {
-    const screenshot = this.getScreenshotRegionForRequest();
-    if (this.dialogMode === 'screenshot' && !screenshot) {
+    if (this.dialogMode === 'screenshot' && !job.screenshot) {
       return null;
     }
 
@@ -956,11 +1203,11 @@ export class ExportImageBatchDialogController implements Disposable {
       channelLabel: job.channel.label
     };
 
-    return screenshot
+    return job.screenshot
       ? {
         ...baseRequest,
         mode: 'screenshot',
-        ...screenshot
+        ...job.screenshot
       }
       : baseRequest;
   }
@@ -970,7 +1217,7 @@ export class ExportImageBatchDialogController implements Disposable {
     let selectedPriority = Number.POSITIVE_INFINITY;
 
     for (const job of this.previewJobsByKey.values()) {
-      const priority = this.getPreviewJobPriority(job.previewKey);
+      const priority = this.getPreviewJobPriority(job);
       if (
         !selectedJob ||
         priority < selectedPriority ||
@@ -988,12 +1235,12 @@ export class ExportImageBatchDialogController implements Disposable {
     return selectedJob;
   }
 
-  private getPreviewJobPriority(previewKey: string): number {
-    if (this.checkedCellKeys.has(previewKey)) {
+  private getPreviewJobPriority(job: BatchPreviewJob): number {
+    if (this.checkedCellKeys.has(job.cellKey)) {
       return 0;
     }
 
-    return this.isPreviewCellVisible(previewKey) ? 1 : 2;
+    return this.isPreviewCellVisible(job.previewKey) ? 1 : 2;
   }
 
   private isPreviewCellVisible(previewKey: string): boolean {
@@ -1002,7 +1249,7 @@ export class ExportImageBatchDialogController implements Disposable {
       return true;
     }
 
-    for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('.export-batch-cell-preview')) {
+    for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
       if (element.dataset.previewKey !== previewKey) {
         continue;
       }
@@ -1187,18 +1434,18 @@ export class ExportImageBatchDialogController implements Disposable {
 
   private updatePreviewElements(previewKey: string): void {
     const { dataUrl, isPending } = this.getPreviewPresentation(previewKey);
-    for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('.export-batch-cell-preview')) {
+    for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
       if (element.dataset.previewKey === previewKey) {
-        updateBatchCellPreview(element, dataUrl, isPending);
+        updateBatchPreviewElement(element, dataUrl, isPending);
       }
     }
   }
 
   private updateAllPreviewElements(): void {
-    for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('.export-batch-cell-preview')) {
+    for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
       const previewKey = element.dataset.previewKey ?? '';
       const { dataUrl, isPending } = this.getPreviewPresentation(previewKey);
-      updateBatchCellPreview(element, dataUrl, isPending);
+      updateBatchPreviewElement(element, dataUrl, isPending);
     }
   }
 
@@ -1225,7 +1472,7 @@ export class ExportImageBatchDialogController implements Disposable {
 
   private updateSelectionActionState(): void {
     const visibleCellKeys = this.target
-      ? buildVisibleExportBatchCellKeys(this.target, this.includeSplitRgbChannels)
+      ? buildVisibleExportBatchCellKeys(this.target, this.includeSplitRgbChannels, this.getSelectionRegions())
       : new Set<string>();
     const visibleCellCount = visibleCellKeys.size;
     let selectedVisibleCellCount = 0;
@@ -1266,9 +1513,9 @@ export class ExportImageBatchDialogController implements Disposable {
       return;
     }
 
-    const screenshot = this.getScreenshotRegionForRequest();
-    if (this.dialogMode === 'screenshot' && !screenshot) {
-      this.setError('Enter a positive width and height.');
+    const screenshots = this.getScreenshotRegionsForRequest();
+    if (this.dialogMode === 'screenshot' && !screenshots) {
+      this.setError(this.screenshotRegions.length > 1 ? 'Enter a positive scale percentage.' : 'Enter a positive width and height.');
       this.elements.exportBatchWidthInput.focus();
       return;
     }
@@ -1277,7 +1524,7 @@ export class ExportImageBatchDialogController implements Disposable {
       target,
       this.checkedCellKeys,
       this.includeSplitRgbChannels,
-      screenshot,
+      screenshots,
       this.getFilenameSource()
     );
     if (entries.length === 0) {
@@ -1463,7 +1710,8 @@ export function buildExportBatchColumns(
 
 export function buildDefaultExportBatchCheckedCells(
   target: ExportImageBatchTarget,
-  includeSplitRgbChannels = false
+  includeSplitRgbChannels = false,
+  screenshotRegions: readonly ExportScreenshotRegionItem[] = []
 ): Set<string> {
   const checked = new Set<string>();
   const file = target.files.find((item) => item.sessionId === target.activeSessionId) ?? target.files[0] ?? null;
@@ -1479,22 +1727,28 @@ export function buildDefaultExportBatchCheckedCells(
     return checked;
   }
 
-  checked.add(serializeCellKey(file.sessionId, getColumnKeyForChannel(channel)));
+  for (const region of expandSelectionRegions(screenshotRegions)) {
+    checked.add(serializeCellKey(file.sessionId, getColumnKeyForChannel(channel), region?.id ?? null));
+  }
   return checked;
 }
 
 export function buildVisibleExportBatchCellKeys(
   target: ExportImageBatchTarget,
-  includeSplitRgbChannels = false
+  includeSplitRgbChannels = false,
+  screenshotRegions: readonly ExportScreenshotRegionItem[] = []
 ): Set<string> {
   const checked = new Set<string>();
   const columns = buildExportBatchColumns(target.files, includeSplitRgbChannels);
+  const regions = expandSelectionRegions(screenshotRegions);
 
   for (const file of target.files) {
     const visibleChannels = getVisibleBatchChannels(file.channels, includeSplitRgbChannels);
-    for (const column of columns) {
-      if (findChannelForColumn(visibleChannels, column.key)) {
-        checked.add(serializeCellKey(file.sessionId, column.key));
+    for (const region of regions) {
+      for (const column of columns) {
+        if (findChannelForColumn(visibleChannels, column.key)) {
+          checked.add(serializeCellKey(file.sessionId, column.key, region?.id ?? null));
+        }
       }
     }
   }
@@ -1506,66 +1760,84 @@ export function buildExportBatchEntries(
   target: ExportImageBatchTarget,
   checkedCellKeys: ReadonlySet<string>,
   includeSplitRgbChannels = false,
-  screenshot: ExportScreenshotRegion | null = null,
+  screenshots: ExportScreenshotRegion | ExportScreenshotRegionItem[] | null = null,
   filenameSource: ExportBatchFilenameSource = 'openFilesName'
 ): ExportImageBatchEntryRequest[] {
   const columns = buildExportBatchColumns(target.files, includeSplitRgbChannels);
-  const entries: Array<{
-    file: ExportImageBatchTarget['files'][number];
-    sessionId: string;
-    activeLayer: number;
-    displaySelection: DisplaySelection;
-    channelLabel: string;
-  }> = [];
+  const usedFilenames = new Map<string, number>();
+  const screenshotRegions = Array.isArray(screenshots)
+    ? screenshots
+    : screenshots
+      ? [buildScreenshotRegionItem(screenshots, 0, 1)]
+      : [];
+  const regionSelections: ExportBatchRegionSelection[] = screenshotRegions.length > 0 ? screenshotRegions : [null];
+  const includeRegionInKey = screenshotRegions.length > 1;
+  const entries: ExportImageBatchEntryRequest[] = [];
 
   for (const file of target.files) {
     const visibleChannels = getVisibleBatchChannels(file.channels, includeSplitRgbChannels);
-    for (const column of columns) {
-      const key = serializeCellKey(file.sessionId, column.key);
-      if (!checkedCellKeys.has(key)) {
-        continue;
-      }
+    const filenameSourceValue = resolveExportBatchFilenameSource(file, filenameSource);
+    for (const region of regionSelections) {
+      for (const column of columns) {
+        const channel = findChannelForColumn(visibleChannels, column.key);
+        if (!channel) {
+          continue;
+        }
 
-      const channel = findChannelForColumn(visibleChannels, column.key);
-      if (!channel) {
-        continue;
-      }
+        const key = serializeCellKey(file.sessionId, column.key, includeRegionInKey ? region?.id ?? null : null);
+        if (!checkedCellKeys.has(key)) {
+          continue;
+        }
 
-      entries.push({
-        file,
-        sessionId: file.sessionId,
-        activeLayer: file.activeLayer,
-        displaySelection: channel.selection,
-        channelLabel: channel.label
-      });
+        const baseEntry = {
+          sessionId: file.sessionId,
+          activeLayer: file.activeLayer,
+          displaySelection: channel.selection,
+          channelLabel: channel.label
+        };
+
+        if (region) {
+          entries.push({
+            ...baseEntry,
+            mode: 'screenshot' as const,
+            rect: { ...region.rect },
+            sourceViewport: { ...region.sourceViewport },
+            outputWidth: region.outputWidth,
+            outputHeight: region.outputHeight,
+            ...(region.count > 1
+              ? {
+                screenshotRegionIndex: region.index,
+                screenshotRegionLabel: formatRegionToken(region),
+                screenshotRegionCount: region.count
+              }
+              : {}),
+            outputFilename: buildExportBatchScreenshotOutputFilename(
+              filenameSourceValue,
+              channel.label,
+              usedFilenames,
+              region.count > 1
+                ? {
+                  index: region.index,
+                  count: region.count
+                }
+                : null
+            )
+          });
+        } else {
+          entries.push({
+            ...baseEntry,
+            outputFilename: buildExportBatchOutputFilename(
+              filenameSourceValue,
+              channel.label,
+              usedFilenames
+            )
+          });
+        }
+      }
     }
   }
 
-  const usedFilenames = new Map<string, number>();
-  if (screenshot) {
-    return entries.map(({ file, ...entry }) => ({
-      ...entry,
-      mode: 'screenshot',
-      rect: { ...screenshot.rect },
-      sourceViewport: { ...screenshot.sourceViewport },
-      outputWidth: screenshot.outputWidth,
-      outputHeight: screenshot.outputHeight,
-      outputFilename: buildExportBatchScreenshotOutputFilename(
-        resolveExportBatchFilenameSource(file, filenameSource),
-        entry.channelLabel,
-        usedFilenames
-      )
-    }));
-  }
-
-  return entries.map(({ file, ...entry }) => ({
-    ...entry,
-    outputFilename: buildExportBatchOutputFilename(
-      resolveExportBatchFilenameSource(file, filenameSource),
-      entry.channelLabel,
-      usedFilenames
-    )
-  }));
+  return entries;
 }
 
 function resolveExportBatchFilenameSource(
@@ -1597,9 +1869,13 @@ export function buildExportBatchOutputFilename(
 export function buildExportBatchScreenshotOutputFilename(
   sourcePath: string,
   channelLabel: string,
-  usedFilenames: Map<string, number> = new Map()
+  usedFilenames: Map<string, number> = new Map(),
+  region: { index: number; count: number } | null = null
 ): string {
-  return buildExportBatchOutputFilenameWithSuffix(sourcePath, channelLabel, '-screenshot', usedFilenames);
+  const regionSuffix = region && region.count > 1
+    ? `.${formatRegionIndexToken(region.index)}`
+    : '';
+  return buildExportBatchOutputFilenameWithSuffix(sourcePath, channelLabel, `-screenshot${regionSuffix}`, usedFilenames);
 }
 
 function buildExportBatchOutputFilenameWithSuffix(
@@ -1653,13 +1929,32 @@ function cloneExportBatchTarget(target: ExportImageBatchTarget): ExportImageBatc
   };
 }
 
-function cloneScreenshotRegion(region: ExportScreenshotRegion): ExportScreenshotRegion {
+function buildScreenshotRegionItem(
+  region: ExportScreenshotRegion,
+  index: number,
+  count: number
+): ExportScreenshotRegionItem {
   return {
+    id: `screenshot-region-${index + 1}`,
+    label: `Region ${index + 1}`,
+    index,
+    count,
     rect: { ...region.rect },
     sourceViewport: { ...region.sourceViewport },
     outputWidth: region.outputWidth,
     outputHeight: region.outputHeight
   };
+}
+
+function cloneScreenshotRegions(regions: ExportScreenshotRegionItem[]): ExportScreenshotRegionItem[] {
+  const count = regions.length;
+  return regions.map((region, index) => ({
+    ...region,
+    index,
+    count,
+    rect: { ...region.rect },
+    sourceViewport: { ...region.sourceViewport }
+  }));
 }
 
 function parsePositiveInteger(value: string): number | null {
@@ -1669,6 +1964,15 @@ function parsePositiveInteger(value: string): number | null {
   }
 
   return parsed;
+}
+
+function parsePositiveScalePercent(value: string): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed / 100;
 }
 
 function createExportBatchEmptyState(message: string): HTMLElement {
@@ -1697,6 +2001,14 @@ function createBatchCellPreview(
   element.dataset.previewKey = previewKey;
   updateBatchCellPreview(element, dataUrl, isPending);
   return element;
+}
+
+function updateBatchPreviewElement(
+  element: HTMLElement,
+  dataUrl: string | null | undefined,
+  isPending: boolean
+): void {
+  updateBatchCellPreview(element, dataUrl, isPending);
 }
 
 function updateBatchCellPreview(
@@ -1737,23 +2049,27 @@ function remapExportBatchCheckedCells(
   target: ExportImageBatchTarget,
   checkedCellKeys: ReadonlySet<string>,
   fromIncludeSplitRgbChannels: boolean,
-  toIncludeSplitRgbChannels: boolean
+  toIncludeSplitRgbChannels: boolean,
+  screenshotRegions: readonly ExportScreenshotRegionItem[] = []
 ): Set<string> {
   const nextChecked = new Set<string>();
+  const regions = expandSelectionRegions(screenshotRegions);
 
   for (const file of target.files) {
     const fromChannels = getVisibleBatchChannels(file.channels, fromIncludeSplitRgbChannels);
     const toChannels = getVisibleBatchChannels(file.channels, toIncludeSplitRgbChannels);
 
-    for (const channel of fromChannels) {
-      const currentKey = serializeCellKey(file.sessionId, getColumnKeyForChannel(channel));
-      if (!checkedCellKeys.has(currentKey)) {
-        continue;
-      }
+    for (const region of regions) {
+      for (const channel of fromChannels) {
+        const currentKey = serializeCellKey(file.sessionId, getColumnKeyForChannel(channel), region?.id ?? null);
+        if (!checkedCellKeys.has(currentKey)) {
+          continue;
+        }
 
-      const nextChannel = findCorrespondingChannelForSelection(toChannels, channel.selection);
-      if (nextChannel) {
-        nextChecked.add(serializeCellKey(file.sessionId, getColumnKeyForChannel(nextChannel)));
+        const nextChannel = findCorrespondingChannelForSelection(toChannels, channel.selection);
+        if (nextChannel) {
+          nextChecked.add(serializeCellKey(file.sessionId, getColumnKeyForChannel(nextChannel), region?.id ?? null));
+        }
       }
     }
   }
@@ -1839,8 +2155,38 @@ function findChannelForColumn(
   return channels.find((channel) => getColumnKeyForChannel(channel) === columnKey) ?? null;
 }
 
-function serializeCellKey(sessionId: string, columnKey: string): string {
-  return `${sessionId}${CELL_KEY_SEPARATOR}${columnKey}`;
+function serializeCellKey(sessionId: string, columnKey: string, regionId: string | null = null): string {
+  return regionId
+    ? `${sessionId}${CELL_KEY_SEPARATOR}${regionId}${CELL_KEY_SEPARATOR}${columnKey}`
+    : `${sessionId}${CELL_KEY_SEPARATOR}${columnKey}`;
+}
+
+function serializeBatchRegionPreviewKey(cellKey: string, region: ExportScreenshotRegionItem): string {
+  return JSON.stringify({
+    cellKey,
+    regionId: region.id,
+    regionIndex: region.index,
+    outputWidth: region.outputWidth,
+    outputHeight: region.outputHeight
+  });
+}
+
+function formatOutputSize(width: number, height: number): string {
+  return `${width} x ${height} px`;
+}
+
+function formatRegionToken(region: Pick<ExportScreenshotRegionItem, 'index'>): string {
+  return formatRegionIndexToken(region.index);
+}
+
+function formatRegionIndexToken(index: number): string {
+  return `R${index + 1}`;
+}
+
+function expandSelectionRegions(
+  regions: readonly ExportScreenshotRegionItem[]
+): ExportBatchRegionSelection[] {
+  return regions.length > 1 ? [...regions] : [null];
 }
 
 function normalizeArchivePath(path: string): string {

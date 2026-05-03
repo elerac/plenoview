@@ -440,11 +440,11 @@
         >
           <div class="app-dialog-header">
             <h2 id="export-dialog-title" class="app-dialog-title">Export Image</h2>
-            <p class="app-dialog-subtitle">Export the current display as a PNG.</p>
+            <p id="export-dialog-subtitle" class="app-dialog-subtitle">Export the current display as a PNG.</p>
           </div>
           <div class="app-dialog-body">
             <label class="app-dialog-field" for="export-filename-input">
-              <span class="app-dialog-field-label">Filename</span>
+              <span id="export-filename-field-label" class="app-dialog-field-label">Filename</span>
               <input id="export-filename-input" type="text" autocomplete="off" spellcheck="false" />
             </label>
             <label class="app-dialog-field" for="export-format-select">
@@ -458,14 +458,14 @@
               <input id="export-compression-input" type="number" min="0" max="9" step="1" inputmode="numeric" value="9" />
             </label>
             <div id="export-size-field" class="app-dialog-field hidden">
-              <span class="app-dialog-field-label">Size</span>
+              <span id="export-size-field-label" class="app-dialog-field-label">Size</span>
               <div class="app-dialog-field-row">
                 <label class="app-dialog-inline-field" for="export-width-input">
-                  <span>Width</span>
+                  <span id="export-width-field-label">Width</span>
                   <input id="export-width-input" type="number" min="1" step="1" inputmode="numeric" />
                 </label>
                 <label class="app-dialog-inline-field" for="export-height-input">
-                  <span>Height</span>
+                  <span id="export-height-field-label">Height</span>
                   <input id="export-height-input" type="number" min="1" step="1" inputmode="numeric" />
                 </label>
               </div>
@@ -538,14 +538,14 @@
               <input id="export-batch-compression-input" type="number" min="0" max="9" step="1" inputmode="numeric" value="9" />
             </label>
             <div id="export-batch-size-field" class="app-dialog-field hidden">
-              <span class="app-dialog-field-label">Size</span>
+              <span id="export-batch-size-field-label" class="app-dialog-field-label">Size</span>
               <div class="app-dialog-field-row">
                 <label class="app-dialog-inline-field" for="export-batch-width-input">
-                  <span>Width</span>
+                  <span id="export-batch-width-field-label">Width</span>
                   <input id="export-batch-width-input" type="number" min="1" step="1" inputmode="numeric" />
                 </label>
                 <label class="app-dialog-inline-field" for="export-batch-height-input">
-                  <span>Height</span>
+                  <span id="export-batch-height-field-label">Height</span>
                   <input id="export-batch-height-input" type="number" min="1" step="1" inputmode="numeric" />
                 </label>
               </div>
@@ -933,9 +933,14 @@
             <div id="screenshot-selection-mask-right" class="screenshot-selection-mask"></div>
             <div id="screenshot-selection-mask-bottom" class="screenshot-selection-mask"></div>
             <div id="screenshot-selection-mask-left" class="screenshot-selection-mask"></div>
+            <svg id="screenshot-selection-mask-svg" class="screenshot-selection-mask-svg" aria-hidden="true" focusable="false">
+              <path id="screenshot-selection-mask-path" class="screenshot-selection-mask-path" fill-rule="evenodd"></path>
+            </svg>
             <div id="screenshot-selection-guide-vertical" class="screenshot-selection-guide screenshot-selection-guide--vertical hidden"></div>
             <div id="screenshot-selection-guide-horizontal" class="screenshot-selection-guide screenshot-selection-guide--horizontal hidden"></div>
+            <div id="screenshot-selection-regions" class="screenshot-selection-regions"></div>
             <div id="screenshot-selection-box" class="screenshot-selection-box">
+              <span class="screenshot-selection-region-badge"></span>
               <span class="screenshot-selection-handle screenshot-selection-handle--nw"></span>
               <span class="screenshot-selection-handle screenshot-selection-handle--n"></span>
               <span class="screenshot-selection-handle screenshot-selection-handle--ne"></span>
@@ -947,7 +952,9 @@
             </div>
             <div id="screenshot-selection-size" class="screenshot-selection-size hidden"></div>
             <div id="screenshot-selection-controls" class="screenshot-selection-controls">
+              <button id="screenshot-selection-add-button" type="button">Add</button>
               <button id="screenshot-selection-fit-button" type="button">Fit</button>
+              <button id="screenshot-selection-delete-button" type="button">Delete</button>
               <button id="screenshot-selection-cancel-button" type="button">Cancel</button>
               <button id="screenshot-selection-export-button" type="button">Export...</button>
               <button id="screenshot-selection-export-batch-button" type="button">Export Batch...</button>

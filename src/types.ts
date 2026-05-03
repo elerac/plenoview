@@ -254,6 +254,13 @@ export interface ExportScreenshotRegion {
   outputHeight: number;
 }
 
+export interface ExportScreenshotRegionItem extends ExportScreenshotRegion {
+  id: string;
+  label: string;
+  index: number;
+  count: number;
+}
+
 export interface ExportFullImageRequest extends PngExportOptions {
   filename: string;
   format: ExportImageFormat;
@@ -270,6 +277,17 @@ export interface ExportScreenshotRequest
 }
 
 export type ExportImageRequest = ExportFullImageRequest | ExportScreenshotRequest;
+
+export interface ExportScreenshotRegionsRequest
+  extends PngExportOptions,
+    ScreenshotReproductionMetadataExportOptions {
+  archiveFilename: string;
+  baseFilename: string;
+  format: 'png-zip';
+  mode: 'screenshot-regions';
+  outputScale: number;
+  regions: ExportScreenshotRegionItem[];
+}
 
 export type ExportImagePreviewRequest =
   | { mode?: 'image' }
@@ -291,6 +309,9 @@ export type ExportImageBatchPreviewRequest =
 
 export type ExportImageBatchEntryRequest = ExportImageBatchPreviewRequest & {
   outputFilename: string;
+  screenshotRegionIndex?: number;
+  screenshotRegionLabel?: string;
+  screenshotRegionCount?: number;
 };
 
 export interface ExportImageBatchRequest {
@@ -336,7 +357,14 @@ export type ExportImageTarget =
       filename: string;
       kind: 'screenshot';
     } & Pick<ExportScreenshotRegion, 'rect' | 'sourceViewport'> &
-      Partial<Pick<ExportScreenshotRegion, 'outputWidth' | 'outputHeight'>>);
+      Partial<Pick<ExportScreenshotRegion, 'outputWidth' | 'outputHeight'>>)
+  | {
+      filename: string;
+      baseFilename: string;
+      kind: 'screenshot-regions';
+      regions: ExportScreenshotRegionItem[];
+      outputScale?: number;
+    };
 
 export interface ExportImageBatchChannelTarget {
   value: string;

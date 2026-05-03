@@ -53,10 +53,16 @@ export interface Elements {
   folderInput: HTMLInputElement;
   exportDialogBackdrop: HTMLDivElement;
   exportDialogForm: HTMLFormElement;
+  exportDialogTitle: HTMLElement;
+  exportDialogSubtitle: HTMLElement;
+  exportFilenameFieldLabel: HTMLElement;
   exportFilenameInput: HTMLInputElement;
   exportFormatSelect: HTMLSelectElement;
   exportCompressionInput: HTMLInputElement;
   exportSizeField: HTMLDivElement;
+  exportSizeFieldLabel: HTMLElement;
+  exportWidthFieldLabel: HTMLElement;
+  exportHeightFieldLabel: HTMLElement;
   exportWidthInput: HTMLInputElement;
   exportHeightInput: HTMLInputElement;
   exportReproductionMetadataField: HTMLElement;
@@ -78,6 +84,9 @@ export interface Elements {
   exportBatchUseOpenFilesNamesCheckbox: HTMLInputElement;
   exportBatchCompressionInput: HTMLInputElement;
   exportBatchSizeField: HTMLDivElement;
+  exportBatchSizeFieldLabel: HTMLElement;
+  exportBatchWidthFieldLabel: HTMLElement;
+  exportBatchHeightFieldLabel: HTMLElement;
   exportBatchWidthInput: HTMLInputElement;
   exportBatchHeightInput: HTMLInputElement;
   exportBatchReproductionMetadataField: HTMLElement;
@@ -206,12 +215,17 @@ export interface Elements {
   screenshotSelectionMaskRight: HTMLDivElement;
   screenshotSelectionMaskBottom: HTMLDivElement;
   screenshotSelectionMaskLeft: HTMLDivElement;
+  screenshotSelectionMaskSvg: SVGSVGElement;
+  screenshotSelectionMaskPath: SVGElement;
   screenshotSelectionGuideVertical: HTMLDivElement;
   screenshotSelectionGuideHorizontal: HTMLDivElement;
+  screenshotSelectionRegions: HTMLDivElement;
   screenshotSelectionBox: HTMLDivElement;
   screenshotSelectionSize: HTMLDivElement;
   screenshotSelectionControls: HTMLDivElement;
+  screenshotSelectionAddButton: HTMLButtonElement;
   screenshotSelectionFitButton: HTMLButtonElement;
+  screenshotSelectionDeleteButton: HTMLButtonElement;
   screenshotSelectionCancelButton: HTMLButtonElement;
   screenshotSelectionExportButton: HTMLButtonElement;
   screenshotSelectionExportBatchButton: HTMLButtonElement;
@@ -313,14 +327,21 @@ export type ExportImageDialogElements = Pick<
   | 'fileMenuButton'
   | 'exportDialogBackdrop'
   | 'exportDialogForm'
+  | 'exportDialogTitle'
+  | 'exportDialogSubtitle'
+  | 'exportFilenameFieldLabel'
   | 'exportFilenameInput'
   | 'exportFormatSelect'
   | 'exportCompressionInput'
   | 'exportSizeField'
+  | 'exportSizeFieldLabel'
+  | 'exportWidthFieldLabel'
+  | 'exportHeightFieldLabel'
   | 'exportWidthInput'
   | 'exportHeightInput'
   | 'exportReproductionMetadataField'
   | 'exportReproductionMetadataCheckbox'
+  | 'exportPreviewStage'
   | 'exportPreviewCanvas'
   | 'exportPreviewStatus'
   | 'exportProgress'
@@ -343,6 +364,9 @@ export type ExportImageBatchDialogElements = Pick<
   | 'exportBatchUseOpenFilesNamesCheckbox'
   | 'exportBatchCompressionInput'
   | 'exportBatchSizeField'
+  | 'exportBatchSizeFieldLabel'
+  | 'exportBatchWidthFieldLabel'
+  | 'exportBatchHeightFieldLabel'
   | 'exportBatchWidthInput'
   | 'exportBatchHeightInput'
   | 'exportBatchReproductionMetadataField'
@@ -534,10 +558,16 @@ export function resolveElements(): Elements {
     folderInput: requireElement('folder-input', HTMLInputElement),
     exportDialogBackdrop: requireElement('export-dialog-backdrop', HTMLDivElement),
     exportDialogForm: requireElement('export-dialog-form', HTMLFormElement),
+    exportDialogTitle: requireElement('export-dialog-title', HTMLElement),
+    exportDialogSubtitle: requireElement('export-dialog-subtitle', HTMLElement),
+    exportFilenameFieldLabel: requireElement('export-filename-field-label', HTMLElement),
     exportFilenameInput: requireElement('export-filename-input', HTMLInputElement),
     exportFormatSelect: requireElement('export-format-select', HTMLSelectElement),
     exportCompressionInput: requireElement('export-compression-input', HTMLInputElement),
     exportSizeField: requireElement('export-size-field', HTMLDivElement),
+    exportSizeFieldLabel: requireElement('export-size-field-label', HTMLElement),
+    exportWidthFieldLabel: requireElement('export-width-field-label', HTMLElement),
+    exportHeightFieldLabel: requireElement('export-height-field-label', HTMLElement),
     exportWidthInput: requireElement('export-width-input', HTMLInputElement),
     exportHeightInput: requireElement('export-height-input', HTMLInputElement),
     exportReproductionMetadataField: requireElement('export-reproduction-metadata-field', HTMLElement),
@@ -562,6 +592,9 @@ export function resolveElements(): Elements {
     ),
     exportBatchCompressionInput: requireElement('export-batch-compression-input', HTMLInputElement),
     exportBatchSizeField: requireElement('export-batch-size-field', HTMLDivElement),
+    exportBatchSizeFieldLabel: requireElement('export-batch-size-field-label', HTMLElement),
+    exportBatchWidthFieldLabel: requireElement('export-batch-width-field-label', HTMLElement),
+    exportBatchHeightFieldLabel: requireElement('export-batch-height-field-label', HTMLElement),
     exportBatchWidthInput: requireElement('export-batch-width-input', HTMLInputElement),
     exportBatchHeightInput: requireElement('export-batch-height-input', HTMLInputElement),
     exportBatchReproductionMetadataField: requireElement('export-batch-reproduction-metadata-field', HTMLElement),
@@ -693,12 +726,17 @@ export function resolveElements(): Elements {
     screenshotSelectionMaskRight: requireElement('screenshot-selection-mask-right', HTMLDivElement),
     screenshotSelectionMaskBottom: requireElement('screenshot-selection-mask-bottom', HTMLDivElement),
     screenshotSelectionMaskLeft: requireElement('screenshot-selection-mask-left', HTMLDivElement),
+    screenshotSelectionMaskSvg: requireElement('screenshot-selection-mask-svg', SVGSVGElement),
+    screenshotSelectionMaskPath: requireElement('screenshot-selection-mask-path', SVGElement),
     screenshotSelectionGuideVertical: requireElement('screenshot-selection-guide-vertical', HTMLDivElement),
     screenshotSelectionGuideHorizontal: requireElement('screenshot-selection-guide-horizontal', HTMLDivElement),
+    screenshotSelectionRegions: requireElement('screenshot-selection-regions', HTMLDivElement),
     screenshotSelectionBox: requireElement('screenshot-selection-box', HTMLDivElement),
     screenshotSelectionSize: requireElement('screenshot-selection-size', HTMLDivElement),
     screenshotSelectionControls: requireElement('screenshot-selection-controls', HTMLDivElement),
+    screenshotSelectionAddButton: requireElement('screenshot-selection-add-button', HTMLButtonElement),
     screenshotSelectionFitButton: requireElement('screenshot-selection-fit-button', HTMLButtonElement),
+    screenshotSelectionDeleteButton: requireElement('screenshot-selection-delete-button', HTMLButtonElement),
     screenshotSelectionCancelButton: requireElement('screenshot-selection-cancel-button', HTMLButtonElement),
     screenshotSelectionExportButton: requireElement('screenshot-selection-export-button', HTMLButtonElement),
     screenshotSelectionExportBatchButton: requireElement('screenshot-selection-export-batch-button', HTMLButtonElement)

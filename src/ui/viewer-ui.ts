@@ -53,7 +53,8 @@ import type {
   ExportImageRequest,
   ExportImageTarget,
   ExportProgressUpdate,
-  ExportScreenshotRegion,
+  ExportScreenshotRegionItem,
+  ExportScreenshotRegionsRequest,
   ImageRoi,
   OpenedImageDropPlacement,
   PixelSample,
@@ -114,11 +115,27 @@ const AUTO_FIT_IMAGE_ON_SELECT_STORAGE_KEY = 'openexr-viewer:auto-fit-image-on-s
 const AUTO_EXPOSURE_STORAGE_KEY = 'openexr-viewer:auto-exposure:v1';
 const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'openexr-viewer:auto-exposure-percentile:v1';
 const RULERS_VISIBLE_STORAGE_KEY = 'openexr-viewer:rulers-visible:v1';
+const SCREENSHOT_SELECTION_DUPLICATE_OFFSET = 24;
+
+interface ScreenshotSelectionRegion {
+  id: string;
+  rect: ViewportRect;
+}
+
+interface ScreenshotSelectionState {
+  regions: ScreenshotSelectionRegion[];
+  activeRegionId: string;
+  hoverHandle: ScreenshotSelectionHandle | null;
+}
 
 export interface UiCallbacks {
   onOpenFileClick: () => void;
   onOpenFolderClick: () => void;
   onExportImage: (request: ExportImageRequest, onProgress?: (update: ExportProgressUpdate) => void) => Promise<void>;
+  onExportScreenshotRegions: (
+    request: ExportScreenshotRegionsRequest,
+    onProgress?: (update: ExportProgressUpdate) => void
+  ) => Promise<void>;
   onResolveExportImagePreview: (
     request: ExportImagePreviewRequest,
     signal: AbortSignal
@@ -224,9 +241,11 @@ export class ViewerUi implements Disposable {
   private openedImageCount = 0;
   private activeSessionId: string | null = null;
   private exportTarget: ExportImageTarget | null = null;
-  private screenshotSelection: { rect: ViewportRect; hoverHandle: ScreenshotSelectionHandle | null } | null = null;
-  private lastScreenshotSelectionRect: ViewportRect | null = null;
+  private screenshotSelection: ScreenshotSelectionState | null = null;
+  private lastScreenshotSelectionRegions: ScreenshotSelectionRegion[] | null = null;
   private lastScreenshotOutputSize: { width: number; height: number } | null = null;
+  private lastScreenshotOutputScale = 1;
+  private nextScreenshotSelectionRegionId = 1;
   private screenshotSelectionResizeActive = false;
   private screenshotSelectionSquareSnapped = false;
   private screenshotSelectionSnapGuide: ScreenshotSelectionSnapGuide = createEmptySnapGuide();
@@ -414,13 +433,21 @@ export class ViewerUi implements Disposable {
           this.hideScreenshotSelection();
         }
       },
+      onExportScreenshotRegions: async (request, onProgress) => {
+        this.lastScreenshotOutputScale = request.outputScale;
+        await this.callbacks.onExportScreenshotRegions(request, onProgress);
+        this.hideScreenshotSelection();
+      },
       onCancel: (target) => {
-        if (target?.kind === 'screenshot') {
+        if (target?.kind === 'screenshot' || target?.kind === 'screenshot-regions') {
           this.hideScreenshotSelection();
         }
       },
       onScreenshotOutputSizeChange: (size) => {
         this.lastScreenshotOutputSize = { ...size };
+      },
+      onScreenshotOutputScaleChange: (scale) => {
+        this.lastScreenshotOutputScale = scale;
       },
       onResolveExportImagePreview: (request, signal) => {
         return this.callbacks.onResolveExportImagePreview(request, signal);
@@ -443,6 +470,9 @@ export class ViewerUi implements Disposable {
       },
       onScreenshotOutputSizeChange: (size) => {
         this.lastScreenshotOutputSize = { ...size };
+      },
+      onScreenshotOutputScaleChange: (scale) => {
+        this.lastScreenshotOutputScale = scale;
       }
     });
     this.exportColormapDialog = new ExportColormapDialogController(this.elements, {
@@ -926,10 +956,24 @@ export class ViewerUi implements Disposable {
     this.updateFileMenuItemsDisabled();
   }
 
-  getScreenshotSelectionInteractionState(): { active: boolean; rect: ViewportRect | null } {
+  getScreenshotSelectionInteractionState(): {
+    active: boolean;
+    rect: ViewportRect | null;
+    activeRegionId: string | null;
+    regions: ScreenshotSelectionRegion[];
+  } {
+    const selection = this.screenshotSelection;
+    const activeRegion = this.getActiveScreenshotRegion();
     return {
-      active: this.screenshotSelection !== null,
-      rect: this.screenshotSelection ? { ...this.screenshotSelection.rect } : null
+      active: selection !== null,
+      rect: activeRegion ? { ...activeRegion.rect } : null,
+      activeRegionId: selection?.activeRegionId ?? null,
+      regions: selection
+        ? selection.regions.map((region) => ({
+          id: region.id,
+          rect: { ...region.rect }
+        }))
+        : []
     };
   }
 
@@ -945,14 +989,21 @@ export class ViewerUi implements Disposable {
     }
 
     const viewport = this.readViewerViewport();
-    const previousRect = this.screenshotSelection.rect;
+    const activeRegion = this.getActiveScreenshotRegion();
+    if (!activeRegion) {
+      return;
+    }
+
+    const previousRect = activeRegion.rect;
     const nextRect = clampScreenshotSelectionRect(rect, viewport);
     if (!sameViewportRectSize(previousRect, nextRect)) {
       this.lastScreenshotOutputSize = null;
     }
     this.screenshotSelection = {
       ...this.screenshotSelection,
-      rect: nextRect
+      regions: this.screenshotSelection.regions.map((region) => region.id === activeRegion.id
+        ? { ...region, rect: nextRect }
+        : region)
     };
     if (options.squareSnapped !== undefined) {
       this.screenshotSelectionSquareSnapped = options.squareSnapped;
@@ -960,7 +1011,25 @@ export class ViewerUi implements Disposable {
     this.screenshotSelectionSnapGuide = options.snapGuide
       ? { ...options.snapGuide }
       : createEmptySnapGuide();
-    this.lastScreenshotSelectionRect = { ...nextRect };
+    this.rememberScreenshotSelectionRegions();
+    this.renderScreenshotSelectionOverlay();
+  }
+
+  setScreenshotSelectionActiveRegion(regionId: string): void {
+    if (this.disposed || !this.screenshotSelection || this.screenshotSelection.activeRegionId === regionId) {
+      return;
+    }
+
+    if (!this.screenshotSelection.regions.some((region) => region.id === regionId)) {
+      return;
+    }
+
+    this.screenshotSelection = {
+      ...this.screenshotSelection,
+      activeRegionId: regionId
+    };
+    this.screenshotSelectionSquareSnapped = false;
+    this.screenshotSelectionSnapGuide = createEmptySnapGuide();
     this.renderScreenshotSelectionOverlay();
   }
 
@@ -1026,8 +1095,9 @@ export class ViewerUi implements Disposable {
   }
 
   private clearScreenshotSelectionMemory(): void {
-    this.lastScreenshotSelectionRect = null;
+    this.lastScreenshotSelectionRegions = null;
     this.lastScreenshotOutputSize = null;
+    this.lastScreenshotOutputScale = 1;
   }
 
   private hideScreenshotSelection(): void {
@@ -1042,6 +1112,8 @@ export class ViewerUi implements Disposable {
     this.screenshotSelectionSnapGuide = createEmptySnapGuide();
     this.elements.screenshotSelectionOverlay.classList.add('hidden');
     this.elements.screenshotSelectionSize.classList.add('hidden');
+    this.elements.screenshotSelectionRegions.replaceChildren();
+    this.elements.screenshotSelectionMaskPath.setAttribute('d', '');
     this.renderScreenshotSelectionSquareSnapFeedback();
     this.renderScreenshotSelectionSnapGuide(this.readViewerViewport());
     this.elements.viewerContainer.classList.remove(
@@ -1262,21 +1334,31 @@ export class ViewerUi implements Disposable {
     }
 
     const viewport = this.readViewerViewport();
-    const previousRect = this.lastScreenshotSelectionRect;
-    const rect = this.lastScreenshotSelectionRect
-      ? clampScreenshotSelectionRect(this.lastScreenshotSelectionRect, viewport)
-      : createDefaultScreenshotSelectionRect(viewport);
-    if (previousRect && !sameViewportRectSize(previousRect, rect)) {
+    const previousRegions = this.lastScreenshotSelectionRegions;
+    const regions = previousRegions?.length
+      ? previousRegions.map((region) => ({
+        id: this.allocateScreenshotSelectionRegionId(),
+        rect: clampScreenshotSelectionRect(region.rect, viewport)
+      }))
+      : [{
+        id: this.allocateScreenshotSelectionRegionId(),
+        rect: createDefaultScreenshotSelectionRect(viewport)
+      }];
+    if (previousRegions && previousRegions.some((region, index) => {
+      const nextRegion = regions[index];
+      return nextRegion ? !sameViewportRectSize(region.rect, nextRegion.rect) : false;
+    })) {
       this.lastScreenshotOutputSize = null;
     }
     this.screenshotSelection = {
-      rect,
+      regions,
+      activeRegionId: regions[regions.length - 1]?.id ?? regions[0]!.id,
       hoverHandle: null
     };
     this.screenshotSelectionResizeActive = false;
     this.screenshotSelectionSquareSnapped = false;
     this.screenshotSelectionSnapGuide = createEmptySnapGuide();
-    this.lastScreenshotSelectionRect = { ...rect };
+    this.rememberScreenshotSelectionRegions();
     this.exportImageDialog.close(false);
     this.exportImageBatchDialog.close(false);
     this.exportColormapDialog.close(false);
@@ -1292,17 +1374,30 @@ export class ViewerUi implements Disposable {
       return;
     }
 
-    const region = this.resolveScreenshotExportRegion();
-    if (!region) {
+    const regions = this.resolveScreenshotExportRegions();
+    if (regions.length === 0) {
       return;
     }
+    const baseFilename = this.exportTarget?.filename ?? 'image.png';
+    if (regions.length === 1) {
+      const region = regions[0]!;
+      this.exportImageDialog.openDialog({
+        filename: buildScreenshotExportFilename(baseFilename),
+        kind: 'screenshot',
+        rect: region.rect,
+        sourceViewport: region.sourceViewport,
+        outputWidth: region.outputWidth,
+        outputHeight: region.outputHeight
+      });
+      return;
+    }
+
     this.exportImageDialog.openDialog({
-      filename: buildScreenshotExportFilename(this.exportTarget?.filename ?? 'image.png'),
-      kind: 'screenshot',
-      rect: region.rect,
-      sourceViewport: region.sourceViewport,
-      outputWidth: region.outputWidth,
-      outputHeight: region.outputHeight
+      filename: buildScreenshotRegionsArchiveFilename(baseFilename),
+      baseFilename,
+      kind: 'screenshot-regions',
+      regions,
+      outputScale: this.lastScreenshotOutputScale
     });
   }
 
@@ -1323,6 +1418,66 @@ export class ViewerUi implements Disposable {
     });
   }
 
+  private addScreenshotSelectionRegion(): void {
+    if (this.disposed || !this.screenshotSelection) {
+      return;
+    }
+
+    const activeRegion = this.getActiveScreenshotRegion();
+    if (!activeRegion) {
+      return;
+    }
+
+    const viewport = this.readViewerViewport();
+    const rect = createOffsetScreenshotSelectionRect(activeRegion.rect, viewport);
+    const region = {
+      id: this.allocateScreenshotSelectionRegionId(),
+      rect
+    };
+    this.screenshotSelection = {
+      ...this.screenshotSelection,
+      regions: [...this.screenshotSelection.regions, region],
+      activeRegionId: region.id,
+      hoverHandle: null
+    };
+    this.lastScreenshotOutputSize = null;
+    this.rememberScreenshotSelectionRegions();
+    this.renderScreenshotSelectionOverlay();
+  }
+
+  private deleteActiveScreenshotSelectionRegion(options: { cancelWhenLast?: boolean } = { cancelWhenLast: true }): void {
+    if (this.disposed || !this.screenshotSelection) {
+      return;
+    }
+
+    const activeRegionId = this.screenshotSelection.activeRegionId;
+    const activeIndex = this.screenshotSelection.regions.findIndex((region) => region.id === activeRegionId);
+    if (activeIndex < 0) {
+      return;
+    }
+
+    if (this.screenshotSelection.regions.length <= 1) {
+      if (options.cancelWhenLast !== false) {
+        this.hideScreenshotSelection();
+      }
+      return;
+    }
+
+    const regions = this.screenshotSelection.regions.filter((region) => region.id !== activeRegionId);
+    const nextActiveRegion = regions[Math.min(activeIndex, regions.length - 1)] ?? regions[0]!;
+    this.screenshotSelection = {
+      ...this.screenshotSelection,
+      regions,
+      activeRegionId: nextActiveRegion.id,
+      hoverHandle: null
+    };
+    this.lastScreenshotOutputSize = null;
+    this.screenshotSelectionSquareSnapped = false;
+    this.screenshotSelectionSnapGuide = createEmptySnapGuide();
+    this.rememberScreenshotSelectionRegions();
+    this.renderScreenshotSelectionOverlay();
+  }
+
   private openExportImageDialog(): void {
     if (this.elements.exportImageButton.disabled) {
       return;
@@ -1340,45 +1495,60 @@ export class ViewerUi implements Disposable {
       return;
     }
 
-    const region = this.resolveScreenshotExportRegion();
-    if (!region) {
+    const regions = this.resolveScreenshotExportRegions();
+    if (regions.length === 0) {
       return;
     }
     this.exportImageDialog.close(false);
     this.exportColormapDialog.close(false);
     this.exportImageBatchDialog.openDialog({
       mode: 'screenshot',
-      screenshot: region
+      screenshots: regions,
+      outputScale: this.lastScreenshotOutputScale
     });
   }
 
-  private resolveScreenshotExportRegion(): ExportScreenshotRegion | null {
+  private resolveScreenshotExportRegions(): ExportScreenshotRegionItem[] {
     if (!this.screenshotSelection) {
-      return null;
+      return [];
     }
 
     const viewport = this.readViewerViewport();
-    const previousRect = this.screenshotSelection.rect;
-    const rect = clampScreenshotSelectionRect(this.screenshotSelection.rect, viewport);
-    if (!sameViewportRectSize(previousRect, rect)) {
+    let resetSingleOutputSize = false;
+    const clampedRegions = this.screenshotSelection.regions.map((region) => {
+      const rect = clampScreenshotSelectionRect(region.rect, viewport);
+      if (!sameViewportRectSize(region.rect, rect)) {
+        resetSingleOutputSize = true;
+      }
+      return { ...region, rect };
+    });
+    if (resetSingleOutputSize) {
       this.lastScreenshotOutputSize = null;
     }
     this.screenshotSelection = {
       ...this.screenshotSelection,
-      rect
+      regions: clampedRegions
     };
-    this.lastScreenshotSelectionRect = { ...rect };
-    const outputSize = this.lastScreenshotOutputSize ?? {
-      width: Math.max(1, Math.round(rect.width)),
-      height: Math.max(1, Math.round(rect.height))
-    };
+    this.rememberScreenshotSelectionRegions();
 
-    return {
-      rect,
-      sourceViewport: viewport,
-      outputWidth: outputSize.width,
-      outputHeight: outputSize.height
-    };
+    const count = clampedRegions.length;
+    return clampedRegions.map((region, index) => {
+      const singleOutputSize = count === 1 ? this.lastScreenshotOutputSize : null;
+      const outputSize = singleOutputSize ?? {
+        width: Math.max(1, Math.round(region.rect.width * (count > 1 ? this.lastScreenshotOutputScale : 1))),
+        height: Math.max(1, Math.round(region.rect.height * (count > 1 ? this.lastScreenshotOutputScale : 1)))
+      };
+      return {
+        id: region.id,
+        label: `Region ${index + 1}`,
+        index,
+        count,
+        rect: { ...region.rect },
+        sourceViewport: viewport,
+        outputWidth: outputSize.width,
+        outputHeight: outputSize.height
+      };
+    });
   }
 
   private renderScreenshotSelectionOverlay(): void {
@@ -1388,37 +1558,107 @@ export class ViewerUi implements Disposable {
     }
 
     const viewport = this.readViewerViewport();
-    const previousRect = selection.rect;
-    const rect = clampScreenshotSelectionRect(selection.rect, viewport);
-    if (!sameViewportRectSize(previousRect, rect)) {
+    let resetSingleOutputSize = false;
+    const regions = selection.regions.map((region) => {
+      const rect = clampScreenshotSelectionRect(region.rect, viewport);
+      if (!sameViewportRectSize(region.rect, rect)) {
+        resetSingleOutputSize = true;
+      }
+      return { ...region, rect };
+    });
+    if (resetSingleOutputSize) {
       this.lastScreenshotOutputSize = null;
     }
-    this.screenshotSelection = { ...selection, rect };
-    this.lastScreenshotSelectionRect = { ...rect };
-    const right = Math.max(0, viewport.width - rect.x - rect.width);
-    const bottom = Math.max(0, viewport.height - rect.y - rect.height);
+    const activeRegion = regions.find((region) => region.id === selection.activeRegionId) ?? regions[regions.length - 1] ?? null;
+    if (!activeRegion) {
+      this.hideScreenshotSelection();
+      return;
+    }
 
-    setBoxStyle(this.elements.screenshotSelectionMaskTop, 0, 0, viewport.width, rect.y);
-    setBoxStyle(this.elements.screenshotSelectionMaskRight, rect.x + rect.width, rect.y, right, rect.height);
-    setBoxStyle(this.elements.screenshotSelectionMaskBottom, 0, rect.y + rect.height, viewport.width, bottom);
-    setBoxStyle(this.elements.screenshotSelectionMaskLeft, 0, rect.y, rect.x, rect.height);
-    setBoxStyle(this.elements.screenshotSelectionBox, rect.x, rect.y, rect.width, rect.height);
+    this.screenshotSelection = {
+      ...selection,
+      regions,
+      activeRegionId: activeRegion.id
+    };
+    this.rememberScreenshotSelectionRegions();
+    this.renderScreenshotSelectionMask(regions, viewport);
+    this.renderInactiveScreenshotSelectionRegions(regions, activeRegion.id);
+    setBoxStyle(this.elements.screenshotSelectionBox, activeRegion.rect.x, activeRegion.rect.y, activeRegion.rect.width, activeRegion.rect.height);
+    this.elements.screenshotSelectionBox.classList.toggle('is-multi-region-active', regions.length > 1);
+    this.renderScreenshotSelectionRegionBadge(
+      this.elements.screenshotSelectionBox.querySelector<HTMLElement>('.screenshot-selection-region-badge'),
+      regions.findIndex((region) => region.id === activeRegion.id) + 1
+    );
     this.renderScreenshotSelectionSnapGuide(viewport);
-    this.renderScreenshotSelectionSize(rect, viewport);
+    this.renderScreenshotSelectionSize(activeRegion.rect, viewport);
     this.renderScreenshotSelectionSquareSnapFeedback();
 
     const controlsWidth = this.elements.screenshotSelectionControls.offsetWidth || 244;
     const controlsHeight = this.elements.screenshotSelectionControls.offsetHeight || 34;
     const controlsX = Math.min(
-      Math.max(8, rect.x + rect.width - controlsWidth),
+      Math.max(8, activeRegion.rect.x + activeRegion.rect.width - controlsWidth),
       Math.max(8, viewport.width - controlsWidth - 8)
     );
-    const belowY = rect.y + rect.height + 8;
+    const belowY = activeRegion.rect.y + activeRegion.rect.height + 8;
     const controlsY = belowY + controlsHeight <= viewport.height
       ? belowY
-      : Math.max(8, rect.y - controlsHeight - 8);
+      : Math.max(8, activeRegion.rect.y - controlsHeight - 8);
     setBoxStyle(this.elements.screenshotSelectionControls, controlsX, controlsY, controlsWidth, controlsHeight);
+    this.elements.screenshotSelectionDeleteButton.disabled = regions.length <= 1;
     this.renderScreenshotSelectionCursor();
+  }
+
+  private renderScreenshotSelectionMask(regions: ScreenshotSelectionRegion[], viewport: ViewportInfo): void {
+    for (const element of [
+      this.elements.screenshotSelectionMaskTop,
+      this.elements.screenshotSelectionMaskRight,
+      this.elements.screenshotSelectionMaskBottom,
+      this.elements.screenshotSelectionMaskLeft
+    ]) {
+      element.classList.add('hidden');
+    }
+
+    this.elements.screenshotSelectionMaskSvg.setAttribute('viewBox', `0 0 ${viewport.width} ${viewport.height}`);
+    const path = [
+      `M0 0 H${viewport.width} V${viewport.height} H0 Z`,
+      ...regions.map((region) => {
+        const { x, y, width, height } = region.rect;
+        return `M${x} ${y} H${x + width} V${y + height} H${x} Z`;
+      })
+    ].join(' ');
+    this.elements.screenshotSelectionMaskPath.setAttribute('d', path);
+  }
+
+  private renderInactiveScreenshotSelectionRegions(
+    regions: ScreenshotSelectionRegion[],
+    activeRegionId: string
+  ): void {
+    const fragment = document.createDocumentFragment();
+    regions.forEach((region, index) => {
+      if (region.id === activeRegionId) {
+        return;
+      }
+
+      const box = document.createElement('div');
+      box.className = 'screenshot-selection-region-box';
+      box.dataset.regionId = region.id;
+      setBoxStyle(box, region.rect.x, region.rect.y, region.rect.width, region.rect.height);
+      const badge = document.createElement('span');
+      badge.className = 'screenshot-selection-region-badge';
+      this.renderScreenshotSelectionRegionBadge(badge, index + 1);
+      box.append(badge);
+      fragment.append(box);
+    });
+    this.elements.screenshotSelectionRegions.replaceChildren(fragment);
+  }
+
+  private renderScreenshotSelectionRegionBadge(element: HTMLElement | null, index: number): void {
+    if (!element) {
+      return;
+    }
+
+    element.textContent = String(index);
+    element.classList.toggle('hidden', index <= 0 || (this.screenshotSelection?.regions.length ?? 0) <= 1);
   }
 
   private renderScreenshotSelectionSize(rect: ViewportRect, viewport: ViewportInfo): void {
@@ -1477,6 +1717,32 @@ export class ViewerUi implements Disposable {
 
   private shouldShowScreenshotSelectionSquareSnapFeedback(): boolean {
     return this.screenshotSelectionResizeActive && this.screenshotSelectionSquareSnapped;
+  }
+
+  private getActiveScreenshotRegion(): ScreenshotSelectionRegion | null {
+    const selection = this.screenshotSelection;
+    if (!selection) {
+      return null;
+    }
+
+    return selection.regions.find((region) => region.id === selection.activeRegionId) ?? null;
+  }
+
+  private rememberScreenshotSelectionRegions(): void {
+    if (!this.screenshotSelection) {
+      return;
+    }
+
+    this.lastScreenshotSelectionRegions = this.screenshotSelection.regions.map((region) => ({
+      id: region.id,
+      rect: { ...region.rect }
+    }));
+  }
+
+  private allocateScreenshotSelectionRegionId(): string {
+    const id = `screenshot-region-${this.nextScreenshotSelectionRegionId}`;
+    this.nextScreenshotSelectionRegionId += 1;
+    return id;
   }
 
   private renderScreenshotSelectionCursor(): void {
@@ -1637,8 +1903,16 @@ export class ViewerUi implements Disposable {
       }
     });
 
+    this.disposables.addEventListener(this.elements.screenshotSelectionAddButton, 'click', () => {
+      this.addScreenshotSelectionRegion();
+    });
+
     this.disposables.addEventListener(this.elements.screenshotSelectionFitButton, 'click', () => {
       this.fitScreenshotSelectionToCurrentImage();
+    });
+
+    this.disposables.addEventListener(this.elements.screenshotSelectionDeleteButton, 'click', () => {
+      this.deleteActiveScreenshotSelectionRegion({ cancelWhenLast: false });
     });
 
     this.disposables.addEventListener(this.elements.screenshotSelectionCancelButton, 'click', () => {
@@ -1811,11 +2085,18 @@ export class ViewerUi implements Disposable {
   };
 
   private readonly onScreenshotSelectionKeyboardGuard = (event: KeyboardEvent): void => {
-    if (
-      !this.screenshotSelection ||
-      event.key === 'Escape' ||
-      this.isAllowedScreenshotSelectionTarget(event.target)
-    ) {
+    if (!this.screenshotSelection || event.key === 'Escape') {
+      return;
+    }
+
+    if ((event.key === 'Delete' || event.key === 'Backspace') && !isTextEntryTarget(event.target)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.deleteActiveScreenshotSelectionRegion();
+      return;
+    }
+
+    if (this.isAllowedScreenshotSelectionTarget(event.target)) {
       return;
     }
 
@@ -2050,9 +2331,44 @@ function sameViewportRectSize(a: ViewportRect, b: ViewportRect): boolean {
   return a.width === b.width && a.height === b.height;
 }
 
+function createOffsetScreenshotSelectionRect(rect: ViewportRect, viewport: ViewportInfo): ViewportRect {
+  const positive = clampScreenshotSelectionRect({
+    ...rect,
+    x: rect.x + SCREENSHOT_SELECTION_DUPLICATE_OFFSET,
+    y: rect.y + SCREENSHOT_SELECTION_DUPLICATE_OFFSET
+  }, viewport);
+  if (positive.x !== rect.x || positive.y !== rect.y) {
+    return positive;
+  }
+
+  return clampScreenshotSelectionRect({
+    ...rect,
+    x: rect.x - SCREENSHOT_SELECTION_DUPLICATE_OFFSET,
+    y: rect.y - SCREENSHOT_SELECTION_DUPLICATE_OFFSET
+  }, viewport);
+}
+
 function buildScreenshotExportFilename(filename: string): string {
   const normalized = filename.toLocaleLowerCase().endsWith('.png') ? filename : `${filename}.png`;
   return normalized.replace(/\.png$/i, '-screenshot.png');
+}
+
+function buildScreenshotRegionsArchiveFilename(filename: string): string {
+  const screenshotFilename = buildScreenshotExportFilename(filename);
+  return screenshotFilename.replace(/\.png$/i, '.zip');
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.isContentEditable
+  );
 }
 
 function readStoredAutoFitImageOnSelect(): boolean {

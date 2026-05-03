@@ -17,6 +17,9 @@ export interface ScreenshotReproductionMetadataBatchContext {
   sessionId: string;
   channelLabel: string;
   outputFilename: string;
+  regionIndex?: number;
+  regionLabel?: string;
+  regionCount?: number;
 }
 
 export interface BuildScreenshotReproductionMetadataArgs {

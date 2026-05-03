@@ -695,6 +695,93 @@ input[type='range'] {
   text-align: center;
 }
 
+.export-screenshot-region-preview-grid {
+  display: grid;
+  width: 100%;
+  max-height: 19rem;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.7rem;
+  overflow: auto;
+}
+
+.export-screenshot-region-preview-card {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.export-screenshot-region-preview-caption {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.export-screenshot-region-preview-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-screenshot-region-preview-size {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.export-screenshot-region-preview-frame {
+  display: grid;
+  width: 100%;
+  min-height: 6rem;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.28rem;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+    #161b24;
+  background-position: 0 0, 0 0.4rem, 0.4rem -0.4rem, -0.4rem 0;
+  background-size: 0.8rem 0.8rem;
+}
+
+.export-screenshot-region-preview-canvas {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+}
+
+.export-screenshot-region-preview-placeholder {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.export-screenshot-region-preview-frame.is-loading .export-screenshot-region-preview-placeholder {
+  animation: export-batch-preview-pulse 1s ease-in-out infinite;
+}
+
+.export-screenshot-region-preview-frame.is-unavailable .export-screenshot-region-preview-placeholder {
+  width: 1.9rem;
+  height: 0.2rem;
+  border-radius: 999px;
+}
+
 .export-progress {
   display: grid;
   gap: 0.38rem;
@@ -798,11 +885,19 @@ input[type='range'] {
   background: color-mix(in srgb, var(--panel) 96%, #000);
 }
 
-.export-batch-table tbody th {
+.export-batch-table tbody th.export-batch-file-cell,
+.export-batch-table tbody th.export-batch-region-cell {
   position: sticky;
-  left: 0;
   z-index: 2;
   background: color-mix(in srgb, var(--panel) 94%, #000);
+}
+
+.export-batch-table tbody th.export-batch-file-cell {
+  left: 0;
+}
+
+.export-batch-table tbody th.export-batch-region-cell {
+  left: 13rem;
 }
 
 .export-batch-table thead th:first-child {
@@ -810,7 +905,13 @@ input[type='range'] {
   z-index: 4;
 }
 
+.export-batch-table thead th.export-batch-region-cell {
+  left: 13rem;
+  z-index: 4;
+}
+
 .export-batch-file-cell,
+.export-batch-region-cell,
 .export-batch-channel-cell {
   padding: 0.45rem;
 }
@@ -827,7 +928,15 @@ input[type='range'] {
   text-align: center;
 }
 
+.export-batch-region-cell {
+  width: 6.6rem;
+  min-width: 6.6rem;
+  max-width: 6.6rem;
+  text-align: left;
+}
+
 .export-batch-file-toggle,
+.export-batch-region-toggle,
 .export-batch-column-toggle,
 .export-batch-cell-toggle {
   display: grid;
@@ -842,18 +951,25 @@ input[type='range'] {
   text-align: left;
 }
 
+.export-batch-region-toggle {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+}
+
 .export-batch-column-toggle,
 .export-batch-cell-toggle {
   justify-items: center;
 }
 
 .export-batch-file-toggle input,
+.export-batch-region-toggle input,
 .export-batch-column-toggle input,
 .export-batch-cell-toggle input {
   margin: 0;
 }
 
 .export-batch-file-label,
+.export-batch-region-label,
 .export-batch-channel-label {
   min-width: 0;
   overflow: hidden;
@@ -864,6 +980,21 @@ input[type='range'] {
 .export-batch-channel-label {
   max-width: 6.2rem;
   font-weight: 600;
+}
+
+.export-batch-region-label {
+  font-weight: 700;
+}
+
+.export-batch-region-size {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .export-batch-cell-toggle {
@@ -900,20 +1031,13 @@ input[type='range'] {
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.28rem;
-  background:
-    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
-    #161b24;
-  background-position: 0 0, 0 0.4rem, 0.4rem -0.4rem, -0.4rem 0;
-  background-size: 0.8rem 0.8rem;
+  background: #161b24;
 }
 
 .export-batch-cell-preview-image {
   display: block;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   max-width: 100%;
@@ -1493,6 +1617,18 @@ body.is-resizing-panel-rows * {
   background: rgba(0, 0, 0, 0.48);
 }
 
+.screenshot-selection-mask-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.screenshot-selection-mask-path {
+  fill: rgba(0, 0, 0, 0.48);
+}
+
 .screenshot-selection-guide {
   position: absolute;
   pointer-events: none;
@@ -1510,6 +1646,12 @@ body.is-resizing-panel-rows * {
   transform: translateY(-0.5px);
 }
 
+.screenshot-selection-regions {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .screenshot-selection-box {
   position: absolute;
   border: 1.5px solid rgba(255, 255, 255, 0.96);
@@ -1524,6 +1666,43 @@ body.is-resizing-panel-rows * {
     0 0 0 1px rgba(3, 7, 18, 0.78),
     0 0 0 9999px rgba(0, 0, 0, 0),
     0 0 0.85rem rgba(125, 211, 252, 0.62);
+}
+
+.screenshot-selection-box.is-multi-region-active {
+  border-color: #7dd3fc;
+  box-shadow:
+    0 0 0 1px rgba(3, 7, 18, 0.78),
+    0 0 0 9999px rgba(0, 0, 0, 0),
+    0 0 0.85rem rgba(125, 211, 252, 0.5);
+}
+
+.screenshot-selection-region-box {
+  position: absolute;
+  border: 1.5px solid rgba(248, 251, 255, 0.74);
+  background: rgba(125, 211, 252, 0.07);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.56),
+    inset 0 0 0 1px rgba(125, 211, 252, 0.28);
+}
+
+.screenshot-selection-region-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.36rem;
+  border-radius: 0 0 0.35rem 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 17, 24, 0.9);
+  color: #f8fbff;
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1;
+  box-shadow: 0 0.16rem 0.42rem rgba(0, 0, 0, 0.32);
+  pointer-events: none;
 }
 
 .screenshot-selection-size {

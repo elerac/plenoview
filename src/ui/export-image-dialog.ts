@@ -17,6 +17,8 @@ import {
   type ExportImagePreviewRequest,
   type ExportProgressUpdate,
   type ExportImageRequest,
+  type ExportScreenshotRegionItem,
+  type ExportScreenshotRegionsRequest,
   type ExportImageTarget
 } from '../types';
 import { bindDialogBackdropDismiss } from './dialog-backdrop';
@@ -28,8 +30,13 @@ const EXPORT_PROGRESS_REVEAL_DELAY_MS = 300;
 
 interface ExportImageDialogCallbacks {
   onExportImage: (request: ExportImageRequest, onProgress?: (update: ExportProgressUpdate) => void) => Promise<void>;
+  onExportScreenshotRegions: (
+    request: ExportScreenshotRegionsRequest,
+    onProgress?: (update: ExportProgressUpdate) => void
+  ) => Promise<void>;
   onCancel?: (target: ExportImageTarget | null) => void;
   onScreenshotOutputSizeChange?: (size: { width: number; height: number }) => void;
+  onScreenshotOutputScaleChange?: (scale: number) => void;
   onResolveExportImagePreview: (
     request: ExportImagePreviewRequest,
     signal: AbortSignal
@@ -176,17 +183,38 @@ export class ExportImageDialogController implements Disposable {
   }
 
   private applyTarget(target: ExportImageTarget): void {
+    this.applyDialogChrome(target);
     this.elements.exportFilenameInput.value = target.filename;
     this.elements.exportCompressionInput.value = String(DEFAULT_PNG_COMPRESSION_LEVEL);
-    if (isScreenshotTarget(target)) {
+    if (isScreenshotRegionsTarget(target)) {
+      this.elements.exportSizeField.classList.remove('hidden');
+      this.elements.exportSizeFieldLabel.textContent = 'Scale';
+      this.elements.exportWidthFieldLabel.textContent = 'Percent';
+      this.elements.exportHeightFieldLabel.textContent = 'Height';
+      this.elements.exportWidthInput.value = String(Math.max(1, Math.round((target.outputScale ?? 1) * 100)));
+      this.elements.exportHeightInput.value = '';
+      this.elements.exportHeightInput.closest('.app-dialog-inline-field')?.classList.add('hidden');
+      this.elements.exportReproductionMetadataField.classList.remove('hidden');
+      this.elements.exportReproductionMetadataCheckbox.checked = false;
+      this.clearPreviewStage();
+      this.setPreviewStatus(formatScreenshotRegionsStatus(target.regions, target.outputScale ?? 1));
+    } else if (isScreenshotTarget(target)) {
       const size = buildDefaultScreenshotOutputSize(target);
       this.elements.exportSizeField.classList.remove('hidden');
+      this.elements.exportSizeFieldLabel.textContent = 'Size';
+      this.elements.exportWidthFieldLabel.textContent = 'Width';
+      this.elements.exportHeightFieldLabel.textContent = 'Height';
+      this.elements.exportHeightInput.closest('.app-dialog-inline-field')?.classList.remove('hidden');
       this.elements.exportReproductionMetadataField.classList.remove('hidden');
       this.elements.exportReproductionMetadataCheckbox.checked = false;
       this.elements.exportWidthInput.value = String(size.width);
       this.elements.exportHeightInput.value = String(size.height);
     } else {
       this.elements.exportSizeField.classList.add('hidden');
+      this.elements.exportSizeFieldLabel.textContent = 'Size';
+      this.elements.exportWidthFieldLabel.textContent = 'Width';
+      this.elements.exportHeightFieldLabel.textContent = 'Height';
+      this.elements.exportHeightInput.closest('.app-dialog-inline-field')?.classList.remove('hidden');
       this.elements.exportReproductionMetadataField.classList.add('hidden');
       this.elements.exportReproductionMetadataCheckbox.checked = false;
       this.elements.exportWidthInput.value = '';
@@ -194,10 +222,30 @@ export class ExportImageDialogController implements Disposable {
     }
   }
 
+  private applyDialogChrome(target: ExportImageTarget): void {
+    if (isScreenshotRegionsTarget(target)) {
+      this.elements.exportDialogTitle.textContent = 'Export Screenshot Regions';
+      this.elements.exportDialogSubtitle.textContent = 'Export selected screenshot regions as a ZIP of PNG images.';
+      this.elements.exportFilenameFieldLabel.textContent = 'Archive';
+      return;
+    }
+
+    this.elements.exportDialogTitle.textContent = isScreenshotTarget(target) ? 'Export Screenshot' : 'Export Image';
+    this.elements.exportDialogSubtitle.textContent = isScreenshotTarget(target)
+      ? 'Export the selected screenshot region as a PNG.'
+      : 'Export the current display as a PNG.';
+    this.elements.exportFilenameFieldLabel.textContent = 'Filename';
+  }
+
   private resetInputs(): void {
     this.elements.exportFilenameInput.value = '';
+    this.applyDialogChrome({ filename: 'image.png' });
     this.elements.exportCompressionInput.value = String(DEFAULT_PNG_COMPRESSION_LEVEL);
     this.elements.exportSizeField.classList.add('hidden');
+    this.elements.exportSizeFieldLabel.textContent = 'Size';
+    this.elements.exportWidthFieldLabel.textContent = 'Width';
+    this.elements.exportHeightFieldLabel.textContent = 'Height';
+    this.elements.exportHeightInput.closest('.app-dialog-inline-field')?.classList.remove('hidden');
     this.elements.exportReproductionMetadataField.classList.add('hidden');
     this.elements.exportReproductionMetadataCheckbox.checked = false;
     this.elements.exportWidthInput.value = '';
@@ -239,9 +287,11 @@ export class ExportImageDialogController implements Disposable {
       return;
     }
 
-    const filename = normalizeExportFilename(this.elements.exportFilenameInput.value);
+    const filename = isScreenshotRegionsTarget(target)
+      ? normalizeExportArchiveFilename(this.elements.exportFilenameInput.value)
+      : normalizeExportFilename(this.elements.exportFilenameInput.value);
     if (!filename) {
-      this.setError('Enter a filename.');
+      this.setError(isScreenshotRegionsTarget(target) ? 'Enter an archive filename.' : 'Enter a filename.');
       this.elements.exportFilenameInput.focus();
       return;
     }
@@ -250,6 +300,60 @@ export class ExportImageDialogController implements Disposable {
     if (pngCompressionLevel === null) {
       this.setError(PNG_COMPRESSION_VALIDATION_MESSAGE);
       this.elements.exportCompressionInput.focus();
+      return;
+    }
+
+    if (isScreenshotRegionsTarget(target)) {
+      const outputScale = parsePositiveScalePercent(this.elements.exportWidthInput.value);
+      if (outputScale === null) {
+        this.setError('Enter a positive scale percentage.');
+        this.elements.exportWidthInput.focus();
+        return;
+      }
+
+      const request: ExportScreenshotRegionsRequest = {
+        archiveFilename: filename,
+        baseFilename: target.baseFilename,
+        format: 'png-zip',
+        mode: 'screenshot-regions',
+        outputScale,
+        regions: buildScaledScreenshotRegions(target.regions, outputScale),
+        pngCompressionLevel,
+        ...(this.elements.exportReproductionMetadataCheckbox.checked ? { includeReproductionMetadata: true } : {})
+      };
+      this.elements.exportFilenameInput.value = request.archiveFilename;
+      this.setError(null);
+      const exportRequestId = this.takeRequestId();
+      this.exportResource = pendingResource('export-image', exportRequestId);
+      this.syncBusyControls();
+      const reportProgress = this.startExportProgress();
+
+      try {
+        await this.callbacks.onExportScreenshotRegions(request, reportProgress);
+        if (!isPendingMatch(this.exportResource, 'export-image', exportRequestId)) {
+          return;
+        }
+        this.close(true);
+      } catch (error) {
+        if (isAbortError(error)) {
+          this.close(true);
+          return;
+        }
+
+        if (!isPendingMatch(this.exportResource, 'export-image', exportRequestId)) {
+          return;
+        }
+        this.exportResource = errorResource('export-image', error, 'Export failed.');
+        this.setError(this.exportResource.status === 'error' ? this.exportResource.error.message : 'Export failed.');
+      } finally {
+        if (this.open) {
+          if (isPendingMatch(this.exportResource, 'export-image', exportRequestId)) {
+            this.exportResource = idleResource();
+          }
+          this.resetExportProgress();
+          this.syncBusyControls();
+        }
+      }
       return;
     }
 
@@ -307,6 +411,25 @@ export class ExportImageDialogController implements Disposable {
     }
 
     const target = this.dialogTarget ?? this.exportTarget;
+    if (isScreenshotRegionsTarget(target)) {
+      const outputScale = parsePositiveScalePercent(this.elements.exportWidthInput.value);
+      if (outputScale === null) {
+        this.cancelPreview();
+        this.clearPreviewStage();
+        this.setPreviewStatus('Enter a positive scale percentage.');
+        return;
+      }
+
+      this.callbacks.onScreenshotOutputScaleChange?.(outputScale);
+      if (this.open) {
+        void this.refreshPreview();
+      } else {
+        this.clearPreviewStage();
+        this.setPreviewStatus(formatScreenshotRegionsStatus(target.regions, outputScale));
+      }
+      return;
+    }
+
     if (!isScreenshotTarget(target)) {
       return;
     }
@@ -347,6 +470,18 @@ export class ExportImageDialogController implements Disposable {
 
     this.cancelPreview();
     const target = this.dialogTarget ?? this.exportTarget;
+    if (isScreenshotRegionsTarget(target)) {
+      const outputScale = parsePositiveScalePercent(this.elements.exportWidthInput.value);
+      if (outputScale === null) {
+        this.clearPreviewStage();
+        this.setPreviewStatus('Enter a positive scale percentage.');
+        return;
+      }
+
+      await this.refreshScreenshotRegionsPreview(target, outputScale);
+      return;
+    }
+
     const previewRequest = target ? parseExportImagePreviewRequest(target, {
       width: this.elements.exportWidthInput.value,
       height: this.elements.exportHeightInput.value
@@ -408,20 +543,152 @@ export class ExportImageDialogController implements Disposable {
 
   private resetPreview(): void {
     this.cancelPreview();
-    this.hidePreviewCanvas();
+    this.clearPreviewStage();
     this.setPreviewStatus(null);
   }
 
   private renderPreview(pixels: ExportImagePixels): void {
+    this.clearScreenshotRegionPreviewGrid();
     renderPixelsToCanvas(this.elements.exportPreviewCanvas, pixels);
     this.elements.exportPreviewCanvas.classList.remove('hidden');
     this.setPreviewStatus(null);
+  }
+
+  private async refreshScreenshotRegionsPreview(
+    target: Extract<ExportImageTarget, { kind: 'screenshot-regions' }>,
+    outputScale: number
+  ): Promise<void> {
+    const regions = buildScaledScreenshotRegions(target.regions, outputScale);
+    const requestKey = serializeScreenshotRegionsPreviewRequest(regions);
+    const requestId = this.takeRequestId();
+    const abortController = new AbortController();
+    this.exportImagePreviewAbortController = abortController;
+    this.previewResource = pendingResource(requestKey, requestId);
+
+    this.renderScreenshotRegionsPreviewPlaceholders(regions);
+    this.setPreviewStatus(formatScreenshotRegionsStatus(regions, outputScale));
+
+    let failed = false;
+    await Promise.all(regions.map(async (region) => {
+      const previewKey = serializeScreenshotRegionPreviewKey(region);
+      try {
+        const pixels = await this.callbacks.onResolveExportImagePreview({
+          mode: 'screenshot',
+          rect: { ...region.rect },
+          sourceViewport: { ...region.sourceViewport },
+          outputWidth: region.outputWidth,
+          outputHeight: region.outputHeight
+        }, abortController.signal);
+        if (
+          this.disposed ||
+          !this.open ||
+          abortController.signal.aborted ||
+          !isPendingMatch(this.previewResource, requestKey, requestId)
+        ) {
+          return;
+        }
+
+        this.updateScreenshotRegionPreviewFrame(previewKey, pixels, false);
+      } catch (error) {
+        if (
+          isAbortError(error) ||
+          this.disposed ||
+          !this.open ||
+          abortController.signal.aborted ||
+          !isPendingMatch(this.previewResource, requestKey, requestId)
+        ) {
+          return;
+        }
+
+        failed = true;
+        this.updateScreenshotRegionPreviewFrame(previewKey, null, false);
+      }
+    }));
+
+    if (
+      !this.disposed &&
+      this.open &&
+      !abortController.signal.aborted &&
+      isPendingMatch(this.previewResource, requestKey, requestId)
+    ) {
+      this.previewResource = idleResource();
+      this.setPreviewStatus(
+        failed
+          ? `Some previews failed. ${formatScreenshotRegionsStatus(regions, outputScale)}`
+          : formatScreenshotRegionsStatus(regions, outputScale)
+      );
+    }
+
+    if (this.exportImagePreviewAbortController === abortController) {
+      this.exportImagePreviewAbortController = null;
+    }
+  }
+
+  private renderScreenshotRegionsPreviewPlaceholders(regions: ExportScreenshotRegionItem[]): void {
+    this.clearPreviewStage();
+
+    const grid = document.createElement('div');
+    grid.className = 'export-screenshot-region-preview-grid';
+    grid.setAttribute('aria-label', 'Screenshot region previews');
+
+    for (const region of regions) {
+      const previewKey = serializeScreenshotRegionPreviewKey(region);
+      const card = document.createElement('figure');
+      card.className = 'export-screenshot-region-preview-card';
+
+      const caption = document.createElement('figcaption');
+      caption.className = 'export-screenshot-region-preview-caption';
+
+      const label = document.createElement('span');
+      label.className = 'export-screenshot-region-preview-label';
+      label.textContent = region.label;
+
+      const size = document.createElement('span');
+      size.className = 'export-screenshot-region-preview-size';
+      size.textContent = formatOutputSize(region.outputWidth, region.outputHeight);
+
+      const frame = document.createElement('div');
+      frame.className = 'export-screenshot-region-preview-frame is-loading';
+      frame.dataset.previewKey = previewKey;
+      updateScreenshotRegionPreviewFrame(frame, null, true);
+
+      caption.append(label, size);
+      card.append(caption, frame);
+      grid.append(card);
+    }
+
+    this.elements.exportPreviewStage.append(grid);
+  }
+
+  private updateScreenshotRegionPreviewFrame(
+    previewKey: string,
+    pixels: ExportImagePixels | null,
+    isPending: boolean
+  ): void {
+    for (const frame of this.elements.exportPreviewStage.querySelectorAll<HTMLElement>(
+      '.export-screenshot-region-preview-frame'
+    )) {
+      if (frame.dataset.previewKey === previewKey) {
+        updateScreenshotRegionPreviewFrame(frame, pixels, isPending);
+      }
+    }
+  }
+
+  private clearPreviewStage(): void {
+    this.hidePreviewCanvas();
+    this.clearScreenshotRegionPreviewGrid();
   }
 
   private hidePreviewCanvas(): void {
     this.elements.exportPreviewCanvas.classList.add('hidden');
     this.elements.exportPreviewCanvas.width = 0;
     this.elements.exportPreviewCanvas.height = 0;
+  }
+
+  private clearScreenshotRegionPreviewGrid(): void {
+    for (const element of this.elements.exportPreviewStage.querySelectorAll('.export-screenshot-region-preview-grid')) {
+      element.remove();
+    }
   }
 
   private setPreviewStatus(message: string | null): void {
@@ -519,6 +786,15 @@ export class ExportImageDialogController implements Disposable {
 }
 
 function formatSingleExportProgress(update: ExportProgressUpdate): string {
+  if (update.total > 1 && update.currentFilename) {
+    const activeIndex = Math.min(clampProgressValue(update.completed, update.total) + 1, update.total);
+    return `Exporting ${activeIndex} of ${update.total}: ${update.currentFilename}`;
+  }
+
+  if (update.total > 1 && update.stage === 'packaging') {
+    return `Packaging ${update.total} images...`;
+  }
+
   switch (update.stage) {
     case 'rendering':
       return 'Rendering image...';
@@ -562,6 +838,15 @@ export function normalizeExportFilename(value: string): string {
   }
 
   return trimmed.toLocaleLowerCase().endsWith('.png') ? trimmed : `${trimmed}.png`;
+}
+
+export function normalizeExportArchiveFilename(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.toLocaleLowerCase().endsWith('.zip') ? trimmed : `${trimmed}.zip`;
 }
 
 function parseExportImageRequest(
@@ -659,6 +944,20 @@ function cloneExportImageTarget(target: ExportImageTarget | null): ExportImageTa
     return null;
   }
 
+  if (isScreenshotRegionsTarget(target)) {
+    return {
+      filename: target.filename,
+      baseFilename: target.baseFilename,
+      kind: 'screenshot-regions',
+      outputScale: target.outputScale,
+      regions: target.regions.map((region) => ({
+        ...region,
+        rect: { ...region.rect },
+        sourceViewport: { ...region.sourceViewport }
+      }))
+    };
+  }
+
   if (isScreenshotTarget(target)) {
     return {
       filename: target.filename,
@@ -679,6 +978,12 @@ function isScreenshotTarget(
   return target?.kind === 'screenshot';
 }
 
+function isScreenshotRegionsTarget(
+  target: ExportImageTarget | null | undefined
+): target is Extract<ExportImageTarget, { kind: 'screenshot-regions' }> {
+  return target?.kind === 'screenshot-regions';
+}
+
 function parsePositiveInteger(value: string): number | null {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -686,6 +991,79 @@ function parsePositiveInteger(value: string): number | null {
   }
 
   return parsed;
+}
+
+function parsePositiveScalePercent(value: string): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed / 100;
+}
+
+function buildScaledScreenshotRegions(
+  regions: ExportScreenshotRegionItem[],
+  outputScale: number
+): ExportScreenshotRegionItem[] {
+  return regions.map((region) => ({
+    ...region,
+    rect: { ...region.rect },
+    sourceViewport: { ...region.sourceViewport },
+    outputWidth: Math.max(1, Math.round(region.rect.width * outputScale)),
+    outputHeight: Math.max(1, Math.round(region.rect.height * outputScale))
+  }));
+}
+
+function formatScreenshotRegionsStatus(regions: ExportScreenshotRegionItem[], outputScale: number): string {
+  const count = regions.length;
+  const percent = Math.max(1, Math.round(outputScale * 100));
+  return `${count} ${count === 1 ? 'region' : 'regions'} selected. ${count} PNG ${count === 1 ? 'image' : 'images'} will be exported at ${percent}%.`;
+}
+
+function updateScreenshotRegionPreviewFrame(
+  frame: HTMLElement,
+  pixels: ExportImagePixels | null,
+  isPending: boolean
+): void {
+  frame.classList.toggle('is-loading', isPending);
+  frame.classList.toggle('is-unavailable', !isPending && !pixels);
+
+  if (pixels) {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'export-screenshot-region-preview-canvas';
+    renderPixelsToCanvas(canvas, pixels);
+    frame.replaceChildren(canvas);
+    return;
+  }
+
+  const placeholder = document.createElement('span');
+  placeholder.className = 'export-screenshot-region-preview-placeholder';
+  frame.replaceChildren(placeholder);
+}
+
+function serializeScreenshotRegionsPreviewRequest(regions: ExportScreenshotRegionItem[]): string {
+  return JSON.stringify(regions.map((region) => ({
+    id: region.id,
+    index: region.index,
+    rect: region.rect,
+    sourceViewport: region.sourceViewport,
+    outputWidth: region.outputWidth,
+    outputHeight: region.outputHeight
+  })));
+}
+
+function serializeScreenshotRegionPreviewKey(region: ExportScreenshotRegionItem): string {
+  return JSON.stringify({
+    id: region.id,
+    index: region.index,
+    outputWidth: region.outputWidth,
+    outputHeight: region.outputHeight
+  });
+}
+
+function formatOutputSize(width: number, height: number): string {
+  return `${width} x ${height} px`;
 }
 
 function serializeExportImagePreviewRequest(request: ExportImagePreviewRequest): string {

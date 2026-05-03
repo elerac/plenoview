@@ -27,7 +27,7 @@ import { formatProbeCoordinates } from '../src/ui/probe-readout';
 import { getListboxOptionIndexAtClientY } from '../src/ui/render-helpers';
 import { ViewerUi } from '../src/ui/viewer-ui';
 import { SPECTRUM_LATTICE_THEME_ID, THEME_STORAGE_KEY } from '../src/theme';
-import type { ViewportRect } from '../src/types';
+import type { ExportImagePreviewRequest, ViewportRect } from '../src/types';
 import {
   SPECTRUM_LATTICE_MOTION_ANIMATE,
   SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM,
@@ -2836,7 +2836,10 @@ describe('view menu', () => {
   it('requests and renders an image export preview when the dialog opens', async () => {
     installUiFixture();
 
-    const onResolveExportImagePreview = vi.fn(async () => createPreviewPixels(32, 16));
+    const onResolveExportImagePreview = vi.fn<(
+      _request: unknown,
+      _signal: AbortSignal
+    ) => Promise<ReturnType<typeof createPreviewPixels>>>(async () => createPreviewPixels(32, 16));
     const ui = new ViewerUi(createUiCallbacks({ onResolveExportImagePreview }));
     ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
     ui.setExportTarget({ filename: 'image.png' });
@@ -3034,7 +3037,10 @@ describe('view menu', () => {
     installUiFixture();
 
     const onExportImage = vi.fn(async () => undefined);
-    const onResolveExportImagePreview = vi.fn(async () => createPreviewPixels(32, 16));
+    const onResolveExportImagePreview = vi.fn<(
+      _request: unknown,
+      _signal: AbortSignal
+    ) => Promise<ReturnType<typeof createPreviewPixels>>>(async () => createPreviewPixels(32, 16));
     const ui = new ViewerUi(createUiCallbacks({ onExportImage, onResolveExportImagePreview }));
     ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
     ui.setExportTarget({ filename: 'image.png' });
@@ -3639,6 +3645,354 @@ describe('view menu', () => {
     });
     expect(batchDialog.classList.contains('hidden')).toBe(true);
     expect(overlay.classList.contains('hidden')).toBe(true);
+  });
+
+  it('exports multiple screenshot regions for the active display as a scaled ZIP', async () => {
+    installUiFixture();
+
+    const onExportScreenshotRegions = vi.fn(async () => undefined);
+    const onResolveExportImagePreview = vi.fn<(
+      _request: unknown,
+      _signal: AbortSignal
+    ) => Promise<ReturnType<typeof createPreviewPixels>>>(async () => createPreviewPixels(32, 16));
+    const ui = new ViewerUi(createUiCallbacks({ onExportScreenshotRegions, onResolveExportImagePreview }));
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+    ui.setExportTarget({ filename: 'image.png' });
+
+    const viewerContainer = document.getElementById('viewer-container') as HTMLElement;
+    mockDomRect(viewerContainer, { top: 0, bottom: 100, height: 100, width: 200 });
+
+    (document.getElementById('export-screenshot-button') as HTMLButtonElement).click();
+    ui.setScreenshotSelectionRect({ x: 30, y: 15, width: 140, height: 70 });
+    (document.getElementById('screenshot-selection-add-button') as HTMLButtonElement).click();
+
+    const selectionBox = document.getElementById('screenshot-selection-box') as HTMLDivElement;
+    expect(selectionBox.style.left).toBe('54px');
+    expect(selectionBox.style.top).toBe('30px');
+    expect(document.querySelectorAll('.screenshot-selection-region-box')).toHaveLength(1);
+    expect((selectionBox.querySelector('.screenshot-selection-region-badge') as HTMLElement).textContent).toBe('2');
+
+    (document.getElementById('screenshot-selection-export-button') as HTMLButtonElement).click();
+    await flushMicrotasks();
+
+    expect((document.getElementById('export-dialog-title') as HTMLElement).textContent).toBe('Export Screenshot Regions');
+    const archiveInput = document.getElementById('export-filename-input') as HTMLInputElement;
+    const scaleInput = document.getElementById('export-width-input') as HTMLInputElement;
+    const heightField = (document.getElementById('export-height-input') as HTMLInputElement).closest('.app-dialog-inline-field') as HTMLElement;
+    expect(archiveInput.value).toBe('image-screenshot.zip');
+    expect(scaleInput.value).toBe('100');
+    expect(heightField.classList.contains('hidden')).toBe(true);
+    expect(Array.from(document.querySelectorAll('.export-screenshot-region-preview-label')).map((element) => element.textContent)).toEqual([
+      'Region 1',
+      'Region 2'
+    ]);
+    expect(Array.from(document.querySelectorAll('.export-screenshot-region-preview-size')).map((element) => element.textContent)).toEqual([
+      '140 x 70 px',
+      '140 x 70 px'
+    ]);
+    expect(document.querySelectorAll('.export-screenshot-region-preview-canvas')).toHaveLength(2);
+    const initialPreviewRequests = onResolveExportImagePreview.mock.calls.map(
+      ([request]) => request as ExportImagePreviewRequest
+    );
+    expect(initialPreviewRequests.map((request) => ({
+      mode: request.mode,
+      rect: request.mode === 'screenshot' ? request.rect : null,
+      outputWidth: request.mode === 'screenshot' ? request.outputWidth : null,
+      outputHeight: request.mode === 'screenshot' ? request.outputHeight : null
+    }))).toEqual([
+      {
+        mode: 'screenshot',
+        rect: { x: 30, y: 15, width: 140, height: 70 },
+        outputWidth: 140,
+        outputHeight: 70
+      },
+      {
+        mode: 'screenshot',
+        rect: { x: 54, y: 30, width: 140, height: 70 },
+        outputWidth: 140,
+        outputHeight: 70
+      }
+    ]);
+
+    scaleInput.value = '200';
+    scaleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushMicrotasks();
+    expect(Array.from(document.querySelectorAll('.export-screenshot-region-preview-size')).map((element) => element.textContent)).toEqual([
+      '280 x 140 px',
+      '280 x 140 px'
+    ]);
+    expect(document.querySelectorAll('.export-screenshot-region-preview-canvas')).toHaveLength(2);
+    expect(onResolveExportImagePreview).toHaveBeenCalledTimes(4);
+    const scaledPreviewRequests = onResolveExportImagePreview.mock.calls.slice(2).map(
+      ([request]) => request as ExportImagePreviewRequest
+    );
+    expect(scaledPreviewRequests.map((request) => ({
+      mode: request.mode,
+      outputWidth: request.mode === 'screenshot' ? request.outputWidth : null,
+      outputHeight: request.mode === 'screenshot' ? request.outputHeight : null
+    }))).toEqual([
+      { mode: 'screenshot', outputWidth: 280, outputHeight: 140 },
+      { mode: 'screenshot', outputWidth: 280, outputHeight: 140 }
+    ]);
+
+    (document.getElementById('export-dialog-submit-button') as HTMLButtonElement).click();
+    await flushMicrotasks();
+
+    expect(onExportScreenshotRegions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archiveFilename: 'image-screenshot.zip',
+        baseFilename: 'image.png',
+        format: 'png-zip',
+        mode: 'screenshot-regions',
+        outputScale: 2,
+        regions: [
+          expect.objectContaining({
+            label: 'Region 1',
+            index: 0,
+            count: 2,
+            rect: { x: 30, y: 15, width: 140, height: 70 },
+            outputWidth: 280,
+            outputHeight: 140
+          }),
+          expect.objectContaining({
+            label: 'Region 2',
+            index: 1,
+            count: 2,
+            rect: { x: 54, y: 30, width: 140, height: 70 },
+            outputWidth: 280,
+            outputHeight: 140
+          })
+        ]
+      }),
+      expect.any(Function)
+    );
+  });
+
+  it('deletes the active screenshot region without leaving selection mode until the last region is removed', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+    ui.setExportTarget({ filename: 'image.png' });
+
+    mockDomRect(document.getElementById('viewer-container') as HTMLElement, {
+      top: 0,
+      bottom: 100,
+      height: 100,
+      width: 200
+    });
+
+    const overlay = document.getElementById('screenshot-selection-overlay') as HTMLDivElement;
+    const selectionBox = document.getElementById('screenshot-selection-box') as HTMLDivElement;
+    const deleteButton = document.getElementById('screenshot-selection-delete-button') as HTMLButtonElement;
+
+    (document.getElementById('export-screenshot-button') as HTMLButtonElement).click();
+    ui.setScreenshotSelectionRect({ x: 30, y: 15, width: 120, height: 60 });
+    expect(deleteButton.disabled).toBe(true);
+    deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(overlay.classList.contains('hidden')).toBe(false);
+
+    (document.getElementById('screenshot-selection-add-button') as HTMLButtonElement).click();
+    expect(deleteButton.disabled).toBe(false);
+
+    deleteButton.click();
+    expect(overlay.classList.contains('hidden')).toBe(false);
+    expect(selectionBox.style.left).toBe('30px');
+    expect(selectionBox.style.top).toBe('15px');
+    expect(document.querySelectorAll('.screenshot-selection-region-box')).toHaveLength(0);
+    expect(deleteButton.disabled).toBe(true);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
+    expect(overlay.classList.contains('hidden')).toBe(true);
+  });
+
+  it('multiplies screenshot batch entries by selected regions', async () => {
+    installUiFixture();
+
+    const onExportImageBatch = vi.fn<(_: {
+      archiveFilename: string;
+      entries: Array<{
+        outputFilename: string;
+        rect?: { x: number; y: number; width: number; height: number };
+        outputWidth?: number;
+        outputHeight?: number;
+        screenshotRegionIndex?: number;
+        screenshotRegionCount?: number;
+      }>;
+      format: 'png-zip';
+    }, _signal: AbortSignal) => Promise<void>>(async () => undefined);
+    const ui = new ViewerUi(createUiCallbacks({ onExportImageBatch }));
+    const target = createRgbExportBatchTarget(2, ['R', 'G', 'B', 'Z']);
+    applyBatchTarget(ui, target);
+    ui.setOpenedImageOptions([
+      { id: 'session-1', label: 'Image 1.exr' },
+      { id: 'session-2', label: 'Image 2.exr' }
+    ], 'session-1');
+    ui.setExportTarget({ filename: 'image.png' });
+
+    mockDomRect(document.getElementById('viewer-container') as HTMLElement, {
+      top: 0,
+      bottom: 100,
+      height: 100,
+      width: 200
+    });
+
+    (document.getElementById('export-screenshot-button') as HTMLButtonElement).click();
+    ui.setScreenshotSelectionRect({ x: 20, y: 10, width: 120, height: 60 });
+    (document.getElementById('screenshot-selection-add-button') as HTMLButtonElement).click();
+    (document.getElementById('screenshot-selection-export-batch-button') as HTMLButtonElement).click();
+
+    expect((document.getElementById('export-batch-dialog-title') as HTMLElement).textContent).toBe(
+      'Export Screenshot Regions Batch'
+    );
+    const scaleInput = document.getElementById('export-batch-width-input') as HTMLInputElement;
+    expect(scaleInput.value).toBe('100');
+    scaleInput.value = '200';
+    scaleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    (document.getElementById('export-batch-select-all-button') as HTMLButtonElement).click();
+    (document.getElementById('export-batch-dialog-submit-button') as HTMLButtonElement).click();
+    await flushMicrotasks();
+
+    const request = onExportImageBatch.mock.calls[0]?.[0];
+    expect(request?.entries.map((entry) => entry.outputFilename)).toEqual([
+      'image-1-screenshot.R1.RGB.png',
+      'image-1-screenshot.R1.Z.png',
+      'image-1-screenshot.R2.RGB.png',
+      'image-1-screenshot.R2.Z.png',
+      'image-2-screenshot.R1.RGB.png',
+      'image-2-screenshot.R1.Z.png',
+      'image-2-screenshot.R2.RGB.png',
+      'image-2-screenshot.R2.Z.png'
+    ]);
+    expect(request?.entries[0]).toMatchObject({
+      rect: { x: 20, y: 10, width: 120, height: 60 },
+      outputWidth: 240,
+      outputHeight: 120,
+      screenshotRegionIndex: 0,
+      screenshotRegionLabel: 'R1',
+      screenshotRegionCount: 2
+    });
+    expect(request?.entries[2]).toMatchObject({
+      rect: { x: 44, y: 34, width: 120, height: 60 },
+      outputWidth: 240,
+      outputHeight: 120,
+      screenshotRegionIndex: 1,
+      screenshotRegionLabel: 'R2',
+      screenshotRegionCount: 2
+    });
+  });
+
+  it('renders multi-region screenshot batch previews as separate region rows', async () => {
+    installUiFixture();
+
+    const onResolveExportImageBatchPreview = vi.fn<(_request: {
+      sessionId: string;
+      channelLabel: string;
+      mode?: 'image' | 'screenshot';
+      rect?: { x: number; y: number; width: number; height: number };
+      outputWidth?: number;
+      outputHeight?: number;
+    }, _signal: AbortSignal) => Promise<ReturnType<typeof createPreviewPixels>>>(async () => createPreviewPixels());
+    const ui = new ViewerUi(createUiCallbacks({ onResolveExportImageBatchPreview }));
+    const target = createRgbExportBatchTarget(1, ['R', 'G', 'B', 'Z']);
+    applyBatchTarget(ui, target);
+    ui.setExportTarget({ filename: 'image.png' });
+
+    mockDomRect(document.getElementById('viewer-container') as HTMLElement, {
+      top: 0,
+      bottom: 100,
+      height: 100,
+      width: 200
+    });
+
+    (document.getElementById('export-screenshot-button') as HTMLButtonElement).click();
+    ui.setScreenshotSelectionRect({ x: 20, y: 10, width: 120, height: 60 });
+    (document.getElementById('screenshot-selection-add-button') as HTMLButtonElement).click();
+    (document.getElementById('screenshot-selection-export-batch-button') as HTMLButtonElement).click();
+
+    expect(Array.from(document.querySelectorAll('#export-batch-matrix thead th')).map((element) => (
+      element.textContent?.trim()
+    ))).toEqual(['File', 'Region', 'RGB', 'Z']);
+    expect(document.querySelectorAll('.export-batch-cell-preview-stack')).toHaveLength(0);
+    expect(document.querySelectorAll('.export-batch-region-preview-frame')).toHaveLength(0);
+    expect(document.querySelectorAll('.export-batch-cell-preview')).toHaveLength(4);
+    expect(Array.from(document.querySelectorAll('.export-batch-region-label')).map((element) => element.textContent)).toEqual([
+      'R1',
+      'R2'
+    ]);
+    expect(Array.from(document.querySelectorAll('.export-batch-region-size')).map((element) => element.textContent)).toEqual([
+      '120 x 60 px',
+      '120 x 60 px'
+    ]);
+    expect(getCheckedExportBatchCellRegionColumnKeys()).toEqual(['R1:RGB', 'R2:RGB']);
+
+    await flushBatchPreviewQueue();
+
+    expect(document.querySelectorAll('.export-batch-cell-preview-image')).toHaveLength(4);
+    expect(onResolveExportImageBatchPreview.mock.calls.map(([request]) => ({
+      channelLabel: request.channelLabel,
+      mode: request.mode,
+      rect: request.rect,
+      outputWidth: request.outputWidth,
+      outputHeight: request.outputHeight
+    }))).toEqual([
+      {
+        channelLabel: 'RGB',
+        mode: 'screenshot',
+        rect: { x: 20, y: 10, width: 120, height: 60 },
+        outputWidth: 120,
+        outputHeight: 60
+      },
+      {
+        channelLabel: 'RGB',
+        mode: 'screenshot',
+        rect: { x: 44, y: 34, width: 120, height: 60 },
+        outputWidth: 120,
+        outputHeight: 60
+      },
+      {
+        channelLabel: 'Z',
+        mode: 'screenshot',
+        rect: { x: 20, y: 10, width: 120, height: 60 },
+        outputWidth: 120,
+        outputHeight: 60
+      },
+      {
+        channelLabel: 'Z',
+        mode: 'screenshot',
+        rect: { x: 44, y: 34, width: 120, height: 60 },
+        outputWidth: 120,
+        outputHeight: 60
+      }
+    ]);
+
+    const scaleInput = document.getElementById('export-batch-width-input') as HTMLInputElement;
+    scaleInput.value = '200';
+    scaleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushBatchPreviewQueue();
+
+    expect(Array.from(document.querySelectorAll('.export-batch-region-size')).map((element) => element.textContent)).toEqual([
+      '240 x 120 px',
+      '240 x 120 px'
+    ]);
+    expect(onResolveExportImageBatchPreview.mock.calls.slice(4).map(([request]) => ({
+      channelLabel: request.channelLabel,
+      outputWidth: request.outputWidth,
+      outputHeight: request.outputHeight
+    }))).toEqual([
+      { channelLabel: 'RGB', outputWidth: 240, outputHeight: 120 },
+      { channelLabel: 'RGB', outputWidth: 240, outputHeight: 120 },
+      { channelLabel: 'Z', outputWidth: 240, outputHeight: 120 },
+      { channelLabel: 'Z', outputWidth: 240, outputHeight: 120 }
+    ]);
+
+    const firstRegionRgb = document.querySelector<HTMLInputElement>(
+      'input[data-batch-toggle="cell"][data-region-id="screenshot-region-1"][data-column-key="RGB"]'
+    );
+    expect(firstRegionRgb).not.toBeNull();
+    firstRegionRgb!.click();
+    expect(getCheckedExportBatchCellRegionColumnKeys()).toEqual(['R2:RGB']);
+    ui.dispose();
   });
 
   it('cancels screenshot selection from the overlay and Escape without forgetting screenshot info', async () => {
@@ -4439,6 +4793,10 @@ describe('view menu', () => {
     expect(previewImageRule).toContain('object-fit: contain;');
     expect(previewImageRule).toContain('object-position: center;');
     expect(previewImageRule).not.toContain('object-fit: cover;');
+    const previewFrameRule = readStyleRule('.export-batch-cell-preview');
+    expect(previewFrameRule).toContain('overflow: hidden;');
+    expect(previewFrameRule).toContain('background: #161b24;');
+    expect(previewFrameRule).not.toContain('linear-gradient');
   });
 
   it('opens batch export in merged mode and submits the merged RGB default', async () => {
@@ -4705,6 +5063,9 @@ describe('view menu', () => {
     expect(buildExportBatchOutputFilename('shots/a/beauty.exr', 'RGB', used)).toBe('shots/a/beauty.RGB.png');
     expect(buildExportBatchOutputFilename('shots/a/beauty.exr', 'RGB', used)).toBe('shots/a/beauty.RGB (2).png');
     expect(buildExportBatchScreenshotOutputFilename('shots/a/beauty.exr', 'RGB', used)).toBe('shots/a/beauty-screenshot.RGB.png');
+    expect(buildExportBatchScreenshotOutputFilename('shots/a/beauty.exr', 'RGB', used, { index: 0, count: 2 })).toBe(
+      'shots/a/beauty-screenshot.R1.RGB.png'
+    );
   });
 
   it('requests and renders a colormap export preview when the dialog opens', async () => {
@@ -7961,6 +8322,15 @@ function getCheckedExportBatchCellColumnKeys(): string[] {
   )).map((input) => input.dataset.columnKey ?? '');
 }
 
+function getCheckedExportBatchCellRegionColumnKeys(): string[] {
+  return Array.from(document.querySelectorAll<HTMLInputElement>(
+    'input[data-batch-toggle="cell"]:checked'
+  )).map((input) => {
+    const regionLabel = input.dataset.regionId?.replace(/^screenshot-region-/, 'R') ?? '';
+    return `${regionLabel}:${input.dataset.columnKey ?? ''}`;
+  });
+}
+
 function installCanvasRenderingMocks(): void {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((contextId: string) => {
     if (contextId !== '2d') {
@@ -8179,6 +8549,7 @@ function createUiCallbacksBase() {
     onOpenFileClick: () => {},
     onOpenFolderClick: () => {},
     onExportImage: async (_request: unknown) => {},
+    onExportScreenshotRegions: async (_request: unknown) => {},
     onResolveExportImagePreview: async (_request: unknown, _signal: AbortSignal) => createPreviewPixels(),
     onExportImageBatch: async (_request: {
       archiveFilename: string;

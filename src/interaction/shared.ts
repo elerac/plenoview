@@ -15,9 +15,16 @@ export interface PointerPosition {
   y: number;
 }
 
+export interface ScreenshotSelectionInteractionRegion {
+  id: string;
+  rect: ViewportRect;
+}
+
 export interface ScreenshotSelectionInteractionState {
   active: boolean;
   rect: ViewportRect | null;
+  activeRegionId?: string | null;
+  regions?: ScreenshotSelectionInteractionRegion[];
 }
 
 export interface InteractionCallbacks {
@@ -37,6 +44,7 @@ export interface InteractionCallbacks {
   onRoiInteractionState?: (state: ViewerRoiInteractionState) => void;
   getScreenshotSelection?: () => ScreenshotSelectionInteractionState;
   onScreenshotSelectionRectChange?: (update: ScreenshotSelectionDragUpdate) => void;
+  onScreenshotSelectionActiveRegionChange?: (regionId: string) => void;
   onScreenshotSelectionHandleHover?: (handle: ScreenshotSelectionHandle | null) => void;
   onScreenshotSelectionResizeActiveChange?: (active: boolean) => void;
   onScreenshotSelectionSquareSnapChange?: (active: boolean) => void;

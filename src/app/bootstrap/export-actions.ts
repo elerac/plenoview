@@ -31,6 +31,7 @@ import type {
   ExportImagePreviewRequest,
   ExportImageRequest,
   ExportProgressUpdate,
+  ExportScreenshotRegionsRequest,
   OpenedImageSession,
   ViewerState,
   ViewerSessionState
@@ -66,6 +67,12 @@ interface ImageExportResolverDependencies {
 }
 
 interface ExportImageActionDependencies {
+  core: ViewerAppCore;
+  resolveImageExportPixels: ReturnType<typeof createImageExportPixelsResolver>;
+  isDisposed: () => boolean;
+}
+
+interface ExportScreenshotRegionsActionDependencies {
   core: ViewerAppCore;
   resolveImageExportPixels: ReturnType<typeof createImageExportPixelsResolver>;
   isDisposed: () => boolean;
@@ -286,6 +293,133 @@ export async function handleExportImage(
   }
 }
 
+export async function handleExportScreenshotRegions(
+  request: ExportScreenshotRegionsRequest,
+  {
+    core,
+    resolveImageExportPixels,
+    isDisposed
+  }: ExportScreenshotRegionsActionDependencies,
+  onProgress?: ExportProgressReporter
+): Promise<void> {
+  if (isDisposed()) {
+    throw createAbortError('Viewer application has been disposed.');
+  }
+
+  try {
+    if (request.format !== 'png-zip' || request.mode !== 'screenshot-regions') {
+      throw new Error('Unsupported screenshot regions export format.');
+    }
+    if (request.regions.length === 0) {
+      throw new Error('Select at least one screenshot region.');
+    }
+
+    const stateSnapshot = core.getState();
+    const sourceSession = selectActiveSession(stateSnapshot);
+    if (!sourceSession) {
+      throw new Error('No image is active.');
+    }
+
+    const usedFilenames = new Map<string, number>();
+    const files: Record<string, Uint8Array> = {};
+    onProgress?.({
+      completed: 0,
+      total: request.regions.length,
+      stage: 'preparing'
+    });
+
+    for (const [regionEntryIndex, region] of request.regions.entries()) {
+      if (isDisposed()) {
+        throw createAbortError('Viewer application has been disposed.');
+      }
+
+      const outputFilename = buildScreenshotRegionOutputFilename(
+        request.baseFilename,
+        region.index,
+        region.count,
+        usedFilenames
+      );
+      const regionRequest: ExportImageRequest = {
+        filename: outputFilename,
+        format: 'png',
+        mode: 'screenshot',
+        rect: { ...region.rect },
+        sourceViewport: { ...region.sourceViewport },
+        outputWidth: region.outputWidth,
+        outputHeight: region.outputHeight,
+        pngCompressionLevel: request.pngCompressionLevel
+      };
+
+      onProgress?.({
+        completed: regionEntryIndex,
+        total: request.regions.length,
+        stage: 'rendering',
+        currentFilename: outputFilename
+      });
+      const pixels = await resolveImageExportPixels(regionRequest);
+      assertActiveSessionCurrent(core.getState(), sourceSession);
+      onProgress?.({
+        completed: regionEntryIndex,
+        total: request.regions.length,
+        stage: 'encoding',
+        currentFilename: outputFilename
+      });
+      const blob = await createPngBlobFromPixels(pixels, {
+        compressionLevel: request.pngCompressionLevel
+      });
+      assertActiveSessionCurrent(core.getState(), sourceSession);
+      files[outputFilename] = new Uint8Array(await blob.arrayBuffer());
+
+      if (request.includeReproductionMetadata) {
+        const jsonFilename = buildReproductionMetadataFilename(outputFilename);
+        const metadata = buildScreenshotReproductionMetadata({
+          pngFilename: outputFilename,
+          jsonFilename,
+          pngCompressionLevel: request.pngCompressionLevel,
+          region,
+          session: sourceSession,
+          renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState),
+          batch: {
+            archiveFilename: request.archiveFilename,
+            sessionId: sourceSession.id,
+            channelLabel: 'Current Display',
+            outputFilename,
+            regionIndex: region.index,
+            regionLabel: region.label,
+            regionCount: region.count
+          }
+        });
+        files[jsonFilename] = new Uint8Array(await createJsonBlob(metadata).arrayBuffer());
+      }
+
+      onProgress?.({
+        completed: regionEntryIndex + 1,
+        total: request.regions.length,
+        stage: 'encoding'
+      });
+    }
+
+    onProgress?.({
+      completed: request.regions.length,
+      total: request.regions.length,
+      stage: 'packaging'
+    });
+    triggerBrowserDownload(createZipBlob(files), request.archiveFilename);
+  } catch (error) {
+    if (isDisposed()) {
+      throw error instanceof Error ? error : createAbortError('Viewer application has been disposed.');
+    }
+
+    if (isAbortError(error)) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : 'Screenshot regions export failed.';
+    core.dispatch({ type: 'errorSet', message });
+    throw new Error(message);
+  }
+}
+
 export async function handleExportImageBatch(
   request: ExportImageBatchRequest,
   signal: AbortSignal,
@@ -379,7 +513,14 @@ export async function handleExportImageBatch(
             archiveFilename: request.archiveFilename,
             sessionId: entry.sessionId,
             channelLabel: entry.channelLabel,
-            outputFilename: entry.outputFilename
+            outputFilename: entry.outputFilename,
+            ...(entry.screenshotRegionIndex !== undefined
+              ? {
+                regionIndex: entry.screenshotRegionIndex,
+                regionLabel: entry.screenshotRegionLabel,
+                regionCount: entry.screenshotRegionCount
+              }
+              : {})
           }
         });
         files[jsonFilename] = new Uint8Array(await createJsonBlob(metadata).arrayBuffer());
@@ -908,6 +1049,31 @@ function buildScreenshotMetadataBundleFilename(pngFilename: string): string {
   return /\.png$/i.test(pngFilename)
     ? pngFilename.replace(/\.png$/i, '.zip')
     : `${pngFilename}.zip`;
+}
+
+function buildScreenshotRegionOutputFilename(
+  baseFilename: string,
+  regionIndex: number,
+  regionCount: number,
+  usedFilenames: Map<string, number>
+): string {
+  const screenshotFilename = /\.png$/i.test(baseFilename)
+    ? baseFilename.replace(/\.png$/i, '-screenshot.png')
+    : `${baseFilename}-screenshot.png`;
+  const filename = regionCount <= 1
+    ? screenshotFilename
+    : screenshotFilename.replace(/\.png$/i, `.region-${String(regionIndex + 1).padStart(2, '0')}.png`);
+  return uniquifyExportFilename(filename, usedFilenames);
+}
+
+function uniquifyExportFilename(filename: string, usedFilenames: Map<string, number>): string {
+  const count = usedFilenames.get(filename) ?? 0;
+  usedFilenames.set(filename, count + 1);
+  if (count === 0) {
+    return filename;
+  }
+
+  return filename.replace(/\.png$/i, ` (${count + 1}).png`);
 }
 
 export function resolveBoundedColormapExportSize(

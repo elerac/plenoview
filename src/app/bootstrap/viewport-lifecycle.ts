@@ -80,6 +80,9 @@ export function createViewerInteraction({
         snapGuide: update.snapGuide
       });
     },
+    onScreenshotSelectionActiveRegionChange: (regionId) => {
+      ui.setScreenshotSelectionActiveRegion(regionId);
+    },
     onScreenshotSelectionHandleHover: (handle) => {
       ui.setScreenshotSelectionHandle(handle);
     },

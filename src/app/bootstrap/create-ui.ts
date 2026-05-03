@@ -6,6 +6,7 @@ import {
   handleExportColormap,
   handleExportImage,
   handleExportImageBatch,
+  handleExportScreenshotRegions,
   resolveExportImageBatchPreviewPixels
 } from './export-actions';
 import type { ExportImagePixels } from '../../export/export-pixels';
@@ -21,6 +22,7 @@ import type {
   ExportImageBatchRequest,
   ExportImagePreviewRequest,
   ExportImageRequest,
+  ExportScreenshotRegionsRequest,
   ExportProgressUpdate,
   OpenedImageDropPlacement,
   ViewerKeyboardNavigationInput,
@@ -81,6 +83,16 @@ export function createViewerUi({
       onProgress?: (update: ExportProgressUpdate) => void
     ) => {
       await handleExportImage(request, {
+        core,
+        resolveImageExportPixels,
+        isDisposed
+      }, onProgress);
+    },
+    onExportScreenshotRegions: async (
+      request: ExportScreenshotRegionsRequest,
+      onProgress?: (update: ExportProgressUpdate) => void
+    ) => {
+      await handleExportScreenshotRegions(request, {
         core,
         resolveImageExportPixels,
         isDisposed
