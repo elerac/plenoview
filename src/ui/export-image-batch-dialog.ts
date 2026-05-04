@@ -115,6 +115,7 @@ type ExportBatchSelectionApplyMode = 'default' | 'remembered' | 'current';
 interface RememberedExportBatchSelection {
   mode: ExportBatchDialogMode;
   regionSignature: string;
+  regionIds: string[];
   includeSplitRgbChannels: boolean;
   checkedCellKeys: Set<string>;
 }
@@ -325,6 +326,7 @@ export class ExportImageBatchDialogController implements Disposable {
       return;
     }
 
+    this.rememberCurrentSelection();
     this.open = false;
     this.abortController?.abort(createAbortError('Batch export cancelled.'));
     this.abortController = null;
@@ -352,6 +354,19 @@ export class ExportImageBatchDialogController implements Disposable {
     const mode = this.dialogMode;
     this.close(restoreFocus);
     this.callbacks.onCancel?.(mode);
+  }
+
+  private rememberCurrentSelection(): void {
+    if (!this.target) {
+      return;
+    }
+
+    const rememberedSelection = this.captureRememberedSelection(this.target);
+    if (rememberedSelection.checkedCellKeys.size === 0) {
+      return;
+    }
+
+    this.rememberedSelection = rememberedSelection;
   }
 
   private applyTarget(
@@ -444,7 +459,7 @@ export class ExportImageBatchDialogController implements Disposable {
     const includeSplitRgbChannels = remembered.includeSplitRgbChannels && targetHasSplitChannelViews(target);
     const checkedCellKeys = filterExportBatchCheckedCells(
       target,
-      remembered.checkedCellKeys,
+      this.remapRememberedRegionCellKeys(remembered),
       includeSplitRgbChannels,
       this.getSelectionRegions()
     );
@@ -461,6 +476,7 @@ export class ExportImageBatchDialogController implements Disposable {
     return {
       mode: this.dialogMode,
       regionSignature: this.getSelectionRegionSignature(),
+      regionIds: this.getSelectionRegions().map((region) => region.id),
       includeSplitRgbChannels: this.includeSplitRgbChannels,
       checkedCellKeys: filterExportBatchCheckedCells(
         target,
@@ -469,6 +485,32 @@ export class ExportImageBatchDialogController implements Disposable {
         this.getSelectionRegions()
       )
     };
+  }
+
+  private remapRememberedRegionCellKeys(remembered: RememberedExportBatchSelection): Set<string> {
+    if (this.dialogMode !== 'screenshot' || !this.isMultiRegionScreenshotMode()) {
+      return new Set(remembered.checkedCellKeys);
+    }
+
+    const currentRegionIds = this.getSelectionRegions().map((region) => region.id);
+    if (remembered.regionIds.length !== currentRegionIds.length) {
+      return new Set(remembered.checkedCellKeys);
+    }
+
+    const regionIdsByRememberedId = new Map<string, string>();
+    for (const [index, regionId] of remembered.regionIds.entries()) {
+      regionIdsByRememberedId.set(regionId, currentRegionIds[index] ?? regionId);
+    }
+
+    const checkedCellKeys = new Set<string>();
+    for (const key of remembered.checkedCellKeys) {
+      const parsed = parseCellKey(key);
+      const currentRegionId = parsed.regionId ? regionIdsByRememberedId.get(parsed.regionId) : null;
+      checkedCellKeys.add(currentRegionId
+        ? serializeCellKey(parsed.sessionId, parsed.columnKey, currentRegionId)
+        : key);
+    }
+    return checkedCellKeys;
   }
 
   private getSelectionRegionSignature(): string {
@@ -480,7 +522,7 @@ export class ExportImageBatchDialogController implements Disposable {
       return 'screenshot:single';
     }
 
-    return `screenshot:multi:${this.screenshotRegions.map((region) => region.id).join('|')}`;
+    return `screenshot:multi:${this.screenshotRegions.length}`;
   }
 
   private resetInputs(): void {
@@ -1761,6 +1803,7 @@ export class ExportImageBatchDialogController implements Disposable {
       return;
     }
     const rememberedSelection = this.captureRememberedSelection(target);
+    this.rememberedSelection = rememberedSelection;
 
     this.elements.exportBatchArchiveFilenameInput.value = archiveFilename;
     this.setError(null);
@@ -1783,7 +1826,6 @@ export class ExportImageBatchDialogController implements Disposable {
           ? { includeReproductionMetadata: true }
           : {})
       }, abortController.signal, reportProgress);
-      this.rememberedSelection = rememberedSelection;
       if (this.abortController === abortController) {
         this.abortController = null;
       }
@@ -2400,6 +2442,21 @@ function serializeCellKey(sessionId: string, columnKey: string, regionId: string
   return regionId
     ? `${sessionId}${CELL_KEY_SEPARATOR}${regionId}${CELL_KEY_SEPARATOR}${columnKey}`
     : `${sessionId}${CELL_KEY_SEPARATOR}${columnKey}`;
+}
+
+function parseCellKey(key: string): { sessionId: string; columnKey: string; regionId: string | null } {
+  const parts = key.split(CELL_KEY_SEPARATOR);
+  return parts.length >= 3
+    ? {
+      sessionId: parts[0] ?? '',
+      regionId: parts[1] ?? null,
+      columnKey: parts.slice(2).join(CELL_KEY_SEPARATOR)
+    }
+    : {
+      sessionId: parts[0] ?? '',
+      regionId: null,
+      columnKey: parts.slice(1).join(CELL_KEY_SEPARATOR)
+    };
 }
 
 function serializeBatchRegionPreviewKey(cellKey: string, region: ExportScreenshotRegionItem): string {

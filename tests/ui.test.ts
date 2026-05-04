@@ -4209,6 +4209,54 @@ describe('view menu', () => {
     ui.dispose();
   });
 
+  it('remembers multi-region screenshot batch file rows after canceling and reopening the screenshot batch dialog', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    applyBatchTarget(ui, createRgbExportBatchTarget(2, ['R', 'G', 'B', 'Z']));
+    ui.setExportTarget({ filename: 'image.png' });
+
+    mockDomRect(document.getElementById('viewer-container') as HTMLElement, {
+      top: 0,
+      bottom: 100,
+      height: 100,
+      width: 200
+    });
+
+    const screenshotButton = document.getElementById('export-screenshot-button') as HTMLButtonElement;
+    const addRegionButton = document.getElementById('screenshot-selection-add-button') as HTMLButtonElement;
+    const overlayBatchButton = document.getElementById('screenshot-selection-export-batch-button') as HTMLButtonElement;
+    const batchCancelButton = document.getElementById('export-batch-dialog-cancel-button') as HTMLButtonElement;
+    const deselectAllButton = document.getElementById('export-batch-deselect-all-button') as HTMLButtonElement;
+
+    screenshotButton.click();
+    ui.setScreenshotSelectionRect({ x: 20, y: 10, width: 120, height: 60 });
+    addRegionButton.click();
+    overlayBatchButton.click();
+
+    deselectAllButton.click();
+    clickExportBatchFileRow('session-2');
+    expect(getCheckedExportBatchRegionCellLabels()).toEqual([
+      'session-2:R1:RGB',
+      'session-2:R1:Z',
+      'session-2:R2:RGB',
+      'session-2:R2:Z'
+    ]);
+
+    batchCancelButton.click();
+    expect((document.getElementById('screenshot-selection-overlay') as HTMLDivElement).classList.contains('hidden')).toBe(true);
+
+    screenshotButton.click();
+    overlayBatchButton.click();
+    expect(getCheckedExportBatchRegionCellLabels()).toEqual([
+      'session-2:R1:RGB',
+      'session-2:R1:Z',
+      'session-2:R2:RGB',
+      'session-2:R2:Z'
+    ]);
+    ui.dispose();
+  });
+
   it('cancels screenshot selection from the overlay and Escape without forgetting screenshot info', async () => {
     installUiFixture();
 
@@ -4675,7 +4723,7 @@ describe('view menu', () => {
     expect(getCheckedExportBatchCellIds()).toEqual(['session-2:Z']);
   });
 
-  it('does not replace the remembered batch cells when reopening after canceling edits', async () => {
+  it('remembers edited batch cells when reopening after canceling the dialog', async () => {
     installUiFixture();
 
     const onExportImageBatch = vi.fn<(_: {
@@ -4703,6 +4751,64 @@ describe('view menu', () => {
 
     batchButton.click();
     expect(onExportImageBatch).toHaveBeenCalledTimes(1);
+    expect(getCheckedExportBatchCellIds()).toEqual(['session-1:RGB']);
+  });
+
+  it('remembers selected batch file rows when reopening after canceling the dialog', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    applyBatchTarget(ui, createRgbExportBatchTarget(2));
+
+    const batchButton = document.getElementById('export-image-batch-button') as HTMLButtonElement;
+    const deselectAllButton = document.getElementById('export-batch-deselect-all-button') as HTMLButtonElement;
+    const cancelButton = document.getElementById('export-batch-dialog-cancel-button') as HTMLButtonElement;
+
+    batchButton.click();
+    deselectAllButton.click();
+    clickExportBatchFileRow('session-2');
+    expect(getCheckedExportBatchCellIds()).toEqual(['session-2:RGB', 'session-2:Z']);
+    cancelButton.click();
+
+    batchButton.click();
+    expect(getCheckedExportBatchCellIds()).toEqual(['session-2:RGB', 'session-2:Z']);
+  });
+
+  it('remembers submitted batch cells when an in-progress export is cancelled', async () => {
+    installUiFixture();
+
+    const onExportImageBatch = vi.fn<(_: {
+      entries: Array<{ outputFilename: string }>;
+    }, signal: AbortSignal) => Promise<void>>((_request, signal) => {
+      return new Promise<void>((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          reject(signal.reason);
+        }, { once: true });
+      });
+    });
+    const ui = new ViewerUi(createUiCallbacks({ onExportImageBatch }));
+    applyBatchTarget(ui, createRgbExportBatchTarget(2));
+
+    const batchButton = document.getElementById('export-image-batch-button') as HTMLButtonElement;
+    const deselectAllButton = document.getElementById('export-batch-deselect-all-button') as HTMLButtonElement;
+    const submitButton = document.getElementById('export-batch-dialog-submit-button') as HTMLButtonElement;
+    const cancelButton = document.getElementById('export-batch-dialog-cancel-button') as HTMLButtonElement;
+
+    batchButton.click();
+    deselectAllButton.click();
+    clickExportBatchCell('session-2', 'Z');
+    submitButton.click();
+    await flushMicrotasks();
+
+    expect(onExportImageBatch).toHaveBeenCalledTimes(1);
+    expect(onExportImageBatch.mock.calls[0]?.[0].entries.map((entry) => entry.outputFilename)).toEqual([
+      'image-2.Z.png'
+    ]);
+
+    cancelButton.click();
+    await flushMicrotasks();
+
+    batchButton.click();
     expect(getCheckedExportBatchCellIds()).toEqual(['session-2:Z']);
   });
 
@@ -8866,12 +8972,30 @@ function clickExportBatchCell(sessionId: string, columnKey: string, regionId: st
   input!.click();
 }
 
+function clickExportBatchFileRow(sessionId: string): void {
+  const input = document.querySelector<HTMLInputElement>(
+    `input[data-batch-toggle="row"][data-session-id="${sessionId}"]`
+  );
+  expect(input).not.toBeNull();
+  input!.click();
+}
+
 function getCheckedExportBatchCellRegionColumnKeys(): string[] {
   return Array.from(document.querySelectorAll<HTMLInputElement>(
     'input[data-batch-toggle="cell"]:checked'
   )).map((input) => {
     const regionLabel = input.dataset.regionId?.replace(/^screenshot-region-/, 'R') ?? '';
     return `${regionLabel}:${input.dataset.columnKey ?? ''}`;
+  });
+}
+
+function getCheckedExportBatchRegionCellLabels(): string[] {
+  return Array.from(document.querySelectorAll<HTMLInputElement>(
+    'input[data-batch-toggle="cell"]:checked'
+  )).map((input) => {
+    const regionLabel = input.closest('tr')?.querySelector('.export-batch-region-label')?.textContent ?? '';
+    const regionToken = regionLabel ? `${regionLabel}:` : '';
+    return `${input.dataset.sessionId ?? ''}:${regionToken}${input.dataset.columnKey ?? ''}`;
   });
 }
 

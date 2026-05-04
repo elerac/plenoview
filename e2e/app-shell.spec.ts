@@ -1172,6 +1172,112 @@ test('exports selected file-channel cells as one batch zip download', async ({ p
   }
 });
 
+test('remembers selected batch export file rows after canceling the dialog', async ({ page }) => {
+  await gotoViewerApp(page);
+
+  const openedImages = page.locator('#opened-images-select');
+  await page.setInputFiles('#file-input', {
+    name: 'rgb_aux.exr',
+    mimeType: 'image/exr',
+    buffer: buildRgbAuxExr()
+  });
+  await expect(openedImages.locator('option:checked')).toContainText('rgb_aux.exr', { timeout: 30000 });
+
+  await page.setInputFiles('#file-input', {
+    name: 'scalar_z.exr',
+    mimeType: 'image/exr',
+    buffer: buildScalarChannelExr()
+  });
+  await expect(openedImages.locator('option')).toHaveCount(2, { timeout: 30000 });
+
+  const fileMenuButton = page.getByRole('button', { name: 'File', exact: true });
+  const exportBatchMenuItem = page.locator('#export-image-batch-button');
+  const exportBatchDialog = page.locator('#export-batch-dialog-form');
+  const cancelButton = page.locator('#export-batch-dialog-cancel-button');
+  const checkedCells = page.locator('input[data-batch-toggle="cell"]:checked');
+  const rgbAuxRowToggle = page.locator('.export-batch-file-toggle').filter({ hasText: 'rgb_aux.exr' }).locator('input');
+  const scalarRowToggle = page.locator('.export-batch-file-toggle').filter({ hasText: 'scalar_z.exr' }).locator('input');
+
+  await fileMenuButton.click();
+  await expect(exportBatchMenuItem).toBeEnabled();
+  await exportBatchMenuItem.click();
+  await expect(exportBatchDialog).toBeVisible();
+
+  await page.locator('#export-batch-deselect-all-button').click();
+  await rgbAuxRowToggle.click();
+  await expect(checkedCells).toHaveCount(2);
+  await expect(rgbAuxRowToggle).toBeChecked();
+  await expect(scalarRowToggle).not.toBeChecked();
+
+  await cancelButton.click();
+  await expect(exportBatchDialog).toBeHidden();
+
+  await fileMenuButton.click();
+  await exportBatchMenuItem.click();
+  await expect(exportBatchDialog).toBeVisible();
+  await expect(checkedCells).toHaveCount(2);
+  await expect(rgbAuxRowToggle).toBeChecked();
+  await expect(scalarRowToggle).not.toBeChecked();
+});
+
+test('remembers selected screenshot batch export file rows after canceling the dialog', async ({ page }) => {
+  await gotoViewerApp(page);
+
+  const openedImages = page.locator('#opened-images-select');
+  await page.setInputFiles('#file-input', {
+    name: 'rgb_aux.exr',
+    mimeType: 'image/exr',
+    buffer: buildRgbAuxExr()
+  });
+  await expect(openedImages.locator('option:checked')).toContainText('rgb_aux.exr', { timeout: 30000 });
+
+  await page.setInputFiles('#file-input', {
+    name: 'scalar_z.exr',
+    mimeType: 'image/exr',
+    buffer: buildScalarChannelExr()
+  });
+  await expect(openedImages.locator('option')).toHaveCount(2, { timeout: 30000 });
+
+  const fileMenuButton = page.getByRole('button', { name: 'File', exact: true });
+  const exportScreenshotMenuItem = page.locator('#export-screenshot-button');
+  const selectionOverlay = page.locator('#screenshot-selection-overlay');
+  const addRegionButton = page.locator('#screenshot-selection-add-button');
+  const overlayBatchButton = page.locator('#screenshot-selection-export-batch-button');
+  const exportBatchDialog = page.locator('#export-batch-dialog-form');
+  const cancelButton = page.locator('#export-batch-dialog-cancel-button');
+  const checkedCells = page.locator('input[data-batch-toggle="cell"]:checked');
+  const rgbAuxRowToggle = page.locator('.export-batch-file-toggle').filter({ hasText: 'rgb_aux.exr' }).locator('input');
+  const scalarRowToggle = page.locator('.export-batch-file-toggle').filter({ hasText: 'scalar_z.exr' }).locator('input');
+
+  await fileMenuButton.click();
+  await expect(exportScreenshotMenuItem).toBeEnabled();
+  await exportScreenshotMenuItem.click();
+  await expect(selectionOverlay).toBeVisible();
+  await addRegionButton.click();
+  await overlayBatchButton.click();
+  await expect(exportBatchDialog).toBeVisible();
+  await expect(page.locator('#export-batch-dialog-title')).toHaveText('Export Screenshot Regions Batch');
+
+  await page.locator('#export-batch-deselect-all-button').click();
+  await rgbAuxRowToggle.click();
+  await expect(checkedCells).toHaveCount(4);
+  await expect(rgbAuxRowToggle).toBeChecked();
+  await expect(scalarRowToggle).not.toBeChecked();
+
+  await cancelButton.click();
+  await expect(exportBatchDialog).toBeHidden();
+  await expect(selectionOverlay).toBeHidden();
+
+  await fileMenuButton.click();
+  await exportScreenshotMenuItem.click();
+  await expect(selectionOverlay).toBeVisible();
+  await overlayBatchButton.click();
+  await expect(exportBatchDialog).toBeVisible();
+  await expect(checkedCells).toHaveCount(4);
+  await expect(rgbAuxRowToggle).toBeChecked();
+  await expect(scalarRowToggle).not.toBeChecked();
+});
+
 test('keeps batch export actions separated from scrollable content at constrained height', async ({ page }) => {
   await page.setViewportSize({ width: 1159, height: 733 });
   await gotoViewerApp(page);
