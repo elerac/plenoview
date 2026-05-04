@@ -1,7 +1,13 @@
 import { zipSync } from 'fflate';
 import { findColormapIdByLabel, getColormapAsset, loadColormapLut, type ColormapLut } from '../../colormaps';
 import { cloneDisplayLuminanceRange, resolveColormapAutoRange } from '../../colormap-range';
+import { computeRec709Luminance } from '../../color';
 import { cloneDisplaySelection, isStokesSelection } from '../../display-model';
+import {
+  createDisplayPixelValues,
+  readDisplaySelectionPixelValuesAtIndex,
+  resolveDisplaySelectionEvaluator
+} from '../../display/evaluator';
 import { createPngBlobFromPixels } from '../../export-image';
 import { buildColormapExportPixels, type ExportImagePixels } from '../../export/export-pixels';
 import {
@@ -32,11 +38,16 @@ import type {
   ExportImageRequest,
   ExportProgressUpdate,
   ExportScreenshotRegionsRequest,
+  DecodedLayer,
+  DisplayLuminanceRange,
   OpenedImageSession,
   ViewerState,
-  ViewerSessionState
+  ViewerSessionState,
+  VisualizationMode
 } from '../../types';
 import type { WebGlExrRenderer } from '../../renderer';
+
+type BatchPreviewRangeStrategy = 'exact' | 'sampledPreview';
 
 type BatchEntryVisualizationState = Pick<
   ViewerSessionState,
@@ -95,6 +106,8 @@ interface ExportImageBatchPreviewActionDependencies {
 
 type ViewerStateProvider = () => ViewerAppState;
 type ExportProgressReporter = (update: ExportProgressUpdate) => void;
+
+const PREVIEW_LUMINANCE_RANGE_MAX_SAMPLES = 4096;
 
 interface ExportColormapActionDependencies {
   core: ViewerAppCore;
@@ -189,8 +202,34 @@ export function createImageExportPixelsResolver({
       throw new Error('The active colormap is not ready for export.');
     }
 
-    assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
-    getRenderCache().prepareActiveSession(activeSession, state.sessionState);
+    const screenshotRegion = request.mode === 'screenshot' ? request : null;
+    if (options.previewMaxLongestEdge && !screenshotRegion) {
+      const layer = activeSession.decoded.layers[state.sessionState.activeLayer] ?? null;
+      if (!layer) {
+        throw new Error('No image layer is active.');
+      }
+
+      const pixels = buildDisplaySelectionThumbnailPixels(
+        layer,
+        activeSession.decoded.width,
+        activeSession.decoded.height,
+        state.sessionState,
+        state.sessionState.displaySelection,
+        options.previewMaxLongestEdge,
+        {
+          visualizationMode: state.sessionState.visualizationMode,
+          colormapRange: state.sessionState.colormapRange,
+          colormapLut: selectActiveColormapLut(state),
+          stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
+          stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode
+        }
+      );
+      assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
+      return pixels;
+    }
+
+	    assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
+	    getRenderCache().prepareActiveSession(activeSession, state.sessionState);
     if (options.signal) {
       throwIfAborted(options.signal);
     }
@@ -200,8 +239,7 @@ export function createImageExportPixelsResolver({
       throw createAbortError('Viewer application has been disposed.');
     }
 
-    const screenshotRegion = request.mode === 'screenshot' ? request : null;
-    const requestedWidth = screenshotRegion?.outputWidth ?? activeSession.decoded.width;
+	    const requestedWidth = screenshotRegion?.outputWidth ?? activeSession.decoded.width;
     const requestedHeight = screenshotRegion?.outputHeight ?? activeSession.decoded.height;
     const outputSize = options.previewMaxLongestEdge
       ? resolveBoundedImageExportSize(requestedWidth, requestedHeight, options.previewMaxLongestEdge)
@@ -665,6 +703,7 @@ async function resolveBatchEntryExportResult({
   lutCache,
   signal,
   previewMaxLongestEdge,
+  rangeStrategy = 'exact',
   abortMessage
 }: {
   entry: ExportImageBatchPreviewRequest;
@@ -676,6 +715,7 @@ async function resolveBatchEntryExportResult({
   lutCache: Map<string, ColormapLut>;
   signal: AbortSignal;
   previewMaxLongestEdge?: number;
+  rangeStrategy?: BatchPreviewRangeStrategy;
   abortMessage: string;
 }): Promise<{ pixels: ExportImagePixels; renderState: ViewerState }> {
   const exportState = await resolveBatchEntryExportState({
@@ -684,7 +724,8 @@ async function resolveBatchEntryExportResult({
     appState,
     renderCache,
     lutCache,
-    signal
+    signal,
+    rangeStrategy
   });
   assertSessionCurrent(getCurrentState(), session, signal);
   if (exportState.lut) {
@@ -766,6 +807,7 @@ async function resolveBatchEntryPreviewPixels({
       lutCache,
       signal,
       previewMaxLongestEdge,
+      rangeStrategy: 'sampledPreview',
       abortMessage
     });
     return result.pixels;
@@ -777,7 +819,8 @@ async function resolveBatchEntryPreviewPixels({
     appState,
     renderCache,
     lutCache,
-    signal
+    signal,
+    rangeStrategy: 'sampledPreview'
   });
   throwIfAborted(signal, abortMessage);
   assertSessionCurrent(getCurrentState(), session, signal);
@@ -813,7 +856,8 @@ async function resolveBatchEntryExportState({
   appState,
   renderCache,
   lutCache,
-  signal
+  signal,
+  rangeStrategy = 'exact'
 }: {
   entry: ExportImageBatchPreviewRequest;
   session: OpenedImageSession;
@@ -821,6 +865,7 @@ async function resolveBatchEntryExportState({
   renderCache: RenderCacheService;
   lutCache: Map<string, ColormapLut>;
   signal: AbortSignal;
+  rangeStrategy?: BatchPreviewRangeStrategy;
 }): Promise<{ state: ViewerSessionState; lut: ColormapLut | null }> {
   const selection = cloneDisplaySelection(entry.displaySelection);
   const layer = session.decoded.layers[entry.activeLayer] ?? null;
@@ -865,11 +910,14 @@ async function resolveBatchEntryExportState({
       }
     }
   } else if (visualizationMode === 'colormap' && colormapRangeMode === 'alwaysAuto') {
-    const displayLuminanceRange = renderCache.resolveDisplayLuminanceRange(session, {
+    const rangeState = {
       activeLayer: entry.activeLayer,
       displaySelection: selection,
       visualizationMode
-    });
+    };
+    const displayLuminanceRange = rangeStrategy === 'sampledPreview'
+      ? resolvePreviewDisplayLuminanceRange(renderCache, session, layer, rangeState)
+      : renderCache.resolveDisplayLuminanceRange(session, rangeState);
     colormapRange = resolveColormapAutoRange(selection, displayLuminanceRange, colormapZeroCentered);
   }
 
@@ -896,6 +944,64 @@ async function resolveBatchEntryExportState({
     : null;
 
   return { state: exportState, lut };
+}
+
+function resolvePreviewDisplayLuminanceRange(
+  renderCache: RenderCacheService,
+  session: OpenedImageSession,
+  layer: DecodedLayer,
+  state: {
+    activeLayer: number;
+    displaySelection: ViewerSessionState['displaySelection'];
+    visualizationMode: VisualizationMode;
+  }
+): DisplayLuminanceRange | null {
+  const cachedRange = renderCache.getCachedLuminanceRange(session.id, state);
+  if (cachedRange) {
+    return cachedRange;
+  }
+
+  return computeSampledDisplayLuminanceRange(
+    layer,
+    session.decoded.width,
+    session.decoded.height,
+    state.displaySelection,
+    state.visualizationMode
+  );
+}
+
+function computeSampledDisplayLuminanceRange(
+  layer: DecodedLayer,
+  width: number,
+  height: number,
+  selection: ViewerSessionState['displaySelection'],
+  visualizationMode: VisualizationMode
+): DisplayLuminanceRange | null {
+  const pixelCount = Math.max(0, width * height);
+  if (pixelCount === 0) {
+    return null;
+  }
+
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const sample = createDisplayPixelValues();
+  const sampleStep = Math.max(1, Math.ceil(pixelCount / PREVIEW_LUMINANCE_RANGE_MAX_SAMPLES));
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let finiteCount = 0;
+
+  for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += sampleStep) {
+    readDisplaySelectionPixelValuesAtIndex(evaluator, pixelIndex, sample);
+    const luminance = computeRec709Luminance(sample.r, sample.g, sample.b);
+    if (!Number.isFinite(luminance)) {
+      continue;
+    }
+
+    finiteCount += 1;
+    min = Math.min(min, luminance);
+    max = Math.max(max, luminance);
+  }
+
+  return finiteCount > 0 ? { min, max } : null;
 }
 
 function resolveBatchEntryVisualizationState(

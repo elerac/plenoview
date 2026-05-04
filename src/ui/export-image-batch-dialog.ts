@@ -94,6 +94,14 @@ interface BatchPreviewJob {
   order: number;
 }
 
+interface BatchPreviewCandidate {
+  previewKey: string;
+  cellKey: string;
+  file: ExportImageBatchTarget['files'][number];
+  channel: ExportImageBatchChannelTarget;
+  screenshot: ExportScreenshotRegionItem | null;
+}
+
 type ExportBatchRegionSelection = ExportScreenshotRegionItem | null;
 
 export class ExportImageBatchDialogController implements Disposable {
@@ -207,22 +215,23 @@ export class ExportImageBatchDialogController implements Disposable {
     return this.exportResource.status === 'pending';
   }
 
-  private getPreviewDataUrl(previewKey: string): string | null {
-    return getSuccessValue(this.previewResourcesByKey.get(previewKey) ?? idleResource()) ?? null;
-  }
-
-  private isPreviewPending(previewKey: string): boolean {
-    return this.previewResourcesByKey.get(previewKey)?.status === 'pending';
-  }
-
-  private getPreviewPresentation(previewKey: string): { dataUrl: string | null; isPending: boolean } {
+  private getPreviewPresentation(
+    previewKey: string
+  ): { dataUrl: string | null; isPending: boolean; isUnavailable: boolean } {
     if (!this.hasValidScreenshotOutputSize()) {
-      return { dataUrl: null, isPending: false };
+      return { dataUrl: null, isPending: false, isUnavailable: true };
     }
 
+    const resource = this.previewResourcesByKey.get(previewKey);
+    if (!resource) {
+      return { dataUrl: null, isPending: false, isUnavailable: false };
+    }
+
+    const dataUrl = getSuccessValue(resource) ?? null;
     return {
-      dataUrl: this.getPreviewDataUrl(previewKey),
-      isPending: this.isPreviewPending(previewKey) || !this.previewResourcesByKey.has(previewKey)
+      dataUrl,
+      isPending: resource.status === 'pending',
+      isUnavailable: resource.status === 'error' || (resource.status === 'success' && !dataUrl)
     };
   }
 
@@ -991,8 +1000,8 @@ export class ExportImageBatchDialogController implements Disposable {
     region: ExportBatchRegionSelection = null
   ): HTMLElement {
     const previewKey = this.createPreviewKey(file.sessionId, columnKey, region);
-    const { dataUrl, isPending } = this.getPreviewPresentation(previewKey);
-    return createBatchCellPreview(previewKey, dataUrl, isPending);
+    const { dataUrl, isPending, isUnavailable } = this.getPreviewPresentation(previewKey);
+    return createBatchCellPreview(previewKey, dataUrl, isPending, isUnavailable);
   }
 
   private createPreviewKey(
@@ -1009,7 +1018,31 @@ export class ExportImageBatchDialogController implements Disposable {
       return;
     }
 
-    let queued = false;
+    const candidates = this.buildPreviewCandidates(columns, target);
+    const visiblePreviewKeys = this.collectVisiblePreviewKeys(candidates);
+    let queued = this.queuePreviewCandidateGroup(candidates, (candidate) => (
+      visiblePreviewKeys.has(candidate.previewKey) && this.checkedCellKeys.has(candidate.cellKey)
+    ));
+    queued = this.queuePreviewCandidateGroup(candidates, (candidate) => (
+      visiblePreviewKeys.has(candidate.previewKey) && !this.checkedCellKeys.has(candidate.cellKey)
+    )) || queued;
+    queued = this.queuePreviewCandidateGroup(candidates, (candidate) => (
+      !visiblePreviewKeys.has(candidate.previewKey) && this.checkedCellKeys.has(candidate.cellKey)
+    )) || queued;
+    if (!queued) {
+      queued = this.queueNextBackgroundPreviewJob(columns, target);
+    }
+
+    if (queued) {
+      this.startPreviewProcessing();
+    }
+  }
+
+  private buildPreviewCandidates(
+    columns: ExportBatchColumn[],
+    target: ExportImageBatchTarget
+  ): BatchPreviewCandidate[] {
+    const candidates: BatchPreviewCandidate[] = [];
     const regions = this.getMatrixRegions();
     const rowRegions: ExportBatchRegionSelection[] = regions.length > 1 ? regions : [null];
     for (const file of target.files) {
@@ -1021,21 +1054,72 @@ export class ExportImageBatchDialogController implements Disposable {
             continue;
           }
 
-          const previewKey = this.createPreviewKey(file.sessionId, column.key, region);
-          queued = this.queuePreviewJob(
-            previewKey,
-            serializeCellKey(file.sessionId, column.key, region?.id ?? null),
+          const cellKey = serializeCellKey(file.sessionId, column.key, region?.id ?? null);
+          candidates.push({
+            previewKey: this.createPreviewKey(file.sessionId, column.key, region),
+            cellKey,
             file,
             channel,
-            region ?? this.getSingleScreenshotRegionForRequest()
-          ) || queued;
+            screenshot: region ?? this.getSingleScreenshotRegionForRequest()
+          });
         }
       }
     }
 
-    if (queued) {
-      this.startPreviewProcessing();
+    return candidates;
+  }
+
+  private queuePreviewCandidateGroup(
+    candidates: BatchPreviewCandidate[],
+    predicate: (candidate: BatchPreviewCandidate) => boolean
+  ): boolean {
+    let queued = false;
+    for (const candidate of candidates) {
+      if (!predicate(candidate)) {
+        continue;
+      }
+
+      queued = this.queuePreviewJob(
+        candidate.previewKey,
+        candidate.cellKey,
+        candidate.file,
+        candidate.channel,
+        candidate.screenshot
+      ) || queued;
     }
+
+    return queued;
+  }
+
+  private queueNextBackgroundPreviewJob(
+    columns: ExportBatchColumn[] | null = null,
+    target: ExportImageBatchTarget | null = null
+  ): boolean {
+    const resolvedTarget = target ?? this.target;
+    if (!resolvedTarget || this.disposed || this.busy || !this.open || !this.hasValidScreenshotOutputSize()) {
+      return false;
+    }
+
+    const resolvedColumns = columns ?? buildExportBatchColumns(resolvedTarget.files, this.includeSplitRgbChannels);
+    const candidates = this.buildPreviewCandidates(resolvedColumns, resolvedTarget);
+    for (const candidate of candidates) {
+      if (
+        this.previewResourcesByKey.has(candidate.previewKey) ||
+        this.previewJobsByKey.has(candidate.previewKey)
+      ) {
+        continue;
+      }
+
+      return this.queuePreviewJob(
+        candidate.previewKey,
+        candidate.cellKey,
+        candidate.file,
+        candidate.channel,
+        candidate.screenshot
+      );
+    }
+
+    return false;
   }
 
   private queuePreviewJob(
@@ -1114,7 +1198,7 @@ export class ExportImageBatchDialogController implements Disposable {
   }
 
   private async processPreviewJobs(generation: number, abortController: AbortController): Promise<void> {
-    while (this.previewJobsByKey.size > 0) {
+    while (true) {
       if (
         this.disposed ||
         this.busy ||
@@ -1122,6 +1206,10 @@ export class ExportImageBatchDialogController implements Disposable {
         generation !== this.previewGeneration ||
         abortController.signal.aborted
       ) {
+        return;
+      }
+
+      if (this.previewJobsByKey.size === 0 && !this.queueNextBackgroundPreviewJob()) {
         return;
       }
 
@@ -1213,9 +1301,10 @@ export class ExportImageBatchDialogController implements Disposable {
   private takeNextPreviewJob(): BatchPreviewJob | null {
     let selectedJob: BatchPreviewJob | null = null;
     let selectedPriority = Number.POSITIVE_INFINITY;
+    const visiblePreviewKeys = this.collectVisiblePreviewKeys();
 
     for (const job of this.previewJobsByKey.values()) {
-      const priority = this.getPreviewJobPriority(job);
+      const priority = this.getPreviewJobPriority(job, visiblePreviewKeys);
       if (
         !selectedJob ||
         priority < selectedPriority ||
@@ -1233,44 +1322,67 @@ export class ExportImageBatchDialogController implements Disposable {
     return selectedJob;
   }
 
-  private getPreviewJobPriority(job: BatchPreviewJob): number {
-    if (this.checkedCellKeys.has(job.cellKey)) {
+  private getPreviewJobPriority(job: BatchPreviewJob, visiblePreviewKeys: ReadonlySet<string>): number {
+    const visible = visiblePreviewKeys.has(job.previewKey);
+    const checked = this.checkedCellKeys.has(job.cellKey);
+    if (visible && checked) {
       return 0;
     }
 
-    return this.isPreviewCellVisible(job.previewKey) ? 1 : 2;
+    if (visible) {
+      return 1;
+    }
+
+    return checked ? 2 : 3;
   }
 
-  private isPreviewCellVisible(previewKey: string): boolean {
+  private collectVisiblePreviewKeys(candidates: BatchPreviewCandidate[] | null = null): Set<string> {
+    const candidateKeys = candidates
+      ? new Set(candidates.map((candidate) => candidate.previewKey))
+      : null;
+    const visiblePreviewKeys = new Set<string>();
     const matrixRect = this.elements.exportBatchMatrix.getBoundingClientRect();
     if (matrixRect.width <= 0 || matrixRect.height <= 0) {
-      return true;
+      if (candidateKeys) {
+        return candidateKeys;
+      }
+
+      for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
+        const previewKey = element.dataset.previewKey;
+        if (previewKey) {
+          visiblePreviewKeys.add(previewKey);
+        }
+      }
+      return visiblePreviewKeys;
     }
 
     for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
-      if (element.dataset.previewKey !== previewKey) {
+      const previewKey = element.dataset.previewKey;
+      if (!previewKey || (candidateKeys && !candidateKeys.has(previewKey))) {
         continue;
       }
 
       const rect = element.getBoundingClientRect();
-      return (
+      if (
         rect.bottom >= matrixRect.top &&
         rect.top <= matrixRect.bottom &&
         rect.right >= matrixRect.left &&
         rect.left <= matrixRect.right
-      );
+      ) {
+        visiblePreviewKeys.add(previewKey);
+      }
     }
 
-    return false;
+    return visiblePreviewKeys;
   }
 
   private schedulePreviewReprioritization(): void {
-    if (this.disposed || this.busy || !this.open || this.previewJobsByKey.size === 0) {
+    if (this.disposed || this.busy || !this.open) {
       return;
     }
 
     if (typeof window.requestAnimationFrame !== 'function') {
-      this.startPreviewProcessing();
+      this.queueCurrentPreviews();
       return;
     }
 
@@ -1280,7 +1392,7 @@ export class ExportImageBatchDialogController implements Disposable {
 
     this.previewScrollRafHandle = window.requestAnimationFrame(() => {
       this.previewScrollRafHandle = null;
-      this.startPreviewProcessing();
+      this.queueCurrentPreviews();
     });
   }
 
@@ -1431,10 +1543,10 @@ export class ExportImageBatchDialogController implements Disposable {
   }
 
   private updatePreviewElements(previewKey: string): void {
-    const { dataUrl, isPending } = this.getPreviewPresentation(previewKey);
+    const { dataUrl, isPending, isUnavailable } = this.getPreviewPresentation(previewKey);
     for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
       if (element.dataset.previewKey === previewKey) {
-        updateBatchPreviewElement(element, dataUrl, isPending);
+        updateBatchPreviewElement(element, dataUrl, isPending, isUnavailable);
       }
     }
   }
@@ -1442,8 +1554,8 @@ export class ExportImageBatchDialogController implements Disposable {
   private updateAllPreviewElements(): void {
     for (const element of this.elements.exportBatchMatrix.querySelectorAll<HTMLElement>('[data-preview-key]')) {
       const previewKey = element.dataset.previewKey ?? '';
-      const { dataUrl, isPending } = this.getPreviewPresentation(previewKey);
-      updateBatchPreviewElement(element, dataUrl, isPending);
+      const { dataUrl, isPending, isUnavailable } = this.getPreviewPresentation(previewKey);
+      updateBatchPreviewElement(element, dataUrl, isPending, isUnavailable);
     }
   }
 
@@ -1985,31 +2097,34 @@ function createFileLabel(file: ExportImageBatchTarget['files'][number]): HTMLEle
 function createBatchCellPreview(
   previewKey: string,
   dataUrl: string | null | undefined,
-  isPending: boolean
+  isPending: boolean,
+  isUnavailable: boolean
 ): HTMLElement {
   const element = document.createElement('span');
   element.className = 'export-batch-cell-preview';
   element.setAttribute('aria-hidden', 'true');
   element.dataset.previewKey = previewKey;
-  updateBatchCellPreview(element, dataUrl, isPending);
+  updateBatchCellPreview(element, dataUrl, isPending, isUnavailable);
   return element;
 }
 
 function updateBatchPreviewElement(
   element: HTMLElement,
   dataUrl: string | null | undefined,
-  isPending: boolean
+  isPending: boolean,
+  isUnavailable: boolean
 ): void {
-  updateBatchCellPreview(element, dataUrl, isPending);
+  updateBatchCellPreview(element, dataUrl, isPending, isUnavailable);
 }
 
 function updateBatchCellPreview(
   element: HTMLElement,
   dataUrl: string | null | undefined,
-  isPending: boolean
+  isPending: boolean,
+  isUnavailable: boolean
 ): void {
   element.classList.toggle('is-loading', isPending);
-  element.classList.toggle('is-unavailable', !isPending && !dataUrl);
+  element.classList.toggle('is-unavailable', isUnavailable);
 
   if (dataUrl) {
     const image = document.createElement('img');

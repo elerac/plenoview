@@ -171,7 +171,6 @@ function sameExportBatchFiles(
       item.filename === other.filename &&
       item.label === other.label &&
       item.sourcePath === other.sourcePath &&
-      item.thumbnailDataUrl === other.thumbnailDataUrl &&
       item.activeLayer === other.activeLayer &&
       sameDisplaySelection(item.displaySelection, other.displaySelection) &&
       sameExportBatchChannels(item.channels, other.channels);

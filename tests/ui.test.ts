@@ -4493,6 +4493,7 @@ describe('view menu', () => {
     expect(getCheckedExportBatchCellColumnKeys()).toEqual(['RGB', 'Z', 'Z']);
     expect(selectAllButton.disabled).toBe(true);
     expect(deselectAllButton.disabled).toBe(false);
+    expect(onResolveExportImageBatchPreview).toHaveBeenCalledTimes(3);
 
     deselectAllButton.click();
     expect(getCheckedExportBatchCellColumnKeys()).toEqual([]);
@@ -4500,8 +4501,10 @@ describe('view menu', () => {
     expect(submitButton.disabled).toBe(true);
     expect(selectAllButton.disabled).toBe(false);
     expect(deselectAllButton.disabled).toBe(true);
+    expect(onResolveExportImageBatchPreview).toHaveBeenCalledTimes(3);
 
     selectAllButton.click();
+    expect(onResolveExportImageBatchPreview).toHaveBeenCalledTimes(3);
 
     archiveInput.value = 'selected-frames';
     compressionInput.value = '10';
@@ -4622,6 +4625,75 @@ describe('view menu', () => {
 
     expect(document.querySelectorAll('.export-batch-cell-preview')).toHaveLength(24);
     expect(onResolveExportImageBatchPreview).not.toHaveBeenCalled();
+    ui.dispose();
+  });
+
+  it('queues visible batch previews before neutral offscreen cells', async () => {
+    installUiFixture();
+    const idleCallbacks = installDeferredIdleCallbacks();
+
+    const onResolveExportImageBatchPreview = vi.fn<(_request: {
+      sessionId: string;
+      channelLabel: string;
+    }, _signal: AbortSignal) => Promise<ReturnType<typeof createPreviewPixels>>>(async () => createPreviewPixels());
+    const ui = new ViewerUi(createUiCallbacks({ onResolveExportImageBatchPreview }));
+    const target = createRgbExportBatchTarget(4, ['R', 'G', 'B']);
+    applyBatchTarget(ui, target);
+
+    const visiblePreviewIndexes = new Set([0]);
+    const rect = (
+      top: number,
+      bottom: number,
+      width = 96
+    ) => ({
+      x: 0,
+      y: top,
+      top,
+      bottom,
+      left: 0,
+      right: width,
+      width,
+      height: bottom - top,
+      toJSON: () => ({})
+    }) as DOMRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.id === 'export-batch-matrix') {
+        return rect(0, 80, 160);
+      }
+      if (this.classList.contains('export-batch-cell-preview')) {
+        const previews = Array.from(document.querySelectorAll<HTMLElement>('.export-batch-cell-preview'));
+        const index = previews.indexOf(this);
+        return visiblePreviewIndexes.has(index) ? rect(0, 40) : rect(200 + index * 60, 240 + index * 60);
+      }
+      return rect(200, 200, 0);
+    });
+
+    (document.getElementById('export-image-batch-button') as HTMLButtonElement).click();
+
+    expect(document.querySelectorAll('.export-batch-cell-preview')).toHaveLength(4);
+    expect(document.querySelectorAll('.export-batch-cell-preview.is-loading')).toHaveLength(1);
+    expect(document.querySelectorAll('.export-batch-cell-preview.is-unavailable')).toHaveLength(0);
+    expect(onResolveExportImageBatchPreview).not.toHaveBeenCalled();
+
+    await flushMicrotasks();
+    idleCallbacks.shift()?.();
+    await flushMicrotasks();
+
+    expect(onResolveExportImageBatchPreview.mock.calls.map(([request]) => request.sessionId)).toEqual([
+      'session-1'
+    ]);
+
+    visiblePreviewIndexes.clear();
+    visiblePreviewIndexes.add(3);
+    (document.getElementById('export-batch-matrix') as HTMLElement).dispatchEvent(new Event('scroll'));
+    await flushMicrotasks();
+    idleCallbacks.shift()?.();
+    await flushMicrotasks();
+
+    expect(onResolveExportImageBatchPreview.mock.calls.map(([request]) => request.sessionId)).toEqual([
+      'session-1',
+      'session-4'
+    ]);
     ui.dispose();
   });
 

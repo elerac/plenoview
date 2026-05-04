@@ -985,7 +985,81 @@ describe('bootstrap app lifecycle', () => {
     app.dispose();
   });
 
-  it('resolves image preview pixels without creating a blob or triggering a download', async () => {
+  it('resolves full-image preview pixels as a bounded CPU thumbnail without GPU preparation', async () => {
+    class ResizeObserverMock {
+      constructor(callback: ResizeObserverCallback) {
+        mocks.setResizeObserverCallback(callback);
+      }
+
+      observe(): void {}
+      disconnect(): void {}
+    }
+
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const { createPlanarChannelStorage } = await import('../src/channel-storage');
+    const pixelCount = 1024 * 512;
+    const layer = {
+      name: null,
+      channelNames: ['R', 'G', 'B'],
+      channelStorage: createPlanarChannelStorage({
+        R: new Float32Array(pixelCount).fill(1),
+        G: new Float32Array(pixelCount).fill(0.5),
+        B: new Float32Array(pixelCount).fill(0.25)
+      }, ['R', 'G', 'B']),
+      analysis: {
+        displayLuminanceRangeBySelectionKey: {},
+        finiteRangeByChannel: {}
+      }
+    };
+    const session = {
+      id: 'session-1',
+      filename: 'image.exr',
+      displayName: 'image.exr',
+      fileSizeBytes: 3,
+      source: {
+        kind: 'url',
+        url: '/image.exr'
+      },
+      decoded: {
+        width: 1024,
+        height: 512,
+        layers: [layer]
+      },
+      state: mocks.coreState.sessionState
+    };
+    const mutableCoreState = mocks.coreState as unknown as {
+      activeSessionId: string | null;
+      sessions: unknown[];
+    };
+    mutableCoreState.activeSessionId = 'session-1';
+    mutableCoreState.sessions = [session];
+
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp();
+    const callbacks = mocks.getUiCallbacks() as {
+      onResolveExportImagePreview: (
+        request: unknown,
+        signal: AbortSignal
+      ) => Promise<{ width: number; height: number; data: Uint8ClampedArray }>;
+    };
+    const abortController = new AbortController();
+
+    const pixels = await callbacks.onResolveExportImagePreview({ mode: 'image' }, abortController.signal);
+
+    expect(pixels.width).toBe(256);
+    expect(pixels.height).toBe(128);
+    expect(pixels.data).toHaveLength(256 * 128 * 4);
+    expect(mocks.renderCachePrepareActiveSession).not.toHaveBeenCalled();
+    expect(mocks.rendererReadExportPixels).not.toHaveBeenCalled();
+    expect(mocks.createPngBlobFromPixels).not.toHaveBeenCalled();
+    expect(anchorClick).not.toHaveBeenCalled();
+
+    app.dispose();
+  });
+
+  it('keeps screenshot image previews on the renderer with bounded output', async () => {
     class ResizeObserverMock {
       constructor(callback: ResizeObserverCallback) {
         mocks.setResizeObserverCallback(callback);
@@ -1003,10 +1077,7 @@ describe('bootstrap app lifecycle', () => {
       filename: 'image.exr',
       displayName: 'image.exr',
       fileSizeBytes: 3,
-      source: {
-        kind: 'url',
-        url: '/image.exr'
-      },
+      source: { kind: 'url', url: '/image.exr' },
       decoded: {
         width: 1024,
         height: 512,
@@ -1034,7 +1105,13 @@ describe('bootstrap app lifecycle', () => {
     };
     const abortController = new AbortController();
 
-    await expect(callbacks.onResolveExportImagePreview({ mode: 'image' }, abortController.signal)).resolves.toEqual(pixels);
+    await expect(callbacks.onResolveExportImagePreview({
+      mode: 'screenshot',
+      rect: { x: 0, y: 0, width: 512, height: 256 },
+      sourceViewport: { width: 1024, height: 512 },
+      outputWidth: 1024,
+      outputHeight: 512
+    }, abortController.signal)).resolves.toBe(pixels);
 
     expect(mocks.renderCachePrepareActiveSession).toHaveBeenCalledWith(session, mocks.coreState.sessionState);
     expect(mocks.rendererReadExportPixels).toHaveBeenCalledWith(expect.objectContaining({
@@ -1297,7 +1374,7 @@ describe('bootstrap app lifecycle', () => {
     app.dispose();
   });
 
-  it('aborts image previews when the active source closes during GPU preparation', async () => {
+  it('aborts screenshot image previews when the active source closes during GPU preparation', async () => {
     class ResizeObserverMock {
       constructor(callback: ResizeObserverCallback) {
         mocks.setResizeObserverCallback(callback);
@@ -1348,7 +1425,13 @@ describe('bootstrap app lifecycle', () => {
     };
 
     await expect(callbacks.onResolveExportImagePreview(
-      { mode: 'image' },
+      {
+        mode: 'screenshot',
+        rect: { x: 0, y: 0, width: 128, height: 64 },
+        sourceViewport: { width: 256, height: 128 },
+        outputWidth: 128,
+        outputHeight: 64
+      },
       new AbortController().signal
     )).rejects.toMatchObject({ name: 'AbortError' });
 

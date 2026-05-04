@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { sameOpenedImageOptions, sameViewerSessionState, sameProbeReadout } from '../src/app/viewer-app-equality';
+import {
+  sameExportBatchTarget,
+  sameOpenedImageOptions,
+  sameProbeReadout,
+  sameViewerSessionState
+} from '../src/app/viewer-app-equality';
 import { createViewerSessionState } from './helpers/state-fixtures';
 
 describe('viewer app equality helpers', () => {
@@ -26,6 +31,46 @@ describe('viewer app equality helpers', () => {
 
     expect(sameViewerSessionState(base, same)).toBe(true);
     expect(sameViewerSessionState(base, changed)).toBe(false);
+  });
+
+  it('ignores unused file thumbnail data while comparing export batch targets', () => {
+    const selection = {
+      kind: 'channelRgb' as const,
+      r: 'R',
+      g: 'G',
+      b: 'B',
+      alpha: null
+    };
+    const base = {
+      archiveFilename: 'openexr-export.zip',
+      activeSessionId: 'session-1',
+      files: [{
+        sessionId: 'session-1',
+        filename: 'image.exr',
+        label: 'image.exr',
+        sourcePath: 'image.exr',
+        thumbnailDataUrl: null,
+        activeLayer: 0,
+        displaySelection: selection,
+        channels: [{
+          value: 'group:',
+          label: 'RGB',
+          selectionKey: 'channelRgb:R:G:B:',
+          selection,
+          swatches: ['#ff6570', '#6bd66f', '#51aefe'],
+          mergedOrder: 0,
+          splitOrder: 0
+        }]
+      }]
+    };
+
+    expect(sameExportBatchTarget(base, {
+      ...base,
+      files: [{
+        ...base.files[0],
+        thumbnailDataUrl: 'data:image/png;base64,AAAA'
+      }]
+    })).toBe(true);
   });
 
   it('compares probe readouts structurally without stringify-based equality', () => {
