@@ -1,5 +1,13 @@
 import { cloneViewerSessionState } from '../../session-state';
 import { createInteractionState } from '../../view-state';
+import {
+  assignActiveViewerPaneSession,
+  assignViewerPaneSession,
+  getActiveViewerPaneSessionId,
+  pruneViewerPaneSessions,
+  resetViewerPaneLayout,
+  sameViewerPaneLayout
+} from '../../viewer-pane-layout';
 import { selectActiveSession } from '../viewer-app-selectors';
 import {
   buildResetSessionState,
@@ -7,7 +15,11 @@ import {
   createClearedViewerState
 } from '../session-resource';
 import type { ViewerAppState, ViewerIntent } from '../viewer-app-types';
-import { patchSessionState, type ViewerReducerContext } from './shared';
+import {
+  patchSessionState,
+  updateActiveSessionStoredState,
+  type ViewerReducerContext
+} from './shared';
 
 export function sessionReducer(
   state: ViewerAppState,
@@ -77,7 +89,8 @@ export function sessionReducer(
         pendingOpenedImages,
         activeSessionId: intent.session.id,
         sessionState: cloneViewerSessionState(intent.session.state),
-        interactionState: createInteractionState(intent.session.state)
+        interactionState: createInteractionState(intent.session.state),
+        viewerPaneLayout: assignActiveViewerPaneSession(state.viewerPaneLayout, intent.session.id)
       };
     }
     case 'sessionReloaded': {
@@ -127,8 +140,20 @@ export function sessionReducer(
     }
     case 'activeSessionSwitched': {
       const nextSession = state.sessions.find((session) => session.id === intent.sessionId);
-      if (!nextSession || state.activeSessionId === nextSession.id) {
+      if (!nextSession) {
         return state;
+      }
+
+      const viewerPaneLayout = intent.panePath
+        ? assignViewerPaneSession(state.viewerPaneLayout, intent.panePath, nextSession.id, true)
+        : assignActiveViewerPaneSession(state.viewerPaneLayout, nextSession.id);
+      if (state.activeSessionId === nextSession.id) {
+        return sameViewerPaneLayout(state.viewerPaneLayout, viewerPaneLayout)
+          ? state
+          : {
+              ...state,
+              viewerPaneLayout
+            };
       }
 
       const nextSessionState = buildSwitchedSessionState(
@@ -140,12 +165,58 @@ export function sessionReducer(
           autoFitInsets: state.autoFitImageOnSelect ? intent.fitInsets ?? null : null
         }
       );
+      const sessionsWithCurrentState = updateActiveSessionStoredState(
+        state.sessions,
+        state.activeSessionId,
+        state.sessionState
+      );
       return {
         ...state,
+        sessions: updateActiveSessionStoredState(sessionsWithCurrentState, nextSession.id, nextSessionState),
+        activeSessionId: nextSession.id,
+        sessionState: nextSessionState,
+        interactionState: createInteractionState(nextSessionState),
+        viewerPaneLayout
+      };
+    }
+    case 'viewerPaneActivated': {
+      const sessionId = getActiveViewerPaneSessionId(state.viewerPaneLayout);
+      if (!sessionId || sessionId === state.activeSessionId) {
+        return state;
+      }
+
+      const nextSession = state.sessions.find((session) => session.id === sessionId);
+      if (!nextSession) {
+        return state;
+      }
+
+      const nextSessionState = cloneViewerSessionState(nextSession.state);
+      return {
+        ...state,
+        sessions: updateActiveSessionStoredState(state.sessions, state.activeSessionId, state.sessionState),
         activeSessionId: nextSession.id,
         sessionState: nextSessionState,
         interactionState: createInteractionState(nextSessionState)
       };
+    }
+    case 'viewerPaneSessionAssigned': {
+      const session = state.sessions.find((item) => item.id === intent.sessionId);
+      if (!session) {
+        return state;
+      }
+
+      const viewerPaneLayout = assignViewerPaneSession(
+        state.viewerPaneLayout,
+        intent.panePath,
+        session.id,
+        false
+      );
+      return sameViewerPaneLayout(state.viewerPaneLayout, viewerPaneLayout)
+        ? state
+        : {
+            ...state,
+            viewerPaneLayout
+          };
     }
     case 'sessionsReordered': {
       if (state.sessions.length <= 1) {
@@ -195,12 +266,17 @@ export function sessionReducer(
       const remainingSessions = state.sessions.filter((session) => session.id !== intent.sessionId);
 
       if (!removingActive) {
+        const validSessionIds = new Set(remainingSessions.map((session) => session.id));
+        const fallbackSessionId = state.activeSessionId && validSessionIds.has(state.activeSessionId)
+          ? state.activeSessionId
+          : remainingSessions[0]?.id ?? null;
         return {
           ...state,
           sessions: remainingSessions,
           pendingOpenedImages: state.pendingOpenedImages.filter(
             (reservation) => reservation.id !== intent.sessionId
-          )
+          ),
+          viewerPaneLayout: pruneViewerPaneSessions(state.viewerPaneLayout, validSessionIds, fallbackSessionId)
         };
       }
 
@@ -212,7 +288,8 @@ export function sessionReducer(
           pendingOpenedImages: [],
           activeSessionId: null,
           sessionState: cleared,
-          interactionState: createInteractionState(cleared)
+          interactionState: createInteractionState(cleared),
+          viewerPaneLayout: resetViewerPaneLayout(null)
         };
       }
 
@@ -235,7 +312,12 @@ export function sessionReducer(
         ),
         activeSessionId: nextSession.id,
         sessionState: nextSessionState,
-        interactionState: createInteractionState(nextSessionState)
+        interactionState: createInteractionState(nextSessionState),
+        viewerPaneLayout: pruneViewerPaneSessions(
+          state.viewerPaneLayout,
+          new Set(remainingSessions.map((session) => session.id)),
+          nextSession.id
+        )
       };
     }
     case 'allSessionsClosed': {
@@ -246,7 +328,8 @@ export function sessionReducer(
         pendingOpenedImages: [],
         activeSessionId: null,
         sessionState: cleared,
-        interactionState: createInteractionState(cleared)
+        interactionState: createInteractionState(cleared),
+        viewerPaneLayout: resetViewerPaneLayout(null)
       };
     }
     case 'activeSessionReset': {

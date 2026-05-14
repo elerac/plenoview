@@ -120,6 +120,16 @@ export interface ViewerImageStatsRequest extends ViewerResourceTarget {
   requestKey: string;
 }
 
+export interface ViewerPaneRenderSource {
+  path: ViewerPanePath;
+  active: boolean;
+  session: OpenedImageSession;
+  activeLayer: number;
+  layer: DecodedLayer;
+  renderState: ViewerRenderState;
+  colormapLut: ColormapLut | null;
+}
+
 export interface ViewerAppState {
   sessionState: ViewerSessionState;
   interactionState: ViewerInteractionState;
@@ -131,6 +141,7 @@ export interface ViewerAppState {
   colormapRegistry: ColormapRegistry | null;
   defaultColormapId: string;
   colormapLutResource: AsyncResource<ColormapLut>;
+  colormapLutsById: Record<string, AsyncResource<ColormapLut>>;
   displayRangeResource: AsyncResource<DisplayLuminanceRange | null>;
   imageStatsResource: AsyncResource<ImageStats | null>;
   autoExposureResource: AsyncResource<AutoExposureResult | null>;
@@ -160,7 +171,7 @@ export type ViewerIntent =
   | { type: 'viewerPaneSplit'; orientation: ViewerPaneSplitOrientation }
   | { type: 'colormapRegistryResolved'; registry: ColormapRegistry }
   | { type: 'colormapLoadStarted'; requestId: number; colormapId: string }
-  | { type: 'colormapLoadResolved'; requestId: number; colormapId: string; lut: ColormapLut }
+  | { type: 'colormapLoadResolved'; requestId: number | null; colormapId: string; lut: ColormapLut }
   | { type: 'colormapLoadFailed'; requestId: number; colormapId: string; error: ViewerError | Error | string }
   | { type: 'displaySelectionTransitionStarted'; requestId: number }
   | { type: 'displaySelectionTransitionFinished'; requestId: number }
@@ -196,7 +207,18 @@ export type ViewerIntent =
   | { type: 'sessionLoaded'; session: OpenedImageSession; activate?: boolean }
   | { type: 'sessionReloaded'; sessionId: string; session: OpenedImageSession }
   | { type: 'sessionDisplayNameChanged'; sessionId: string; displayName: string }
-  | { type: 'activeSessionSwitched'; sessionId: string; viewport?: ViewportInfo; fitInsets?: ViewportInsets }
+  | {
+      type: 'activeSessionSwitched';
+      sessionId: string;
+      panePath?: ViewerPanePath;
+      viewport?: ViewportInfo;
+      fitInsets?: ViewportInsets;
+    }
+  | {
+      type: 'viewerPaneSessionAssigned';
+      sessionId: string;
+      panePath: ViewerPanePath;
+    }
   | {
       type: 'sessionsReordered';
       draggedSessionId: string;
@@ -314,6 +336,7 @@ export interface ViewerRenderSnapshot {
   activeSession: OpenedImageSession | null;
   activeLayer: DecodedLayer | null;
   renderState: ViewerRenderState;
+  paneRenderSources: ViewerPaneRenderSource[];
   activeColormapLut: ColormapLut | null;
   probeReadout: ProbeReadoutModel;
   roiReadout: RoiReadoutModel;

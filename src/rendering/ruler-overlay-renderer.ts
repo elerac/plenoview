@@ -100,7 +100,7 @@ export class RulerOverlayRenderer implements Disposable {
       return;
     }
 
-    this.clear();
+    this.clearOverlay();
 
     const imageSize = this.imageSize;
     if (!visible || !imageSize || state.viewerMode === 'panorama') {
@@ -116,20 +116,36 @@ export class RulerOverlayRenderer implements Disposable {
     const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
 
     for (const pane of panes) {
-      const group = document.createElementNS(SVG_NS, 'g');
-      group.setAttribute('transform', `translate(${pane.rect.x} ${pane.rect.y})`);
-
-      appendSvgRect(group, 0, 0, pane.viewport.width, RULER_SIZE, palette.surface);
-      appendSvgRect(group, 0, 0, RULER_SIZE, pane.viewport.height, palette.surface);
-      appendSvgLine(group, 0, RULER_SIZE - 0.5, pane.viewport.width, RULER_SIZE - 0.5, palette.border);
-      appendSvgLine(group, RULER_SIZE - 0.5, 0, RULER_SIZE - 0.5, pane.viewport.height, palette.border);
-
-      const origin = { x: pane.rect.x, y: pane.rect.y };
-      drawHorizontalRuler(group, this.labelOverlay, state, pane.viewport, imageSize.width, palette.tick, origin);
-      drawVerticalRuler(group, this.labelOverlay, state, pane.viewport, imageSize.height, palette.tick, origin);
-      fragment.append(group);
+      this.appendPaneRuler(fragment, state, pane, imageSize, palette);
     }
 
+    this.svg.append(fragment);
+  }
+
+  clearOverlay(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.clear();
+  }
+
+  renderPane(state: ViewerState, visible: boolean, pane: ViewerPaneRenderInfo): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const imageSize = this.imageSize;
+    if (!visible || !imageSize || state.viewerMode === 'panorama') {
+      return;
+    }
+
+    if (imageSize.width <= 0 || imageSize.height <= 0 || state.zoom <= 0) {
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    this.appendPaneRuler(fragment, state, pane, imageSize, readRulerPalette(this.svg));
     this.svg.append(fragment);
   }
 
@@ -146,6 +162,27 @@ export class RulerOverlayRenderer implements Disposable {
   private clear(): void {
     this.svg.replaceChildren();
     this.labelOverlay.replaceChildren();
+  }
+
+  private appendPaneRuler(
+    fragment: DocumentFragment,
+    state: ViewerState,
+    pane: ViewerPaneRenderInfo,
+    imageSize: { width: number; height: number },
+    palette: RulerPalette
+  ): void {
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('transform', `translate(${pane.rect.x} ${pane.rect.y})`);
+
+    appendSvgRect(group, 0, 0, pane.viewport.width, RULER_SIZE, palette.surface);
+    appendSvgRect(group, 0, 0, RULER_SIZE, pane.viewport.height, palette.surface);
+    appendSvgLine(group, 0, RULER_SIZE - 0.5, pane.viewport.width, RULER_SIZE - 0.5, palette.border);
+    appendSvgLine(group, RULER_SIZE - 0.5, 0, RULER_SIZE - 0.5, pane.viewport.height, palette.border);
+
+    const origin = { x: pane.rect.x, y: pane.rect.y };
+    drawHorizontalRuler(group, this.labelOverlay, state, pane.viewport, imageSize.width, palette.tick, origin);
+    drawVerticalRuler(group, this.labelOverlay, state, pane.viewport, imageSize.height, palette.tick, origin);
+    fragment.append(group);
   }
 }
 

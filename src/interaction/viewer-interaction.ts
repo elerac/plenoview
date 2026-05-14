@@ -63,6 +63,11 @@ import type {
 export type { InteractionCallbacks, InteractionDependencies } from './shared';
 
 type DragMode = 'pan' | 'roi' | 'roi-adjust' | 'screenshot' | null;
+type PanePoint = {
+  pane: ViewerPaneRenderInfo;
+  point: PointerPosition;
+  inside: boolean;
+};
 const KEYBOARD_ZOOM_SPEED_STEPS_PER_SECOND = 3;
 const KEYBOARD_ZOOM_MAX_FRAME_MS = 50;
 
@@ -230,7 +235,13 @@ export class ViewerInteraction {
       return;
     }
 
-    const panePoint = this.resolvePanePoint(event, { activate: true });
+    const panePoint = this.resolveActivePanePoint(event);
+    if (!panePoint.inside) {
+      this.lastPointerInElement = null;
+      this.callbacks.onHoverPixel(null);
+      return;
+    }
+
     const point = panePoint.point;
     const state = this.callbacks.getState();
     const viewport = panePoint.pane.viewport;
@@ -354,13 +365,15 @@ export class ViewerInteraction {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
-    const panePoint = this.resolvePanePoint(event, {
-      activate: !this.dragging,
-      preferDragPane: this.dragging
-    });
-    const point = panePoint.point;
-    this.lastPointerInElement = point;
     const screenshotSelection = this.getScreenshotSelection();
+    const panePoint = screenshotSelection.active || this.dragging
+      ? this.resolvePanePoint(event, {
+        activate: false,
+        preferDragPane: this.dragging
+      })
+      : this.resolveActivePanePoint(event);
+    const point = panePoint.point;
+    this.lastPointerInElement = panePoint.inside ? point : null;
     if (screenshotSelection.active) {
       this.callbacks.onHoverPixel(null);
       if (this.dragging && this.dragMode === 'screenshot' && this.screenshotDrag) {
@@ -394,6 +407,12 @@ export class ViewerInteraction {
     const imageSize = this.callbacks.getImageSize();
     if (!imageSize) {
       this.callbacks.onHoverPixel(null);
+      return;
+    }
+
+    if (!this.dragging && !panePoint.inside) {
+      this.callbacks.onHoverPixel(null);
+      this.setRoiInteractionState(createRoiInteractionState());
       return;
     }
 
@@ -636,7 +655,7 @@ export class ViewerInteraction {
   private resolvePanePoint(
     event: MouseEvent,
     options: { activate?: boolean; preferDragPane?: boolean } = {}
-  ): { pane: ViewerPaneRenderInfo; point: PointerPosition } {
+  ): PanePoint {
     const elementPoint = this.getElementPoint(event);
     const pane = options.preferDragPane && this.dragPane
       ? this.dragPane
@@ -645,12 +664,23 @@ export class ViewerInteraction {
       this.activatePane(pane);
     }
 
+    return this.createPanePoint(elementPoint, pane);
+  }
+
+  private resolveActivePanePoint(event: MouseEvent): PanePoint {
+    const elementPoint = this.getElementPoint(event);
+    const pane = this.callbacks.getActivePane?.() ?? this.resolvePaneAtElementPoint(elementPoint);
+    return this.createPanePoint(elementPoint, pane);
+  }
+
+  private createPanePoint(elementPoint: PointerPosition, pane: ViewerPaneRenderInfo): PanePoint {
     return {
       pane,
       point: {
         x: elementPoint.x - pane.rect.x,
         y: elementPoint.y - pane.rect.y
-      }
+      },
+      inside: isPointInsideRect(elementPoint, pane.rect)
     };
   }
 
@@ -1009,6 +1039,17 @@ function isPointInsideViewport(point: PointerPosition, viewport: ViewportInfo): 
     point.x <= viewport.width &&
     point.y >= 0 &&
     point.y <= viewport.height
+  );
+}
+
+function isPointInsideRect(point: PointerPosition, rect: ViewportRect): boolean {
+  return (
+    Number.isFinite(point.x) &&
+    Number.isFinite(point.y) &&
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
   );
 }
 

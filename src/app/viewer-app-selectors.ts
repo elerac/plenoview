@@ -35,6 +35,11 @@ export function selectActiveSession(state: ViewerAppState): OpenedImageSession |
 }
 
 export function selectColormapLutById(state: ViewerAppState, colormapId: string): ColormapLut | null {
+  const cached = state.colormapLutsById?.[colormapId];
+  if (cached?.status === 'success') {
+    return cached.value;
+  }
+
   return state.colormapLutResource.status === 'success' && state.colormapLutResource.key === colormapId
     ? state.colormapLutResource.value
     : null;

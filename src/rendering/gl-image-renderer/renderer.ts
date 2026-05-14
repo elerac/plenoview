@@ -137,6 +137,14 @@ export class GlImageRenderer implements Disposable {
 
     this.state.imageSize = null;
     this.state.activeBinding = createEmptyDisplaySourceBinding();
+    this.clearFramebuffer();
+  }
+
+  clearFramebuffer(): void {
+    if (this.state.disposed) {
+      return;
+    }
+
     this.state.gl.bindFramebuffer(this.state.gl.FRAMEBUFFER, null);
     this.state.gl.viewport(0, 0, this.state.viewport.width, this.state.viewport.height);
     this.state.gl.clearColor(0, 0, 0, 0);
@@ -157,6 +165,14 @@ export class GlImageRenderer implements Disposable {
     }
 
     render(this.state, state, this.panes);
+  }
+
+  renderPane(state: ViewerState, pane: ViewerPaneRenderInfo): void {
+    if (this.state.disposed) {
+      return;
+    }
+
+    render(this.state, state, [pane], { clear: false });
   }
 
   dispose(): void {

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { gotoViewerApp, openGalleryCbox } from './helpers/app';
+import { buildScalarChannelExr } from './helpers/exr-fixtures';
 import { resolveViewerPoint } from './helpers/viewer';
 
 test('splits the viewer with Cmd+D shortcuts and resets to a single pane', async ({ page }) => {
@@ -39,6 +40,32 @@ test('splits the viewer with Cmd+D shortcuts and resets to a single pane', async
 
   await expectPaneCount(page, 0);
   await expect(exportScreenshot).toBeEnabled();
+});
+
+test('keeps different opened images assigned to split panes', async ({ page }) => {
+  await gotoViewerApp(page);
+  await openGalleryCbox(page);
+
+  const viewer = page.locator('#viewer-container');
+  const openedImages = page.locator('#opened-images-select');
+
+  await page.keyboard.press('Meta+D');
+  await expectPaneCount(page, 2);
+
+  await page.setInputFiles('#file-input', {
+    name: 'scalar_z.exr',
+    mimeType: 'image/exr',
+    buffer: buildScalarChannelExr()
+  });
+  await expect(openedImages.locator('option:checked')).toContainText('scalar_z.exr', { timeout: 30000 });
+
+  const leftPanePoint = await resolveViewerPoint(viewer, 0.25, 0.5);
+  await page.mouse.click(leftPanePoint.x, leftPanePoint.y);
+  await expect(openedImages.locator('option:checked')).toContainText('cbox_rgb.exr');
+
+  const rightPanePoint = await resolveViewerPoint(viewer, 0.75, 0.5);
+  await page.mouse.click(rightPanePoint.x, rightPanePoint.y);
+  await expect(openedImages.locator('option:checked')).toContainText('scalar_z.exr');
 });
 
 async function expectPaneCount(page: Page, count: number): Promise<void> {

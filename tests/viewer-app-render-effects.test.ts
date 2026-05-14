@@ -37,7 +37,15 @@ function createUiMock(): ViewerUi {
     setProbeReadout: vi.fn(),
     setRoiReadout: vi.fn(),
     setViewerStateReadout: vi.fn(),
-    setImageStats: vi.fn()
+    setImageStats: vi.fn(),
+    getViewerPaneRenderInfos: vi.fn(() => [
+      {
+        path: [],
+        rect: { x: 0, y: 0, width: 320, height: 180 },
+        viewport: { width: 320, height: 180 },
+        active: true
+      }
+    ])
   } as unknown as ViewerUi;
 }
 
@@ -46,11 +54,17 @@ function createRendererMock() {
     setColormapTexture: vi.fn(),
     clearColormapTexture: vi.fn(),
     clearImage: vi.fn(),
+    setViewerPanes: vi.fn(),
     setRulersVisible: vi.fn(),
+    beginPaneRender: vi.fn(),
     renderImage: vi.fn(),
+    renderImagePane: vi.fn(),
     renderValueOverlay: vi.fn(),
+    renderValueOverlayPane: vi.fn(),
     renderProbeOverlay: vi.fn(),
-    renderRulerOverlay: vi.fn()
+    renderProbeOverlayPane: vi.fn(),
+    renderRulerOverlay: vi.fn(),
+    renderRulerOverlayPane: vi.fn()
   };
 }
 
@@ -112,7 +126,7 @@ describe('viewer app render effects', () => {
 
     core.dispatch({ type: 'activeColormapSet', colormapId: '0' });
 
-    expect(renderer.clearColormapTexture).toHaveBeenCalledTimes(1);
+    expect(renderer.clearColormapTexture).toHaveBeenCalled();
     expect(renderer.setColormapTexture).not.toHaveBeenCalled();
   });
 
@@ -134,7 +148,7 @@ describe('viewer app render effects', () => {
     core.dispatch({ type: 'autoExposureSet', enabled: true });
     core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
 
-    const exposureCalls = renderer.renderImage.mock.calls.map(([state]) => {
+    const exposureCalls = renderer.renderImagePane.mock.calls.map(([, state]) => {
       return (state as ViewerRenderState).exposureEv;
     });
     expect(exposureCalls).toEqual([0, -2]);

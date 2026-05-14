@@ -15,7 +15,11 @@ import {
   sameRoiInteractionState,
   sameViewState
 } from '../view-state';
-import { sameViewerPaneLayout } from '../viewer-pane-layout';
+import {
+  collectViewerPaneLeaves,
+  samePanePath,
+  sameViewerPaneLayout
+} from '../viewer-pane-layout';
 import type { DisplayLuminanceRange, OpenedImageSession, ViewerRenderState } from '../types';
 import { buildProbeReadoutModel } from './probe-presentation';
 import { buildRoiReadoutModel } from './roi-presentation';
@@ -31,12 +35,14 @@ import {
   selectActiveColormapLut,
   selectActiveDisplayLuminanceRange,
   selectActiveImageStats,
-  selectActiveSession
+  selectActiveSession,
+  selectColormapLutById
 } from './viewer-app-selectors';
 import type {
   ViewerAppState,
   ViewerDisplayRangeRequest,
   ViewerImageStatsRequest,
+  ViewerPaneRenderSource,
   ViewerRenderSnapshot,
   ViewerResourceTarget
 } from './viewer-app-types';
@@ -76,11 +82,13 @@ export function createViewerRenderSnapshotSelector(): (state: ViewerAppState) =>
     const activeLayer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
     const activeColormapLut = selectActiveColormapLut(state);
     const imageStatsRequest = selectImageStatsRequest(state, activeSession, activeLayer);
+    const renderState = selectRenderState(state);
 
     const nextSnapshot: ViewerRenderSnapshot = {
       activeSession,
       activeLayer,
-      renderState: selectRenderState(state),
+      renderState,
+      paneRenderSources: selectPaneRenderSources(state, activeSession, renderState),
       activeColormapLut,
       probeReadout: selectProbeReadout(state, activeSession, activeLayer),
       roiReadout: selectRoiReadout(state, activeSession, activeLayer),
@@ -137,7 +145,10 @@ export function computeViewerRenderInvalidation(
     flags |= ViewerRenderInvalidationFlags.ViewerPaneLayout;
   }
 
-  if (!sameResourceTarget(previous.resourceTarget, next.resourceTarget) && next.resourceTarget) {
+  if (
+    (!sameResourceTarget(previous.resourceTarget, next.resourceTarget) && next.resourceTarget) ||
+    !samePaneResourceInputs(previous.paneRenderSources, next.paneRenderSources)
+  ) {
     flags |= ViewerRenderInvalidationFlags.ResourcePrepare;
   }
 
@@ -153,19 +164,19 @@ export function computeViewerRenderInvalidation(
     flags |= ViewerRenderInvalidationFlags.ResourceRequestAutoExposure;
   }
 
-  if (previous.activeSession && !next.activeSession) {
+  if (previous.paneRenderSources.length > 0 && next.paneRenderSources.length === 0) {
     flags |= ViewerRenderInvalidationFlags.ResourceClearImage;
   }
 
-  if (next.activeSession && next.activeLayer && !sameRenderImageInputs(previous, next)) {
+  if (next.paneRenderSources.length > 0 && !sameRenderImageInputs(previous, next)) {
     flags |= ViewerRenderInvalidationFlags.RenderImage;
   }
 
-  if (next.activeSession && next.activeLayer && !sameRenderValueOverlayInputs(previous, next)) {
+  if (next.paneRenderSources.length > 0 && !sameRenderValueOverlayInputs(previous, next)) {
     flags |= ViewerRenderInvalidationFlags.RenderValueOverlay;
   }
 
-  if (next.activeSession && next.activeLayer && !sameRenderProbeOverlayInputs(previous, next)) {
+  if (next.paneRenderSources.length > 0 && !sameRenderProbeOverlayInputs(previous, next)) {
     flags |= ViewerRenderInvalidationFlags.RenderProbeOverlay;
   }
 
@@ -174,7 +185,7 @@ export function computeViewerRenderInvalidation(
   }
 
   if (flags & ViewerRenderInvalidationFlags.ViewerPaneLayout) {
-    if (next.activeSession && next.activeLayer) {
+    if (next.paneRenderSources.length > 0) {
       flags |=
         ViewerRenderInvalidationFlags.RenderImage |
         ViewerRenderInvalidationFlags.RenderValueOverlay |
@@ -196,6 +207,56 @@ function createRenderStateSelector(): (state: ViewerAppState) => ViewerRenderSna
 
     previousResult = nextResult;
     return previousResult;
+  };
+}
+
+function selectPaneRenderSources(
+  state: ViewerAppState,
+  activeSession: OpenedImageSession | null,
+  activeRenderState: ViewerRenderState
+): ViewerPaneRenderSource[] {
+  const sessionsById = new Map(state.sessions.map((session) => [session.id, session]));
+  const sources: ViewerPaneRenderSource[] = [];
+
+  for (const pane of collectViewerPaneLeaves(state.viewerPaneLayout)) {
+    const session = pane.active
+      ? activeSession ?? (pane.sessionId ? sessionsById.get(pane.sessionId) ?? null : null)
+      : pane.sessionId
+        ? sessionsById.get(pane.sessionId) ?? null
+        : null;
+    if (!session) {
+      continue;
+    }
+
+    const usesLiveState = session.id === state.activeSessionId;
+    const renderState = usesLiveState
+      ? activeRenderState
+      : createStoredPaneRenderState(session.state);
+    const layer = session.decoded.layers[renderState.activeLayer] ?? null;
+    if (!layer) {
+      continue;
+    }
+
+    sources.push({
+      path: [...pane.path],
+      active: pane.active,
+      session,
+      activeLayer: renderState.activeLayer,
+      layer,
+      renderState,
+      colormapLut: selectColormapLutById(state, renderState.activeColormapId)
+    });
+  }
+
+  return sources;
+}
+
+function createStoredPaneRenderState(sessionState: ViewerAppState['sessionState']): ViewerRenderState {
+  return {
+    ...sessionState,
+    hoveredPixel: null,
+    draftRoi: null,
+    roiInteraction: createEmptyRoiInteractionState()
   };
 }
 
@@ -502,6 +563,7 @@ function sameViewerRenderSnapshot(a: ViewerRenderSnapshot, b: ViewerRenderSnapsh
     a.activeSession?.id === b.activeSession?.id &&
     a.activeLayer === b.activeLayer &&
     sameViewerRenderState(a.renderState, b.renderState) &&
+    samePaneRenderSources(a.paneRenderSources, b.paneRenderSources) &&
     a.activeColormapLut === b.activeColormapLut &&
     sameProbeReadout(a.probeReadout, b.probeReadout) &&
     sameRoiReadout(a.roiReadout, b.roiReadout) &&
@@ -566,15 +628,89 @@ function sameAutoExposureRequest(
 }
 
 function sameRenderImageInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
+  return samePaneRenderSourcesBy(a.paneRenderSources, b.paneRenderSources, samePaneImageInput);
+}
+
+function sameRenderValueOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
+  return samePaneRenderSourcesBy(a.paneRenderSources, b.paneRenderSources, samePaneValueOverlayInput);
+}
+
+function sameRenderProbeOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
+  return samePaneRenderSourcesBy(a.paneRenderSources, b.paneRenderSources, samePaneProbeOverlayInput);
+}
+
+function sameRenderRulerOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
+  if (!a.rulersVisible && !b.rulersVisible) {
+    return true;
+  }
+
+  return (
+    a.rulersVisible === b.rulersVisible &&
+    samePaneRenderSourcesBy(a.paneRenderSources, b.paneRenderSources, samePaneRulerOverlayInput)
+  );
+}
+
+function samePaneRenderSources(a: readonly ViewerPaneRenderSource[], b: readonly ViewerPaneRenderSource[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return a.every((source, index) => {
+    const other = b[index];
+    return Boolean(other) &&
+      samePanePath(source.path, other.path) &&
+      source.active === other.active &&
+      source.session.id === other.session.id &&
+      source.session.decoded === other.session.decoded &&
+      source.activeLayer === other.activeLayer &&
+      source.layer === other.layer &&
+      sameViewerRenderState(source.renderState, other.renderState) &&
+      source.colormapLut === other.colormapLut;
+  });
+}
+
+function samePaneResourceInputs(
+  a: readonly ViewerPaneRenderSource[],
+  b: readonly ViewerPaneRenderSource[]
+): boolean {
+  return samePaneRenderSourcesBy(a, b, (source, other) => (
+    source.renderState.visualizationMode === other.renderState.visualizationMode &&
+    sameDisplaySelection(source.renderState.displaySelection, other.renderState.displaySelection)
+  ));
+}
+
+function samePaneRenderSourcesBy(
+  a: readonly ViewerPaneRenderSource[],
+  b: readonly ViewerPaneRenderSource[],
+  compareInput: (a: ViewerPaneRenderSource, b: ViewerPaneRenderSource) => boolean
+): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return a.every((source, index) => {
+    const other = b[index];
+    return Boolean(other) && samePaneRenderSourceShell(source, other) && compareInput(source, other);
+  });
+}
+
+function samePaneRenderSourceShell(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource): boolean {
+  return (
+    samePanePath(a.path, b.path) &&
+    a.session.id === b.session.id &&
+    a.session.decoded === b.session.decoded &&
+    a.activeLayer === b.activeLayer &&
+    a.layer === b.layer
+  );
+}
+
+function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource): boolean {
   const previous = a.renderState;
   const next = b.renderState;
   const sharesCommonInputs = (
-    a.activeSession?.id === b.activeSession?.id &&
-    a.activeSession?.decoded === b.activeSession?.decoded &&
     previous.viewerMode === next.viewerMode &&
     previous.exposureEv === next.exposureEv &&
     previous.displayGamma === next.displayGamma &&
-    previous.activeLayer === next.activeLayer &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     previous.visualizationMode === next.visualizationMode &&
     sameViewState(previous, next)
@@ -596,31 +732,25 @@ function sameRenderImageInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot)
     previous.stokesDegreeModulation.cop === next.stokesDegreeModulation.cop &&
     previous.stokesDegreeModulation.top === next.stokesDegreeModulation.top &&
     previous.stokesAolpDegreeModulationMode === next.stokesAolpDegreeModulationMode &&
-    a.activeColormapLut === b.activeColormapLut
+    a.colormapLut === b.colormapLut
   );
 }
 
-function sameRenderValueOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
+function samePaneValueOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource): boolean {
   const previous = a.renderState;
   const next = b.renderState;
   return (
-    a.activeSession?.id === b.activeSession?.id &&
-    a.activeSession?.decoded === b.activeSession?.decoded &&
     previous.viewerMode === next.viewerMode &&
-    previous.activeLayer === next.activeLayer &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     sameViewState(previous, next)
   );
 }
 
-function sameRenderProbeOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
+function samePaneProbeOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource): boolean {
   const previous = a.renderState;
   const next = b.renderState;
   return (
-    a.activeSession?.id === b.activeSession?.id &&
-    a.activeSession?.decoded === b.activeSession?.decoded &&
     previous.viewerMode === next.viewerMode &&
-    previous.activeLayer === next.activeLayer &&
     samePixel(previous.lockedPixel, next.lockedPixel) &&
     samePixel(previous.hoveredPixel, next.hoveredPixel) &&
     sameRoi(previous.roi, next.roi) &&
@@ -630,23 +760,8 @@ function sameRenderProbeOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSn
   );
 }
 
-function sameRenderRulerOverlayInputs(a: ViewerRenderSnapshot, b: ViewerRenderSnapshot): boolean {
-  if (!a.rulersVisible && !b.rulersVisible) {
-    return true;
-  }
-
-  if (a.rulersVisible !== b.rulersVisible) {
-    return false;
-  }
-
-  const previous = a.renderState;
-  const next = b.renderState;
-  return (
-    a.activeSession?.id === b.activeSession?.id &&
-    a.activeSession?.decoded === b.activeSession?.decoded &&
-    previous.viewerMode === next.viewerMode &&
-    sameViewState(previous, next)
-  );
+function samePaneRulerOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource): boolean {
+  return a.renderState.viewerMode === b.renderState.viewerMode && sameViewState(a.renderState, b.renderState);
 }
 
 function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): boolean {

@@ -41,6 +41,7 @@ export function createInitialViewerAppState(): ViewerAppState {
     colormapRegistry: null,
     defaultColormapId: DEFAULT_COLORMAP_ID,
     colormapLutResource: idleResource(),
+    colormapLutsById: {},
     displayRangeResource: idleResource(),
     imageStatsResource: idleResource(),
     autoExposureResource: idleResource(),

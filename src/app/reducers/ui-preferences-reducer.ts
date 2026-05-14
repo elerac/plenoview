@@ -40,7 +40,7 @@ export function uiPreferencesReducer(
         rulersVisible: intent.enabled
       };
     case 'viewerPaneReset': {
-      const viewerPaneLayout = resetViewerPaneLayout();
+      const viewerPaneLayout = resetViewerPaneLayout(state.activeSessionId);
       return sameViewerPaneLayout(state.viewerPaneLayout, viewerPaneLayout) ? state : {
         ...state,
         viewerPaneLayout

@@ -83,25 +83,30 @@ export class OverlayRenderer implements Disposable {
       return;
     }
 
-    const ctx = this.overlayContext;
-    const imageSize = this.imageSize;
+    this.clearValues();
 
-    ctx.clearRect(0, 0, this.viewport.width, this.viewport.height);
+    const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
+    for (const pane of panes) {
+      this.renderPaneValues(state, pane);
+    }
+  }
 
-    if (!imageSize) {
+  clearValues(): void {
+    if (this.disposed) {
       return;
     }
 
-    if (state.viewerMode === 'panorama') {
+    this.overlayContext.clearRect(0, 0, this.viewport.width, this.viewport.height);
+  }
+
+  renderPaneValues(state: ViewerState, pane: ViewerPaneRenderInfo): void {
+    if (this.disposed || !this.imageSize || state.viewerMode === 'panorama') {
       return;
     }
 
     const labelOpacity = resolveValueLabelOpacity(state.zoom);
     if (labelOpacity > 0) {
-      const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
-      for (const pane of panes) {
-        this.drawPixelValues(state, imageSize.width, imageSize.height, labelOpacity, pane);
-      }
+      this.drawPixelValues(state, this.imageSize.width, this.imageSize.height, labelOpacity, pane);
     }
   }
 

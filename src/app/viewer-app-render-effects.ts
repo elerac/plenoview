@@ -5,7 +5,8 @@ import { ViewerUi } from '../ui/viewer-ui';
 import { ViewerAppCore } from './viewer-app-core';
 import { ViewerRenderInvalidationFlags } from './viewer-app-render';
 import { selectActiveDisplayLuminanceRange } from './viewer-app-selectors';
-import type { ViewerRenderTransition } from './viewer-app-types';
+import type { ViewerPaneRenderSource, ViewerRenderTransition } from './viewer-app-types';
+import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 
 export function applyRenderEffects(
   core: ViewerAppCore,
@@ -17,6 +18,7 @@ export function applyRenderEffects(
   const { snapshot, invalidation, state } = transition;
   const activeSession = snapshot.activeSession;
   let deferredAutoExposureDispatch: (() => void) | null = null;
+  let renderedPaneSurfaces = false;
 
   if (invalidation & ViewerRenderInvalidationFlags.ViewerPaneLayout) {
     renderer.setViewerPanes(ui.getViewerPaneRenderInfos());
@@ -166,31 +168,63 @@ export function applyRenderEffects(
     }
   }
 
-  if (!activeSession) {
-    if (invalidation & ViewerRenderInvalidationFlags.RenderRulerOverlay) {
-      renderer.renderRulerOverlay(snapshot.renderState);
+  if (snapshot.paneRenderSources.length === 0) {
+    if (invalidation & ViewerRenderInvalidationFlags.ResourceClearImage) {
+      renderer.clearImage();
     }
     deferredAutoExposureDispatch?.();
     return;
   }
 
-  if (invalidation & ViewerRenderInvalidationFlags.RenderImage) {
-    renderer.renderImage(snapshot.renderState);
+  if (
+    invalidation & (
+      ViewerRenderInvalidationFlags.ResourcePrepare |
+      ViewerRenderInvalidationFlags.ColormapTexture |
+      ViewerRenderInvalidationFlags.RenderImage |
+      ViewerRenderInvalidationFlags.RenderValueOverlay |
+      ViewerRenderInvalidationFlags.RenderProbeOverlay |
+      ViewerRenderInvalidationFlags.RenderRulerOverlay
+    )
+  ) {
+    renderPaneSources(renderer, renderCache, ui.getViewerPaneRenderInfos(), snapshot.paneRenderSources);
+    renderedPaneSurfaces = true;
   }
 
-  if (invalidation & ViewerRenderInvalidationFlags.RenderValueOverlay) {
-    renderer.renderValueOverlay(snapshot.renderState);
-  }
-
-  if (invalidation & ViewerRenderInvalidationFlags.RenderProbeOverlay) {
-    renderer.renderProbeOverlay(snapshot.renderState);
-  }
-
-  if (invalidation & ViewerRenderInvalidationFlags.RenderRulerOverlay) {
+  if (!renderedPaneSurfaces && invalidation & ViewerRenderInvalidationFlags.RenderRulerOverlay) {
     renderer.renderRulerOverlay(snapshot.renderState);
   }
-
   deferredAutoExposureDispatch?.();
+}
+
+function renderPaneSources(
+  renderer: WebGlExrRenderer,
+  renderCache: RenderCacheService,
+  panes: ViewerPaneRenderInfo[],
+  sources: ViewerPaneRenderSource[]
+): void {
+  const panesByPath = new Map(panes.map((pane) => [serializePanePath(pane.path), pane]));
+  renderer.beginPaneRender();
+  for (const source of sources) {
+    const pane = panesByPath.get(serializePanePath(source.path));
+    if (!pane) {
+      continue;
+    }
+
+    if (source.colormapLut) {
+      renderer.setColormapTexture(source.colormapLut.entryCount, source.colormapLut.rgba8);
+    } else {
+      renderer.clearColormapTexture();
+    }
+    renderCache.prepareActiveSession(source.session, source.renderState);
+    renderer.renderImagePane(pane, source.renderState);
+    renderer.renderValueOverlayPane(pane, source.renderState);
+    renderer.renderProbeOverlayPane(pane, source.renderState);
+    renderer.renderRulerOverlayPane(pane, source.renderState);
+  }
+}
+
+function serializePanePath(path: readonly number[]): string {
+  return path.join('.');
 }
 
 function synchronizeCachedDisplayRange(

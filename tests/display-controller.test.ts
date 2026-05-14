@@ -314,7 +314,7 @@ describe('display controller shim', () => {
     colormapMocks.loadColormapLut.mockClear();
     await controller.ensureActiveColormapLutLoaded();
 
-    expect(colormapMocks.loadColormapLut.mock.calls.map(([, id]) => id)).toEqual(['0']);
+    expect(colormapMocks.loadColormapLut.mock.calls.map(([, id]) => id)).toEqual([]);
     expect(getLoadedColormapId(core)).toBe('0');
     expect(getLoadedColormapLut(core)).toEqual(luts['0']);
   });

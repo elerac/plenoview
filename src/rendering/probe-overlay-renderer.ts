@@ -61,8 +61,7 @@ export class ProbeOverlayRenderer implements Disposable {
       return;
     }
 
-    const ctx = this.overlayContext;
-    ctx.clearRect(0, 0, this.viewport.width, this.viewport.height);
+    this.clearOverlay();
 
     if (!this.hasImage || state.viewerMode === 'panorama') {
       return;
@@ -70,38 +69,55 @@ export class ProbeOverlayRenderer implements Disposable {
 
     const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
     for (const pane of panes) {
-      const usePaneClip = !isFullViewportPane(pane, this.viewport);
+      this.renderPane(state, pane);
+    }
+  }
+
+  clearOverlay(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.overlayContext.clearRect(0, 0, this.viewport.width, this.viewport.height);
+  }
+
+  renderPane(state: ViewerState, pane: ViewerPaneRenderInfo): void {
+    if (this.disposed || !this.hasImage || state.viewerMode === 'panorama') {
+      return;
+    }
+
+    const ctx = this.overlayContext;
+    const usePaneClip = !isFullViewportPane(pane, this.viewport);
+    if (usePaneClip) {
+      ctx.save();
+    }
+    try {
       if (usePaneClip) {
-        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
+        ctx.clip();
+        ctx.translate(pane.rect.x, pane.rect.y);
       }
-      try {
-        if (usePaneClip) {
-          ctx.beginPath();
-          ctx.rect(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
-          ctx.clip();
-          ctx.translate(pane.rect.x, pane.rect.y);
-        }
 
-        if (state.roi) {
-          this.drawRoi(state, state.roi, pane.viewport, 'rgba(255, 122, 89, 0.95)');
-        }
+      if (state.roi) {
+        this.drawRoi(state, state.roi, pane.viewport, 'rgba(255, 122, 89, 0.95)');
+      }
 
-        if (state.draftRoi) {
-          this.drawRoi(state, state.draftRoi, pane.viewport, 'rgba(75, 192, 255, 0.95)');
-        }
+      if (state.draftRoi) {
+        this.drawRoi(state, state.draftRoi, pane.viewport, 'rgba(75, 192, 255, 0.95)');
+      }
 
-        if (state.roi && (state.roiInteraction.hoverHandle || state.roiInteraction.activeHandle)) {
-          this.drawRoiHandles(state, state.draftRoi ?? state.roi, pane.viewport);
-        }
+      if (state.roi && (state.roiInteraction.hoverHandle || state.roiInteraction.activeHandle)) {
+        this.drawRoiHandles(state, state.draftRoi ?? state.roi, pane.viewport);
+      }
 
-        const probe = resolveActiveProbePixel(state.lockedPixel, state.hoveredPixel);
-        if (probe) {
-          this.drawProbeMarker(state, probe, pane.viewport);
-        }
-      } finally {
-        if (usePaneClip) {
-          ctx.restore();
-        }
+      const probe = resolveActiveProbePixel(state.lockedPixel, state.hoveredPixel);
+      if (probe) {
+        this.drawProbeMarker(state, probe, pane.viewport);
+      }
+    } finally {
+      if (usePaneClip) {
+        ctx.restore();
       }
     }
   }

@@ -218,7 +218,14 @@ export interface UiCallbacks {
   onReloadSelectedOpenedImage: (sessionId: string) => void;
   onCloseSelectedOpenedImage: (sessionId: string) => void;
   onCloseAllOpenedImages: () => void;
-  onOpenedImageSelected: (sessionId: string) => void;
+  onOpenedImageSelected: (
+    sessionId: string,
+    targetPane?: { path: ViewerPanePath; viewport: ViewportInfo }
+  ) => void;
+  onOpenedImageAssignedToViewerPane: (
+    sessionId: string,
+    targetPane: { path: ViewerPanePath; viewport: ViewportInfo }
+  ) => void;
   onOpenedImageDisplayNameChange: (sessionId: string, displayName: string) => void;
   onReorderOpenedImage: (
     draggedSessionId: string,
@@ -338,6 +345,19 @@ export class ViewerUi implements Disposable {
     this.openedImagesPanel = new OpenedImagesPanel(this.elements, {
       onOpenedImageSelected: (sessionId) => {
         this.callbacks.onOpenedImageSelected(sessionId);
+      },
+      onOpenedImageDroppedToViewer: (sessionId, clientX, clientY) => {
+        const pane = this.resolveViewerPaneAtClientPoint(clientX, clientY);
+        const targetPane = {
+          path: pane.path,
+          viewport: pane.viewport
+        };
+        if (pane.active) {
+          this.callbacks.onOpenedImageSelected(sessionId, targetPane);
+          return;
+        }
+
+        this.callbacks.onOpenedImageAssignedToViewerPane(sessionId, targetPane);
       },
       onOpenedImageRowClick: () => {
         this.globalKeyboardController.setVerticalNavigationTarget('openedFiles');
@@ -934,6 +954,14 @@ export class ViewerUi implements Disposable {
       ?? this.viewerPaneRenderInfos[0]
       ?? createFallbackViewerPaneRenderInfo(this.readViewerViewport());
     return cloneViewerPaneRenderInfo(pane);
+  }
+
+  private resolveViewerPaneAtClientPoint(clientX: number, clientY: number): ViewerPaneRenderInfo {
+    const rect = this.elements.viewerContainer.getBoundingClientRect();
+    return this.resolveViewerPaneAtPoint({
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    }) ?? createFallbackViewerPaneRenderInfo(this.readViewerViewport());
   }
 
   setExposure(exposureEv: number): void {

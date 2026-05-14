@@ -4,7 +4,7 @@ export type ViewerPaneSplitOrientation = 'vertical' | 'horizontal';
 export type ViewerPanePath = number[];
 
 export type ViewerPaneNode =
-  | { type: 'leaf' }
+  | { type: 'leaf'; sessionId: string | null }
   | {
       type: 'split';
       orientation: ViewerPaneSplitOrientation;
@@ -23,15 +23,21 @@ export interface ViewerPaneRenderInfo {
   active: boolean;
 }
 
-export function createSinglePaneLayout(): ViewerPaneLayoutState {
+export interface ViewerPaneLeafInfo {
+  path: ViewerPanePath;
+  sessionId: string | null;
+  active: boolean;
+}
+
+export function createSinglePaneLayout(sessionId: string | null = null): ViewerPaneLayoutState {
   return {
-    root: { type: 'leaf' },
+    root: { type: 'leaf', sessionId },
     activePanePath: []
   };
 }
 
-export function resetViewerPaneLayout(): ViewerPaneLayoutState {
-  return createSinglePaneLayout();
+export function resetViewerPaneLayout(sessionId: string | null = null): ViewerPaneLayoutState {
+  return createSinglePaneLayout(sessionId);
 }
 
 export function activateViewerPane(
@@ -57,6 +63,64 @@ export function splitActiveViewerPane(
     root,
     activePanePath: [...activePanePath, 1]
   };
+}
+
+export function assignActiveViewerPaneSession(
+  layout: ViewerPaneLayoutState,
+  sessionId: string | null
+): ViewerPaneLayoutState {
+  return assignViewerPaneSession(layout, layout.activePanePath, sessionId, false);
+}
+
+export function assignViewerPaneSession(
+  layout: ViewerPaneLayoutState,
+  path: ViewerPanePath,
+  sessionId: string | null,
+  activate = true
+): ViewerPaneLayoutState {
+  const normalizedPath = normalizeActivePanePath(layout.root, path);
+  const root = setPaneSessionAtPath(layout.root, normalizedPath, sessionId);
+  const activePanePath = activate ? normalizedPath : normalizeActivePanePath(root, layout.activePanePath);
+  return samePaneNode(root, layout.root) && samePanePath(activePanePath, layout.activePanePath)
+    ? layout
+    : {
+        root,
+        activePanePath
+      };
+}
+
+export function getActiveViewerPaneSessionId(layout: ViewerPaneLayoutState): string | null {
+  return getViewerPaneSessionId(layout, layout.activePanePath);
+}
+
+export function getViewerPaneSessionId(
+  layout: ViewerPaneLayoutState,
+  path: ViewerPanePath
+): string | null {
+  const activePanePath = normalizeActivePanePath(layout.root, path);
+  const node = getPaneNode(layout.root, activePanePath);
+  return node?.type === 'leaf' ? node.sessionId : null;
+}
+
+export function collectViewerPaneLeaves(layout: ViewerPaneLayoutState): ViewerPaneLeafInfo[] {
+  const activePanePath = normalizeActivePanePath(layout.root, layout.activePanePath);
+  const leaves: ViewerPaneLeafInfo[] = [];
+  collectLeafInfos(layout.root, [], activePanePath, leaves);
+  return leaves;
+}
+
+export function pruneViewerPaneSessions(
+  layout: ViewerPaneLayoutState,
+  validSessionIds: ReadonlySet<string>,
+  fallbackSessionId: string | null
+): ViewerPaneLayoutState {
+  const root = prunePaneSessions(layout.root, validSessionIds, fallbackSessionId);
+  return samePaneNode(root, layout.root)
+    ? layout
+    : {
+        root,
+        activePanePath: normalizeActivePanePath(root, layout.activePanePath)
+      };
 }
 
 export function normalizeViewerPaneLayout(layout: ViewerPaneLayoutState): ViewerPaneLayoutState {
@@ -157,10 +221,14 @@ function splitPaneAtPath(
   orientation: ViewerPaneSplitOrientation
 ): ViewerPaneNode {
   if (path.length === 0) {
+    const sessionId = node.type === 'leaf' ? node.sessionId : null;
     return {
       type: 'split',
       orientation,
-      children: [{ type: 'leaf' }, { type: 'leaf' }]
+      children: [
+        { type: 'leaf', sessionId },
+        { type: 'leaf', sessionId }
+      ]
     };
   }
 
@@ -179,6 +247,36 @@ function splitPaneAtPath(
     ...node,
     children
   };
+}
+
+function setPaneSessionAtPath(
+  node: ViewerPaneNode,
+  path: ViewerPanePath,
+  sessionId: string | null
+): ViewerPaneNode {
+  if (path.length === 0) {
+    return node.type === 'leaf' && node.sessionId === sessionId
+      ? node
+      : { type: 'leaf', sessionId };
+  }
+
+  if (node.type === 'leaf') {
+    return node;
+  }
+
+  const [childIndex, ...rest] = path;
+  if (childIndex !== 0 && childIndex !== 1) {
+    return node;
+  }
+
+  const children: [ViewerPaneNode, ViewerPaneNode] = [...node.children];
+  children[childIndex] = setPaneSessionAtPath(children[childIndex], rest, sessionId);
+  return samePaneNode(children[0], node.children[0]) && samePaneNode(children[1], node.children[1])
+    ? node
+    : {
+        ...node,
+        children
+      };
 }
 
 function getPaneNode(node: ViewerPaneNode, path: ViewerPanePath): ViewerPaneNode | null {
@@ -204,6 +302,47 @@ function findFirstLeafPath(node: ViewerPaneNode, prefix: ViewerPanePath = []): V
   }
 
   return findFirstLeafPath(node.children[0], [...prefix, 0]);
+}
+
+function collectLeafInfos(
+  node: ViewerPaneNode,
+  path: ViewerPanePath,
+  activePanePath: ViewerPanePath,
+  leaves: ViewerPaneLeafInfo[]
+): void {
+  if (node.type === 'leaf') {
+    leaves.push({
+      path: [...path],
+      sessionId: node.sessionId,
+      active: samePanePath(path, activePanePath)
+    });
+    return;
+  }
+
+  collectLeafInfos(node.children[0], [...path, 0], activePanePath, leaves);
+  collectLeafInfos(node.children[1], [...path, 1], activePanePath, leaves);
+}
+
+function prunePaneSessions(
+  node: ViewerPaneNode,
+  validSessionIds: ReadonlySet<string>,
+  fallbackSessionId: string | null
+): ViewerPaneNode {
+  if (node.type === 'leaf') {
+    const sessionId = node.sessionId && validSessionIds.has(node.sessionId)
+      ? node.sessionId
+      : fallbackSessionId;
+    return sessionId === node.sessionId ? node : { type: 'leaf', sessionId };
+  }
+
+  const first = prunePaneSessions(node.children[0], validSessionIds, fallbackSessionId);
+  const second = prunePaneSessions(node.children[1], validSessionIds, fallbackSessionId);
+  return samePaneNode(first, node.children[0]) && samePaneNode(second, node.children[1])
+    ? node
+    : {
+        ...node,
+        children: [first, second]
+      };
 }
 
 function collectPaneRects(
@@ -291,7 +430,7 @@ function samePaneNode(a: ViewerPaneNode, b: ViewerPaneNode): boolean {
   }
 
   if (a.type === 'leaf' || b.type === 'leaf') {
-    return true;
+    return a.type === 'leaf' && b.type === 'leaf' && a.sessionId === b.sessionId;
   }
 
   return (

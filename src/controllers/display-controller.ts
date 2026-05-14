@@ -255,6 +255,12 @@ export class DisplayController implements Disposable {
       colormapId
     });
     if (loadedLut) {
+      this.core.dispatch({
+        type: 'colormapLoadResolved',
+        requestId: null,
+        colormapId,
+        lut: loadedLut
+      });
       return;
     }
 
@@ -440,7 +446,19 @@ export class DisplayController implements Disposable {
       return;
     }
 
-    if (selectColormapLutById(state, state.sessionState.activeColormapId)) {
+    const loadedLut = selectColormapLutById(state, state.sessionState.activeColormapId);
+    if (loadedLut) {
+      if (
+        state.colormapLutResource.status !== 'success' ||
+        state.colormapLutResource.key !== state.sessionState.activeColormapId
+      ) {
+        this.core.dispatch({
+          type: 'colormapLoadResolved',
+          requestId: null,
+          colormapId: state.sessionState.activeColormapId,
+          lut: loadedLut
+        });
+      }
       return;
     }
 

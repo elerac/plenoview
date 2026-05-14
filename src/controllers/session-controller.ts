@@ -28,6 +28,7 @@ import type {
   ViewportInfo,
   ViewportInsets
 } from '../types';
+import type { ViewerPanePath } from '../viewer-pane-layout';
 
 const GALLERY_IMAGES = [
   {
@@ -243,7 +244,10 @@ export class SessionController implements Disposable {
     });
   }
 
-  switchActiveSession(sessionId: string): void {
+  switchActiveSession(
+    sessionId: string,
+    options: { panePath?: ViewerPanePath; viewport?: ViewportInfo } = {}
+  ): void {
     if (this.disposed) {
       return;
     }
@@ -255,8 +259,21 @@ export class SessionController implements Disposable {
     this.core.dispatch({
       type: 'activeSessionSwitched',
       sessionId,
-      viewport: state.autoFitImageOnSelect ? this.getViewport() : undefined,
+      panePath: options.panePath,
+      viewport: state.autoFitImageOnSelect ? options.viewport ?? this.getViewport() : undefined,
       fitInsets: state.autoFitImageOnSelect ? this.getFitInsets() : undefined
+    });
+  }
+
+  assignSessionToViewerPane(sessionId: string, panePath: ViewerPanePath): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.core.dispatch({
+      type: 'viewerPaneSessionAssigned',
+      sessionId,
+      panePath
     });
   }
 

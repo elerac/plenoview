@@ -20,6 +20,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 interface OpenedImagesPanelCallbacks {
   onOpenedImageSelected: (sessionId: string) => void;
+  onOpenedImageDroppedToViewer: (sessionId: string, clientX: number, clientY: number) => void;
   onOpenedImageRowClick: () => void;
   onOpenedImageDisplayNameChange: (sessionId: string, displayName: string) => void;
   onReorderOpenedImage: (
@@ -782,8 +783,9 @@ export class OpenedImagesPanel implements Disposable {
     event.stopPropagation();
 
     const sessionId = this.openedImageDragState?.sessionId ?? '';
+    const { clientX, clientY } = event;
     this.finishOpenedImagesDrag();
-    this.chooseOpenedImage(sessionId);
+    this.callbacks.onOpenedImageDroppedToViewer(sessionId, clientX, clientY);
   }
 
   private finishOpenedImagesDrag(): void {

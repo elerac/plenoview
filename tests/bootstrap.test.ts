@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
       | null,
     defaultColormapId: '0',
     colormapLutResource: { status: 'idle' },
+    colormapLutsById: {},
     displayRangeResource: { status: 'idle' },
     imageStatsResource: { status: 'idle' },
     autoExposureResource: { status: 'idle' },
@@ -39,7 +40,7 @@ const mocks = vi.hoisted(() => {
     autoExposurePercentile: 99.5,
     rulersVisible: false,
     viewerPaneLayout: {
-      root: { type: 'leaf' },
+      root: { type: 'leaf', sessionId: null },
       activePanePath: []
     },
     sessionState: {

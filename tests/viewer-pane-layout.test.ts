@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assignActiveViewerPaneSession,
+  assignViewerPaneSession,
   activateViewerPane,
+  collectViewerPaneLeaves,
   computeViewerPaneRects,
   countViewerPaneLeaves,
   createSinglePaneLayout,
+  getActiveViewerPaneSessionId,
   normalizeActivePanePath,
+  pruneViewerPaneSessions,
   resetViewerPaneLayout,
   splitActiveViewerPane
 } from '../src/viewer-pane-layout';
@@ -15,6 +20,43 @@ describe('viewer pane layout', () => {
 
     expect(countViewerPaneLeaves(split.root)).toBe(2);
     expect(resetViewerPaneLayout()).toEqual(createSinglePaneLayout());
+  });
+
+  it('assigns sessions to active panes and copies the assignment when splitting', () => {
+    const assigned = assignActiveViewerPaneSession(createSinglePaneLayout(), 'session-1');
+    const split = splitActiveViewerPane(assigned, 'vertical');
+
+    expect(getActiveViewerPaneSessionId(split)).toBe('session-1');
+    expect(collectViewerPaneLeaves(split)).toEqual([
+      { path: [0], sessionId: 'session-1', active: false },
+      { path: [1], sessionId: 'session-1', active: true }
+    ]);
+  });
+
+  it('assigns a target pane session and activates that pane', () => {
+    const split = splitActiveViewerPane(createSinglePaneLayout('session-1'), 'vertical');
+    const assigned = assignViewerPaneSession(split, [0], 'session-2');
+
+    expect(assigned.activePanePath).toEqual([0]);
+    expect(getActiveViewerPaneSessionId(assigned)).toBe('session-2');
+    expect(collectViewerPaneLeaves(assigned)).toEqual([
+      { path: [0], sessionId: 'session-2', active: true },
+      { path: [1], sessionId: 'session-1', active: false }
+    ]);
+  });
+
+  it('prunes closed session assignments to the fallback session', () => {
+    const split = splitActiveViewerPane(createSinglePaneLayout('session-1'), 'vertical');
+    const assigned = assignViewerPaneSession(split, [0], 'session-2');
+
+    expect(collectViewerPaneLeaves(pruneViewerPaneSessions(
+      assigned,
+      new Set(['session-1']),
+      'session-1'
+    ))).toEqual([
+      { path: [0], sessionId: 'session-1', active: true },
+      { path: [1], sessionId: 'session-1', active: false }
+    ]);
   });
 
   it('splits the active pane and focuses the new right or bottom child', () => {

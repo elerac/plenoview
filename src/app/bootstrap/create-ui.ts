@@ -172,8 +172,11 @@ export function createViewerUi({
     onCloseAllOpenedImages: () => {
       getSessionController().closeAllSessions();
     },
-    onOpenedImageSelected: (sessionId) => {
-      getSessionController().switchActiveSession(sessionId);
+    onOpenedImageSelected: (sessionId, targetPane) => {
+      getSessionController().switchActiveSession(sessionId, targetPane);
+    },
+    onOpenedImageAssignedToViewerPane: (sessionId, targetPane) => {
+      getSessionController().assignSessionToViewerPane(sessionId, targetPane.path);
     },
     onOpenedImageDisplayNameChange: (sessionId, displayName) => {
       getSessionController().renameSessionDisplayName(sessionId, displayName);

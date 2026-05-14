@@ -20,16 +20,19 @@ import type {
 export function render(
   state: GlImageRendererState,
   viewerState: ViewerState,
-  panes: readonly ViewerPaneRenderInfo[] = []
+  panes: readonly ViewerPaneRenderInfo[] = [],
+  options: { clear?: boolean } = {}
 ): void {
   const gl = state.gl;
   const renderPanes = panes.length > 0 ? panes : [createFullViewportPane(state)];
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.disable(gl.SCISSOR_TEST);
-  gl.viewport(0, 0, state.viewport.width, state.viewport.height);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  if (options.clear !== false) {
+    gl.disable(gl.SCISSOR_TEST);
+    gl.viewport(0, 0, state.viewport.width, state.viewport.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
   gl.enable(gl.SCISSOR_TEST);
 
   try {

@@ -151,6 +151,17 @@ export class WebGlExrRenderer implements Disposable {
     this.rulerOverlayRenderer.clearImage();
   }
 
+  beginPaneRender(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.imageRenderer.clearFramebuffer();
+    this.overlayRenderer.clearValues();
+    this.probeOverlayRenderer.clearOverlay();
+    this.rulerOverlayRenderer.clearOverlay();
+  }
+
   render(state: ViewerRenderState): void {
     if (this.disposed) {
       return;
@@ -170,6 +181,14 @@ export class WebGlExrRenderer implements Disposable {
     this.imageRenderer.render(state);
   }
 
+  renderImagePane(pane: ViewerPaneRenderInfo, state: ViewerState): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.imageRenderer.renderPane(state, pane);
+  }
+
   renderValueOverlay(state: ViewerState): void {
     if (this.disposed) {
       return;
@@ -178,12 +197,28 @@ export class WebGlExrRenderer implements Disposable {
     this.overlayRenderer.renderValues(state);
   }
 
+  renderValueOverlayPane(pane: ViewerPaneRenderInfo, state: ViewerState): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.overlayRenderer.renderPaneValues(state, pane);
+  }
+
   renderProbeOverlay(state: ViewerState): void {
     if (this.disposed) {
       return;
     }
 
     this.probeOverlayRenderer.render(state);
+  }
+
+  renderProbeOverlayPane(pane: ViewerPaneRenderInfo, state: ViewerState): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.probeOverlayRenderer.renderPane(state, pane);
   }
 
   setRulersVisible(visible: boolean): void {
@@ -200,6 +235,14 @@ export class WebGlExrRenderer implements Disposable {
     }
 
     this.rulerOverlayRenderer.render(state, this.rulersVisible);
+  }
+
+  renderRulerOverlayPane(pane: ViewerPaneRenderInfo, state: ViewerState): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.rulerOverlayRenderer.renderPane(state, this.rulersVisible, pane);
   }
 
   readExportPixels(args: ReadExportPixelsArgs): ExportImagePixels {

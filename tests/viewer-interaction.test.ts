@@ -59,6 +59,37 @@ describe('viewer interaction roi gestures', () => {
     expect(harness.onToggleLockPixel).toHaveBeenCalledWith({ ix: 5, iy: 5 });
   });
 
+  it('keeps active pane selection on hover and wheel until a pane is clicked', () => {
+    const harness = createHarness({}, {
+      viewport: { width: 50, height: 100 },
+      panes: [
+        {
+          path: [0],
+          rect: { x: 0, y: 0, width: 50, height: 100 }
+        },
+        {
+          path: [1],
+          rect: { x: 50, y: 0, width: 50, height: 100 }
+        }
+      ],
+      activePanePath: [0]
+    });
+
+    dispatchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 75, clientY: 50 });
+    dispatchWheel(harness.element, { clientX: 75, clientY: 50, deltaY: 100 });
+
+    expect(harness.onActivePaneChange).not.toHaveBeenCalled();
+    expect(harness.onHoverPixel).toHaveBeenLastCalledWith(null);
+    expect(harness.onViewChange).not.toHaveBeenCalled();
+
+    dispatchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 75, clientY: 50 });
+    dispatchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 75, clientY: 50 });
+
+    expect(harness.onActivePaneChange).toHaveBeenCalledTimes(1);
+    expect(harness.onActivePaneChange).toHaveBeenCalledWith([1]);
+    expect(harness.onToggleLockPixel).toHaveBeenCalledWith({ ix: 5, iy: 5 });
+  });
+
   it('ignores secondary-button drags outside screenshot selection', () => {
     const harness = createHarness();
 
@@ -1360,6 +1391,17 @@ function dispatchPointer(
   element.dispatchEvent(new PointerEvent(type, {
     bubbles: true,
     button: 0,
+    ...init
+  }));
+}
+
+function dispatchWheel(
+  element: HTMLElement,
+  init: Partial<WheelEventInit> & { clientX: number; clientY: number }
+): void {
+  element.dispatchEvent(new WheelEvent('wheel', {
+    bubbles: true,
+    cancelable: true,
     ...init
   }));
 }

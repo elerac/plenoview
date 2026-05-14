@@ -3,6 +3,7 @@ import { AUTO_EXPOSURE_PERCENTILE } from '../src/auto-exposure';
 import { getSuccessValue } from '../src/async-resource';
 import { ViewerAppCore } from '../src/app/viewer-app-core';
 import { createInteractionState } from '../src/view-state';
+import { collectViewerPaneLeaves } from '../src/viewer-pane-layout';
 import { buildViewerStateForLayer, createInitialState } from '../src/viewer-store';
 import {
   createChannelMonoSelection,
@@ -121,7 +122,7 @@ describe('viewer app core', () => {
 
     core.dispatch({ type: 'viewerPaneReset' });
     expect(core.getState().viewerPaneLayout).toEqual({
-      root: { type: 'leaf' },
+      root: { type: 'leaf', sessionId: null },
       activePanePath: []
     });
   });
@@ -460,6 +461,81 @@ describe('viewer app core', () => {
       displaySelection: createChannelMonoSelection('R'),
       lockedPixel: { ix: 1, iy: 0 }
     });
+  });
+
+  it('assigns selected images to the active split pane and switches when activating another pane', () => {
+    const core = new ViewerAppCore();
+    const first = createSession('first');
+    const second = createSession('second');
+
+    core.dispatch({ type: 'sessionLoaded', session: first });
+    core.dispatch({ type: 'viewerPaneSplit', orientation: 'vertical' });
+    core.dispatch({ type: 'sessionLoaded', session: second });
+
+    expect(core.getState().activeSessionId).toBe(second.id);
+    expect(collectViewerPaneLeaves(core.getState().viewerPaneLayout)).toEqual([
+      { path: [0], sessionId: first.id, active: false },
+      { path: [1], sessionId: second.id, active: true }
+    ]);
+
+    core.dispatch({ type: 'viewerPaneActivated', path: [0] });
+
+    expect(core.getState().activeSessionId).toBe(first.id);
+    expect(collectViewerPaneLeaves(core.getState().viewerPaneLayout)).toEqual([
+      { path: [0], sessionId: first.id, active: true },
+      { path: [1], sessionId: second.id, active: false }
+    ]);
+  });
+
+  it('assigns dropped images to the target pane path', () => {
+    const core = new ViewerAppCore();
+    const first = createSession('first');
+    const second = createSession('second');
+
+    core.dispatch({ type: 'sessionLoaded', session: first });
+    core.dispatch({ type: 'viewerPaneSplit', orientation: 'vertical' });
+    core.dispatch({ type: 'sessionLoaded', session: second, activate: false });
+    core.dispatch({ type: 'activeSessionSwitched', sessionId: second.id, panePath: [0] });
+
+    expect(core.getState().activeSessionId).toBe(second.id);
+    expect(collectViewerPaneLeaves(core.getState().viewerPaneLayout)).toEqual([
+      { path: [0], sessionId: second.id, active: true },
+      { path: [1], sessionId: first.id, active: false }
+    ]);
+  });
+
+  it('assigns dragged opened images to inactive panes without activating them', () => {
+    const core = new ViewerAppCore();
+    const first = createSession('first');
+    const second = createSession('second');
+
+    core.dispatch({ type: 'sessionLoaded', session: first });
+    core.dispatch({ type: 'viewerPaneSplit', orientation: 'vertical' });
+    core.dispatch({ type: 'sessionLoaded', session: second, activate: false });
+    core.dispatch({ type: 'viewerPaneSessionAssigned', sessionId: second.id, panePath: [0] });
+
+    expect(core.getState().activeSessionId).toBe(first.id);
+    expect(collectViewerPaneLeaves(core.getState().viewerPaneLayout)).toEqual([
+      { path: [0], sessionId: second.id, active: false },
+      { path: [1], sessionId: first.id, active: true }
+    ]);
+  });
+
+  it('replaces closed pane assignments with the next active session fallback', () => {
+    const core = new ViewerAppCore();
+    const first = createSession('first');
+    const second = createSession('second');
+
+    core.dispatch({ type: 'sessionLoaded', session: first });
+    core.dispatch({ type: 'viewerPaneSplit', orientation: 'vertical' });
+    core.dispatch({ type: 'sessionLoaded', session: second });
+    core.dispatch({ type: 'sessionClosed', sessionId: second.id });
+
+    expect(core.getState().activeSessionId).toBe(first.id);
+    expect(collectViewerPaneLeaves(core.getState().viewerPaneLayout)).toEqual([
+      { path: [0], sessionId: first.id, active: false },
+      { path: [1], sessionId: first.id, active: true }
+    ]);
   });
 
   it('appends inactive loaded sessions without switching the active image', () => {

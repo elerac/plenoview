@@ -1,5 +1,6 @@
 import {
   errorResource,
+  idleResource,
   isPendingMatch,
   pendingResource,
   successResource,
@@ -37,24 +38,52 @@ export function resourceReducer(
     case 'colormapLoadStarted':
       return {
         ...state,
-        colormapLutResource: pendingResource(intent.colormapId, intent.requestId)
+        colormapLutResource: pendingResource(intent.colormapId, intent.requestId),
+        colormapLutsById: {
+          ...state.colormapLutsById,
+          [intent.colormapId]: pendingResource(intent.colormapId, intent.requestId)
+        }
       };
     case 'colormapLoadResolved':
-      if (intent.requestId !== null && !isPendingMatch(state.colormapLutResource, intent.colormapId, intent.requestId)) {
+      if (
+        intent.requestId !== null &&
+        !isPendingMatch(state.colormapLutResource, intent.colormapId, intent.requestId) &&
+        !isPendingMatch(
+          state.colormapLutsById[intent.colormapId] ?? idleResource(),
+          intent.colormapId,
+          intent.requestId
+        )
+      ) {
         return state;
       }
       return {
         ...state,
-        colormapLutResource: successResource(intent.colormapId, intent.lut)
+        colormapLutResource: successResource(intent.colormapId, intent.lut),
+        colormapLutsById: {
+          ...state.colormapLutsById,
+          [intent.colormapId]: successResource(intent.colormapId, intent.lut)
+        }
       };
     case 'colormapLoadFailed': {
-      if (intent.requestId !== null && !isPendingMatch(state.colormapLutResource, intent.colormapId, intent.requestId)) {
+      if (
+        intent.requestId !== null &&
+        !isPendingMatch(state.colormapLutResource, intent.colormapId, intent.requestId) &&
+        !isPendingMatch(
+          state.colormapLutsById[intent.colormapId] ?? idleResource(),
+          intent.colormapId,
+          intent.requestId
+        )
+      ) {
         return state;
       }
       const error = toViewerError(intent.error, 'Failed to load colormap.');
       return {
         ...state,
         colormapLutResource: errorResource(intent.colormapId, error),
+        colormapLutsById: {
+          ...state.colormapLutsById,
+          [intent.colormapId]: errorResource(intent.colormapId, error)
+        },
         errorMessage: error.message
       };
     }

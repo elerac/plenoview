@@ -1855,7 +1855,10 @@ describe('view menu', () => {
       root: {
         type: 'split',
         orientation: 'vertical',
-        children: [{ type: 'leaf' }, { type: 'leaf' }]
+        children: [
+          { type: 'leaf', sessionId: 'session-1' },
+          { type: 'leaf', sessionId: 'session-1' }
+        ]
       },
       activePanePath: [1]
     });
@@ -6492,7 +6495,7 @@ describe('opened files actions', () => {
 
     expect(openedFilesList.getAttribute('aria-describedby')).toBe('opened-files-reorder-hint');
     expect(document.getElementById('opened-files-reorder-hint')?.textContent).toBe(
-      'Drag rows to reorder open files or drop a row on the image viewer to select it. Press Alt+Up/Down or Option+Up/Down to reorder open files.'
+      'Drag rows to reorder open files or drop a row on the image viewer to assign it to a pane. Press Alt+Up/Down or Option+Up/Down to reorder open files.'
     );
     expect(openedFilesList.querySelector('.opened-file-grip')).toBeInstanceOf(HTMLSpanElement);
     expect(openedFilesList.querySelector('.opened-file-thumbnail')).toBeInstanceOf(HTMLImageElement);
@@ -7037,6 +7040,7 @@ describe('opened files reordering', () => {
     const openedImagesSelect = document.getElementById('opened-images-select') as HTMLSelectElement;
     const dataTransfer = createMockDataTransfer();
     mockDomRect(ui.viewerContainer, { top: 0, bottom: 120, height: 120, left: 300, width: 420 });
+    ui.setViewerViewportRect({ top: 0, left: 300, width: 420, height: 120 });
 
     secondRow.dispatchEvent(createOpenedFileDragEvent('dragstart', dataTransfer));
 
@@ -7067,9 +7071,57 @@ describe('opened files reordering', () => {
     expect(ui.viewerContainer.classList.contains('is-opened-file-drop-target')).toBe(false);
     expect(document.querySelector('.opened-file-drag-image')).toBeNull();
     expect(onOpenedImageSelected).toHaveBeenCalledTimes(1);
-    expect(onOpenedImageSelected).toHaveBeenCalledWith('session-2');
+    expect(onOpenedImageSelected).toHaveBeenCalledWith('session-2', {
+      path: [],
+      viewport: { width: 420, height: 120 }
+    });
     expect(onReorderOpenedImage).not.toHaveBeenCalled();
-    expect(openedImagesSelect.value).toBe('session-2');
+    expect(openedImagesSelect.value).toBe('session-1');
+  });
+
+  it('assigns an open file to the split pane under the drop point without selecting it', () => {
+    installUiFixture();
+
+    const onOpenedImageSelected = vi.fn();
+    const onOpenedImageAssignedToViewerPane = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({
+      onOpenedImageSelected,
+      onOpenedImageAssignedToViewerPane
+    }));
+    ui.setOpenedImageOptions([
+      { id: 'session-1', label: 'first.exr' },
+      { id: 'session-2', label: 'second.exr' }
+    ], 'session-1');
+    ui.setViewerPaneLayout({
+      root: {
+        type: 'split',
+        orientation: 'vertical',
+        children: [
+          { type: 'leaf', sessionId: 'session-1' },
+          { type: 'leaf', sessionId: 'session-1' }
+        ]
+      },
+      activePanePath: [1]
+    });
+
+    const rows = mockOpenedFilesListGeometry();
+    const secondRow = rows[1] as HTMLDivElement;
+    const dataTransfer = createMockDataTransfer();
+    mockDomRect(ui.viewerContainer, { top: 0, bottom: 120, height: 120, left: 300, width: 420 });
+    ui.setViewerViewportRect({ top: 0, left: 300, width: 420, height: 120 });
+
+    secondRow.dispatchEvent(createOpenedFileDragEvent('dragstart', dataTransfer));
+    ui.viewerContainer.dispatchEvent(createOpenedFileDragEvent('drop', dataTransfer, {
+      clientX: 360,
+      clientY: 60
+    }));
+
+    expect(onOpenedImageSelected).not.toHaveBeenCalled();
+    expect(onOpenedImageAssignedToViewerPane).toHaveBeenCalledTimes(1);
+    expect(onOpenedImageAssignedToViewerPane).toHaveBeenCalledWith('session-2', {
+      path: [0],
+      viewport: { width: 210, height: 120 }
+    });
   });
 
   it('uses a file icon fallback for the open-file native drag image without a thumbnail', () => {
@@ -9544,6 +9596,7 @@ function createUiCallbacksBase() {
     onCloseSelectedOpenedImage: () => {},
     onCloseAllOpenedImages: () => {},
     onOpenedImageSelected: () => {},
+    onOpenedImageAssignedToViewerPane: () => {},
     onOpenedImageDisplayNameChange: () => {},
     onReorderOpenedImage: () => {},
     onDisplayCacheBudgetChange: () => {},
