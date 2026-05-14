@@ -1,8 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { gotoViewerApp, openGalleryCbox } from './helpers/app';
 import {
   buildAutoExposureRgbExr,
   buildDepthAlphaExr,
+  buildDuplicateWavelengthSpectralExr,
   buildNamedRgbaExr,
   buildNamedRgbBareAlphaExr,
   buildRgbAuxExr,
@@ -10,7 +11,25 @@ import {
   buildScalarChannelExr,
   buildSpectralExr
 } from './helpers/exr-fixtures';
-import { setExposureValue } from './helpers/viewer';
+import { dragBy, resolveViewerPoint, setExposureValue } from './helpers/viewer';
+
+async function readSpectralPlotMetrics(spectralPlot: Locator): Promise<{
+  svgWidth: number;
+  tickLabelHeight: number;
+}> {
+  return await spectralPlot.evaluate((element) => {
+    const svg = element.querySelector('svg');
+    const tickLabel = element.querySelector('.spectral-tick-label');
+    if (!(svg instanceof SVGSVGElement) || !(tickLabel instanceof SVGTextElement)) {
+      throw new Error('Spectral plot SVG tick label was not rendered.');
+    }
+
+    return {
+      svgWidth: svg.getBoundingClientRect().width,
+      tickLabelHeight: tickLabel.getBoundingClientRect().height
+    };
+  });
+}
 
 test('carries exposure when opening and switching files', async ({ page }) => {
   await gotoViewerApp(page);
@@ -81,6 +100,9 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   const channelSelect = page.locator('#rgb-group-select');
   const rgbSplitToggleButton = page.locator('#rgb-split-toggle-button');
   const probeColorValues = page.locator('#probe-color-values');
+  const spectralPanel = page.locator('#spectral-panel');
+  const spectralPlot = page.locator('#spectral-plot');
+  const rightPanelResizer = page.locator('#right-panel-resizer');
   const viewer = page.locator('#viewer-container');
 
   await expect(openedImages.locator('option')).toHaveCount(0);
@@ -99,6 +121,7 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
 
   await viewer.hover();
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['Mono:']);
+  await expect(spectralPanel).toBeHidden();
 
   await page.setInputFiles('#file-input', {
     name: 'spectral.exr',
@@ -115,11 +138,65 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await expect(channelSelect.locator('option').filter({ hasText: /^500nm$/ })).toHaveCount(1);
   await expect(channelSelect.locator('option').filter({ hasText: /^600nm$/ })).toHaveCount(1);
   await expect(channelSelect.locator('option').filter({ hasText: /^700nm$/ })).toHaveCount(1);
+  await expect(spectralPanel).toBeVisible();
+  await expect(page.locator('#spectral-empty-state')).toBeVisible();
+  await expect(spectralPlot).toBeVisible();
+  await expect(spectralPlot.locator('.spectral-point')).toHaveCount(0);
 
   await channelSelect.selectOption({ label: '500nm' });
   await expect(channelSelect.locator('option:checked')).toHaveText('500nm');
   await viewer.hover();
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['Mono:']);
+  await expect(spectralPlot).toBeVisible();
+  await expect(spectralPlot.locator('.spectral-point')).toHaveCount(4);
+  await expect(spectralPlot.locator('.spectral-point').nth(0)).toHaveAttribute('data-wavelength', '400');
+  await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-wavelength', '500');
+  await expect(spectralPlot.locator('.spectral-point').nth(2)).toHaveAttribute('data-wavelength', '600');
+  await expect(spectralPlot.locator('.spectral-point').nth(3)).toHaveAttribute('data-wavelength', '700');
+
+  const lockedSpectralPoint = await resolveViewerPoint(viewer, 0.5, 0.5);
+  await page.mouse.click(lockedSpectralPoint.x, lockedSpectralPoint.y);
+  await expect(page.locator('#probe-mode')).toHaveText('Locked');
+  await expect(spectralPlot).toBeVisible();
+
+  const initialSpectralPlotMetrics = await readSpectralPlotMetrics(spectralPlot);
+  expect(initialSpectralPlotMetrics.tickLabelHeight).toBeGreaterThan(0);
+
+  await dragBy(page, rightPanelResizer, -80, 0);
+
+  await expect.poll(async () => {
+    return (await readSpectralPlotMetrics(spectralPlot)).svgWidth;
+  }).toBeGreaterThan(initialSpectralPlotMetrics.svgWidth + 30);
+  const resizedSpectralPlotMetrics = await readSpectralPlotMetrics(spectralPlot);
+  expect(resizedSpectralPlotMetrics.svgWidth).toBeGreaterThan(initialSpectralPlotMetrics.svgWidth + 30);
+  expect(Math.abs(resizedSpectralPlotMetrics.tickLabelHeight - initialSpectralPlotMetrics.tickLabelHeight))
+    .toBeLessThan(1);
+
+  await page.setInputFiles('#file-input', {
+    name: 'duplicate_wavelength_spectral.exr',
+    mimeType: 'image/exr',
+    buffer: buildDuplicateWavelengthSpectralExr()
+  });
+
+  await expect(openedImages.locator('option:checked')).toContainText('duplicate_wavelength_spectral.exr', {
+    timeout: 30000
+  });
+  await expect(channelSelect.locator('option:checked')).toHaveText('fuga.414nm');
+  await expect(spectralPanel).toBeVisible();
+  await viewer.hover();
+  await expect(spectralPlot.locator('.spectral-point')).toHaveCount(2);
+  await expect(spectralPlot.locator('.spectral-point').nth(0)).toHaveAttribute('data-channel', 'fuga.414nm');
+  await expect(spectralPlot.locator('.spectral-point').nth(0)).toHaveAttribute('data-wavelength', '414');
+  await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-channel', 'fuga.453nm');
+  await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-wavelength', '453');
+
+  await channelSelect.selectOption({ label: 'hoge.414nm' });
+  await expect(channelSelect.locator('option:checked')).toHaveText('hoge.414nm');
+  await expect(spectralPlot.locator('.spectral-point')).toHaveCount(2);
+  await expect(spectralPlot.locator('.spectral-point').nth(0)).toHaveAttribute('data-channel', 'hoge.414nm');
+  await expect(spectralPlot.locator('.spectral-point').nth(0)).toHaveAttribute('data-wavelength', '414');
+  await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-channel', 'hoge.453nm');
+  await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-wavelength', '453');
 
   await page.setInputFiles('#file-input', {
     name: 'rgb_aux.exr',
@@ -128,6 +205,7 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   });
 
   await expect(openedImages.locator('option:checked')).toContainText('rgb_aux.exr', { timeout: 30000 });
+  await expect(spectralPanel).toBeHidden();
   await expect(channelSelect).toBeEnabled();
   await expect(rgbSplitToggleButton).toBeVisible();
   await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'false');

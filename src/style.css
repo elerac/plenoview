@@ -3170,6 +3170,31 @@ body.is-resizing-panel-rows * {
   text-overflow: ellipsis;
 }
 
+.spectral-empty-state {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.spectral-plot {
+  margin-top: 0.35rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.4rem;
+  background: rgba(9, 13, 20, 0.72);
+  overflow: hidden;
+}
+
+.spectral-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.spectral-tick-label {
+  fill: var(--text-dim);
+  font-size: 0.66rem;
+}
+
 .metadata-table {
   margin-top: 0.65rem;
   border: 1px solid var(--panel-border);

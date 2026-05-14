@@ -313,6 +313,228 @@ describe('probe coordinate formatting', () => {
   });
 });
 
+describe('spectral inspector', () => {
+  it('initializes hidden but keeps its collapsible controls ready', () => {
+    installUiFixture();
+
+    new ViewerUi(createUiCallbacks());
+
+    const spectralPanel = document.getElementById('spectral-panel') as HTMLElement;
+    const spectralToggle = document.getElementById('spectral-toggle') as HTMLButtonElement;
+    const spectralContent = document.getElementById('spectral-content') as HTMLDivElement;
+
+    expect(spectralPanel.classList.contains('hidden')).toBe(true);
+    expect(spectralToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(spectralContent.hidden).toBe(false);
+
+    spectralToggle.click();
+
+    expect(spectralToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(spectralContent.hidden).toBe(true);
+    expect(spectralPanel.classList.contains('is-collapsed')).toBe(true);
+  });
+
+  it('toggles visibility and renders spectral plot points', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setSpectralReadout({
+      visible: true,
+      mode: 'Hover',
+      pixel: { x: 1, y: 2 },
+      imageSize: { width: 10, height: 20 },
+      channels: [
+        { channelName: '405.5nm', wavelength: 405.5, seriesKey: '', seriesLabel: '' },
+        { channelName: 'HOGE.520nm', wavelength: 520, seriesKey: 'HOGE', seriesLabel: 'HOGE' },
+        { channelName: 'FUGA735.25nm', wavelength: 735.25, seriesKey: '', seriesLabel: '' }
+      ],
+      points: [
+        { channelName: '405.5nm', wavelength: 405.5, seriesKey: '', seriesLabel: '', intensity: 0.25 },
+        { channelName: 'HOGE.520nm', wavelength: 520, seriesKey: 'HOGE', seriesLabel: 'HOGE', intensity: 0.75 },
+        { channelName: 'FUGA735.25nm', wavelength: 735.25, seriesKey: '', seriesLabel: '', intensity: 0.5 }
+      ]
+    });
+
+    const spectralPanel = document.getElementById('spectral-panel') as HTMLElement;
+    const spectralEmptyState = document.getElementById('spectral-empty-state') as HTMLElement;
+    const spectralPlot = document.getElementById('spectral-plot') as HTMLElement;
+    const points = Array.from(document.querySelectorAll<SVGCircleElement>('#spectral-plot .spectral-point'));
+    const wavelengthTickLabels = Array.from(
+      document.querySelectorAll<SVGTextElement>('#spectral-plot .spectral-tick-label--x')
+    ).map((text) => text.textContent);
+    const yTickLabels = Array.from(
+      document.querySelectorAll<SVGTextElement>('#spectral-plot .spectral-tick-label--y')
+    ).map((text) => text.textContent);
+
+    expect(spectralPanel.classList.contains('hidden')).toBe(false);
+    expect(spectralEmptyState.classList.contains('hidden')).toBe(true);
+    expect(spectralPlot.classList.contains('hidden')).toBe(false);
+    expect(document.querySelector('#spectral-plot svg')).not.toBeNull();
+    expect(Array.from(document.querySelectorAll('#spectral-plot text')).map((text) => text.textContent)).not.toEqual(
+      expect.arrayContaining(['Spectral intensity plot', 'Intensity', 'Wavelength (nm)'])
+    );
+    expect(wavelengthTickLabels).toEqual(expect.arrayContaining(['405.5', '735.25']));
+    expect(wavelengthTickLabels).not.toContain('800');
+    expect(points.map((point) => point.getAttribute('data-wavelength'))).toEqual(['405.5', '520', '735.25']);
+    expect(points.map((point) => point.getAttribute('data-intensity'))).toEqual(['0.25', '0.75', '0.5']);
+    expect(points.map((point) => point.getAttribute('r'))).toEqual(['2.6', '2.6', '2.6']);
+    expect(points.at(0)?.getAttribute('cx')).toBe('42');
+    expect(points.at(-1)?.getAttribute('cx')).toBe('346');
+    expect(points.at(1)?.getAttribute('cy')).toBe('14');
+    expect(yTickLabels).not.toContain('0.75');
+    expect(yTickLabels).not.toEqual(expect.arrayContaining(['1', '1.0', '1.00']));
+
+    ui.setSpectralReadout({
+      visible: true,
+      mode: 'Hover',
+      pixel: null,
+      imageSize: { width: 10, height: 20 },
+      channels: [
+        { channelName: '405.5nm', wavelength: 405.5, seriesKey: '', seriesLabel: '' },
+        { channelName: 'HOGE.520nm', wavelength: 520, seriesKey: 'HOGE', seriesLabel: 'HOGE' },
+        { channelName: 'FUGA735.25nm', wavelength: 735.25, seriesKey: '', seriesLabel: '' }
+      ],
+      points: []
+    });
+
+    expect(spectralPanel.classList.contains('hidden')).toBe(false);
+    expect(spectralEmptyState.classList.contains('hidden')).toBe(false);
+    expect(spectralEmptyState.textContent).toContain('Hover or lock a pixel');
+    expect(spectralPlot.classList.contains('hidden')).toBe(false);
+    expect(document.querySelector('#spectral-plot svg')).not.toBeNull();
+    expect(document.querySelectorAll('#spectral-plot .spectral-point')).toHaveLength(0);
+    expect(Array.from(
+      document.querySelectorAll<SVGTextElement>('#spectral-plot .spectral-tick-label--x')
+    ).map((text) => text.textContent)).toEqual(expect.arrayContaining(['405.5', '735.25']));
+
+    ui.setSpectralReadout({
+      visible: false,
+      mode: 'Hover',
+      pixel: null,
+      imageSize: null,
+      channels: [],
+      points: []
+    });
+
+    expect(spectralPanel.classList.contains('hidden')).toBe(true);
+  });
+
+  it('renders spectral chart in measured CSS pixels and rerenders after plot resize', () => {
+    installUiFixture();
+
+    const spectralPlot = document.getElementById('spectral-plot') as HTMLElement;
+    mockDomRect(spectralPlot, { top: 0, bottom: 307, height: 307, width: 480 });
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setSpectralReadout({
+      visible: true,
+      mode: 'Hover',
+      pixel: { x: 1, y: 2 },
+      imageSize: { width: 10, height: 20 },
+      channels: [
+        { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '' },
+        { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '' },
+        { channelName: '700nm', wavelength: 700, seriesKey: '', seriesLabel: '' }
+      ],
+      points: [
+        { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '', intensity: 0.25 },
+        { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '', intensity: 0.75 },
+        { channelName: '700nm', wavelength: 700, seriesKey: '', seriesLabel: '', intensity: 0.5 }
+      ]
+    });
+
+    const initialSvg = document.querySelector<SVGSVGElement>('#spectral-plot svg');
+    expect(initialSvg).not.toBeNull();
+    expect(readSvgViewBox(initialSvg!)).toEqual({
+      x: 0,
+      y: 0,
+      width: 480,
+      height: 306.667
+    });
+    expect(initialSvg!.getAttribute('width')).toBe('480');
+    expect(initialSvg!.getAttribute('height')).toBe('306.667');
+    expect(document.querySelector<SVGCircleElement>('#spectral-plot .spectral-point:last-of-type')?.getAttribute('cx'))
+      .toBe('466');
+
+    mockDomRect(spectralPlot, { top: 0, bottom: 192, height: 192, width: 300 });
+    triggerResizeObserversForElement(spectralPlot);
+
+    const resizedSvg = document.querySelector<SVGSVGElement>('#spectral-plot svg');
+    expect(resizedSvg).not.toBeNull();
+    expect(resizedSvg).not.toBe(initialSvg);
+    expect(readSvgViewBox(resizedSvg!)).toEqual({
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 191.667
+    });
+    expect(resizedSvg!.getAttribute('width')).toBe('300');
+    expect(resizedSvg!.getAttribute('height')).toBe('191.667');
+    expect(document.querySelector<SVGCircleElement>('#spectral-plot .spectral-point:last-of-type')?.getAttribute('cx'))
+      .toBe('286');
+  });
+
+  it('uses the raw spectral maximum as the y-axis endpoint for values above one', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setSpectralReadout({
+      visible: true,
+      mode: 'Hover',
+      pixel: { x: 1, y: 2 },
+      imageSize: { width: 10, height: 20 },
+      channels: [
+        { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '' },
+        { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '' },
+        { channelName: '600nm', wavelength: 600, seriesKey: '', seriesLabel: '' }
+      ],
+      points: [
+        { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '', intensity: 40 },
+        { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '', intensity: 100.5 },
+        { channelName: '600nm', wavelength: 600, seriesKey: '', seriesLabel: '', intensity: 80 }
+      ]
+    });
+
+    const points = Array.from(document.querySelectorAll<SVGCircleElement>('#spectral-plot .spectral-point'));
+    const yTickLabels = Array.from(
+      document.querySelectorAll<SVGTextElement>('#spectral-plot .spectral-tick-label--y')
+    ).map((text) => text.textContent);
+
+    expect(points.at(1)?.getAttribute('cy')).toBe('14');
+    expect(yTickLabels).not.toContain('100.5');
+    expect(yTickLabels).not.toContain('112.56');
+  });
+
+  it('keeps crowded min and max wavelength tick labels over normal tick labels', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setSpectralReadout({
+      visible: true,
+      mode: 'Hover',
+      pixel: { x: 1, y: 2 },
+      imageSize: { width: 10, height: 20 },
+      channels: [
+        { channelName: '398nm', wavelength: 398, seriesKey: '', seriesLabel: '' },
+        { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '' },
+        { channelName: '604nm', wavelength: 604, seriesKey: '', seriesLabel: '' }
+      ],
+      points: [
+        { channelName: '398nm', wavelength: 398, seriesKey: '', seriesLabel: '', intensity: 0.25 },
+        { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '', intensity: 0.75 },
+        { channelName: '604nm', wavelength: 604, seriesKey: '', seriesLabel: '', intensity: 0.5 }
+      ]
+    });
+
+    const wavelengthTickLabels = Array.from(
+      document.querySelectorAll<SVGTextElement>('#spectral-plot .spectral-tick-label--x')
+    ).map((text) => text.textContent);
+
+    expect(wavelengthTickLabels).toEqual(expect.arrayContaining(['398', '604']));
+    expect(wavelengthTickLabels).not.toEqual(expect.arrayContaining(['400', '600']));
+  });
+});
+
 describe('metadata inspector', () => {
   it('starts with all inspector readout sections expanded and toggles them independently', () => {
     installUiFixture();
@@ -6442,7 +6664,7 @@ describe('ui disposal', () => {
     expect(onOpenFileClick).not.toHaveBeenCalled();
     expect(onFilesDropped).not.toHaveBeenCalled();
     expect(onReorderOpenedImage).not.toHaveBeenCalled();
-    expect(disconnectSpy).toHaveBeenCalledTimes(2);
+    expect(disconnectSpy).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -9450,6 +9672,20 @@ function triggerResizeObserversForElement(element: Element): void {
     .forEach((registration) => {
       registration.callback([], {} as ResizeObserver);
     });
+}
+
+function readSvgViewBox(svg: SVGSVGElement): { x: number; y: number; width: number; height: number } {
+  const parts = (svg.getAttribute('viewBox') ?? '').split(/\s+/).map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
+    throw new Error(`Invalid SVG viewBox: ${svg.getAttribute('viewBox') ?? ''}`);
+  }
+
+  return {
+    x: parts[0]!,
+    y: parts[1]!,
+    width: parts[2]!,
+    height: parts[3]!
+  };
 }
 
 function mockDomRect(

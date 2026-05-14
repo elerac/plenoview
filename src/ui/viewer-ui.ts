@@ -49,7 +49,7 @@ import {
   getScreenshotRegionCropSize,
   type ScreenshotRegionCrop
 } from '../export/screenshot-region';
-import type { ImageStatsReadoutModel, ViewerStateReadoutModel } from '../app/viewer-app-types';
+import type { ImageStatsReadoutModel, SpectralPlotReadoutModel, ViewerStateReadoutModel } from '../app/viewer-app-types';
 import type {
   DisplaySelection,
   DisplayLuminanceRange,
@@ -82,6 +82,7 @@ import type {
 import type { ProbeColorPreview } from '../probe';
 import { ProbeReadoutController, type ProbeCoordinateImageSize } from './probe-readout';
 import { setRoiReadout } from './roi-readout';
+import { SpectralPlotPanel } from './spectral-plot-panel';
 import { ThemeController } from './theme-controller';
 import { SettingsDialogController } from './settings-dialog';
 import {
@@ -300,6 +301,7 @@ export class ViewerUi implements Disposable {
   private readonly exportColormapDialog: ExportColormapDialogController;
   private readonly folderLoadDialog: FolderLoadDialogController;
   private readonly probeReadoutController: ProbeReadoutController;
+  private readonly spectralPlotPanel: SpectralPlotPanel;
   private readonly viewerStatePanel: ViewerStatePanel;
   private readonly dragDropController: DragDropController;
   private readonly collapsibleSectionsController: CollapsibleSectionsController;
@@ -584,6 +586,7 @@ export class ViewerUi implements Disposable {
     });
     this.folderLoadDialog = new FolderLoadDialogController(this.elements);
     this.probeReadoutController = new ProbeReadoutController(this.elements);
+    this.spectralPlotPanel = new SpectralPlotPanel(this.elements);
     this.viewerStatePanel = new ViewerStatePanel(this.elements, {
       onViewerViewStateChange: (patch) => {
         this.callbacks.onViewerViewStateChange(patch);
@@ -630,6 +633,7 @@ export class ViewerUi implements Disposable {
     this.disposables.addDisposable(this.exportImageBatchDialog);
     this.disposables.addDisposable(this.exportColormapDialog);
     this.disposables.addDisposable(this.folderLoadDialog);
+    this.disposables.addDisposable(this.spectralPlotPanel);
     this.disposables.addDisposable(this.viewerStatePanel);
     this.disposables.addDisposable(this.dragDropController);
     this.disposables.addDisposable(this.collapsibleSectionsController);
@@ -1446,6 +1450,14 @@ export class ViewerUi implements Disposable {
     }
 
     this.probeReadoutController.setProbeReadout(mode, sample, colorPreview, imageSize);
+  }
+
+  setSpectralReadout(readout: SpectralPlotReadoutModel): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.spectralPlotPanel.setReadout(readout);
   }
 
   setMetadata(metadata: ExrMetadataEntry[] | null): void {

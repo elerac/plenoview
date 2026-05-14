@@ -17,6 +17,7 @@ export class CollapsibleSectionsController implements Disposable {
     this.bindReadoutSection({ toggle: this.elements.metadataToggle, content: this.elements.metadataContent });
     this.bindReadoutSection({ toggle: this.elements.imageStatsToggle, content: this.elements.imageStatsContent });
     this.bindReadoutSection({ toggle: this.elements.probeToggle, content: this.elements.probeContent });
+    this.bindReadoutSection({ toggle: this.elements.spectralToggle, content: this.elements.spectralContent });
     this.bindReadoutSection({ toggle: this.elements.roiToggle, content: this.elements.roiContent });
     this.bindReadoutSection({ toggle: this.elements.viewerStateToggle, content: this.elements.viewerStateContent });
   }

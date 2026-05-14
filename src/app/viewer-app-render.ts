@@ -23,12 +23,14 @@ import {
 import type { DisplayLuminanceRange, OpenedImageSession, ViewerRenderState } from '../types';
 import { buildProbeReadoutModel } from './probe-presentation';
 import { buildRoiReadoutModel } from './roi-presentation';
+import { buildSpectralPlotReadoutModel } from './spectral-presentation';
 import {
   sameDisplayRangeRequest,
   sameImageStatsReadout,
   sameProbeReadout,
   sameRoiReadout,
   sameResourceTarget,
+  sameSpectralPlotReadout,
   sameViewerStateReadout
 } from './viewer-app-equality';
 import {
@@ -63,12 +65,14 @@ export const enum ViewerRenderInvalidationFlags {
   ImageStatsReadout = 1 << 11,
   ResourceRequestImageStats = 1 << 12,
   ViewerStateReadout = 1 << 13,
-  ViewerPaneLayout = 1 << 14
+  ViewerPaneLayout = 1 << 14,
+  SpectralReadout = 1 << 15
 }
 
 export function createViewerRenderSnapshotSelector(): (state: ViewerAppState) => ViewerRenderSnapshot {
   const selectRenderState = createRenderStateSelector();
   const selectProbeReadout = createProbeReadoutSelector();
+  const selectSpectralPlotReadout = createSpectralPlotReadoutSelector();
   const selectRoiReadout = createRoiReadoutSelector();
   const selectImageStatsReadout = createImageStatsReadoutSelector();
   const selectResourceTarget = createResourceTargetSelector();
@@ -91,6 +95,7 @@ export function createViewerRenderSnapshotSelector(): (state: ViewerAppState) =>
       paneRenderSources: selectPaneRenderSources(state, activeSession, renderState),
       activeColormapLut,
       probeReadout: selectProbeReadout(state, activeSession, activeLayer),
+      spectralPlotReadout: selectSpectralPlotReadout(state, activeSession, activeLayer),
       roiReadout: selectRoiReadout(state, activeSession, activeLayer),
       viewerStateReadout: buildViewerStateReadout(state, activeSession),
       imageStatsReadout: selectImageStatsReadout(state, activeSession, activeLayer, imageStatsRequest),
@@ -127,6 +132,10 @@ export function computeViewerRenderInvalidation(
 
   if (!sameProbeReadout(previous.probeReadout, next.probeReadout)) {
     flags |= ViewerRenderInvalidationFlags.ProbeReadout;
+  }
+
+  if (!sameSpectralPlotReadout(previous.spectralPlotReadout, next.spectralPlotReadout)) {
+    flags |= ViewerRenderInvalidationFlags.SpectralReadout;
   }
 
   if (!sameRoiReadout(previous.roiReadout, next.roiReadout)) {
@@ -351,6 +360,58 @@ function createProbeReadoutSelector(): (
   };
 }
 
+function createSpectralPlotReadoutSelector(): (
+  state: ViewerAppState,
+  activeSession: OpenedImageSession | null,
+  activeLayer: ViewerRenderSnapshot['activeLayer']
+) => ViewerRenderSnapshot['spectralPlotReadout'] {
+  let previousSessionId: string | null = null;
+  let previousLayer: ViewerRenderSnapshot['activeLayer'] = null;
+  let previousWidth = 0;
+  let previousHeight = 0;
+  let previousLockedPixel: ViewerAppState['sessionState']['lockedPixel'] = null;
+  let previousHoveredPixel: ViewerAppState['interactionState']['hoveredPixel'] = null;
+  let previousDisplaySelection: ViewerAppState['sessionState']['displaySelection'] = null;
+  let previousResult = buildSpectralPlotReadoutModel({
+    activeSession: null,
+    activeLayer: null,
+    sessionState: stateLikeSessionState(),
+    interactionState: stateLikeInteractionState()
+  });
+
+  return (state, activeSession, activeLayer) => {
+    const sessionId = activeSession?.id ?? null;
+    const width = activeSession?.decoded.width ?? 0;
+    const height = activeSession?.decoded.height ?? 0;
+    if (
+      sessionId === previousSessionId &&
+      activeLayer === previousLayer &&
+      width === previousWidth &&
+      height === previousHeight &&
+      samePixel(state.sessionState.lockedPixel, previousLockedPixel) &&
+      samePixel(state.interactionState.hoveredPixel, previousHoveredPixel) &&
+      sameDisplaySelection(state.sessionState.displaySelection, previousDisplaySelection)
+    ) {
+      return previousResult;
+    }
+
+    previousSessionId = sessionId;
+    previousLayer = activeLayer;
+    previousWidth = width;
+    previousHeight = height;
+    previousLockedPixel = state.sessionState.lockedPixel;
+    previousHoveredPixel = state.interactionState.hoveredPixel;
+    previousDisplaySelection = state.sessionState.displaySelection;
+    previousResult = buildSpectralPlotReadoutModel({
+      activeSession,
+      activeLayer,
+      sessionState: state.sessionState,
+      interactionState: state.interactionState
+    });
+    return previousResult;
+  };
+}
+
 function createResourceTargetSelector(): (
   state: ViewerAppState,
   activeSession: OpenedImageSession | null
@@ -566,6 +627,7 @@ function sameViewerRenderSnapshot(a: ViewerRenderSnapshot, b: ViewerRenderSnapsh
     samePaneRenderSources(a.paneRenderSources, b.paneRenderSources) &&
     a.activeColormapLut === b.activeColormapLut &&
     sameProbeReadout(a.probeReadout, b.probeReadout) &&
+    sameSpectralPlotReadout(a.spectralPlotReadout, b.spectralPlotReadout) &&
     sameRoiReadout(a.roiReadout, b.roiReadout) &&
     sameViewerStateReadout(a.viewerStateReadout, b.viewerStateReadout) &&
     sameImageStatsReadout(a.imageStatsReadout, b.imageStatsReadout) &&

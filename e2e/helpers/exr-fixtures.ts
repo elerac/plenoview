@@ -67,6 +67,29 @@ export function buildSpectralExr(): Buffer {
   }
 }
 
+export function buildDuplicateWavelengthSpectralExr(): Buffer {
+  ensureExrEncoderInitialized();
+
+  const encoder = new ExrEncoder(2, 2);
+  try {
+    encoder.addLayer(
+      null,
+      ['hoge.414nm', 'fuga.414nm', 'hoge.453nm', 'fuga.453nm'],
+      new Float32Array([
+        0.1, 0.8, 0.2, 0.7,
+        0.2, 0.7, 0.3, 0.6,
+        0.3, 0.6, 0.4, 0.5,
+        0.4, 0.5, 0.5, 0.4
+      ]),
+      SamplePrecision.F32,
+      CompressionMethod.None
+    );
+    return Buffer.from(encoder.encode());
+  } finally {
+    encoder.free();
+  }
+}
+
 export function buildRgbAuxExr(): Buffer {
   ensureExrEncoderInitialized();
 

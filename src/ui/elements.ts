@@ -190,6 +190,11 @@ export interface Elements {
   probeValues: HTMLElement;
   probeToggle: HTMLButtonElement;
   probeContent: HTMLDivElement;
+  spectralPanel: HTMLElement;
+  spectralToggle: HTMLButtonElement;
+  spectralContent: HTMLDivElement;
+  spectralEmptyState: HTMLElement;
+  spectralPlot: HTMLElement;
   metadataEmptyState: HTMLElement;
   metadataTable: HTMLElement;
   roiToggle: HTMLButtonElement;
@@ -447,6 +452,13 @@ export type ProbeReadoutElements = Pick<
   | 'probeValues'
 >;
 
+export type SpectralPlotPanelElements = Pick<
+  Elements,
+  | 'spectralPanel'
+  | 'spectralEmptyState'
+  | 'spectralPlot'
+>;
+
 export type MetadataPanelElements = Pick<Elements, 'metadataEmptyState' | 'metadataTable'>;
 
 export type ImageStatsPanelElements = Pick<
@@ -511,6 +523,8 @@ export type CollapsibleSectionsElements = Pick<
   | 'metadataContent'
   | 'probeToggle'
   | 'probeContent'
+  | 'spectralToggle'
+  | 'spectralContent'
   | 'roiToggle'
   | 'roiContent'
 >;
@@ -714,6 +728,11 @@ export function resolveElements(): Elements {
     probeValues: requireElement('probe-values', HTMLElement),
     probeToggle: requireElement('probe-toggle', HTMLButtonElement),
     probeContent: requireElement('probe-content', HTMLDivElement),
+    spectralPanel: requireElement('spectral-panel', HTMLElement),
+    spectralToggle: requireElement('spectral-toggle', HTMLButtonElement),
+    spectralContent: requireElement('spectral-content', HTMLDivElement),
+    spectralEmptyState: requireElement('spectral-empty-state', HTMLElement),
+    spectralPlot: requireElement('spectral-plot', HTMLElement),
     metadataEmptyState: requireElement('metadata-empty-state', HTMLElement),
     metadataTable: requireElement('metadata-table', HTMLElement),
     roiToggle: requireElement('roi-toggle', HTMLButtonElement),

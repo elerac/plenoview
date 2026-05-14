@@ -35,6 +35,7 @@ function createSession(id: string, decoded = createDecodedImage()): OpenedImageS
 function createUiMock(): ViewerUi {
   return {
     setProbeReadout: vi.fn(),
+    setSpectralReadout: vi.fn(),
     setRoiReadout: vi.fn(),
     setViewerStateReadout: vi.fn(),
     setImageStats: vi.fn(),

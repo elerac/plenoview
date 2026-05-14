@@ -8,6 +8,7 @@ import type {
   ProbeReadoutModel,
   ImageStatsReadoutModel,
   RoiReadoutModel,
+  SpectralPlotReadoutModel,
   StokesDegreeModulationControlModel,
   ViewerChannelThumbnailItem,
   ViewerDisplayRangeRequest,
@@ -225,6 +226,24 @@ export function sameProbeReadout(a: ProbeReadoutModel, b: ProbeReadoutModel): bo
   );
 }
 
+export function sameSpectralPlotReadout(
+  a: SpectralPlotReadoutModel,
+  b: SpectralPlotReadoutModel
+): boolean {
+  if (!a.visible && !b.visible) {
+    return true;
+  }
+
+  return (
+    a.visible === b.visible &&
+    a.mode === b.mode &&
+    sameSpectralPixel(a.pixel, b.pixel) &&
+    sameImageSize(a.imageSize, b.imageSize) &&
+    sameSpectralChannels(a.channels, b.channels) &&
+    sameSpectralPlotPoints(a.points, b.points)
+  );
+}
+
 export function sameResourceTarget(a: ViewerResourceTarget | null, b: ViewerResourceTarget | null): boolean {
   if (!a && !b) {
     return true;
@@ -296,6 +315,43 @@ function sameProbeDisplayValues(a: ProbeDisplayValue[], b: ProbeDisplayValue[]):
   }
 
   return a.every((item, index) => item.label === b[index]?.label && item.value === b[index]?.value);
+}
+
+function sameSpectralPlotPoints(
+  a: SpectralPlotReadoutModel['points'],
+  b: SpectralPlotReadoutModel['points']
+): boolean {
+  return sameSpectralChannels(a, b) && a.every((item, index) => item.intensity === b[index]?.intensity);
+}
+
+function sameSpectralChannels(
+  a: SpectralPlotReadoutModel['channels'],
+  b: SpectralPlotReadoutModel['channels']
+): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return a.every((item, index) => {
+    const other = b[index];
+    return Boolean(other) &&
+      item.channelName === other.channelName &&
+      item.wavelength === other.wavelength;
+  });
+}
+
+function sameSpectralPixel(
+  a: SpectralPlotReadoutModel['pixel'],
+  b: SpectralPlotReadoutModel['pixel']
+): boolean {
+  if (!a && !b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+
+  return a.x === b.x && a.y === b.y;
 }
 
 function samePixelSample(a: PixelSample | null, b: PixelSample | null): boolean {

@@ -3,6 +3,7 @@ import type { AsyncResource, ViewerError } from '../async-resource';
 import type { AutoExposureResult } from '../analysis/auto-exposure';
 import type { ColormapLut, ColormapRegistry } from '../colormaps';
 import type { ProbeColorPreview } from '../probe';
+import type { SpectralChannel, SpectralPlotPoint } from '../spectral';
 import type {
   DecodedLayer,
   DisplayLuminanceRange,
@@ -53,6 +54,15 @@ export interface ProbeReadoutModel {
   sample: PixelSample | null;
   colorPreview: ProbeColorPreview | null;
   imageSize: { width: number; height: number } | null;
+}
+
+export interface SpectralPlotReadoutModel {
+  visible: boolean;
+  mode: 'Hover' | 'Locked';
+  pixel: { x: number; y: number } | null;
+  imageSize: { width: number; height: number } | null;
+  channels: SpectralChannel[];
+  points: SpectralPlotPoint[];
 }
 
 export interface RoiReadoutModel {
@@ -339,6 +349,7 @@ export interface ViewerRenderSnapshot {
   paneRenderSources: ViewerPaneRenderSource[];
   activeColormapLut: ColormapLut | null;
   probeReadout: ProbeReadoutModel;
+  spectralPlotReadout: SpectralPlotReadoutModel;
   roiReadout: RoiReadoutModel;
   viewerStateReadout: ViewerStateReadoutModel;
   imageStatsReadout: ImageStatsReadoutModel;

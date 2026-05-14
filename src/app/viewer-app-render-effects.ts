@@ -41,6 +41,10 @@ export function applyRenderEffects(
     );
   }
 
+  if (invalidation & ViewerRenderInvalidationFlags.SpectralReadout) {
+    ui.setSpectralReadout(snapshot.spectralPlotReadout);
+  }
+
   if (invalidation & ViewerRenderInvalidationFlags.RoiReadout) {
     ui.setRoiReadout(snapshot.roiReadout);
   }
