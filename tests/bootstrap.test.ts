@@ -38,6 +38,10 @@ const mocks = vi.hoisted(() => {
     autoExposureEnabled: false,
     autoExposurePercentile: 99.5,
     rulersVisible: false,
+    viewerPaneLayout: {
+      root: { type: 'leaf' },
+      activePanePath: []
+    },
     sessionState: {
       exposureEv: 0,
       channelThumbnailExposureEv: 0,
@@ -245,6 +249,23 @@ vi.mock('../src/ui/viewer-ui', () => ({
     readonly rulerOverlaySvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     readonly rulerLabelOverlay = document.createElement('div');
     readonly dispose = mocks.uiDispose;
+    readonly setViewerPaneLayout = vi.fn();
+    readonly getActiveViewerPane = vi.fn(() => ({
+      path: [],
+      rect: {
+        x: 0,
+        y: 0,
+        width: mocks.viewerRect.width,
+        height: mocks.viewerRect.height
+      },
+      viewport: {
+        width: mocks.viewerRect.width,
+        height: mocks.viewerRect.height
+      },
+      active: true
+    }));
+    readonly getViewerPaneRenderInfos = vi.fn(() => [this.getActiveViewerPane()]);
+    readonly resolveViewerPaneAtPoint = vi.fn(() => this.getActiveViewerPane());
     readonly setViewerViewportRect = vi.fn((rect: { left: number; top: number }) => {
       this.viewerContainer.style.setProperty('--viewer-checker-offset-x', `${-rect.left}px`);
       this.viewerContainer.style.setProperty('--viewer-checker-offset-y', `${-rect.top}px`);
@@ -288,6 +309,7 @@ vi.mock('../src/renderer', () => ({
     readonly renderValueOverlay = vi.fn();
     readonly renderProbeOverlay = vi.fn();
     readonly renderRulerOverlay = vi.fn();
+    readonly setViewerPanes = vi.fn();
     readonly setRulersVisible = vi.fn();
     readonly getViewport = vi.fn(() => ({ width: 320, height: 180 }));
     readonly clearImage = vi.fn();

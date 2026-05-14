@@ -2,6 +2,7 @@ import { imageToScreen } from '../interaction/image-geometry';
 import type { Disposable } from '../lifecycle';
 import { RULER_SIZE_PX } from '../ruler-layout';
 import type { ViewerState, ViewportInfo } from '../types';
+import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 
 const RULER_SIZE = RULER_SIZE_PX;
 const TARGET_MAJOR_TICK_PIXELS = 80;
@@ -38,10 +39,16 @@ interface RulerLabelBounds {
   end: number;
 }
 
+interface RulerLabelOrigin {
+  x: number;
+  y: number;
+}
+
 export class RulerOverlayRenderer implements Disposable {
   private readonly svg: SVGSVGElement;
   private readonly labelOverlay: HTMLElement;
   private viewport: ViewportInfo = { width: 1, height: 1 };
+  private panes: ViewerPaneRenderInfo[] = [];
   private imageSize: { width: number; height: number } | null = null;
   private disposed = false;
 
@@ -62,6 +69,10 @@ export class RulerOverlayRenderer implements Disposable {
     this.svg.setAttribute('width', String(this.viewport.width));
     this.svg.setAttribute('height', String(this.viewport.height));
     this.svg.setAttribute('viewBox', `0 0 ${this.viewport.width} ${this.viewport.height}`);
+  }
+
+  setPanes(panes: readonly ViewerPaneRenderInfo[]): void {
+    this.panes = panes.map(clonePaneRenderInfo);
   }
 
   setImageSize(width: number, height: number): void {
@@ -102,14 +113,22 @@ export class RulerOverlayRenderer implements Disposable {
 
     const palette = readRulerPalette(this.svg);
     const fragment = document.createDocumentFragment();
+    const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
 
-    appendSvgRect(fragment, 0, 0, this.viewport.width, RULER_SIZE, palette.surface);
-    appendSvgRect(fragment, 0, 0, RULER_SIZE, this.viewport.height, palette.surface);
-    appendSvgLine(fragment, 0, RULER_SIZE - 0.5, this.viewport.width, RULER_SIZE - 0.5, palette.border);
-    appendSvgLine(fragment, RULER_SIZE - 0.5, 0, RULER_SIZE - 0.5, this.viewport.height, palette.border);
+    for (const pane of panes) {
+      const group = document.createElementNS(SVG_NS, 'g');
+      group.setAttribute('transform', `translate(${pane.rect.x} ${pane.rect.y})`);
 
-    drawHorizontalRuler(fragment, this.labelOverlay, state, this.viewport, imageSize.width, palette.tick);
-    drawVerticalRuler(fragment, this.labelOverlay, state, this.viewport, imageSize.height, palette.tick);
+      appendSvgRect(group, 0, 0, pane.viewport.width, RULER_SIZE, palette.surface);
+      appendSvgRect(group, 0, 0, RULER_SIZE, pane.viewport.height, palette.surface);
+      appendSvgLine(group, 0, RULER_SIZE - 0.5, pane.viewport.width, RULER_SIZE - 0.5, palette.border);
+      appendSvgLine(group, RULER_SIZE - 0.5, 0, RULER_SIZE - 0.5, pane.viewport.height, palette.border);
+
+      const origin = { x: pane.rect.x, y: pane.rect.y };
+      drawHorizontalRuler(group, this.labelOverlay, state, pane.viewport, imageSize.width, palette.tick, origin);
+      drawVerticalRuler(group, this.labelOverlay, state, pane.viewport, imageSize.height, palette.tick, origin);
+      fragment.append(group);
+    }
 
     this.svg.append(fragment);
   }
@@ -136,7 +155,8 @@ function drawHorizontalRuler(
   state: ViewerState,
   viewport: ViewportInfo,
   imageWidth: number,
-  tickColor: string
+  tickColor: string,
+  origin: RulerLabelOrigin
 ): void {
   const majorStep = resolveMajorTickStep(state.zoom);
   const minorStep = resolveMinorTickStep(majorStep, state.zoom);
@@ -173,7 +193,7 @@ function drawHorizontalRuler(
     );
   }
 
-  appendRulerLabels(labelOverlay, labels);
+  appendRulerLabels(labelOverlay, labels, origin);
 }
 
 function drawVerticalRuler(
@@ -182,7 +202,8 @@ function drawVerticalRuler(
   state: ViewerState,
   viewport: ViewportInfo,
   imageHeight: number,
-  tickColor: string
+  tickColor: string,
+  origin: RulerLabelOrigin
 ): void {
   const majorStep = resolveMajorTickStep(state.zoom);
   const minorStep = resolveMinorTickStep(majorStep, state.zoom);
@@ -219,7 +240,7 @@ function drawVerticalRuler(
     );
   }
 
-  appendRulerLabels(labelOverlay, labels);
+  appendRulerLabels(labelOverlay, labels, origin);
 }
 
 function appendRulerLabel(
@@ -255,14 +276,18 @@ function addRulerLabelCandidate(
   });
 }
 
-function appendRulerLabels(labelOverlay: HTMLElement, labels: RulerLabelCandidate[]): void {
+function appendRulerLabels(
+  labelOverlay: HTMLElement,
+  labels: RulerLabelCandidate[],
+  origin: RulerLabelOrigin
+): void {
   const visibleLabels = resolveVisibleRulerLabels(labelOverlay, labels);
 
   for (const label of labels) {
     if (!visibleLabels.has(label)) {
       continue;
     }
-    appendRulerLabel(labelOverlay, label.axis, label.text, label.x, label.y);
+    appendRulerLabel(labelOverlay, label.axis, label.text, label.x + origin.x, label.y + origin.y);
   }
 }
 
@@ -484,4 +509,27 @@ function readCssColor(style: CSSStyleDeclaration, name: string, fallback: string
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function createFullViewportPane(viewport: ViewportInfo): ViewerPaneRenderInfo {
+  return {
+    path: [],
+    rect: {
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height
+    },
+    viewport: { ...viewport },
+    active: true
+  };
+}
+
+function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
+  return {
+    path: [...pane.path],
+    rect: { ...pane.rect },
+    viewport: { ...pane.viewport },
+    active: pane.active
+  };
 }

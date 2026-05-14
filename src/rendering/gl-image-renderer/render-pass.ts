@@ -6,6 +6,7 @@ import {
 } from '../../display/gpu-bindings';
 import { clampPanoramaProjectionPitch } from '../../interaction/panorama-geometry';
 import type { ViewerState } from '../../types';
+import type { ViewerPaneRenderInfo } from '../../viewer-pane-layout';
 import {
   COLORMAP_TEXTURE_UNIT,
   DEFAULT_RENDER_PASS_OPTIONS
@@ -16,13 +17,52 @@ import type {
   RenderPassOptions
 } from './types';
 
-export function render(state: GlImageRendererState, viewerState: ViewerState): void {
-  if (viewerState.viewerMode === 'panorama') {
-    renderPanoramaPass(state, viewerState, DEFAULT_RENDER_PASS_OPTIONS);
-    return;
-  }
+export function render(
+  state: GlImageRendererState,
+  viewerState: ViewerState,
+  panes: readonly ViewerPaneRenderInfo[] = []
+): void {
+  const gl = state.gl;
+  const renderPanes = panes.length > 0 ? panes : [createFullViewportPane(state)];
 
-  renderImagePass(state, viewerState, DEFAULT_RENDER_PASS_OPTIONS);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.viewport(0, 0, state.viewport.width, state.viewport.height);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.SCISSOR_TEST);
+
+  try {
+    for (const pane of renderPanes) {
+      const rect = normalizePaneRect(pane.rect, state.viewport.width, state.viewport.height);
+      if (!rect) {
+        continue;
+      }
+
+      const glY = state.viewport.height - rect.y - rect.height;
+      gl.viewport(rect.x, glY, rect.width, rect.height);
+      gl.scissor(rect.x, glY, rect.width, rect.height);
+      const options = {
+        ...DEFAULT_RENDER_PASS_OPTIONS,
+        viewportWidth: rect.width,
+        viewportHeight: rect.height,
+        viewportLeft: state.viewportOrigin.left + rect.x,
+        viewportTop: state.viewportOrigin.top + rect.y,
+        outputWidth: rect.width,
+        outputHeight: rect.height,
+        screenOriginX: -rect.x,
+        screenOriginY: glY
+      };
+      if (viewerState.viewerMode === 'panorama') {
+        renderPanoramaPass(state, viewerState, options);
+      } else {
+        renderImagePass(state, viewerState, options);
+      }
+    }
+  } finally {
+    gl.disable(gl.SCISSOR_TEST);
+    gl.viewport(0, 0, state.viewport.width, state.viewport.height);
+  }
 }
 
 export function renderImagePass(
@@ -123,4 +163,38 @@ function setCommonUniforms(
   gl.uniform1i(uniforms.useImageAlpha, state.activeBinding.usesImageAlpha ? 1 : 0);
   gl.uniform1i(uniforms.compositeCheckerboard, options.compositeCheckerboard ? 1 : 0);
   gl.uniform1i(uniforms.alphaOutputMode, resolveAlphaOutputModeUniformValue(options.alphaOutputMode));
+}
+
+function createFullViewportPane(state: GlImageRendererState): ViewerPaneRenderInfo {
+  return {
+    path: [],
+    rect: {
+      x: 0,
+      y: 0,
+      width: state.viewport.width,
+      height: state.viewport.height
+    },
+    viewport: { ...state.viewport },
+    active: true
+  };
+}
+
+function normalizePaneRect(
+  rect: { x: number; y: number; width: number; height: number },
+  maxWidth: number,
+  maxHeight: number
+): { x: number; y: number; width: number; height: number } | null {
+  const x0 = clamp(Math.floor(rect.x), 0, maxWidth);
+  const y0 = clamp(Math.floor(rect.y), 0, maxHeight);
+  const x1 = clamp(Math.ceil(rect.x + rect.width), 0, maxWidth);
+  const y1 = clamp(Math.ceil(rect.y + rect.height), 0, maxHeight);
+  const width = x1 - x0;
+  const height = y1 - y0;
+  return width > 0 && height > 0
+    ? { x: x0, y: y0, width, height }
+    : null;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

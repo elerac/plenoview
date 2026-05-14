@@ -5,6 +5,7 @@ import {
 } from '../display/evaluator';
 import type { Disposable } from '../lifecycle';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../types';
+import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 import { buildOverlayValueLines } from './overlay-value-lines';
 
 const VALUE_LABEL_FADE_START_ZOOM = 24;
@@ -15,6 +16,7 @@ export class OverlayRenderer implements Disposable {
   private readonly overlayCanvas: HTMLCanvasElement;
   private readonly overlayContext: CanvasRenderingContext2D;
   private viewport: ViewportInfo = { width: 1, height: 1 };
+  private panes: ViewerPaneRenderInfo[] = [];
   private imageSize: { width: number; height: number } | null = null;
   private displayEvaluator: DisplaySelectionEvaluator | null = null;
   private disposed = false;
@@ -41,6 +43,10 @@ export class OverlayRenderer implements Disposable {
 
     this.overlayCanvas.width = this.viewport.width;
     this.overlayCanvas.height = this.viewport.height;
+  }
+
+  setPanes(panes: readonly ViewerPaneRenderInfo[]): void {
+    this.panes = panes.map(clonePaneRenderInfo);
   }
 
   setDisplaySelectionContext(
@@ -92,17 +98,26 @@ export class OverlayRenderer implements Disposable {
 
     const labelOpacity = resolveValueLabelOpacity(state.zoom);
     if (labelOpacity > 0) {
-      this.drawPixelValues(state, imageSize.width, imageSize.height, labelOpacity);
+      const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
+      for (const pane of panes) {
+        this.drawPixelValues(state, imageSize.width, imageSize.height, labelOpacity, pane);
+      }
     }
   }
 
-  private drawPixelValues(state: ViewerState, imageWidth: number, imageHeight: number, opacity: number): void {
+  private drawPixelValues(
+    state: ViewerState,
+    imageWidth: number,
+    imageHeight: number,
+    opacity: number,
+    pane: ViewerPaneRenderInfo
+  ): void {
     const evaluator = this.displayEvaluator;
     if (!evaluator) {
       return;
     }
 
-    const bounds = visibleBounds(state, this.viewport);
+    const bounds = visibleBounds(state, pane.viewport);
     const startX = Math.max(0, Math.floor(bounds.left));
     const endX = Math.min(imageWidth - 1, Math.ceil(bounds.right));
     const startY = Math.max(0, Math.floor(bounds.top));
@@ -118,11 +133,21 @@ export class OverlayRenderer implements Disposable {
     }
 
     const ctx = this.overlayContext;
-    prepareValueLabelContext(ctx);
-    ctx.globalAlpha = opacity;
+    const usePaneClip = !isFullViewportPane(pane, this.viewport);
+    if (usePaneClip) {
+      ctx.save();
+    }
     try {
-      const halfViewWidth = this.viewport.width * 0.5;
-      const halfViewHeight = this.viewport.height * 0.5;
+      if (usePaneClip) {
+        ctx.beginPath();
+        ctx.rect(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
+        ctx.clip();
+        ctx.translate(pane.rect.x, pane.rect.y);
+      }
+      prepareValueLabelContext(ctx);
+      ctx.globalAlpha = opacity;
+      const halfViewWidth = pane.viewport.width * 0.5;
+      const halfViewHeight = pane.viewport.height * 0.5;
       const values = { r: 0, g: 0, b: 0, a: 1 };
 
       for (let y = startY; y <= endY; y += 1) {
@@ -144,6 +169,9 @@ export class OverlayRenderer implements Disposable {
       }
     } finally {
       ctx.globalAlpha = 1;
+      if (usePaneClip) {
+        ctx.restore();
+      }
     }
   }
 
@@ -157,6 +185,38 @@ export class OverlayRenderer implements Disposable {
     this.displayEvaluator = null;
     this.overlayContext.clearRect(0, 0, this.viewport.width, this.viewport.height);
   }
+}
+
+function createFullViewportPane(viewport: ViewportInfo): ViewerPaneRenderInfo {
+  return {
+    path: [],
+    rect: {
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height
+    },
+    viewport: { ...viewport },
+    active: true
+  };
+}
+
+function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
+  return {
+    path: [...pane.path],
+    rect: { ...pane.rect },
+    viewport: { ...pane.viewport },
+    active: pane.active
+  };
+}
+
+function isFullViewportPane(pane: ViewerPaneRenderInfo, viewport: ViewportInfo): boolean {
+  return (
+    pane.rect.x === 0 &&
+    pane.rect.y === 0 &&
+    pane.rect.width === viewport.width &&
+    pane.rect.height === viewport.height
+  );
 }
 
 function prepareValueLabelContext(ctx: CanvasRenderingContext2D): void {

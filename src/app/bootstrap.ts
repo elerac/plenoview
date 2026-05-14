@@ -137,7 +137,6 @@ export async function bootstrapApp(): Promise<AppHandle> {
     interaction = createViewerInteraction({
       core,
       ui,
-      renderer: services.renderer,
       interactionCoordinator: services.interactionCoordinator
     });
     resizeObserver = initializeViewportLifecycle({

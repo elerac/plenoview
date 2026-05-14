@@ -19,6 +19,7 @@ import {
 import type { ViewerAppState } from '../src/app/viewer-app-types';
 import { createInteractionState } from '../src/view-state';
 import { buildViewerStateForLayer, createInitialState } from '../src/viewer-store';
+import { createSinglePaneLayout, splitActiveViewerPane } from '../src/viewer-pane-layout';
 import {
   createChannelMonoSelection,
   createLayerFromChannels
@@ -141,6 +142,23 @@ describe('viewer app lanes', () => {
     expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderImage)).toBe(false);
     expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderValueOverlay)).toBe(false);
     expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderProbeOverlay)).toBe(false);
+  });
+
+  it('invalidates UI and all pane-local render passes when the pane layout changes', () => {
+    const state = createActiveState();
+    const nextState = {
+      ...state,
+      viewerPaneLayout: splitActiveViewerPane(createSinglePaneLayout(), 'vertical')
+    };
+    const uiFlags = createUiFlags(state, nextState);
+    const renderFlags = createRenderFlags(state, nextState);
+
+    expect(hasUiFlag(uiFlags, ViewerUiInvalidationFlags.ViewerPaneLayout)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.ViewerPaneLayout)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderValueOverlay)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderProbeOverlay)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderRulerOverlay)).toBe(true);
   });
 
   it('exposes auto exposure through UI and render request lanes', () => {

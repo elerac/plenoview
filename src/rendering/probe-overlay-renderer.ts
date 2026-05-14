@@ -2,11 +2,13 @@ import { imageToScreen } from '../interaction/image-geometry';
 import type { Disposable } from '../lifecycle';
 import { resolveActiveProbePixel } from '../probe';
 import type { ImagePixel, ImageRoi, ViewerState, ViewportInfo } from '../types';
+import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 
 export class ProbeOverlayRenderer implements Disposable {
   private readonly overlayCanvas: HTMLCanvasElement;
   private readonly overlayContext: CanvasRenderingContext2D;
   private viewport: ViewportInfo = { width: 1, height: 1 };
+  private panes: ViewerPaneRenderInfo[] = [];
   private hasImage = false;
   private disposed = false;
 
@@ -31,6 +33,10 @@ export class ProbeOverlayRenderer implements Disposable {
     };
     this.overlayCanvas.width = this.viewport.width;
     this.overlayCanvas.height = this.viewport.height;
+  }
+
+  setPanes(panes: readonly ViewerPaneRenderInfo[]): void {
+    this.panes = panes.map(clonePaneRenderInfo);
   }
 
   setImagePresent(hasImage: boolean): void {
@@ -62,24 +68,42 @@ export class ProbeOverlayRenderer implements Disposable {
       return;
     }
 
-    if (state.roi) {
-      this.drawRoi(state, state.roi, 'rgba(255, 122, 89, 0.95)');
-    }
+    const panes = this.panes.length > 0 ? this.panes : [createFullViewportPane(this.viewport)];
+    for (const pane of panes) {
+      const usePaneClip = !isFullViewportPane(pane, this.viewport);
+      if (usePaneClip) {
+        ctx.save();
+      }
+      try {
+        if (usePaneClip) {
+          ctx.beginPath();
+          ctx.rect(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
+          ctx.clip();
+          ctx.translate(pane.rect.x, pane.rect.y);
+        }
 
-    if (state.draftRoi) {
-      this.drawRoi(state, state.draftRoi, 'rgba(75, 192, 255, 0.95)');
-    }
+        if (state.roi) {
+          this.drawRoi(state, state.roi, pane.viewport, 'rgba(255, 122, 89, 0.95)');
+        }
 
-    if (state.roi && (state.roiInteraction.hoverHandle || state.roiInteraction.activeHandle)) {
-      this.drawRoiHandles(state, state.draftRoi ?? state.roi);
-    }
+        if (state.draftRoi) {
+          this.drawRoi(state, state.draftRoi, pane.viewport, 'rgba(75, 192, 255, 0.95)');
+        }
 
-    const probe = resolveActiveProbePixel(state.lockedPixel, state.hoveredPixel);
-    if (!probe) {
-      return;
-    }
+        if (state.roi && (state.roiInteraction.hoverHandle || state.roiInteraction.activeHandle)) {
+          this.drawRoiHandles(state, state.draftRoi ?? state.roi, pane.viewport);
+        }
 
-    this.drawProbeMarker(state, probe);
+        const probe = resolveActiveProbePixel(state.lockedPixel, state.hoveredPixel);
+        if (probe) {
+          this.drawProbeMarker(state, probe, pane.viewport);
+        }
+      } finally {
+        if (usePaneClip) {
+          ctx.restore();
+        }
+      }
+    }
   }
 
   dispose(): void {
@@ -92,29 +116,29 @@ export class ProbeOverlayRenderer implements Disposable {
     this.overlayContext.clearRect(0, 0, this.viewport.width, this.viewport.height);
   }
 
-  private drawProbeMarker(state: ViewerState, pixel: ImagePixel): void {
+  private drawProbeMarker(state: ViewerState, pixel: ImagePixel, viewport: ViewportInfo): void {
     const ctx = this.overlayContext;
-    const topLeft = imageToScreen(pixel.ix, pixel.iy, state, this.viewport);
+    const topLeft = imageToScreen(pixel.ix, pixel.iy, state, viewport);
 
     ctx.strokeStyle = state.lockedPixel ? 'rgba(255, 196, 0, 0.95)' : 'rgba(255, 255, 255, 0.95)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(topLeft.x, topLeft.y, state.zoom, state.zoom);
   }
 
-  private drawRoi(state: ViewerState, roi: ImageRoi, strokeStyle: string): void {
+  private drawRoi(state: ViewerState, roi: ImageRoi, viewport: ViewportInfo, strokeStyle: string): void {
     const ctx = this.overlayContext;
-    const topLeft = imageToScreen(roi.x0, roi.y0, state, this.viewport);
-    const bottomRight = imageToScreen(roi.x1 + 1, roi.y1 + 1, state, this.viewport);
+    const topLeft = imageToScreen(roi.x0, roi.y0, state, viewport);
+    const bottomRight = imageToScreen(roi.x1 + 1, roi.y1 + 1, state, viewport);
 
     ctx.strokeStyle = strokeStyle;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
   }
 
-  private drawRoiHandles(state: ViewerState, roi: ImageRoi): void {
+  private drawRoiHandles(state: ViewerState, roi: ImageRoi, viewport: ViewportInfo): void {
     const normalized = normalizeRoiForDrawing(roi);
-    const leftTop = imageToScreen(normalized.x0, normalized.y0, state, this.viewport);
-    const rightBottom = imageToScreen(normalized.x1 + 1, normalized.y1 + 1, state, this.viewport);
+    const leftTop = imageToScreen(normalized.x0, normalized.y0, state, viewport);
+    const rightBottom = imageToScreen(normalized.x1 + 1, normalized.y1 + 1, state, viewport);
     const centerX = (leftTop.x + rightBottom.x) * 0.5;
     const centerY = (leftTop.y + rightBottom.y) * 0.5;
     const handles: Array<{ handle: NonNullable<ViewerState['roiInteraction']['hoverHandle']>; x: number; y: number }> = [
@@ -148,6 +172,38 @@ export class ProbeOverlayRenderer implements Disposable {
     ctx.fillRect(x - half, y - half, size, size);
     ctx.strokeRect(x - half, y - half, size, size);
   }
+}
+
+function createFullViewportPane(viewport: ViewportInfo): ViewerPaneRenderInfo {
+  return {
+    path: [],
+    rect: {
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height
+    },
+    viewport: { ...viewport },
+    active: true
+  };
+}
+
+function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
+  return {
+    path: [...pane.path],
+    rect: { ...pane.rect },
+    viewport: { ...pane.viewport },
+    active: pane.active
+  };
+}
+
+function isFullViewportPane(pane: ViewerPaneRenderInfo, viewport: ViewportInfo): boolean {
+  return (
+    pane.rect.x === 0 &&
+    pane.rect.y === 0 &&
+    pane.rect.width === viewport.width &&
+    pane.rect.height === viewport.height
+  );
 }
 
 function normalizeRoiForDrawing(roi: ImageRoi): ImageRoi {

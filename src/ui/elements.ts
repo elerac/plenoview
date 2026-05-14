@@ -43,6 +43,9 @@ export interface Elements {
   rulersMenuItem: HTMLButtonElement;
   windowNormalMenuItem: HTMLButtonElement;
   windowFullScreenPreviewMenuItem: HTMLButtonElement;
+  windowSinglePaneMenuItem: HTMLButtonElement;
+  windowSplitVerticalMenuItem: HTMLButtonElement;
+  windowSplitHorizontalMenuItem: HTMLButtonElement;
   galleryCboxRgbButton: HTMLButtonElement;
   openFileButton: HTMLButtonElement;
   openFolderButton: HTMLButtonElement;
@@ -216,6 +219,7 @@ export interface Elements {
   probeOverlayCanvas: HTMLCanvasElement;
   rulerOverlaySvg: SVGSVGElement;
   rulerLabelOverlay: HTMLDivElement;
+  viewerPaneOverlay: HTMLDivElement;
   screenshotSelectionOverlay: HTMLDivElement;
   screenshotSelectionMaskTop: HTMLDivElement;
   screenshotSelectionMaskRight: HTMLDivElement;
@@ -557,6 +561,9 @@ export function resolveElements(): Elements {
     rulersMenuItem: requireElement('rulers-menu-item', HTMLButtonElement),
     windowNormalMenuItem: requireElement('window-normal-menu-item', HTMLButtonElement),
     windowFullScreenPreviewMenuItem: requireElement('window-full-screen-preview-menu-item', HTMLButtonElement),
+    windowSinglePaneMenuItem: requireElement('window-single-pane-menu-item', HTMLButtonElement),
+    windowSplitVerticalMenuItem: requireElement('window-split-vertical-menu-item', HTMLButtonElement),
+    windowSplitHorizontalMenuItem: requireElement('window-split-horizontal-menu-item', HTMLButtonElement),
     galleryCboxRgbButton: requireElement('gallery-cbox-rgb-button', HTMLButtonElement),
     openFileButton: requireElement('open-file-button', HTMLButtonElement),
     openFolderButton: requireElement('open-folder-button', HTMLButtonElement),
@@ -736,6 +743,7 @@ export function resolveElements(): Elements {
     probeOverlayCanvas: requireElement('probe-overlay-canvas', HTMLCanvasElement),
     rulerOverlaySvg: requireElement('ruler-overlay-svg', SVGSVGElement),
     rulerLabelOverlay: requireElement('ruler-label-overlay', HTMLDivElement),
+    viewerPaneOverlay: requireElement('viewer-pane-overlay', HTMLDivElement),
     screenshotSelectionOverlay: requireElement('screenshot-selection-overlay', HTMLDivElement),
     screenshotSelectionMaskTop: requireElement('screenshot-selection-mask-top', HTMLDivElement),
     screenshotSelectionMaskRight: requireElement('screenshot-selection-mask-right', HTMLDivElement),

@@ -3,6 +3,7 @@ import { idleResource } from '../async-resource';
 import { DEFAULT_COLORMAP_ID } from '../colormaps';
 import { createDefaultStokesColormapDefaultSettings } from '../stokes';
 import { createInteractionState } from '../view-state';
+import { createSinglePaneLayout } from '../viewer-pane-layout';
 import { createInitialState } from '../viewer-store';
 import { analysisReducer } from './reducers/analysis-reducer';
 import { displayReducer } from './reducers/display-reducer';
@@ -53,7 +54,8 @@ export function createInitialViewerAppState(): ViewerAppState {
     autoFitImageOnSelect: false,
     autoExposureEnabled: false,
     autoExposurePercentile: AUTO_EXPOSURE_PERCENTILE,
-    rulersVisible: false
+    rulersVisible: false,
+    viewerPaneLayout: createSinglePaneLayout()
   };
 }
 

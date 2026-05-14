@@ -1,5 +1,11 @@
 import { normalizeAutoExposurePercentile } from '../../analysis/auto-exposure';
 import { idleResource } from '../../async-resource';
+import {
+  activateViewerPane,
+  resetViewerPaneLayout,
+  splitActiveViewerPane,
+  sameViewerPaneLayout
+} from '../../viewer-pane-layout';
 import type { ViewerAppState, ViewerIntent } from '../viewer-app-types';
 import type { ViewerReducerContext } from './shared';
 
@@ -33,6 +39,27 @@ export function uiPreferencesReducer(
         ...state,
         rulersVisible: intent.enabled
       };
+    case 'viewerPaneReset': {
+      const viewerPaneLayout = resetViewerPaneLayout();
+      return sameViewerPaneLayout(state.viewerPaneLayout, viewerPaneLayout) ? state : {
+        ...state,
+        viewerPaneLayout
+      };
+    }
+    case 'viewerPaneActivated': {
+      const viewerPaneLayout = activateViewerPane(state.viewerPaneLayout, intent.path);
+      return viewerPaneLayout === state.viewerPaneLayout ? state : {
+        ...state,
+        viewerPaneLayout
+      };
+    }
+    case 'viewerPaneSplit': {
+      const viewerPaneLayout = splitActiveViewerPane(state.viewerPaneLayout, intent.orientation);
+      return {
+        ...state,
+        viewerPaneLayout
+      };
+    }
     default:
       return state;
   }

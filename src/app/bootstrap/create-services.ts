@@ -116,7 +116,7 @@ export function createBootstrapServices({
     core,
     loadQueue,
     decodeBytes: loadExrOffMainThread,
-    getViewport: () => renderer.getViewport(),
+    getViewport: () => ui.getActiveViewerPane().viewport,
     getFitInsets: () => resolveRulerFitInsets(core.getState().rulersVisible)
   });
   const interactionCoordinator = new ViewerInteractionCoordinator({

@@ -18,6 +18,10 @@ export function applyRenderEffects(
   const activeSession = snapshot.activeSession;
   let deferredAutoExposureDispatch: (() => void) | null = null;
 
+  if (invalidation & ViewerRenderInvalidationFlags.ViewerPaneLayout) {
+    renderer.setViewerPanes(ui.getViewerPaneRenderInfos());
+  }
+
   if (invalidation & ViewerRenderInvalidationFlags.ColormapTexture) {
     if (snapshot.activeColormapLut) {
       renderer.setColormapTexture(snapshot.activeColormapLut.entryCount, snapshot.activeColormapLut.rgba8);

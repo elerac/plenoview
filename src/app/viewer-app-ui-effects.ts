@@ -38,6 +38,10 @@ export function applyUiEffects(ui: ViewerUi, transition: ViewerUiTransition): vo
     ui.setRulersVisible(snapshot.rulersVisible);
   }
 
+  if (invalidation & ViewerUiInvalidationFlags.ViewerPaneLayout) {
+    ui.setViewerPaneLayout(snapshot.viewerPaneLayout);
+  }
+
   if (invalidation & ViewerUiInvalidationFlags.Exposure) {
     ui.setExposure(snapshot.exposureEv);
   }

@@ -5,6 +5,7 @@ import { screenToImage } from '../src/interaction/image-geometry';
 import { getPanoramaVerticalFovDeg, screenToPanoramaPixel } from '../src/interaction/panorama-geometry';
 import { ViewerInteraction } from '../src/interaction/viewer-interaction';
 import { createChannelRgbSelection, createViewerState } from './helpers/state-fixtures';
+import type { ViewerPaneRenderInfo } from '../src/viewer-pane-layout';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -33,6 +34,29 @@ describe('viewer interaction roi gestures', () => {
     expect(harness.onToggleLockPixel).toHaveBeenCalledWith({ ix: 5, iy: 5 });
     expect(harness.onDraftRoi).not.toHaveBeenCalled();
     expect(harness.onCommitRoi).not.toHaveBeenCalled();
+  });
+
+  it('maps pointer interaction through the pane-local viewport and activates that pane', () => {
+    const harness = createHarness({}, {
+      viewport: { width: 50, height: 100 },
+      panes: [
+        {
+          path: [0],
+          rect: { x: 0, y: 0, width: 50, height: 100 }
+        },
+        {
+          path: [1],
+          rect: { x: 50, y: 0, width: 50, height: 100 }
+        }
+      ],
+      activePanePath: [0]
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 75, clientY: 50 });
+    dispatchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 75, clientY: 50 });
+
+    expect(harness.onActivePaneChange).toHaveBeenCalledWith([1]);
+    expect(harness.onToggleLockPixel).toHaveBeenCalledWith({ ix: 5, iy: 5 });
   });
 
   it('ignores secondary-button drags outside screenshot selection', () => {
@@ -1091,6 +1115,8 @@ function createHarness(
   options: {
     imageSize?: { width: number; height: number } | null;
     viewport?: { width: number; height: number };
+    panes?: Array<{ path: number[]; rect: { x: number; y: number; width: number; height: number } }>;
+    activePanePath?: number[];
     screenshotRect?: { x: number; y: number; width: number; height: number } | null;
     screenshotRegions?: Array<{ id: string; rect: { x: number; y: number; width: number; height: number } }>;
     activeScreenshotRegionId?: string;
@@ -1100,6 +1126,8 @@ function createHarness(
   document.body.append(element);
   const viewport = options.viewport ?? { width: 100, height: 100 };
   const imageSize = options.imageSize === undefined ? { width: 10, height: 10 } : options.imageSize;
+  let activePanePath = options.activePanePath ? [...options.activePanePath] : options.panes?.[0]?.path ?? [];
+  const paneInfos = options.panes?.map((pane) => createPaneRenderInfo(pane.path, pane.rect, activePanePath)) ?? null;
 
   let capturedPointerId: number | null = null;
   Object.defineProperty(element, 'getBoundingClientRect', {
@@ -1172,6 +1200,9 @@ function createHarness(
   const onScreenshotSelectionResizeActiveChange = vi.fn();
   const onScreenshotSelectionSquareSnapChange = vi.fn();
   const onScreenshotSelectionSnapGuideChange = vi.fn();
+  const onActivePaneChange = vi.fn((path: number[]) => {
+    activePanePath = [...path];
+  });
   let frameCallback: FrameRequestCallback | null = null;
   let nextFrameId = 1;
   const cancelFrame = vi.fn((frameId: number) => {
@@ -1183,6 +1214,13 @@ function createHarness(
   const interaction = new ViewerInteraction(element, {
     getState: () => state,
     getViewport: () => viewport,
+    getActivePane: paneInfos
+      ? () => paneInfos.find((pane) => samePath(pane.path, activePanePath)) ?? paneInfos[0]!
+      : undefined,
+    resolvePaneAtPoint: paneInfos
+      ? (point) => paneInfos.find((pane) => isPointInRect(point, pane.rect)) ?? paneInfos[0]!
+      : undefined,
+    onActivePaneChange: paneInfos ? onActivePaneChange : undefined,
     getImageSize: () => imageSize,
     onViewChange,
     onHoverPixel,
@@ -1223,6 +1261,7 @@ function createHarness(
     onDraftRoi,
     onCommitRoi,
     onRoiInteractionState,
+    onActivePaneChange,
     onScreenshotSelectionRectChange,
     onScreenshotSelectionActiveRegionChange,
     onScreenshotSelectionHandleHover,
@@ -1268,6 +1307,38 @@ function createViewerKeyboardNavigationInput(overrides: Partial<{
     right: false,
     ...overrides
   };
+}
+
+function createPaneRenderInfo(
+  path: number[],
+  rect: { x: number; y: number; width: number; height: number },
+  activePath: number[]
+): ViewerPaneRenderInfo {
+  return {
+    path: [...path],
+    rect: { ...rect },
+    viewport: {
+      width: rect.width,
+      height: rect.height
+    },
+    active: samePath(path, activePath)
+  };
+}
+
+function isPointInRect(
+  point: { x: number; y: number },
+  rect: { x: number; y: number; width: number; height: number }
+): boolean {
+  return (
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
+  );
+}
+
+function samePath(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((entry, index) => entry === b[index]);
 }
 
 function createViewerKeyboardZoomInput(overrides: Partial<{

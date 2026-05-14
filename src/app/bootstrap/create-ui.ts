@@ -230,6 +230,15 @@ export function createViewerUi({
     onRulersVisibleChange: (enabled) => {
       core.dispatch({ type: 'rulersVisibleSet', enabled });
     },
+    onViewerPaneSplit: (orientation) => {
+      core.dispatch({ type: 'viewerPaneSplit', orientation });
+    },
+    onViewerPaneReset: () => {
+      core.dispatch({ type: 'viewerPaneReset' });
+    },
+    onViewerPaneActivated: (path) => {
+      core.dispatch({ type: 'viewerPaneActivated', path });
+    },
     getScreenshotSelectionContext: () => {
       const state = core.getState();
       const activeSession = selectActiveSession(state);

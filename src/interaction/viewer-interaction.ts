@@ -12,6 +12,11 @@ import type {
   ViewportRect,
   ViewerState
 } from '../types';
+import {
+  samePanePath,
+  type ViewerPanePath,
+  type ViewerPaneRenderInfo
+} from '../viewer-pane-layout';
 import { imageToScreen } from './image-geometry';
 import {
   ImageKeyboardPanController,
@@ -72,6 +77,8 @@ export class ViewerInteraction {
   private dragMode: DragMode = null;
   private previousPointer: PointerPosition | null = null;
   private lastPointerInElement: PointerPosition | null = null;
+  private lastRequestedActivePanePath: ViewerPanePath | null = null;
+  private dragPane: ViewerPaneRenderInfo | null = null;
   private roiAnchorPixel: ImagePixel | null = null;
   private roiAdjustmentDrag: RoiAdjustmentDrag | null = null;
   private screenshotDrag: ScreenshotSelectionDrag | null = null;
@@ -85,7 +92,7 @@ export class ViewerInteraction {
     this.callbacks = callbacks;
     this.imageKeyboardPan = new ImageKeyboardPanController({
       getState: callbacks.getState,
-      getViewport: callbacks.getViewport,
+      getViewport: () => this.getActiveViewport(),
       getImageSize: callbacks.getImageSize,
       onViewChange: callbacks.onViewChange,
       onHoverPixel: callbacks.onHoverPixel,
@@ -93,7 +100,7 @@ export class ViewerInteraction {
     }, dependencies);
     this.panoramaKeyboardOrbit = new PanoramaKeyboardOrbitController({
       getState: callbacks.getState,
-      getViewport: callbacks.getViewport,
+      getViewport: () => this.getActiveViewport(),
       getImageSize: callbacks.getImageSize,
       onViewChange: callbacks.onViewChange,
       onHoverPixel: callbacks.onHoverPixel,
@@ -101,7 +108,7 @@ export class ViewerInteraction {
     }, dependencies);
     this.keyboardZoom = new ViewerKeyboardZoomController({
       getState: callbacks.getState,
-      getViewport: callbacks.getViewport,
+      getViewport: () => this.getActiveViewport(),
       getImageSize: callbacks.getImageSize,
       onViewChange: callbacks.onViewChange,
       onHoverPixel: callbacks.onHoverPixel,
@@ -160,7 +167,7 @@ export class ViewerInteraction {
     }
 
     const state = this.callbacks.getState();
-    const viewport = this.callbacks.getViewport();
+    const viewport = this.getActiveViewport();
     if (viewport.width <= 0 || viewport.height <= 0) {
       return;
     }
@@ -223,9 +230,10 @@ export class ViewerInteraction {
       return;
     }
 
-    const point = this.getLocalPoint(event);
+    const panePoint = this.resolvePanePoint(event, { activate: true });
+    const point = panePoint.point;
     const state = this.callbacks.getState();
-    const viewport = this.callbacks.getViewport();
+    const viewport = panePoint.pane.viewport;
 
     if (state.viewerMode === 'panorama') {
       const nextView = zoomPanoramaFromWheel(state, event.deltaY);
@@ -252,7 +260,8 @@ export class ViewerInteraction {
         return;
       }
 
-      const point = this.getLocalPoint(event);
+      const panePoint = this.resolvePanePoint(event, { activate: false });
+      const point = panePoint.point;
       this.lastPointerInElement = point;
       if (event.target instanceof Element && event.target.closest('.screenshot-selection-controls')) {
         return;
@@ -288,7 +297,9 @@ export class ViewerInteraction {
       return;
     }
 
-    const point = this.getLocalPoint(event);
+    const panePoint = this.resolvePanePoint(event, { activate: true });
+    const point = panePoint.point;
+    this.dragPane = panePoint.pane;
     this.lastPointerInElement = point;
     const imageSize = this.callbacks.getImageSize();
     if (!imageSize) {
@@ -296,7 +307,7 @@ export class ViewerInteraction {
     }
 
     const state = this.callbacks.getState();
-    const viewport = this.callbacks.getViewport();
+    const viewport = panePoint.pane.viewport;
     if (state.viewerMode === 'image') {
       const handle = state.roi ? resolveRoiAdjustmentHandle(point, state.roi, state, viewport) : null;
       this.setRoiInteractionState(createRoiInteractionState({ hoverHandle: handle }));
@@ -343,7 +354,11 @@ export class ViewerInteraction {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
-    const point = this.getLocalPoint(event);
+    const panePoint = this.resolvePanePoint(event, {
+      activate: !this.dragging,
+      preferDragPane: this.dragging
+    });
+    const point = panePoint.point;
     this.lastPointerInElement = point;
     const screenshotSelection = this.getScreenshotSelection();
     if (screenshotSelection.active) {
@@ -357,7 +372,7 @@ export class ViewerInteraction {
         const update = updateScreenshotSelectionRectFromDrag(
           this.screenshotDrag,
           point,
-          this.callbacks.getViewport(),
+          panePoint.pane.viewport,
           {
             preserveAspectRatio: event.shiftKey,
             resizeFromCenter: this.screenshotDrag.handle !== 'move' && event.ctrlKey,
@@ -383,7 +398,7 @@ export class ViewerInteraction {
     }
 
     const state = this.callbacks.getState();
-    const viewport = this.callbacks.getViewport();
+    const viewport = panePoint.pane.viewport;
     let hoverState: ViewerState = state;
 
     if (this.dragging && this.previousPointer) {
@@ -436,7 +451,11 @@ export class ViewerInteraction {
   private readonly onPointerUp = (event: PointerEvent): void => {
     const screenshotSelection = this.getScreenshotSelection();
     if (screenshotSelection.active) {
-      const point = this.getLocalPoint(event);
+      const panePoint = this.resolvePanePoint(event, {
+        activate: false,
+        preferDragPane: this.dragging
+      });
+      const point = panePoint.point;
       this.lastPointerInElement = point;
       if (this.dragging && this.dragMode === 'screenshot') {
         const rect = this.getScreenshotSelection().rect;
@@ -462,7 +481,11 @@ export class ViewerInteraction {
       return;
     }
 
-    const point = this.getLocalPoint(event);
+    const panePoint = this.resolvePanePoint(event, {
+      activate: !this.dragging,
+      preferDragPane: this.dragging
+    });
+    const point = panePoint.point;
     this.lastPointerInElement = point;
     const imageSize = this.callbacks.getImageSize();
     if (!imageSize) {
@@ -472,7 +495,7 @@ export class ViewerInteraction {
 
     if (this.dragging && this.dragMode === 'roi' && this.roiAnchorPixel) {
       const state = this.callbacks.getState();
-      const viewport = this.callbacks.getViewport();
+      const viewport = panePoint.pane.viewport;
       this.callbacks.onDraftRoi(null);
       this.callbacks.onCommitRoi(
         commitRoiFromDrag(this.roiAnchorPixel, point, state, viewport, imageSize)
@@ -483,7 +506,7 @@ export class ViewerInteraction {
 
     if (this.dragging && this.dragMode === 'roi-adjust' && this.roiAdjustmentDrag) {
       const state = this.callbacks.getState();
-      const viewport = this.callbacks.getViewport();
+      const viewport = panePoint.pane.viewport;
       this.callbacks.onDraftRoi(null);
       if (this.movedDuringDrag) {
         const roi = updateRoiFromAdjustmentDrag(
@@ -515,7 +538,7 @@ export class ViewerInteraction {
 
     if (this.dragging && !this.movedDuringDrag) {
       const state = this.callbacks.getState();
-      const viewport = this.callbacks.getViewport();
+      const viewport = panePoint.pane.viewport;
       this.callbacks.onToggleLockPixel(resolveProbePixel(point, state, viewport, imageSize));
     }
 
@@ -554,6 +577,7 @@ export class ViewerInteraction {
     this.dragMode = null;
     this.movedDuringDrag = false;
     this.previousPointer = null;
+    this.dragPane = null;
     this.roiAnchorPixel = null;
     this.roiAdjustmentDrag = null;
     this.screenshotDrag = null;
@@ -601,7 +625,7 @@ export class ViewerInteraction {
     }
   }
 
-  private getLocalPoint(event: MouseEvent): PointerPosition {
+  private getElementPoint(event: MouseEvent): PointerPosition {
     const rect = this.element.getBoundingClientRect();
     return {
       x: event.clientX - rect.left,
@@ -609,11 +633,57 @@ export class ViewerInteraction {
     };
   }
 
+  private resolvePanePoint(
+    event: MouseEvent,
+    options: { activate?: boolean; preferDragPane?: boolean } = {}
+  ): { pane: ViewerPaneRenderInfo; point: PointerPosition } {
+    const elementPoint = this.getElementPoint(event);
+    const pane = options.preferDragPane && this.dragPane
+      ? this.dragPane
+      : this.resolvePaneAtElementPoint(elementPoint);
+    if (options.activate !== false) {
+      this.activatePane(pane);
+    }
+
+    return {
+      pane,
+      point: {
+        x: elementPoint.x - pane.rect.x,
+        y: elementPoint.y - pane.rect.y
+      }
+    };
+  }
+
+  private resolvePaneAtElementPoint(point: PointerPosition): ViewerPaneRenderInfo {
+    return this.callbacks.resolvePaneAtPoint?.(point)
+      ?? this.callbacks.getActivePane?.()
+      ?? createFallbackPane(this.callbacks.getViewport());
+  }
+
+  private activatePane(pane: ViewerPaneRenderInfo): void {
+    const activePath = this.callbacks.getActivePane?.().path ?? [];
+    if (samePanePath(pane.path, activePath)) {
+      this.lastRequestedActivePanePath = null;
+      return;
+    }
+
+    if (this.lastRequestedActivePanePath && samePanePath(this.lastRequestedActivePanePath, pane.path)) {
+      return;
+    }
+
+    this.lastRequestedActivePanePath = [...pane.path];
+    this.callbacks.onActivePaneChange?.([...pane.path]);
+  }
+
+  private getActiveViewport(): ViewportInfo {
+    return this.callbacks.getActivePane?.().viewport ?? this.callbacks.getViewport();
+  }
+
   private resolveScreenshotSelectionSnapTargets(): {
     centerSnapTarget: PointerPosition | null;
     edgeSnapTargets: ScreenshotSelectionEdgeSnapTargets | null;
   } {
-    const viewport = this.callbacks.getViewport();
+    const viewport = this.getActiveViewport();
     if (!isValidViewport(viewport)) {
       return { centerSnapTarget: null, edgeSnapTargets: null };
     }
@@ -952,5 +1022,19 @@ function createViewerKeyboardNavigationInput(): ViewerKeyboardNavigationInput {
     left: false,
     down: false,
     right: false
+  };
+}
+
+function createFallbackPane(viewport: ViewportInfo): ViewerPaneRenderInfo {
+  return {
+    path: [],
+    rect: {
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height
+    },
+    viewport: { ...viewport },
+    active: true
   };
 }

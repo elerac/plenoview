@@ -114,6 +114,18 @@ import {
   getFolderLoadStats
 } from '../folder-load-limits';
 import {
+  computeViewerPaneRects,
+  createSinglePaneLayout,
+  findViewerPaneAtPoint,
+  isSingleViewerPaneLayout,
+  normalizeViewerPaneLayout,
+  sameViewerPaneLayout,
+  type ViewerPaneLayoutState,
+  type ViewerPanePath,
+  type ViewerPaneRenderInfo,
+  type ViewerPaneSplitOrientation
+} from '../viewer-pane-layout';
+import {
   AUTO_EXPOSURE_PERCENTILE,
   AUTO_EXPOSURE_PERCENTILE_MAX,
   AUTO_EXPOSURE_PERCENTILE_MIN,
@@ -227,6 +239,9 @@ export interface UiCallbacks {
   onAutoExposurePercentileChange: (percentile: number) => void;
   onImageLoadWorkersChange: (workerCount: number) => void;
   onRulersVisibleChange: (enabled: boolean) => void;
+  onViewerPaneSplit: (orientation: ViewerPaneSplitOrientation) => void;
+  onViewerPaneReset: () => void;
+  onViewerPaneActivated: (path: ViewerPanePath) => void;
   getScreenshotSelectionContext: () => ScreenshotSelectionContext;
   getScreenshotFitRect: () => ViewportRect | null;
   onViewerModeChange: (mode: ViewerMode) => void;
@@ -310,6 +325,8 @@ export class ViewerUi implements Disposable {
   private autoExposurePercentile = AUTO_EXPOSURE_PERCENTILE;
   private imageLoadWorkers = getDefaultImageLoadWorkers();
   private rulersVisible = false;
+  private viewerPaneLayout: ViewerPaneLayoutState = createSinglePaneLayout();
+  private viewerPaneRenderInfos: ViewerPaneRenderInfo[] = [];
   private hasActiveChannelImage = false;
   private disposed = false;
 
@@ -457,6 +474,9 @@ export class ViewerUi implements Disposable {
       },
       getViewerMode: () => this.viewerMode,
       getOpenedImageCount: () => this.openedImageCount,
+      onViewerPaneSplit: (orientation) => {
+        this.callbacks.onViewerPaneSplit(orientation);
+      },
       onViewerKeyboardNavigationInputChange: (input) => {
         this.callbacks.onViewerKeyboardNavigationInputChange(input);
       },
@@ -608,7 +628,9 @@ export class ViewerUi implements Disposable {
     this.callbacks.onImageLoadWorkersChange(this.imageLoadWorkers);
     this.setRulersVisible(readStoredRulersVisible(), false);
     this.callbacks.onRulersVisibleChange(this.rulersVisible);
+    this.refreshViewerPaneLayout();
     this.updateViewerModeMenuItemsDisabled();
+    this.updateWindowPaneMenuItemsDisabled();
     this.updateFileMenuItemsDisabled();
     this.bindEvents();
   }
@@ -700,6 +722,7 @@ export class ViewerUi implements Disposable {
     this.colormapPanel.setLoading(viewerBlocked);
     this.updateFileMenuItemsDisabled();
     this.updateViewerModeMenuItemsDisabled();
+    this.updateWindowPaneMenuItemsDisabled();
     this.updateLoadingOverlayVisibility();
     if (loading && !wasLoading) {
       this.exportImageDialog.close(false);
@@ -865,9 +888,52 @@ export class ViewerUi implements Disposable {
     }
 
     this.viewerBackgroundController.setViewportRect(rect);
+    this.refreshViewerPaneLayout({
+      width: Math.max(1, Math.floor(rect.width)),
+      height: Math.max(1, Math.floor(rect.height))
+    });
     if (this.screenshotSelection) {
       this.renderScreenshotSelectionOverlay();
     }
+  }
+
+  setViewerPaneLayout(layout: ViewerPaneLayoutState): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const nextLayout = normalizeViewerPaneLayout(layout);
+    if (sameViewerPaneLayout(this.viewerPaneLayout, nextLayout)) {
+      this.refreshViewerPaneLayout();
+      return;
+    }
+
+    this.viewerPaneLayout = {
+      root: nextLayout.root,
+      activePanePath: [...nextLayout.activePanePath]
+    };
+    if (!this.isSingleViewerPane()) {
+      this.hideScreenshotSelection();
+    }
+    this.refreshViewerPaneLayout();
+    this.updateWindowPaneMenuItemsDisabled();
+    this.updateFileMenuItemsDisabled();
+  }
+
+  getViewerPaneRenderInfos(): ViewerPaneRenderInfo[] {
+    return this.viewerPaneRenderInfos.map(cloneViewerPaneRenderInfo);
+  }
+
+  getActiveViewerPane(): ViewerPaneRenderInfo {
+    const activePane = this.viewerPaneRenderInfos.find((pane) => pane.active) ?? this.viewerPaneRenderInfos[0];
+    return cloneViewerPaneRenderInfo(activePane ?? createFallbackViewerPaneRenderInfo(this.readViewerViewport()));
+  }
+
+  resolveViewerPaneAtPoint(point: { x: number; y: number }): ViewerPaneRenderInfo | null {
+    const pane = findViewerPaneAtPoint(this.viewerPaneRenderInfos, point)
+      ?? this.viewerPaneRenderInfos[0]
+      ?? createFallbackViewerPaneRenderInfo(this.readViewerViewport());
+    return cloneViewerPaneRenderInfo(pane);
   }
 
   setExposure(exposureEv: number): void {
@@ -1025,6 +1091,7 @@ export class ViewerUi implements Disposable {
     this.windowPreviewController.setOpenedImageCount(items.length);
     this.viewerBackgroundController.setHasOpenImages(items.length > 0);
     this.updateViewerModeMenuItemsDisabled();
+    this.updateWindowPaneMenuItemsDisabled();
     this.updateFileMenuItemsDisabled();
     if (items.length === 0 && this.windowPreviewController.isActive()) {
       void this.windowPreviewController.setEnabled(false);
@@ -1414,7 +1481,7 @@ export class ViewerUi implements Disposable {
   }
 
   private startScreenshotSelectionFromAction(): void {
-    if (this.elements.exportScreenshotButton.disabled) {
+    if (this.elements.exportScreenshotButton.disabled || !this.isSingleViewerPane()) {
       return;
     }
 
@@ -1424,7 +1491,13 @@ export class ViewerUi implements Disposable {
   }
 
   private startScreenshotSelection(): void {
-    if (this.disposed || this.openedImageCount === 0 || this.isViewerLoadBlocked || this.isDisplayBusy) {
+    if (
+      this.disposed ||
+      this.openedImageCount === 0 ||
+      this.isViewerLoadBlocked ||
+      this.isDisplayBusy ||
+      !this.isSingleViewerPane()
+    ) {
       return;
     }
 
@@ -2076,6 +2149,33 @@ export class ViewerUi implements Disposable {
     };
   }
 
+  private refreshViewerPaneLayout(viewport: ViewportInfo = this.readViewerViewport()): void {
+    this.viewerPaneRenderInfos = computeViewerPaneRects(this.viewerPaneLayout, viewport);
+    this.renderViewerPaneOverlay();
+  }
+
+  private renderViewerPaneOverlay(): void {
+    if (this.isSingleViewerPane()) {
+      this.elements.viewerPaneOverlay.replaceChildren();
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (const pane of this.viewerPaneRenderInfos) {
+      const frame = document.createElement('div');
+      frame.className = 'viewer-pane-frame';
+      frame.classList.toggle('is-active', pane.active);
+      frame.dataset.panePath = pane.path.join('.');
+      setBoxStyle(frame, pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
+      fragment.append(frame);
+    }
+    this.elements.viewerPaneOverlay.replaceChildren(fragment);
+  }
+
+  private isSingleViewerPane(): boolean {
+    return isSingleViewerPaneLayout(this.viewerPaneLayout);
+  }
+
   private updateFileMenuItemsDisabled(): void {
     if (this.disposed) {
       return;
@@ -2083,10 +2183,11 @@ export class ViewerUi implements Disposable {
 
     const hasExportTarget = this.exportImageDialog.hasTarget();
     const screenshotDisabledByDisplayBusy = !this.isLoading && this.isDisplayBusy && hasExportTarget;
+    const screenshotDisabledBySplitPane = !this.isSingleViewerPane();
 
     this.elements.exportImageButton.disabled = this.isLoading || this.isDisplayBusy || !hasExportTarget;
     this.elements.exportScreenshotButton.disabled =
-      this.isLoading || this.isDisplayBusy || !hasExportTarget;
+      this.isLoading || this.isDisplayBusy || screenshotDisabledBySplitPane || !hasExportTarget;
     this.elements.appScreenshotButton.disabled = this.elements.exportScreenshotButton.disabled;
     this.elements.appScreenshotButton.classList.toggle('is-display-busy-disabled', screenshotDisabledByDisplayBusy);
     if (screenshotDisabledByDisplayBusy) {
@@ -2110,12 +2211,46 @@ export class ViewerUi implements Disposable {
     this.elements.panoramaViewerMenuItem.disabled = disabled;
   }
 
+  private updateWindowPaneMenuItemsDisabled(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const splitDisabled = this.isViewerLoadBlocked || this.openedImageCount === 0;
+    this.elements.windowSplitVerticalMenuItem.disabled = splitDisabled;
+    this.elements.windowSplitHorizontalMenuItem.disabled = splitDisabled;
+    this.elements.windowSinglePaneMenuItem.disabled = this.isViewerLoadBlocked || this.isSingleViewerPane();
+  }
+
   private updateAutoFitImageButtonDisabled(): void {
     if (this.disposed) {
       return;
     }
 
     this.elements.appAutoFitImageButton.disabled = this.viewerMode === 'panorama';
+  }
+
+  private resetViewerPanesFromAction(): void {
+    if (this.elements.windowSinglePaneMenuItem.disabled) {
+      return;
+    }
+
+    this.clearViewerKeyboardNavigationInput();
+    this.topMenuController.closeAll();
+    this.callbacks.onViewerPaneReset();
+  }
+
+  private splitViewerPaneFromAction(orientation: ViewerPaneSplitOrientation): void {
+    const button = orientation === 'vertical'
+      ? this.elements.windowSplitVerticalMenuItem
+      : this.elements.windowSplitHorizontalMenuItem;
+    if (button.disabled) {
+      return;
+    }
+
+    this.clearViewerKeyboardNavigationInput();
+    this.topMenuController.closeAll();
+    this.callbacks.onViewerPaneSplit(orientation);
   }
 
   private bindEvents(): void {
@@ -2324,6 +2459,18 @@ export class ViewerUi implements Disposable {
 
       this.topMenuController.closeAll();
       void this.windowPreviewController.setEnabled(true);
+    });
+
+    this.disposables.addEventListener(this.elements.windowSinglePaneMenuItem, 'click', () => {
+      this.resetViewerPanesFromAction();
+    });
+
+    this.disposables.addEventListener(this.elements.windowSplitVerticalMenuItem, 'click', () => {
+      this.splitViewerPaneFromAction('vertical');
+    });
+
+    this.disposables.addEventListener(this.elements.windowSplitHorizontalMenuItem, 'click', () => {
+      this.splitViewerPaneFromAction('horizontal');
     });
 
     this.disposables.addEventListener(this.elements.fileInput, 'change', (event) => {
@@ -2697,6 +2844,29 @@ function setBoxStyle(element: HTMLElement, x: number, y: number, width: number, 
 function setPositionStyle(element: HTMLElement, x: number, y: number): void {
   element.style.left = `${x}px`;
   element.style.top = `${y}px`;
+}
+
+function cloneViewerPaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
+  return {
+    path: [...pane.path],
+    rect: { ...pane.rect },
+    viewport: { ...pane.viewport },
+    active: pane.active
+  };
+}
+
+function createFallbackViewerPaneRenderInfo(viewport: ViewportInfo): ViewerPaneRenderInfo {
+  return {
+    path: [],
+    rect: {
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height
+    },
+    viewport: { ...viewport },
+    active: true
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {

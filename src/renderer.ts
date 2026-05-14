@@ -7,6 +7,7 @@ import type { Disposable } from './lifecycle';
 import type { DisplaySourceBinding } from './display/bindings';
 import type { ResidentChannelUpload } from './display-cache';
 import type { DecodedLayer, ViewerRenderState, ViewerState, ViewportInfo } from './types';
+import type { ViewerPaneRenderInfo } from './viewer-pane-layout';
 import type { ReadExportPixelsArgs } from './rendering/gl-image-renderer';
 
 export class WebGlExrRenderer implements Disposable {
@@ -15,6 +16,7 @@ export class WebGlExrRenderer implements Disposable {
   private readonly probeOverlayRenderer: ProbeOverlayRenderer;
   private readonly rulerOverlayRenderer: RulerOverlayRenderer;
   private rulersVisible = false;
+  private panes: ViewerPaneRenderInfo[] = [];
   private disposed = false;
 
   constructor(
@@ -31,7 +33,7 @@ export class WebGlExrRenderer implements Disposable {
   }
 
   getViewport(): ViewportInfo {
-    return this.imageRenderer.getViewport();
+    return this.panes.find((pane) => pane.active)?.viewport ?? this.panes[0]?.viewport ?? this.imageRenderer.getViewport();
   }
 
   getImageSize(): { width: number; height: number } | null {
@@ -48,6 +50,18 @@ export class WebGlExrRenderer implements Disposable {
     this.overlayRenderer.resize(viewport.width, viewport.height);
     this.probeOverlayRenderer.resize(viewport.width, viewport.height);
     this.rulerOverlayRenderer.resize(viewport.width, viewport.height);
+  }
+
+  setViewerPanes(panes: readonly ViewerPaneRenderInfo[]): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.panes = panes.map(clonePaneRenderInfo);
+    this.imageRenderer.setPanes(this.panes);
+    this.overlayRenderer.setPanes(this.panes);
+    this.probeOverlayRenderer.setPanes(this.panes);
+    this.rulerOverlayRenderer.setPanes(this.panes);
   }
 
   ensureLayerChannelsResident(
@@ -207,4 +221,13 @@ export class WebGlExrRenderer implements Disposable {
     this.overlayRenderer.dispose();
     this.imageRenderer.dispose();
   }
+}
+
+function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
+  return {
+    path: [...pane.path],
+    rect: { ...pane.rect },
+    viewport: { ...pane.viewport },
+    active: pane.active
+  };
 }

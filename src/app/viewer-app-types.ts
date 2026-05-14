@@ -28,6 +28,11 @@ import type {
   StokesColormapDefaultSetting,
   StokesColormapDefaultSettings
 } from '../stokes';
+import type {
+  ViewerPaneLayoutState,
+  ViewerPanePath,
+  ViewerPaneSplitOrientation
+} from '../viewer-pane-layout';
 
 export interface RestorableVisualizationState {
   visualizationMode: ViewerSessionState['visualizationMode'];
@@ -140,6 +145,7 @@ export interface ViewerAppState {
   autoExposureEnabled: boolean;
   autoExposurePercentile: number;
   rulersVisible: boolean;
+  viewerPaneLayout: ViewerPaneLayoutState;
 }
 
 export type ViewerIntent =
@@ -149,6 +155,9 @@ export type ViewerIntent =
   | { type: 'autoExposureSet'; enabled: boolean }
   | { type: 'autoExposurePercentileSet'; percentile: number }
   | { type: 'rulersVisibleSet'; enabled: boolean }
+  | { type: 'viewerPaneReset' }
+  | { type: 'viewerPaneActivated'; path: ViewerPanePath }
+  | { type: 'viewerPaneSplit'; orientation: ViewerPaneSplitOrientation }
   | { type: 'colormapRegistryResolved'; registry: ColormapRegistry }
   | { type: 'colormapLoadStarted'; requestId: number; colormapId: string }
   | { type: 'colormapLoadResolved'; requestId: number; colormapId: string; lut: ColormapLut }
@@ -292,6 +301,7 @@ export interface ViewerUiSnapshot {
   rgbGroupChannelNames: string[];
   channelThumbnailItems: ViewerChannelThumbnailItem[];
   shouldClearImageBrowserPanels: boolean;
+  viewerPaneLayout: ViewerPaneLayoutState;
 }
 
 export interface ViewerUiTransition extends ViewerStateTransition {
@@ -314,6 +324,7 @@ export interface ViewerRenderSnapshot {
   imageStatsRequest: ViewerImageStatsRequest | null;
   autoExposureRequest: ViewerAutoExposureRequest | null;
   rulersVisible: boolean;
+  viewerPaneLayout: ViewerPaneLayoutState;
 }
 
 export interface ViewerRenderTransition extends ViewerStateTransition {

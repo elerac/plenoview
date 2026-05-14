@@ -203,6 +203,40 @@ describe('gl image renderer', () => {
     })).toThrow('No prepared image is active for export.');
   });
 
+  it('renders each configured viewer pane with pane-local viewport and scissor', () => {
+    const { renderer, gl } = createHarness();
+    const state = {
+      ...createInitialState(),
+      displaySelection: createChannelRgbSelection('R', 'G', 'B'),
+      hoveredPixel: null,
+      draftRoi: null,
+      roiInteraction: createEmptyRoiInteractionState()
+    };
+
+    renderer.resize(320, 180);
+    renderer.setPanes([
+      {
+        path: [0],
+        rect: { x: 0, y: 0, width: 160, height: 180 },
+        viewport: { width: 160, height: 180 },
+        active: false
+      },
+      {
+        path: [1],
+        rect: { x: 160, y: 0, width: 160, height: 180 },
+        viewport: { width: 160, height: 180 },
+        active: true
+      }
+    ]);
+
+    renderer.render(state);
+
+    expect(gl.scissor).toHaveBeenCalledWith(0, 0, 160, 180);
+    expect(gl.scissor).toHaveBeenCalledWith(160, 0, 160, 180);
+    expect(gl.drawArrays).toHaveBeenCalledTimes(2);
+    expect(lastUniform2fValue(gl, 'uViewport')).toEqual([160, 180]);
+  });
+
   it('reuses export framebuffers and textures when the export size is unchanged', () => {
     const { renderer, gl } = createHarness();
     const layer = createInterleavedLayerFromChannels({
@@ -774,6 +808,7 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
   uniform2f: ReturnType<typeof vi.fn>;
   clearColor: ReturnType<typeof vi.fn>;
   clear: ReturnType<typeof vi.fn>;
+  scissor: ReturnType<typeof vi.fn>;
 } {
   const programs = [{ id: 'program-1' }, { id: 'program-2' }];
   const shaders = [{ id: 'shader-1' }, { id: 'shader-2' }, { id: 'shader-3' }, { id: 'shader-4' }];
@@ -815,6 +850,7 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     COLOR_ATTACHMENT0: 0x8ce0,
     FRAMEBUFFER_COMPLETE: 0x8cd5,
     COLOR_BUFFER_BIT: 0x00004000,
+    SCISSOR_TEST: 0x0c11,
     MAX_TEXTURE_SIZE: 4096,
     MAX_TEXTURE_IMAGE_UNITS: 16,
     createVertexArray: vi.fn(() => vaos.shift() ?? { id: 'vao-extra' }),
@@ -850,6 +886,9 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     uniform2i: vi.fn(),
     clearColor: vi.fn(),
     clear: vi.fn(),
+    enable: vi.fn(),
+    disable: vi.fn(),
+    scissor: vi.fn(),
     drawArrays: vi.fn(),
     readPixels: vi.fn(),
     viewport: vi.fn(),
@@ -878,5 +917,6 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     deleteVertexArray: ReturnType<typeof vi.fn>;
     clearColor: ReturnType<typeof vi.fn>;
     clear: ReturnType<typeof vi.fn>;
+    scissor: ReturnType<typeof vi.fn>;
   };
 }

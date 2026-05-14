@@ -13,6 +13,7 @@ import {
   sameStokesControl
 } from './viewer-app-equality';
 import { sameStokesColormapDefaultSettings } from '../stokes-colormap-settings';
+import { sameViewerPaneLayout } from '../viewer-pane-layout';
 import {
   buildExportTarget,
   buildExportBatchTarget,
@@ -49,7 +50,8 @@ export const enum ViewerUiInvalidationFlags {
   RgbGroupOptions = 1 << 18,
   ClearPanels = 1 << 19,
   StokesColormapDefaults = 1 << 20,
-  DisplayGamma = 1 << 21
+  DisplayGamma = 1 << 21,
+  ViewerPaneLayout = 1 << 22
 }
 
 export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => ViewerUiSnapshot {
@@ -112,7 +114,8 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       displaySelection: state.sessionState.displaySelection,
       rgbGroupChannelNames: selectRgbGroupChannelNames(activeSession, state.sessionState.activeLayer),
       channelThumbnailItems: selectChannelThumbnailItems(state),
-      shouldClearImageBrowserPanels: !activeSession
+      shouldClearImageBrowserPanels: !activeSession,
+      viewerPaneLayout: state.viewerPaneLayout
     };
 
     if (previousSnapshot && sameViewerUiSnapshot(previousSnapshot, nextSnapshot)) {
@@ -178,6 +181,10 @@ export function computeViewerUiInvalidation(
 
   if (previous.displayGamma !== next.displayGamma) {
     flags |= ViewerUiInvalidationFlags.DisplayGamma;
+  }
+
+  if (!sameViewerPaneLayout(previous.viewerPaneLayout, next.viewerPaneLayout)) {
+    flags |= ViewerUiInvalidationFlags.ViewerPaneLayout;
   }
 
   if (
@@ -446,7 +453,8 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&
     sameStringArray(a.rgbGroupChannelNames, b.rgbGroupChannelNames) &&
     sameChannelThumbnailItems(a.channelThumbnailItems, b.channelThumbnailItems) &&
-    a.shouldClearImageBrowserPanels === b.shouldClearImageBrowserPanels
+    a.shouldClearImageBrowserPanels === b.shouldClearImageBrowserPanels &&
+    sameViewerPaneLayout(a.viewerPaneLayout, b.viewerPaneLayout)
   );
 }
 

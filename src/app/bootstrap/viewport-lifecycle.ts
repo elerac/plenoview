@@ -17,7 +17,6 @@ import type { WebGlExrRenderer } from '../../renderer';
 interface CreateViewerInteractionArgs {
   core: ViewerAppCore;
   ui: ViewerUi;
-  renderer: WebGlExrRenderer;
   interactionCoordinator: ViewerInteractionCoordinator;
 }
 
@@ -32,12 +31,19 @@ interface InitializeViewportLifecycleArgs {
 export function createViewerInteraction({
   core,
   ui,
-  renderer,
   interactionCoordinator
 }: CreateViewerInteractionArgs): ViewerInteraction {
   return new ViewerInteraction(ui.viewerContainer, {
     getState: () => mergeRenderState(core.getState().sessionState, core.getState().interactionState),
-    getViewport: () => renderer.getViewport(),
+    getViewport: () => ui.getActiveViewerPane().viewport,
+    getActivePane: () => ui.getActiveViewerPane(),
+    resolvePaneAtPoint: (point) => ui.resolveViewerPaneAtPoint(point),
+    onActivePaneChange: (path) => {
+      core.dispatch({
+        type: 'viewerPaneActivated',
+        path
+      });
+    },
     getImageSize: () => {
       const activeSession = selectActiveSession(core.getState());
       if (!activeSession) {
@@ -105,7 +111,7 @@ export function initializeViewportLifecycle({
   interactionCoordinator,
   isDisposed
 }: InitializeViewportLifecycleArgs): ResizeObserver {
-  let viewerContainerRect: ViewportClientRect | null = null;
+  let activePaneClientRect: ViewportClientRect | null = null;
 
   const renderCurrentView = (): void => {
     if (selectActiveSession(core.getState())) {
@@ -121,44 +127,57 @@ export function initializeViewportLifecycle({
     }
 
     const rect = readViewportClientRect(ui.viewerContainer);
+    const previousActivePaneClientRect = activePaneClientRect;
     const interactionState = interactionCoordinator.getState();
     const state = core.getState();
     const activeSession = selectActiveSession(state);
     const fitInsets = resolveRulerFitInsets(state.rulersVisible);
-    if (viewerContainerRect && state.sessionState.viewerMode === 'image') {
+    ui.setViewerViewportRect(rect);
+    activePaneClientRect = resolveActivePaneClientRect(ui, rect);
+    if (previousActivePaneClientRect && state.sessionState.viewerMode === 'image') {
       const nextViewPatch = activeSession && isFitViewForViewport(
         interactionState.view,
-        viewportInfoFromClientRect(viewerContainerRect),
+        viewportInfoFromClientRect(previousActivePaneClientRect),
         activeSession.decoded.width,
         activeSession.decoded.height,
         fitInsets
       )
         ? computeFitView(
-            viewportInfoFromClientRect(rect),
+            viewportInfoFromClientRect(activePaneClientRect),
             activeSession.decoded.width,
             activeSession.decoded.height,
             fitInsets
           )
-        : preserveImagePanOnViewportChange(interactionState.view, viewerContainerRect, rect);
+        : preserveImagePanOnViewportChange(interactionState.view, previousActivePaneClientRect, activePaneClientRect);
       if (hasImageViewPatchChanged(interactionState.view, nextViewPatch)) {
         interactionCoordinator.enqueueViewPatch(nextViewPatch);
       }
     }
-    viewerContainerRect = rect;
-    ui.setViewerViewportRect(rect);
     renderer.resize(rect.width, rect.height, rect.left, rect.top);
+    renderer.setViewerPanes(ui.getViewerPaneRenderInfos());
     renderCurrentView();
   });
 
   resizeObserver.observe(ui.viewerContainer);
 
   const rect = readViewportClientRect(ui.viewerContainer);
-  viewerContainerRect = rect;
   ui.setViewerViewportRect(rect);
+  activePaneClientRect = resolveActivePaneClientRect(ui, rect);
   renderer.resize(rect.width, rect.height, rect.left, rect.top);
+  renderer.setViewerPanes(ui.getViewerPaneRenderInfos());
   renderCurrentView();
 
   return resizeObserver;
+}
+
+function resolveActivePaneClientRect(ui: ViewerUi, containerRect: ViewportClientRect): ViewportClientRect {
+  const activePane = ui.getActiveViewerPane();
+  return {
+    left: containerRect.left + activePane.rect.x,
+    top: containerRect.top + activePane.rect.y,
+    width: activePane.rect.width,
+    height: activePane.rect.height
+  };
 }
 
 export function readViewportClientRect(element: HTMLElement): ViewportClientRect {

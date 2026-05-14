@@ -3,6 +3,7 @@ import type { ResidentChannelUpload } from '../../display-cache';
 import type { ExportImagePixels } from '../../export/export-pixels';
 import type { Disposable } from '../../lifecycle';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../../types';
+import type { ViewerPaneRenderInfo } from '../../viewer-pane-layout';
 import { REQUIRED_TEXTURE_UNITS } from './constants';
 import { clearColormapTexture, setColormapTexture } from './colormap-texture';
 import { deleteExportSurface, readExportPixels } from './export-surface';
@@ -19,6 +20,7 @@ import type { GlImageRendererState, ReadExportPixelsArgs } from './types';
 
 export class GlImageRenderer implements Disposable {
   private readonly state: GlImageRendererState;
+  private panes: ViewerPaneRenderInfo[] = [];
 
   private get layerTexturesBySession() {
     return this.state.layerTexturesBySession;
@@ -34,6 +36,10 @@ export class GlImageRenderer implements Disposable {
 
   getImageSize(): { width: number; height: number } | null {
     return this.state.imageSize;
+  }
+
+  setPanes(panes: readonly ViewerPaneRenderInfo[]): void {
+    this.panes = panes.map(clonePaneRenderInfo);
   }
 
   resize(width: number, height: number, left = 0, top = 0): void {
@@ -150,7 +156,7 @@ export class GlImageRenderer implements Disposable {
       return;
     }
 
-    render(this.state, state);
+    render(this.state, state, this.panes);
   }
 
   dispose(): void {
@@ -180,4 +186,13 @@ export class GlImageRenderer implements Disposable {
     this.state.gl.deleteProgram(this.state.imageProgram.program);
     this.state.gl.deleteProgram(this.state.panoramaProgram.program);
   }
+}
+
+function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
+  return {
+    path: [...pane.path],
+    rect: { ...pane.rect },
+    viewport: { ...pane.viewport },
+    active: pane.active
+  };
 }

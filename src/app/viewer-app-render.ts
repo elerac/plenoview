@@ -15,6 +15,7 @@ import {
   sameRoiInteractionState,
   sameViewState
 } from '../view-state';
+import { sameViewerPaneLayout } from '../viewer-pane-layout';
 import type { DisplayLuminanceRange, OpenedImageSession, ViewerRenderState } from '../types';
 import { buildProbeReadoutModel } from './probe-presentation';
 import { buildRoiReadoutModel } from './roi-presentation';
@@ -55,7 +56,8 @@ export const enum ViewerRenderInvalidationFlags {
   RenderRulerOverlay = 1 << 10,
   ImageStatsReadout = 1 << 11,
   ResourceRequestImageStats = 1 << 12,
-  ViewerStateReadout = 1 << 13
+  ViewerStateReadout = 1 << 13,
+  ViewerPaneLayout = 1 << 14
 }
 
 export function createViewerRenderSnapshotSelector(): (state: ViewerAppState) => ViewerRenderSnapshot {
@@ -88,7 +90,8 @@ export function createViewerRenderSnapshotSelector(): (state: ViewerAppState) =>
       displayRangeRequest: selectDisplayRangeRequest(state, activeSession, activeLayer),
       imageStatsRequest,
       autoExposureRequest: selectAutoExposureRequest(state, activeSession, activeLayer),
-      rulersVisible: state.rulersVisible
+      rulersVisible: state.rulersVisible,
+      viewerPaneLayout: state.viewerPaneLayout
     };
 
     if (previousSnapshot && sameViewerRenderSnapshot(previousSnapshot, nextSnapshot)) {
@@ -130,6 +133,10 @@ export function computeViewerRenderInvalidation(
     flags |= ViewerRenderInvalidationFlags.ViewerStateReadout;
   }
 
+  if (!sameViewerPaneLayout(previous.viewerPaneLayout, next.viewerPaneLayout)) {
+    flags |= ViewerRenderInvalidationFlags.ViewerPaneLayout;
+  }
+
   if (!sameResourceTarget(previous.resourceTarget, next.resourceTarget) && next.resourceTarget) {
     flags |= ViewerRenderInvalidationFlags.ResourcePrepare;
   }
@@ -163,6 +170,16 @@ export function computeViewerRenderInvalidation(
   }
 
   if (!sameRenderRulerOverlayInputs(previous, next)) {
+    flags |= ViewerRenderInvalidationFlags.RenderRulerOverlay;
+  }
+
+  if (flags & ViewerRenderInvalidationFlags.ViewerPaneLayout) {
+    if (next.activeSession && next.activeLayer) {
+      flags |=
+        ViewerRenderInvalidationFlags.RenderImage |
+        ViewerRenderInvalidationFlags.RenderValueOverlay |
+        ViewerRenderInvalidationFlags.RenderProbeOverlay;
+    }
     flags |= ViewerRenderInvalidationFlags.RenderRulerOverlay;
   }
 
@@ -494,7 +511,8 @@ function sameViewerRenderSnapshot(a: ViewerRenderSnapshot, b: ViewerRenderSnapsh
     sameDisplayRangeRequest(a.displayRangeRequest, b.displayRangeRequest) &&
     sameImageStatsRequest(a.imageStatsRequest, b.imageStatsRequest) &&
     sameAutoExposureRequest(a.autoExposureRequest, b.autoExposureRequest) &&
-    a.rulersVisible === b.rulersVisible
+    a.rulersVisible === b.rulersVisible &&
+    sameViewerPaneLayout(a.viewerPaneLayout, b.viewerPaneLayout)
   );
 }
 

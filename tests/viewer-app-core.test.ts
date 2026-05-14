@@ -90,6 +90,42 @@ describe('viewer app core', () => {
     expect(core.getState().rulersVisible).toBe(false);
   });
 
+  it('splits, activates, and resets viewer panes without changing view state', () => {
+    const core = new ViewerAppCore();
+    const initialView = {
+      zoom: core.getState().sessionState.zoom,
+      panX: core.getState().sessionState.panX,
+      panY: core.getState().sessionState.panY,
+      panoramaYawDeg: core.getState().sessionState.panoramaYawDeg,
+      panoramaPitchDeg: core.getState().sessionState.panoramaPitchDeg,
+      panoramaHfovDeg: core.getState().sessionState.panoramaHfovDeg
+    };
+
+    core.dispatch({ type: 'viewerPaneSplit', orientation: 'vertical' });
+    expect(core.getState().viewerPaneLayout.activePanePath).toEqual([1]);
+
+    core.dispatch({ type: 'viewerPaneSplit', orientation: 'horizontal' });
+    expect(core.getState().viewerPaneLayout.activePanePath).toEqual([1, 1]);
+
+    core.dispatch({ type: 'viewerPaneActivated', path: [0] });
+    expect(core.getState().viewerPaneLayout.activePanePath).toEqual([0]);
+
+    expect({
+      zoom: core.getState().sessionState.zoom,
+      panX: core.getState().sessionState.panX,
+      panY: core.getState().sessionState.panY,
+      panoramaYawDeg: core.getState().sessionState.panoramaYawDeg,
+      panoramaPitchDeg: core.getState().sessionState.panoramaPitchDeg,
+      panoramaHfovDeg: core.getState().sessionState.panoramaHfovDeg
+    }).toEqual(initialView);
+
+    core.dispatch({ type: 'viewerPaneReset' });
+    expect(core.getState().viewerPaneLayout).toEqual({
+      root: { type: 'leaf' },
+      activePanePath: []
+    });
+  });
+
   it('toggles auto exposure and applies resolved exposure only while enabled in None mode', () => {
     const core = new ViewerAppCore();
     const session = createSession('session-1');

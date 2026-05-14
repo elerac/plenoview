@@ -6,6 +6,7 @@ import type {
   ViewerKeyboardZoomInput,
   ViewerMode
 } from '../types';
+import type { ViewerPaneSplitOrientation } from '../viewer-pane-layout';
 import type { GlobalKeyboardControllerElements } from './elements';
 
 export type VerticalNavigationTarget = 'openedFiles' | 'channelView';
@@ -32,6 +33,7 @@ interface GlobalKeyboardControllerCallbacks {
   openExportImageDialog: () => void;
   getViewerMode: () => ViewerMode;
   getOpenedImageCount: () => number;
+  onViewerPaneSplit: (orientation: ViewerPaneSplitOrientation) => void;
   onViewerKeyboardNavigationInputChange: (input: ViewerKeyboardNavigationInput) => void;
   onViewerKeyboardZoomInputChange: (input: ViewerKeyboardZoomInput) => void;
   routeVerticalNavigation: (target: VerticalNavigationTarget, delta: -1 | 1) => boolean;
@@ -108,6 +110,10 @@ export class GlobalKeyboardController implements Disposable {
         if (!this.isDialogOpen()) {
           this.callbacks.openExportImageDialog();
         }
+        return;
+      }
+
+      if (this.handleViewerPaneShortcutKeyDown(event)) {
         return;
       }
 
@@ -194,6 +200,29 @@ export class GlobalKeyboardController implements Disposable {
     }
 
     return this.verticalNavigationTarget;
+  }
+
+  private handleViewerPaneShortcutKeyDown(event: KeyboardEvent): boolean {
+    if (
+      event.defaultPrevented ||
+      !isViewerPaneSplitKeyboardEvent(event) ||
+      event.repeat ||
+      isEditableKeyboardEvent(event) ||
+      this.callbacks.isExportImageDialogOpen() ||
+      this.callbacks.isExportImageBatchDialogOpen() ||
+      this.callbacks.isExportColormapDialogOpen() ||
+      this.callbacks.isFolderLoadDialogOpen() ||
+      this.callbacks.isSettingsDialogOpen() ||
+      this.callbacks.isScreenshotSelectionActive() ||
+      this.callbacks.hasOpenMenu() ||
+      this.callbacks.getOpenedImageCount() === 0
+    ) {
+      return false;
+    }
+
+    event.preventDefault();
+    this.callbacks.onViewerPaneSplit(event.shiftKey ? 'horizontal' : 'vertical');
+    return true;
   }
 
   private handleGlobalPanelNavigationKeyDown(event: KeyboardEvent): boolean {
@@ -517,6 +546,15 @@ function isPrimarySaveKeyboardEvent(event: KeyboardEvent): boolean {
     (event.ctrlKey || event.metaKey) &&
     !event.altKey &&
     !event.shiftKey
+  );
+}
+
+function isViewerPaneSplitKeyboardEvent(event: KeyboardEvent): boolean {
+  return (
+    (event.key === 'd' || event.key === 'D') &&
+    event.metaKey &&
+    !event.ctrlKey &&
+    !event.altKey
   );
 }
 

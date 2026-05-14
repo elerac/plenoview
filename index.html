@@ -162,6 +162,33 @@
               >
                 Full Screen Preview
               </button>
+              <div class="app-menu-separator" role="separator" aria-orientation="horizontal"></div>
+              <button
+                id="window-single-pane-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitem"
+              >
+                Single Pane
+              </button>
+              <button
+                id="window-split-vertical-menu-item"
+                class="app-menu-item app-menu-item--with-shortcut"
+                type="button"
+                role="menuitem"
+              >
+                <span>Split Vertically</span>
+                <span class="app-menu-shortcut" aria-hidden="true">⌘D</span>
+              </button>
+              <button
+                id="window-split-horizontal-menu-item"
+                class="app-menu-item app-menu-item--with-shortcut"
+                type="button"
+                role="menuitem"
+              >
+                <span>Split Horizontally</span>
+                <span class="app-menu-shortcut" aria-hidden="true">⌘⇧D</span>
+              </button>
             </div>
           </div>
           <div class="app-menu">
@@ -946,6 +973,7 @@
           <canvas id="probe-overlay-canvas"></canvas>
           <svg id="ruler-overlay-svg" aria-hidden="true"></svg>
           <div id="ruler-label-overlay" class="ruler-label-overlay" aria-hidden="true"></div>
+          <div id="viewer-pane-overlay" class="viewer-pane-overlay" aria-hidden="true"></div>
           <div id="screenshot-selection-overlay" class="screenshot-selection-overlay hidden" aria-hidden="true">
             <div id="screenshot-selection-mask-top" class="screenshot-selection-mask"></div>
             <div id="screenshot-selection-mask-right" class="screenshot-selection-mask"></div>

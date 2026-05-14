@@ -394,6 +394,19 @@ output {
   cursor: not-allowed;
 }
 
+.app-menu-item--with-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.8rem;
+}
+
+.app-menu-shortcut {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .viewer-context-menu {
   z-index: calc(var(--z-loading-overlay) + 1);
   min-width: 8.5rem;
@@ -1487,7 +1500,8 @@ body.is-resizing-panel-rows * {
 #overlay-canvas,
 #probe-overlay-canvas,
 #ruler-overlay-svg,
-#ruler-label-overlay {
+#ruler-label-overlay,
+#viewer-pane-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1517,7 +1531,8 @@ body.is-resizing-panel-rows * {
 #overlay-canvas,
 #probe-overlay-canvas,
 #ruler-overlay-svg,
-#ruler-label-overlay {
+#ruler-label-overlay,
+#viewer-pane-overlay {
   pointer-events: none;
 }
 
@@ -1542,6 +1557,23 @@ body.is-resizing-panel-rows * {
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   line-height: 1;
+}
+
+.viewer-pane-overlay {
+  z-index: var(--z-viewer-ruler-overlay);
+}
+
+.viewer-pane-frame {
+  position: absolute;
+  border: 1px solid rgba(215, 221, 232, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(3, 7, 18, 0.34);
+}
+
+.viewer-pane-frame.is-active {
+  border-color: color-mix(in srgb, var(--accent) 82%, white 8%);
+  box-shadow:
+    inset 0 0 0 1px rgba(3, 7, 18, 0.48),
+    inset 0 0 0 2px color-mix(in srgb, var(--accent) 48%, transparent);
 }
 
 .ruler-label {

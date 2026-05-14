@@ -1814,11 +1814,77 @@ describe('view menu', () => {
     expect(previewItem.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('renders the Window menu items in normal-full-screen-preview order', () => {
+  it('renders the Window menu items in preview and pane command order', () => {
     installUiFixture();
 
-    const labels = Array.from(document.querySelectorAll('#window-menu .app-menu-item')).map((item) => item.textContent?.trim());
-    expect(labels).toEqual(['Normal', 'Full Screen Preview']);
+    const labels = Array.from(document.querySelectorAll('#window-menu .app-menu-item')).map((item) => (
+      item.textContent?.replace(/\s+/g, ' ').trim()
+    ));
+    expect(labels).toEqual([
+      'Normal',
+      'Full Screen Preview',
+      'Single Pane',
+      'Split Vertically ⌘D',
+      'Split Horizontally ⌘⇧D'
+    ]);
+  });
+
+  it('routes Window pane menu commands through pane callbacks and disables screenshots while split', () => {
+    installUiFixture();
+
+    const onViewerPaneSplit = vi.fn();
+    const onViewerPaneReset = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onViewerPaneSplit, onViewerPaneReset }));
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+    ui.setExportTarget({ filename: 'image.png' });
+
+    const singlePaneItem = document.getElementById('window-single-pane-menu-item') as HTMLButtonElement;
+    const splitVerticalItem = document.getElementById('window-split-vertical-menu-item') as HTMLButtonElement;
+    const splitHorizontalItem = document.getElementById('window-split-horizontal-menu-item') as HTMLButtonElement;
+    const screenshotButton = document.getElementById('export-screenshot-button') as HTMLButtonElement;
+
+    expect(splitVerticalItem.disabled).toBe(false);
+    expect(splitHorizontalItem.disabled).toBe(false);
+    expect(singlePaneItem.disabled).toBe(true);
+    expect(screenshotButton.disabled).toBe(false);
+
+    splitVerticalItem.click();
+    expect(onViewerPaneSplit).toHaveBeenCalledWith('vertical');
+
+    ui.setViewerPaneLayout({
+      root: {
+        type: 'split',
+        orientation: 'vertical',
+        children: [{ type: 'leaf' }, { type: 'leaf' }]
+      },
+      activePanePath: [1]
+    });
+
+    expect(singlePaneItem.disabled).toBe(false);
+    expect(screenshotButton.disabled).toBe(true);
+    splitHorizontalItem.click();
+    expect(onViewerPaneSplit).toHaveBeenCalledWith('horizontal');
+
+    singlePaneItem.click();
+    expect(onViewerPaneReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes Cmd+D and Cmd+Shift+D to split commands without treating Ctrl+D as a shortcut', () => {
+    installUiFixture();
+
+    const onViewerPaneSplit = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onViewerPaneSplit }));
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+
+    const vertical = dispatchViewerPaneKeyboardEvent(ui, { key: 'd', metaKey: true });
+    const horizontal = dispatchViewerPaneKeyboardEvent(ui, { key: 'D', metaKey: true, shiftKey: true });
+    const ctrl = dispatchViewerPaneKeyboardEvent(ui, { key: 'd', ctrlKey: true });
+
+    expect(vertical.defaultPrevented).toBe(true);
+    expect(horizontal.defaultPrevented).toBe(true);
+    expect(ctrl.defaultPrevented).toBe(false);
+    expect(onViewerPaneSplit).toHaveBeenNthCalledWith(1, 'vertical');
+    expect(onViewerPaneSplit).toHaveBeenNthCalledWith(2, 'horizontal');
   });
 
   it('renders Reset Settings in the settings dialog', () => {
@@ -9494,6 +9560,9 @@ function createUiCallbacksBase() {
     onAutoExposurePercentileChange: () => {},
     onImageLoadWorkersChange: () => {},
     onRulersVisibleChange: () => {},
+    onViewerPaneSplit: () => {},
+    onViewerPaneReset: () => {},
+    onViewerPaneActivated: () => {},
     getScreenshotSelectionContext: () => ({
       viewerMode: 'image' as ViewerMode,
       view: {
@@ -9538,6 +9607,23 @@ function dispatchViewerZoomKeyboardEvent(
       handleGlobalViewerKeyboardZoomKeyDown: (event: KeyboardEvent) => boolean;
     };
   }).globalKeyboardController.handleGlobalViewerKeyboardZoomKeyDown(event);
+  return event;
+}
+
+function dispatchViewerPaneKeyboardEvent(
+  ui: ViewerUi,
+  init: KeyboardEventInit & { key: string }
+): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ...init
+  });
+  (ui as unknown as {
+    globalKeyboardController: {
+      handleViewerPaneShortcutKeyDown: (event: KeyboardEvent) => boolean;
+    };
+  }).globalKeyboardController.handleViewerPaneShortcutKeyDown(event);
   return event;
 }
 

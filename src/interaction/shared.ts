@@ -1,4 +1,5 @@
 import type { ImagePixel, ViewerRoiInteractionState, ViewerState, ViewportInfo, ViewportRect } from '../types';
+import type { ViewerPanePath, ViewerPaneRenderInfo } from '../viewer-pane-layout';
 import type {
   ScreenshotSelectionDragUpdate,
   ScreenshotSelectionHandle,
@@ -30,6 +31,9 @@ export interface ScreenshotSelectionInteractionState {
 export interface InteractionCallbacks {
   getState: () => ViewerState;
   getViewport: () => ViewportInfo;
+  getActivePane?: () => ViewerPaneRenderInfo;
+  resolvePaneAtPoint?: (point: PointerPosition) => ViewerPaneRenderInfo | null;
+  onActivePaneChange?: (path: ViewerPanePath) => void;
   getImageSize: () => ImageSize | null;
   onViewChange: (
     next: Partial<Pick<
