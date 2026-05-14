@@ -116,7 +116,7 @@ function buildStokesDisplaySourceBinding(
   }
 
   if (selection.source.kind === 'scalar') {
-    const channels = detectScalarStokesChannels(layer.channelNames);
+    const channels = detectScalarStokesChannels(layer.channelNames, selection.source.suffix ?? null);
     return channels
       ? createScalarStokesBinding(channels, selection.parameter)
       : createEmptyDisplaySourceBinding();

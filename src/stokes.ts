@@ -48,6 +48,7 @@ export interface ScalarStokesChannels {
   s1: string;
   s2: string;
   s3: string;
+  suffix?: string;
 }
 
 export interface RgbStokesChannels {
@@ -130,6 +131,15 @@ const STOKES_COLORMAP_DEFAULT_GROUP_LABELS: Record<StokesColormapDefaultGroup, s
   top: 'ToP',
   normalized: 'Normalized'
 };
+const RGB_STOKES_SUFFIXES = new Set<string>(['R', 'G', 'B']);
+
+type StokesChannelComponent = 'S0' | 'S1' | 'S2' | 'S3';
+
+interface ScalarStokesChannelGroup {
+  suffix: string | null;
+  channels: Partial<Record<StokesChannelComponent, string>>;
+  firstIndex: number;
+}
 
 export function createDefaultStokesDegreeModulation(): StokesDegreeModulationState {
   return { ...DEFAULT_STOKES_DEGREE_MODULATION };
@@ -170,11 +180,47 @@ export function isStokesColormapDefaultGroup(value: string): value is StokesColo
   return STOKES_COLORMAP_DEFAULT_GROUPS.includes(value as StokesColormapDefaultGroup);
 }
 
-export function detectScalarStokesChannels(channelNames: string[]): ScalarStokesChannels | null {
-  const channels = new Set(channelNames);
-  return channels.has('S0') && channels.has('S1') && channels.has('S2') && channels.has('S3')
-    ? { s0: 'S0', s1: 'S1', s2: 'S2', s3: 'S3' }
-    : null;
+export function detectScalarStokesChannels(
+  channelNames: string[],
+  suffix: string | null = null
+): ScalarStokesChannels | null {
+  const normalizedSuffix = suffix || null;
+  return detectScalarStokesChannelSets(channelNames)
+    .find((channels) => (channels.suffix ?? null) === normalizedSuffix) ?? null;
+}
+
+export function detectScalarStokesChannelSets(channelNames: string[]): ScalarStokesChannels[] {
+  const groups = new Map<string, ScalarStokesChannelGroup>();
+
+  channelNames.forEach((channelName, index) => {
+    const parsed = parseScalarStokesChannelName(channelName);
+    if (!parsed || isRgbStokesScalarSuffix(parsed.suffix)) {
+      return;
+    }
+
+    const key = parsed.suffix ?? '';
+    const group = groups.get(key) ?? {
+      suffix: parsed.suffix,
+      channels: {},
+      firstIndex: index
+    };
+    group.channels[parsed.component] ??= channelName;
+    group.firstIndex = Math.min(group.firstIndex, index);
+    groups.set(key, group);
+  });
+
+  const completed = [...groups.values()]
+    .map(buildScalarStokesChannelsFromGroup)
+    .filter((channels): channels is ScalarStokesChannels => channels !== null);
+  const bare = completed.find((channels) => !channels.suffix) ?? null;
+  const suffixed = completed
+    .filter((channels) => channels.suffix)
+    .sort((a, b) => (
+      (groups.get(a.suffix ?? '')?.firstIndex ?? Number.MAX_SAFE_INTEGER) -
+      (groups.get(b.suffix ?? '')?.firstIndex ?? Number.MAX_SAFE_INTEGER)
+    ));
+
+  return bare ? [bare, ...suffixed] : suffixed;
 }
 
 export function detectRgbStokesChannels(channelNames: string[]): RgbStokesChannels | null {
@@ -195,10 +241,14 @@ export function detectRgbStokesChannels(channelNames: string[]): RgbStokesChanne
   return r && g && b ? { r, g, b } : null;
 }
 
-export function buildScalarStokesSelection(parameter: StokesParameter): StokesSelection {
+export function buildScalarStokesSelection(
+  parameter: StokesParameter,
+  suffix: string | null = null
+): StokesSelection {
+  const source = suffix ? { kind: 'scalar' as const, suffix } : { kind: 'scalar' as const };
   return isStokesAngleParameter(parameter)
-    ? { kind: 'stokesAngle', parameter, source: { kind: 'scalar' } }
-    : { kind: 'stokesScalar', parameter, source: { kind: 'scalar' } };
+    ? { kind: 'stokesAngle', parameter, source }
+    : { kind: 'stokesScalar', parameter, source };
 }
 
 export function buildRgbStokesLuminanceSelection(parameter: StokesParameter): StokesSelection {
@@ -250,8 +300,8 @@ export function getStokesDisplayOptions(
   const options: StokesDisplayOption[] = [];
   const includeRgbGroups = config.includeRgbGroups ?? true;
   const includeSplitChannels = config.includeSplitChannels ?? false;
-  const scalarChannels = detectScalarStokesChannels(channelNames);
-  if (scalarChannels) {
+  const scalarChannelSets = detectScalarStokesChannelSets(channelNames);
+  for (const scalarChannels of scalarChannelSets) {
     for (const parameter of STOKES_PARAMETER_ORDER) {
       options.push(buildScalarStokesDisplayOption(parameter, scalarChannels));
     }
@@ -352,7 +402,7 @@ export function isStokesDisplayAvailable(
   }
 
   return selection.source.kind === 'scalar'
-    ? Boolean(detectScalarStokesChannels(channelNames))
+    ? Boolean(detectScalarStokesChannels(channelNames, selection.source.suffix ?? null))
     : Boolean(detectRgbStokesChannels(channelNames));
 }
 
@@ -514,14 +564,47 @@ function buildScalarStokesDisplayOption(
   parameter: StokesParameter,
   channels: ScalarStokesChannels
 ): StokesDisplayOption {
-  const selection = buildScalarStokesSelection(parameter);
+  const selection = buildScalarStokesSelection(parameter, channels.suffix ?? null);
   return {
-    key: `stokesScalar:${parameter}`,
+    key: channels.suffix ? `stokesScalar:${parameter}:${channels.suffix}` : `stokesScalar:${parameter}`,
     label: getDisplaySelectionOptionLabel(selection),
     selection,
     mapping: buildScalarStokesMapping(channels),
     component: null
   };
+}
+
+function parseScalarStokesChannelName(channelName: string): {
+  component: StokesChannelComponent;
+  suffix: string | null;
+} | null {
+  const match = channelName.match(/^(S[0-3])(?:\.(.+))?$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    component: match[1] as StokesChannelComponent,
+    suffix: match[2] ?? null
+  };
+}
+
+function isRgbStokesScalarSuffix(suffix: string | null): boolean {
+  return suffix !== null && RGB_STOKES_SUFFIXES.has(suffix);
+}
+
+function buildScalarStokesChannelsFromGroup(group: ScalarStokesChannelGroup): ScalarStokesChannels | null {
+  const s0 = group.channels.S0;
+  const s1 = group.channels.S1;
+  const s2 = group.channels.S2;
+  const s3 = group.channels.S3;
+  if (!s0 || !s1 || !s2 || !s3) {
+    return null;
+  }
+
+  return group.suffix
+    ? { s0, s1, s2, s3, suffix: group.suffix }
+    : { s0, s1, s2, s3 };
 }
 
 function buildRgbStokesGroupDisplayOption(

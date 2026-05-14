@@ -8,6 +8,7 @@ import {
   computeStokesNormalizedComponent,
   createDefaultStokesColormapDefaultSettings,
   detectRgbStokesChannels,
+  detectScalarStokesChannelSets,
   detectScalarStokesChannels,
   getStokesColormapDefault,
   getStokesColormapDefaultGroup,
@@ -23,6 +24,12 @@ describe('stokes', () => {
       s2: 'S2',
       s3: 'S3'
     });
+    expect(detectScalarStokesChannelSets(['S0', 'S1', 'S2', 'S3'])).toEqual([{
+      s0: 'S0',
+      s1: 'S1',
+      s2: 'S2',
+      s3: 'S3'
+    }]);
     expect(detectScalarStokesChannels(['S0', 'S1', 'S2'])).toBeNull();
 
     const rgbNames = [
@@ -100,6 +107,65 @@ describe('stokes', () => {
       displayB: 'S0.R',
       displayA: null
     });
+  });
+
+  it('detects every complete non-RGB suffixed scalar Stokes channel set', () => {
+    const channelNames = [
+      'S0.500nm', 'S0.Y',
+      'S1.Y', 'S2.Y', 'S3.Y',
+      'S1.500nm', 'S2.500nm', 'S3.500nm',
+      'S0', 'S1', 'S2', 'S3',
+      'S0.mask', 'S1.mask', 'S3.mask'
+    ];
+
+    expect(detectScalarStokesChannels(channelNames, 'Y')).toEqual({
+      s0: 'S0.Y',
+      s1: 'S1.Y',
+      s2: 'S2.Y',
+      s3: 'S3.Y',
+      suffix: 'Y'
+    });
+    expect(detectScalarStokesChannels(channelNames, 'mask')).toBeNull();
+    expect(detectScalarStokesChannelSets(channelNames)).toEqual([
+      { s0: 'S0', s1: 'S1', s2: 'S2', s3: 'S3' },
+      { s0: 'S0.500nm', s1: 'S1.500nm', s2: 'S2.500nm', s3: 'S3.500nm', suffix: '500nm' },
+      { s0: 'S0.Y', s1: 'S1.Y', s2: 'S2.Y', s3: 'S3.Y', suffix: 'Y' }
+    ]);
+    expect(getStokesDisplayOptions(['S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm']).map((option) => option.label))
+      .toEqual([
+        'S1/S0.400nm',
+        'S2/S0.400nm',
+        'S3/S0.400nm',
+        'AoLP.400nm',
+        'DoP.400nm',
+        'DoLP.400nm',
+        'DoCP.400nm',
+        'CoP.400nm',
+        'ToP.400nm'
+      ]);
+    expect(getStokesDisplayOptions(['S0.Y', 'S1.Y', 'S2.Y', 'S3.Y']).map((option) => option.label)).toEqual([
+      'S1/S0.Y',
+      'S2/S0.Y',
+      'S3/S0.Y',
+      'AoLP.Y',
+      'DoP.Y',
+      'DoLP.Y',
+      'DoCP.Y',
+      'CoP.Y',
+      'ToP.Y'
+    ]);
+  });
+
+  it('keeps RGB Stokes components out of scalar suffix detection', () => {
+    const rgbNames = [
+      'S0.R', 'S0.G', 'S0.B',
+      'S1.R', 'S1.G', 'S1.B',
+      'S2.R', 'S2.G', 'S2.B',
+      'S3.R', 'S3.G', 'S3.B'
+    ];
+
+    expect(detectScalarStokesChannelSets(rgbNames)).toEqual([]);
+    expect(getStokesDisplayOptions(rgbNames).filter((option) => option.key.startsWith('stokesScalar:'))).toEqual([]);
   });
 
   it('groups Stokes parameters by default colormap behavior', () => {

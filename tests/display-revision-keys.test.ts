@@ -34,6 +34,11 @@ describe('display revision keys', () => {
       displaySelection: createStokesSelection('dolp', 'stokesRgb'),
       visualizationMode: 'colormap'
     })).toBe('2:stokesScalar:dolp:rgbLuminance:colormap');
+
+    expect(buildDisplayTextureRevisionKey({
+      activeLayer: 2,
+      displaySelection: createStokesSelection('dolp', 'stokesScalar', null, '500nm')
+    })).toBe('2:stokesScalar:dolp:scalar:500nm');
   });
 
   it('builds luminance revision keys that ignore alpha-only channel changes', () => {

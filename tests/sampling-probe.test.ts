@@ -43,10 +43,34 @@ describe('display probe sampling', () => {
       'S3.G': [0],
       'S3.B': [0]
     }, 'rgb-stokes');
+    const suffixedLayer = createLayerFromChannels({
+      'S0.Y': [1],
+      'S1.Y': [0],
+      'S2.Y': [1],
+      'S3.Y': [0]
+    }, 'suffixed-stokes');
 
     expect(
       samplePixelValuesForDisplay(scalarLayer, 1, 1, { ix: 0, iy: 0 }, createStokesSelection('aolp'))?.values.AoLP
     ).toBeCloseTo(Math.PI / 4, 6);
+    expect(
+      samplePixelValuesForDisplay(
+        suffixedLayer,
+        1,
+        1,
+        { ix: 0, iy: 0 },
+        createStokesSelection('aolp', 'stokesScalar', null, 'Y')
+      )?.values['AoLP.Y']
+    ).toBeCloseTo(Math.PI / 4, 6);
+    expect(
+      samplePixelValuesForDisplay(
+        suffixedLayer,
+        1,
+        1,
+        { ix: 0, iy: 0 },
+        createStokesSelection('aolp', 'stokesScalar', null, 'Y')
+      )?.values['DoLP.Y']
+    ).toBeCloseTo(1, 6);
     expect(
       samplePixelValuesForDisplay(rgbLayer, 1, 1, { ix: 0, iy: 0 }, createStokesSelection('aolp', 'stokesRgb'))?.values['AoLP.R']
     ).toBeCloseTo(Math.PI / 4, 6);

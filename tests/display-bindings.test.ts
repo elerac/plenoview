@@ -29,10 +29,20 @@ describe('display bindings', () => {
       'S3.G': [11],
       'S3.B': [12]
     });
+    const suffixedStokesLayer = createLayerFromChannels({
+      'S0.Y': [1],
+      'S1.Y': [2],
+      'S2.Y': [3],
+      'S3.Y': [4]
+    });
 
     const rgbBinding = buildDisplaySourceBinding(channelLayer, createChannelRgbSelection('R', 'G', 'B', 'A'));
     const monoBinding = buildDisplaySourceBinding(channelLayer, createChannelMonoSelection('G', 'A'));
     const stokesBinding = buildDisplaySourceBinding(stokesLayer, createStokesSelection('dop', 'stokesRgb'));
+    const suffixedStokesBinding = buildDisplaySourceBinding(
+      suffixedStokesLayer,
+      createStokesSelection('dop', 'stokesScalar', null, 'Y')
+    );
     const stokesColormapBinding = buildDisplaySourceBinding(
       stokesLayer,
       createStokesSelection('dop', 'stokesRgb'),
@@ -57,6 +67,10 @@ describe('display bindings', () => {
     ]);
     expect(stokesBinding.usesImageAlpha).toBe(false);
     expect(stokesBinding.stokesParameter).toBe('dop');
+    expect(suffixedStokesBinding.mode).toBe('stokesDirect');
+    expect(suffixedStokesBinding.slots.slice(0, 4)).toEqual(['S0.Y', 'S1.Y', 'S2.Y', 'S3.Y']);
+    expect(suffixedStokesBinding.usesImageAlpha).toBe(false);
+    expect(suffixedStokesBinding.stokesParameter).toBe('dop');
     expect(stokesColormapBinding.mode).toBe('stokesRgbLuminance');
     expect(stokesColormapBinding.slots).toEqual(stokesBinding.slots);
   });

@@ -79,6 +79,27 @@ describe('display CPU materialization', () => {
     expect(texture[12]).toBe(0);
   });
 
+  it('builds suffixed scalar Stokes display textures', () => {
+    const layer = createLayerFromChannels({
+      'S0.500nm': [2],
+      'S1.500nm': [1],
+      'S2.500nm': [Math.sqrt(3)],
+      'S3.500nm': [0]
+    }, 'spectral-stokes');
+
+    const texture = buildSelectedDisplayTexture(
+      layer,
+      1,
+      1,
+      createStokesSelection('dolp', 'stokesScalar', null, '500nm')
+    );
+
+    expect(texture[0]).toBeCloseTo(1, 6);
+    expect(texture[1]).toBeCloseTo(1, 6);
+    expect(texture[2]).toBeCloseTo(1, 6);
+    expect(texture[3]).toBe(1);
+  });
+
   it('builds grouped RGB Stokes display textures for None and Colormap, plus split RGB textures', () => {
     const layer = createLayerFromChannels({
       'S0.R': [1],

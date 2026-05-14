@@ -15,7 +15,7 @@ export type StokesAngleParameter = 'aolp' | 'cop' | 'top';
 export type StokesScalarParameter = Exclude<StokesParameter, StokesAngleParameter>;
 
 export type StokesSource =
-  | { kind: 'scalar' }
+  | { kind: 'scalar'; suffix?: string }
   | { kind: 'rgbLuminance' }
   | { kind: 'rgbComponent'; component: 'R' | 'G' | 'B' };
 
@@ -214,9 +214,7 @@ export function getDisplaySelectionValueLabel(selection: DisplaySelection | null
   }
 
   const label = getStokesParameterLabel(selection.parameter);
-  return selection.source.kind === 'rgbComponent'
-    ? `${label}.${selection.source.component}`
-    : label;
+  return appendStokesSourceSuffix(label, getStokesSourceLabelSuffix(selection.source));
 }
 
 export function getDisplaySelectionDegreeModulationValueLabel(
@@ -231,9 +229,7 @@ export function getDisplaySelectionDegreeModulationValueLabel(
     return null;
   }
 
-  return selection.source.kind === 'rgbComponent'
-    ? `${label}.${selection.source.component}`
-    : label;
+  return appendStokesSourceSuffix(label, getStokesSourceLabelSuffix(selection.source));
 }
 
 export function getDisplaySelectionOptionLabel(selection: DisplaySelection): string {
@@ -306,7 +302,9 @@ function formatStokesSelectionLabel(selection: StokesSelection): string {
   const label = getStokesParameterLabel(selection.parameter);
   switch (selection.source.kind) {
     case 'scalar':
-      return `Stokes ${label}`;
+      return selection.source.suffix
+        ? appendStokesSourceSuffix(label, selection.source.suffix)
+        : `Stokes ${label}`;
     case 'rgbLuminance':
       return `${label}.(R,G,B)`;
     case 'rgbComponent':
@@ -315,9 +313,15 @@ function formatStokesSelectionLabel(selection: StokesSelection): string {
 }
 
 function cloneStokesSource(source: StokesSource): StokesSource {
-  return source.kind === 'rgbComponent'
-    ? { kind: 'rgbComponent', component: source.component }
-    : { kind: source.kind };
+  if (source.kind === 'rgbComponent') {
+    return { kind: 'rgbComponent', component: source.component };
+  }
+
+  if (source.kind === 'scalar') {
+    return source.suffix ? { kind: 'scalar', suffix: source.suffix } : { kind: 'scalar' };
+  }
+
+  return { kind: source.kind };
 }
 
 function sameStokesSource(a: StokesSource, b: StokesSource): boolean {
@@ -325,11 +329,41 @@ function sameStokesSource(a: StokesSource, b: StokesSource): boolean {
     return false;
   }
 
-  return a.kind !== 'rgbComponent' || a.component === (b as { kind: 'rgbComponent'; component: 'R' | 'G' | 'B' }).component;
+  if (a.kind === 'rgbComponent') {
+    return a.component === (b as { kind: 'rgbComponent'; component: 'R' | 'G' | 'B' }).component;
+  }
+
+  if (a.kind === 'scalar') {
+    return (a.suffix ?? null) === ((b as { kind: 'scalar'; suffix?: string }).suffix ?? null);
+  }
+
+  return true;
 }
 
 function serializeStokesSource(source: StokesSource): string {
-  return source.kind === 'rgbComponent'
-    ? `rgbComponent:${source.component}`
-    : source.kind;
+  if (source.kind === 'rgbComponent') {
+    return `rgbComponent:${source.component}`;
+  }
+
+  if (source.kind === 'scalar' && source.suffix) {
+    return `scalar:${source.suffix}`;
+  }
+
+  return source.kind;
+}
+
+function getStokesSourceLabelSuffix(source: StokesSource): string | null {
+  if (source.kind === 'rgbComponent') {
+    return source.component;
+  }
+
+  if (source.kind === 'scalar') {
+    return source.suffix ?? null;
+  }
+
+  return null;
+}
+
+function appendStokesSourceSuffix(label: string, suffix: string | null): string {
+  return suffix ? `${label}.${suffix}` : label;
 }

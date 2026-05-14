@@ -157,10 +157,11 @@ export function createViewerInteractionState(
 export function createStokesSelection(
   stokesParameter: StokesParameter,
   displaySource: 'stokesScalar' | 'stokesRgb' = 'stokesScalar',
-  component: RgbStokesComponent | null = null
+  component: RgbStokesComponent | null = null,
+  scalarSuffix: string | null = null
 ): StokesSelection {
   if (displaySource === 'stokesScalar') {
-    return buildScalarStokesSelection(stokesParameter);
+    return buildScalarStokesSelection(stokesParameter, scalarSuffix);
   }
 
   return component

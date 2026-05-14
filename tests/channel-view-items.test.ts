@@ -5,7 +5,7 @@ import {
   hasSplitChannelViewItems,
   selectVisibleChannelViewItems
 } from '../src/channel-view-items';
-import { createChannelMonoSelection } from './helpers/state-fixtures';
+import { createChannelMonoSelection, createStokesSelection } from './helpers/state-fixtures';
 
 describe('channel view items', () => {
   it('keeps merged and split channel ordering stable from one shared descriptor list', () => {
@@ -39,6 +39,17 @@ describe('channel view items', () => {
 
     expect(selectVisibleChannelViewItems(items, false).some((item) => item.value === 'stokesRgb:s1_over_s0:group')).toBe(true);
     expect(selectVisibleChannelViewItems(items, true).some((item) => item.value === 'stokesRgb:s1_over_s0:R')).toBe(true);
+  });
+
+  it('builds suffixed scalar stokes descriptors', () => {
+    const items = buildChannelViewItems(['S0.Y', 'S1.Y', 'S2.Y', 'S3.Y']);
+    const stokesItem = selectVisibleChannelViewItems(items, false)
+      .find((item) => item.value === 'stokesScalar:aolp:Y');
+
+    expect(stokesItem?.label).toBe('AoLP.Y');
+    expect(stokesItem?.meta).toBe('32f x 3');
+    expect(findSelectedChannelViewItem(items, createStokesSelection('aolp', 'stokesScalar', null, 'Y'))?.value)
+      .toBe('stokesScalar:aolp:Y');
   });
 
   it('finds the selected descriptor by display selection', () => {

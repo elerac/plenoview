@@ -21,7 +21,6 @@ interface SpectralSeriesCandidate {
   firstIndex: number;
 }
 
-const DEFAULT_SPECTRAL_SERIES_KEY = '';
 const DEFAULT_SPECTRAL_SERIES_LABEL = '';
 const JCGT_SPECTRAL_CHANNEL_PATTERN = /^((?:S[0-3]|T))\.(\d+(?:,\d+)?(?:[eE][-+]?\d+)?)nm$/i;
 const RESERVED_SPECTRAL_LAYER_PATTERN = /^(?:S[0-4]|T)\./i;

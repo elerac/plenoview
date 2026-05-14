@@ -155,14 +155,20 @@ export function appendStokesSampleValues(
   const label = getStokesParameterLabel(selection.parameter);
 
   if (selection.source.kind === 'scalar') {
-    const channels = detectScalarStokesChannels(layer.channelNames);
+    const channels = detectScalarStokesChannels(layer.channelNames, selection.source.suffix ?? null);
     if (!channels) {
       return;
     }
 
     const sample = readScalarStokesSample(resolveStokesChannelArrays(layer, channels), flatIndex);
-    values[label] = computeStokesDisplayValue(selection.parameter, sample.s0, sample.s1, sample.s2, sample.s3);
-    appendStokesDegreeModulationSampleValue(selection.parameter, sample, values);
+    values[appendStokesLabelSuffix(label, channels.suffix ?? null)] = computeStokesDisplayValue(
+      selection.parameter,
+      sample.s0,
+      sample.s1,
+      sample.s2,
+      sample.s3
+    );
+    appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, channels.suffix ?? null);
     return;
   }
 
@@ -232,7 +238,7 @@ function appendStokesDegreeModulationSampleValue(
   parameter: StokesParameter,
   sample: StokesSample,
   values: Record<string, number>,
-  component: RgbStokesComponent | null = null
+  suffix: string | null = null
 ): void {
   const label = getStokesDegreeModulationLabel(parameter);
   if (!label) {
@@ -241,8 +247,12 @@ function appendStokesDegreeModulationSampleValue(
 
   const value = computeStokesDegreeModulationValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
   if (value !== null) {
-    values[component ? `${label}.${component}` : label] = value;
+    values[appendStokesLabelSuffix(label, suffix)] = value;
   }
+}
+
+function appendStokesLabelSuffix(label: string, suffix: string | null): string {
+  return suffix ? `${label}.${suffix}` : label;
 }
 
 function computeRawStokesAolp(s1: number, s2: number): number {
