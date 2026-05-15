@@ -47,7 +47,7 @@ export interface ScalarStokesChannels {
   s0: string;
   s1: string;
   s2: string;
-  s3: string;
+  s3: string | null;
   suffix?: string;
 }
 
@@ -76,6 +76,13 @@ const STOKES_PARAMETER_ORDER: StokesParameter[] = [
   'cop',
   'top'
 ];
+
+const S3_STOKES_PARAMETERS = new Set<StokesParameter>([
+  's3_over_s0',
+  'docp',
+  'cop',
+  'top'
+]);
 
 export const DEFAULT_STOKES_DEGREE_MODULATION: StokesDegreeModulationState = {
   aolp: false,
@@ -230,8 +237,8 @@ export function detectRgbStokesChannels(channelNames: string[]): RgbStokesChanne
     const s1 = `S1.${suffix}`;
     const s2 = `S2.${suffix}`;
     const s3 = `S3.${suffix}`;
-    return channels.has(s0) && channels.has(s1) && channels.has(s2) && channels.has(s3)
-      ? { s0, s1, s2, s3 }
+    return channels.has(s0) && channels.has(s1) && channels.has(s2)
+      ? { s0, s1, s2, s3: channels.has(s3) ? s3 : null }
       : null;
   };
 
@@ -316,7 +323,8 @@ export function getStokesDisplayOptions(
   const options: StokesDisplayOption[] = [];
   const includeRgbGroups = config.includeRgbGroups ?? true;
   const includeSplitChannels = config.includeSplitChannels ?? false;
-  const hasSpectralStokesRgbOptions = isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames);
+  const spectralStokesCapabilities = getSpectralStokesRgbCapabilitiesForChannelNames(channelNames);
+  const hasSpectralStokesRgbOptions = spectralStokesCapabilities.available;
   const scalarChannelSets = detectScalarStokesChannelSets(channelNames);
   for (const scalarChannels of scalarChannelSets) {
     const isSplitSpectralStokesSet = Boolean(
@@ -328,14 +336,14 @@ export function getStokesDisplayOptions(
       continue;
     }
 
-    for (const parameter of STOKES_PARAMETER_ORDER) {
+    for (const parameter of getAvailableStokesParameters(hasCompleteScalarStokesS3(scalarChannels))) {
       options.push(buildScalarStokesDisplayOption(parameter, scalarChannels));
     }
   }
 
   const rgbChannels = detectRgbStokesChannels(channelNames);
   if (rgbChannels) {
-    for (const parameter of STOKES_PARAMETER_ORDER) {
+    for (const parameter of getAvailableStokesParameters(hasCompleteRgbStokesS3(rgbChannels))) {
       if (includeRgbGroups) {
         options.push(buildRgbStokesGroupDisplayOption(parameter, rgbChannels));
       }
@@ -351,7 +359,7 @@ export function getStokesDisplayOptions(
   }
 
   if (hasSpectralStokesRgbOptions && includeRgbGroups) {
-    for (const parameter of STOKES_PARAMETER_ORDER) {
+    for (const parameter of getAvailableStokesParameters(spectralStokesCapabilities.hasS3)) {
       options.push(buildSpectralStokesRgbDisplayOption(parameter));
     }
   }
@@ -434,14 +442,17 @@ export function isStokesDisplayAvailable(
   }
 
   if (selection.source.kind === 'scalar') {
-    return Boolean(detectScalarStokesChannels(channelNames, selection.source.suffix ?? null));
+    const channels = detectScalarStokesChannels(channelNames, selection.source.suffix ?? null);
+    return Boolean(channels && isStokesParameterAvailable(selection.parameter, hasCompleteScalarStokesS3(channels)));
   }
 
   if (selection.source.kind === 'spectralRgb') {
-    return isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames);
+    const capabilities = getSpectralStokesRgbCapabilitiesForChannelNames(channelNames);
+    return capabilities.available && isStokesParameterAvailable(selection.parameter, capabilities.hasS3);
   }
 
-  return Boolean(detectRgbStokesChannels(channelNames));
+  const rgbChannels = detectRgbStokesChannels(channelNames);
+  return Boolean(rgbChannels && isStokesParameterAvailable(selection.parameter, hasCompleteRgbStokesS3(rgbChannels)));
 }
 
 export {
@@ -635,11 +646,11 @@ function buildScalarStokesChannelsFromGroup(group: ScalarStokesChannelGroup): Sc
   const s0 = group.channels.S0;
   const s1 = group.channels.S1;
   const s2 = group.channels.S2;
-  const s3 = group.channels.S3;
-  if (!s0 || !s1 || !s2 || !s3) {
+  if (!s0 || !s1 || !s2) {
     return null;
   }
 
+  const s3 = group.channels.S3 ?? null;
   return group.suffix
     ? { s0, s1, s2, s3, suffix: group.suffix }
     : { s0, s1, s2, s3 };
@@ -685,7 +696,26 @@ function buildSpectralStokesRgbDisplayOption(parameter: StokesParameter): Stokes
   };
 }
 
-function isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames: string[]): boolean {
+function getAvailableStokesParameters(hasS3: boolean): StokesParameter[] {
+  return STOKES_PARAMETER_ORDER.filter((parameter) => isStokesParameterAvailable(parameter, hasS3));
+}
+
+function isStokesParameterAvailable(parameter: StokesParameter, hasS3: boolean): boolean {
+  return hasS3 || !S3_STOKES_PARAMETERS.has(parameter);
+}
+
+function hasCompleteScalarStokesS3(channels: ScalarStokesChannels): boolean {
+  return channels.s3 !== null;
+}
+
+function hasCompleteRgbStokesS3(channels: RgbStokesChannels): boolean {
+  return channels.r.s3 !== null && channels.g.s3 !== null && channels.b.s3 !== null;
+}
+
+function getSpectralStokesRgbCapabilitiesForChannelNames(channelNames: string[]): {
+  available: boolean;
+  hasS3: boolean;
+} {
   const componentsByWavelength = new Map<string, Set<StokesChannelComponent>>();
 
   for (const channelName of channelNames) {
@@ -705,19 +735,25 @@ function isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames: string
     componentsByWavelength.set(key, components);
   }
 
-  let completeWavelengthCount = 0;
+  let linearWavelengthCount = 0;
+  let fullWavelengthCount = 0;
   for (const components of componentsByWavelength.values()) {
     if (
       components.has('S0') &&
       components.has('S1') &&
-      components.has('S2') &&
-      components.has('S3')
+      components.has('S2')
     ) {
-      completeWavelengthCount += 1;
+      linearWavelengthCount += 1;
+      if (components.has('S3')) {
+        fullWavelengthCount += 1;
+      }
     }
   }
 
-  return completeWavelengthCount >= 2;
+  return {
+    available: linearWavelengthCount >= 2,
+    hasS3: linearWavelengthCount >= 2 && linearWavelengthCount === fullWavelengthCount
+  };
 }
 
 function isSpectralStokesSuffixValue(value: string | null | undefined): boolean {

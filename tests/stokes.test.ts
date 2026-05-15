@@ -31,7 +31,19 @@ describe('stokes', () => {
       s2: 'S2',
       s3: 'S3'
     }]);
-    expect(detectScalarStokesChannels(['S0', 'S1', 'S2'])).toBeNull();
+    expect(detectScalarStokesChannels(['S0', 'S1', 'S2'])).toEqual({
+      s0: 'S0',
+      s1: 'S1',
+      s2: 'S2',
+      s3: null
+    });
+    expect(getStokesDisplayOptions(['S0', 'S1', 'S2']).map((option) => option.label)).toEqual([
+      'Stokes S1/S0',
+      'Stokes S2/S0',
+      'Stokes AoLP',
+      'Stokes DoP',
+      'Stokes DoLP'
+    ]);
 
     const rgbNames = [
       'S0.R', 'S0.G', 'S0.B',
@@ -45,6 +57,51 @@ describe('stokes', () => {
       s2: 'S2.R',
       s3: 'S3.R'
     });
+    const linearRgbNames = [
+      'S0.R', 'S0.G', 'S0.B',
+      'S1.R', 'S1.G', 'S1.B',
+      'S2.R', 'S2.G', 'S2.B'
+    ];
+    expect(detectRgbStokesChannels(linearRgbNames)?.r).toEqual({
+      s0: 'S0.R',
+      s1: 'S1.R',
+      s2: 'S2.R',
+      s3: null
+    });
+    expect(getStokesDisplayOptions(linearRgbNames).map((option) => option.label)).toEqual([
+      'S1/S0.(R,G,B)',
+      'S2/S0.(R,G,B)',
+      'AoLP.(R,G,B)',
+      'DoP.(R,G,B)',
+      'DoLP.(R,G,B)'
+    ]);
+    expect(getStokesDisplayOptions([...linearRgbNames, 'S3.R']).map((option) => option.label)).toEqual([
+      'S1/S0.(R,G,B)',
+      'S2/S0.(R,G,B)',
+      'AoLP.(R,G,B)',
+      'DoP.(R,G,B)',
+      'DoLP.(R,G,B)'
+    ]);
+    expect(getStokesDisplayOptions(linearRgbNames, {
+      includeRgbGroups: false,
+      includeSplitChannels: true
+    }).map((option) => option.label)).toEqual([
+      'S1/S0.R',
+      'S1/S0.G',
+      'S1/S0.B',
+      'S2/S0.R',
+      'S2/S0.G',
+      'S2/S0.B',
+      'AoLP.R',
+      'AoLP.G',
+      'AoLP.B',
+      'DoP.R',
+      'DoP.G',
+      'DoP.B',
+      'DoLP.R',
+      'DoLP.G',
+      'DoLP.B'
+    ]);
     expect(getStokesDisplayOptions(['S0', 'S1', 'S2', 'S3']).map((option) => option.label)).toEqual([
       'Stokes S1/S0',
       'Stokes S2/S0',
@@ -131,6 +188,13 @@ describe('stokes', () => {
       { s0: 'S0', s1: 'S1', s2: 'S2', s3: 'S3' },
       { s0: 'S0.500nm', s1: 'S1.500nm', s2: 'S2.500nm', s3: 'S3.500nm', suffix: '500nm' },
       { s0: 'S0.Y', s1: 'S1.Y', s2: 'S2.Y', s3: 'S3.Y', suffix: 'Y' }
+    ]);
+    expect(getStokesDisplayOptions(['S0.Y', 'S1.Y', 'S2.Y']).map((option) => option.label)).toEqual([
+      'S1/S0.Y',
+      'S2/S0.Y',
+      'AoLP.Y',
+      'DoP.Y',
+      'DoLP.Y'
     ]);
     expect(getStokesDisplayOptions(['S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm']).map((option) => option.label))
       .toEqual([
@@ -230,6 +294,40 @@ describe('stokes', () => {
     ]);
     expect(mixedOptions.map((option) => option.label)).toContain('S1/S0.Y');
     expect(mixedOptions.map((option) => option.label)).not.toContain('S1/S0.400nm');
+  });
+
+  it('exposes linear-only spectral Stokes options without S3-derived entries', () => {
+    const channelNames = [
+      'S0.400nm', 'S1.400nm', 'S2.400nm',
+      'S0.500nm', 'S1.500nm', 'S2.500nm'
+    ];
+    const options = getStokesDisplayOptions(channelNames);
+    const spectralOptions = options.filter((option) => option.key.startsWith('stokesSpectralRgb:'));
+
+    expect(spectralOptions.map((option) => option.label)).toEqual([
+      'S1/S0 Spectral RGB',
+      'S2/S0 Spectral RGB',
+      'AoLP Spectral RGB',
+      'DoP Spectral RGB',
+      'DoLP Spectral RGB'
+    ]);
+
+    const splitOptions = getStokesDisplayOptions(channelNames, {
+      includeRgbGroups: false,
+      includeSplitChannels: true
+    });
+    expect(splitOptions.map((option) => option.label)).toEqual([
+      'S1/S0.400nm',
+      'S2/S0.400nm',
+      'AoLP.400nm',
+      'DoP.400nm',
+      'DoLP.400nm',
+      'S1/S0.500nm',
+      'S2/S0.500nm',
+      'AoLP.500nm',
+      'DoP.500nm',
+      'DoLP.500nm'
+    ]);
   });
 
   it('groups Stokes parameters by default colormap behavior', () => {

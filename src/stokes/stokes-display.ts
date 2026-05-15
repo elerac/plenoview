@@ -40,7 +40,7 @@ export function resolveStokesChannelArrays(
     s0: getChannelReadView(layer, channels.s0),
     s1: getChannelReadView(layer, channels.s1),
     s2: getChannelReadView(layer, channels.s2),
-    s3: getChannelReadView(layer, channels.s3)
+    s3: getOptionalChannelReadView(layer, channels.s3)
   };
 }
 

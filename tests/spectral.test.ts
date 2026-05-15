@@ -6,6 +6,7 @@ import {
   detectSpectralChannels,
   detectSpectralStokesChannelGroups,
   getSpectralRgbDisplayOptions,
+  hasCompleteSpectralStokesS3,
   isSpectralRgbDisplayAvailable,
   parseSpectralChannel,
   parseSpectralChannelName
@@ -169,8 +170,8 @@ describe('spectral channel helpers', () => {
     ]);
   });
 
-  it('detects complete spectral Stokes wavelength groups', () => {
-    expect(detectSpectralStokesChannelGroups([
+  it('detects spectral Stokes wavelength groups with optional S3', () => {
+    const channelNames = [
       'S1.500nm',
       'S0.400nm',
       'S3.400nm',
@@ -182,7 +183,9 @@ describe('spectral channel helpers', () => {
       'S0.600nm',
       'S1.600nm',
       'S2.600nm'
-    ])).toEqual([
+    ];
+
+    expect(detectSpectralStokesChannelGroups(channelNames)).toEqual([
       {
         wavelength: 400,
         suffix: '400nm',
@@ -198,8 +201,17 @@ describe('spectral channel helpers', () => {
         s1: 'S1.500nm',
         s2: 'S2.500nm',
         s3: 'S3.500nm'
+      },
+      {
+        wavelength: 600,
+        suffix: '600nm',
+        s0: 'S0.600nm',
+        s1: 'S1.600nm',
+        s2: 'S2.600nm',
+        s3: null
       }
     ]);
+    expect(hasCompleteSpectralStokesS3(channelNames)).toBe(false);
   });
 
   it('builds derived spectral Stokes plot points for selected components', () => {
@@ -275,6 +287,24 @@ describe('spectral channel helpers', () => {
     expect(isSpectralRgbDisplayAvailable(channelNames, createSpectralRgbSelection('S1'))).toBe(true);
     expect(isSpectralRgbDisplayAvailable(channelNames, createSpectralRgbSelection('S2'))).toBe(true);
     expect(isSpectralRgbDisplayAvailable(channelNames, createSpectralRgbSelection('S3'))).toBe(true);
+    expect(hasCompleteSpectralStokesS3(channelNames)).toBe(true);
+  });
+
+  it('hides incomplete S3 spectral RGB grouping for linear-only spectral Stokes data', () => {
+    const channelNames = [
+      'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
+      'S0.500nm', 'S1.500nm', 'S2.500nm',
+      'S0.600nm', 'S1.600nm', 'S2.600nm', 'S3.600nm'
+    ];
+    const options = getSpectralRgbDisplayOptions(channelNames);
+
+    expect(options.map((option) => option.label)).toEqual([
+      'S0 Spectral RGB',
+      'S1 Spectral RGB',
+      'S2 Spectral RGB'
+    ]);
+    expect(isSpectralRgbDisplayAvailable(channelNames, createSpectralRgbSelection('S3'))).toBe(false);
+    expect(hasCompleteSpectralStokesS3(channelNames)).toBe(false);
   });
 
   it('resolves channels for a selected spectral RGB series', () => {

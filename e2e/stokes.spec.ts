@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { gotoViewerApp } from './helpers/app';
-import { buildRgbStokesExr, buildScalarStokesExr, expectedColormapLabels } from './helpers/exr-fixtures';
+import {
+  buildLinearScalarStokesExr,
+  buildRgbStokesExr,
+  buildScalarStokesExr,
+  expectedColormapLabels
+} from './helpers/exr-fixtures';
 import {
   flushAllIdleCallbacks,
   getPendingIdleCallbackCount,
@@ -165,6 +170,45 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-0.4, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(0.6, 8);
+});
+
+test('loads linear-only scalar Stokes channels without S3-derived options', async ({ page }) => {
+  await gotoViewerApp(page);
+
+  const openedImages = page.locator('#opened-images-select');
+  await page.setInputFiles('#file-input', {
+    name: 'stokes_linear_scalar.exr',
+    mimeType: 'image/exr',
+    buffer: buildLinearScalarStokesExr()
+  });
+  await expect(openedImages.locator('option:checked')).toContainText('stokes_linear_scalar.exr', { timeout: 30000 });
+
+  const channelSelect = page.locator('#rgb-group-select');
+  const stokesDegreeModulationButton = page.locator('#stokes-degree-modulation-button');
+  const stokesAolpModeControl = page.locator('#stokes-aolp-modulation-mode-control');
+  const colormapSelect = page.locator('#colormap-select');
+  const colormapVminInput = page.locator('#colormap-vmin-input');
+  const colormapVmaxInput = page.locator('#colormap-vmax-input');
+  const blackRedId = String(expectedColormapLabels.indexOf('Black-Red'));
+
+  expect(blackRedId).not.toBe('-1');
+  await expect(channelSelect).toBeEnabled();
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes S1\/S0$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes S2\/S0$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes AoLP$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes DoP$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes DoLP$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes S3\/S0$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes DoCP$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes CoP$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^Stokes ToP$/ })).toHaveCount(0);
+
+  await channelSelect.selectOption({ label: 'Stokes DoP' });
+  await expect(stokesDegreeModulationButton).toBeHidden();
+  await expect(stokesAolpModeControl).toBeHidden();
+  await expect(colormapSelect).toHaveValue(blackRedId);
+  await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(0, 8);
+  await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(1, 8);
 });
 
 test('loads RGB Stokes channels and applies grouped and split derived defaults', async ({ page }) => {

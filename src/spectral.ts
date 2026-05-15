@@ -26,7 +26,7 @@ export interface SpectralStokesChannelGroup {
   s0: string;
   s1: string;
   s2: string;
-  s3: string;
+  s3: string | null;
 }
 
 export interface SpectralRgbDisplayOption {
@@ -163,6 +163,10 @@ export function detectSpectralChannelsForSeries(
   channelNames: string[],
   seriesKey: string
 ): SpectralChannel[] {
+  if (shouldHideIncompleteSpectralStokesS3Series(channelNames, seriesKey)) {
+    return [];
+  }
+
   const series = buildSpectralSeriesCandidates(parseIndexedSpectralChannels(channelNames))
     .find((candidate) => candidate.key === seriesKey);
   if (!series || countUniqueSpectralWavelengths(series.channels) < MIN_SPECTRAL_CHANNEL_COUNT) {
@@ -180,7 +184,9 @@ export function detectSpectralChannelsForSeries(
 }
 
 export function detectSpectralRgbChannelSeries(channelNames: string[]): SpectralChannel[][] {
+  const hideIncompleteS3 = shouldHideIncompleteSpectralStokesS3Series(channelNames, 'S3');
   return buildSpectralSeriesCandidates(parseIndexedSpectralChannels(channelNames))
+    .filter((candidate) => !(hideIncompleteS3 && candidate.key === 'S3'))
     .filter((candidate) => countUniqueSpectralWavelengths(candidate.channels) >= MIN_SPECTRAL_CHANNEL_COUNT)
     .sort(compareSpectralSeriesCandidates)
     .map((candidate) => candidate.channels
@@ -279,7 +285,8 @@ export function shouldReadSpectralRgbSeriesSigned(
 ): boolean {
   return (
     SIGNED_STOKES_SPECTRAL_RGB_SERIES.has(seriesKey) &&
-    isSpectralStokesRgbDisplayAvailable(channelNames)
+    isSpectralStokesRgbDisplayAvailable(channelNames) &&
+    !shouldHideIncompleteSpectralStokesS3Series(channelNames, seriesKey)
   );
 }
 
@@ -355,16 +362,31 @@ export function isSpectralStokesRgbDisplayAvailable(channelNames: string[]): boo
   return detectSpectralStokesChannelGroups(channelNames).length >= MIN_SPECTRAL_CHANNEL_COUNT;
 }
 
+export function hasCompleteSpectralStokesS3(channelNames: string[]): boolean {
+  const groups = detectSpectralStokesChannelGroups(channelNames);
+  return groups.length >= MIN_SPECTRAL_CHANNEL_COUNT && groups.every((group) => group.s3 !== null);
+}
+
 export function buildSpectralStokesComponentChannels(
   groups: readonly SpectralStokesChannelGroup[],
   component: SpectralStokesComponent
 ): SpectralChannel[] {
-  return groups.map((group) => ({
-    channelName: getSpectralStokesComponentChannelName(group, component),
-    wavelength: group.wavelength,
-    seriesKey: component,
-    seriesLabel: component
-  }));
+  const channels: SpectralChannel[] = [];
+  for (const group of groups) {
+    const channelName = getSpectralStokesComponentChannelName(group, component);
+    if (!channelName) {
+      continue;
+    }
+
+    channels.push({
+      channelName,
+      wavelength: group.wavelength,
+      seriesKey: component,
+      seriesLabel: component
+    });
+  }
+
+  return channels;
 }
 
 export function buildSpectralStokesChannels(
@@ -402,7 +424,7 @@ export function buildSpectralStokesPlotPoints(
         sample.values[group.s0],
         sample.values[group.s1],
         sample.values[group.s2],
-        sample.values[group.s3]
+        group.s3 ? sample.values[group.s3] : 0
       );
       return Number.isFinite(intensity)
         ? { ...channel, intensity }
@@ -454,7 +476,7 @@ function isSpectralStokesComponent(value: string): value is SpectralStokesCompon
 function getSpectralStokesComponentChannelName(
   group: SpectralStokesChannelGroup,
   component: SpectralStokesComponent
-): string {
+): string | null {
   switch (component) {
     case 'S0':
       return group.s0;
@@ -473,8 +495,7 @@ function buildSpectralStokesChannelGroup(
   const s0 = candidate.channels.S0;
   const s1 = candidate.channels.S1;
   const s2 = candidate.channels.S2;
-  const s3 = candidate.channels.S3;
-  if (!s0 || !s1 || !s2 || !s3) {
+  if (!s0 || !s1 || !s2) {
     return null;
   }
 
@@ -484,8 +505,16 @@ function buildSpectralStokesChannelGroup(
     s0,
     s1,
     s2,
-    s3
+    s3: candidate.channels.S3 ?? null
   };
+}
+
+function shouldHideIncompleteSpectralStokesS3Series(channelNames: string[], seriesKey: string): boolean {
+  return (
+    seriesKey === 'S3' &&
+    isSpectralStokesRgbDisplayAvailable(channelNames) &&
+    !hasCompleteSpectralStokesS3(channelNames)
+  );
 }
 
 function buildSpectralSeriesCandidates(channels: IndexedSpectralChannel[]): SpectralSeriesCandidate[] {

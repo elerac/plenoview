@@ -13,6 +13,7 @@ import {
 import {
   buildSpectralStokesRgbSourceName,
   buildSpectralRgbSourceName,
+  hasCompleteSpectralStokesS3,
   isSpectralStokesRgbDisplayAvailable,
   isSpectralRgbDisplayAvailable
 } from '../spectral';
@@ -144,7 +145,8 @@ function buildStokesDisplaySourceBinding(
     return isSpectralStokesRgbDisplayAvailable(layer.channelNames)
       ? createSpectralStokesRgbBinding(
           selection.parameter,
-          visualizationMode === 'colormap' ? 'stokesSpectralRgbLuminance' : 'stokesSpectralRgb'
+          visualizationMode === 'colormap' ? 'stokesSpectralRgbLuminance' : 'stokesSpectralRgb',
+          hasCompleteSpectralStokesS3(layer.channelNames)
         )
       : createEmptyDisplaySourceBinding();
   }
@@ -201,7 +203,8 @@ function createRgbStokesBinding(
 
 function createSpectralStokesRgbBinding(
   parameter: StokesParameter,
-  mode: 'stokesSpectralRgb' | 'stokesSpectralRgbLuminance'
+  mode: 'stokesSpectralRgb' | 'stokesSpectralRgbLuminance',
+  hasS3: boolean
 ): DisplaySourceBinding {
   return createDisplaySourceBinding(
     mode,
@@ -209,7 +212,7 @@ function createSpectralStokesRgbBinding(
       buildSpectralStokesRgbSourceName('S0'),
       buildSpectralStokesRgbSourceName('S1'),
       buildSpectralStokesRgbSourceName('S2'),
-      buildSpectralStokesRgbSourceName('S3')
+      hasS3 ? buildSpectralStokesRgbSourceName('S3') : null
     ],
     false,
     parameter

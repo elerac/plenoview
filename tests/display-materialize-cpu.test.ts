@@ -80,6 +80,23 @@ describe('display CPU materialization', () => {
     expect(texture[12]).toBe(0);
   });
 
+  it('builds linear-only Stokes DoP with missing S3 treated as zero', () => {
+    const layer = createLayerFromChannels({
+      S0: [2],
+      S1: [1],
+      S2: [Math.sqrt(3)]
+    }, 'linear-stokes');
+
+    const texture = buildSelectedDisplayTexture(layer, 1, 1, createStokesSelection('dop'));
+    const sample = samplePixelValuesForDisplay(layer, 1, 1, { ix: 0, iy: 0 }, createStokesSelection('dop'));
+
+    expect(texture[0]).toBeCloseTo(1, 6);
+    expect(texture[1]).toBeCloseTo(1, 6);
+    expect(texture[2]).toBeCloseTo(1, 6);
+    expect(texture[3]).toBe(1);
+    expect(sample?.values.DoP).toBeCloseTo(1, 6);
+  });
+
   it('builds suffixed scalar Stokes display textures', () => {
     const layer = createLayerFromChannels({
       'S0.500nm': [2],

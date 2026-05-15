@@ -254,6 +254,29 @@ export function buildScalarStokesExr(): Buffer {
   }
 }
 
+export function buildLinearScalarStokesExr(): Buffer {
+  ensureExrEncoderInitialized();
+
+  const encoder = new ExrEncoder(2, 2);
+  try {
+    encoder.addLayer(
+      null,
+      ['S0', 'S1', 'S2'],
+      new Float32Array([
+        1, 1, 0,
+        1, 0, 1,
+        1, -1, 0,
+        1, 0, -1
+      ]),
+      SamplePrecision.F32,
+      CompressionMethod.None
+    );
+    return Buffer.from(encoder.encode());
+  } finally {
+    encoder.free();
+  }
+}
+
 export function buildLandscapeRgbExr(): Buffer {
   ensureExrEncoderInitialized();
 

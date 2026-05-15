@@ -114,4 +114,56 @@ describe('display bindings', () => {
     expect(spectralStokesColormapBinding.mode).toBe('stokesSpectralRgbLuminance');
     expect(spectralStokesColormapBinding.slots).toEqual(spectralStokesBinding.slots);
   });
+
+  it('binds missing S3 as a zero slot for linear-only Stokes selections', () => {
+    const scalarLayer = createLayerFromChannels({
+      S0: [2],
+      S1: [1],
+      S2: [Math.sqrt(3)]
+    });
+    const rgbLayer = createLayerFromChannels({
+      'S0.R': [2],
+      'S0.G': [2],
+      'S0.B': [2],
+      'S1.R': [1],
+      'S1.G': [1],
+      'S1.B': [1],
+      'S2.R': [Math.sqrt(3)],
+      'S2.G': [Math.sqrt(3)],
+      'S2.B': [Math.sqrt(3)]
+    });
+    const spectralLayer = createLayerFromChannels({
+      'S0.400nm': [2],
+      'S1.400nm': [1],
+      'S2.400nm': [Math.sqrt(3)],
+      'S0.500nm': [2],
+      'S1.500nm': [1],
+      'S2.500nm': [Math.sqrt(3)]
+    });
+
+    const scalarBinding = buildDisplaySourceBinding(scalarLayer, createStokesSelection('dop'));
+    const scalarHiddenBinding = buildDisplaySourceBinding(scalarLayer, createStokesSelection('docp'));
+    const rgbBinding = buildDisplaySourceBinding(rgbLayer, createStokesSelection('dop', 'stokesRgb'));
+    const spectralBinding = buildDisplaySourceBinding(
+      spectralLayer,
+      createStokesSelection('dop', 'stokesSpectralRgb')
+    );
+
+    expect(scalarBinding.mode).toBe('stokesDirect');
+    expect(scalarBinding.slots.slice(0, 4)).toEqual(['S0', 'S1', 'S2', null]);
+    expect(scalarHiddenBinding.mode).toBe('empty');
+    expect(rgbBinding.mode).toBe('stokesRgb');
+    expect(rgbBinding.slots).toEqual([
+      'S0.R', 'S1.R', 'S2.R', null,
+      'S0.G', 'S1.G', 'S2.G', null,
+      'S0.B', 'S1.B', 'S2.B', null
+    ]);
+    expect(spectralBinding.mode).toBe('stokesSpectralRgb');
+    expect(spectralBinding.slots.slice(0, 4)).toEqual([
+      '__spectralStokesRgb:S0',
+      '__spectralStokesRgb:S1',
+      '__spectralStokesRgb:S2',
+      null
+    ]);
+  });
 });
