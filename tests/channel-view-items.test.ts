@@ -58,12 +58,32 @@ describe('channel view items', () => {
     expect(findSelectedChannelViewItem(items, createChannelMonoSelection('depth.Z'))?.value).toBe('channel:depth.Z');
   });
 
-  it('includes spectral RGB descriptors in merged and split channel lists', () => {
+  it('splits spectral RGB descriptors into wavelength channels', () => {
     const items = buildChannelViewItems(['410nm', '500nm', '650nm']);
 
-    expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toContain('spectralRgb:');
-    expect(selectVisibleChannelViewItems(items, true).map((item) => item.value)).toContain('spectralRgb:');
+    expect(hasSplitChannelViewItems(items)).toBe(true);
+    expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual(['spectralRgb:']);
+    expect(selectVisibleChannelViewItems(items, true).map((item) => item.value)).toEqual([
+      'channel:410nm',
+      'channel:500nm',
+      'channel:650nm'
+    ]);
     expect(findSelectedChannelViewItem(items, createSpectralRgbSelection())?.label).toBe('Spectral RGB');
+  });
+
+  it('keeps auxiliary channels visible while splitting valid spectral series', () => {
+    const items = buildChannelViewItems(['410nm', '500nm', '650nm', 'mask']);
+
+    expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual([
+      'channel:mask',
+      'spectralRgb:'
+    ]);
+    expect(selectVisibleChannelViewItems(items, true).map((item) => item.value)).toEqual([
+      'channel:410nm',
+      'channel:500nm',
+      'channel:650nm',
+      'channel:mask'
+    ]);
   });
 
   it('includes signed spectral Stokes RGB descriptors alongside derived Stokes spectral RGB descriptors', () => {
@@ -71,13 +91,18 @@ describe('channel view items', () => {
       'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
       'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
     ]);
-    const visible = selectVisibleChannelViewItems(items, false);
+    const mergedVisible = selectVisibleChannelViewItems(items, false);
+    const splitVisible = selectVisibleChannelViewItems(items, true);
 
-    expect(visible.map((item) => item.label)).toContain('S0 Spectral RGB');
-    expect(visible.map((item) => item.label)).toContain('S1 Spectral RGB');
-    expect(visible.map((item) => item.label)).toContain('S2 Spectral RGB');
-    expect(visible.map((item) => item.label)).toContain('S3 Spectral RGB');
-    expect(visible.map((item) => item.label)).toContain('S1/S0 Spectral RGB');
+    expect(mergedVisible.map((item) => item.label)).toContain('S0 Spectral RGB');
+    expect(mergedVisible.map((item) => item.label)).toContain('S1 Spectral RGB');
+    expect(mergedVisible.map((item) => item.label)).toContain('S2 Spectral RGB');
+    expect(mergedVisible.map((item) => item.label)).toContain('S3 Spectral RGB');
+    expect(mergedVisible.map((item) => item.label)).toContain('S1/S0 Spectral RGB');
+    expect(mergedVisible.map((item) => item.label)).not.toContain('S1/S0.400nm');
+    expect(splitVisible.map((item) => item.label)).toContain('S1/S0.400nm');
+    expect(splitVisible.map((item) => item.label)).toContain('AoLP.500nm');
+    expect(splitVisible.map((item) => item.label)).not.toContain('S1/S0 Spectral RGB');
     expect(findSelectedChannelViewItem(items, createStokesSelection('s1_over_s0', 'stokesSpectralRgb'))?.value)
       .toBe('stokesSpectralRgb:s1_over_s0:group');
   });

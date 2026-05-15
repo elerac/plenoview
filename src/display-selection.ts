@@ -1,11 +1,19 @@
 import {
   buildRgbStokesLuminanceSelection,
   buildRgbStokesSplitSelection,
+  buildScalarStokesSelection,
+  buildSpectralStokesRgbSelection,
   detectRgbStokesChannels,
   isStokesDisplayAvailable
 } from './stokes';
 import {
+  buildSpectralRgbSelection,
+  detectSpectralStokesChannelGroups,
+  findFirstSpectralRgbSplitChannel,
+  findSpectralRgbSeriesKeyForChannel,
   isSpectralRgbDisplayAvailable,
+  isSpectralStokesRgbDisplayAvailable,
+  isSpectralStokesSuffix,
   pickDefaultSpectralRgbSelection
 } from './spectral';
 import {
@@ -255,9 +263,19 @@ export function findMergedSelectionForSplitDisplay(
     return null;
   }
 
+  const spectralSelection = findMergedSelectionForSplitSpectralChannel(channelNames, selected);
+  if (spectralSelection) {
+    return spectralSelection;
+  }
+
   const channelSelection = findMergedSelectionForSplitChannel(channelNames, selected);
   if (channelSelection) {
     return channelSelection;
+  }
+
+  const spectralStokesSelection = findMergedSelectionForSplitSpectralStokes(channelNames, selected);
+  if (spectralStokesSelection) {
+    return spectralStokesSelection;
   }
 
   if (!isStokesSelection(selected) || selected.source.kind !== 'rgbComponent') {
@@ -280,6 +298,16 @@ export function findSplitSelectionForMergedDisplay(
   const channelSelection = findSplitSelectionForMergedGroup(channelNames, selected);
   if (channelSelection) {
     return channelSelection;
+  }
+
+  const spectralSelection = findSplitSelectionForMergedSpectralRgb(channelNames, selected);
+  if (spectralSelection) {
+    return spectralSelection;
+  }
+
+  const spectralStokesSelection = findSplitSelectionForMergedSpectralStokes(channelNames, selected);
+  if (spectralStokesSelection) {
+    return spectralStokesSelection;
   }
 
   if (!isStokesSelection(selected) || selected.source.kind !== 'rgbLuminance') {
@@ -360,6 +388,35 @@ function findMergedSelectionForSplitChannel(
     : null;
 }
 
+function findMergedSelectionForSplitSpectralChannel(
+  channelNames: string[],
+  selected: DisplaySelection
+): DisplaySelection | null {
+  if (!isChannelSelection(selected) || selected.kind !== 'channelMono') {
+    return null;
+  }
+
+  const seriesKey = findSpectralRgbSeriesKeyForChannel(channelNames, selected.channel);
+  return seriesKey === null ? null : buildSpectralRgbSelection(seriesKey);
+}
+
+function findMergedSelectionForSplitSpectralStokes(
+  channelNames: string[],
+  selected: DisplaySelection
+): DisplaySelection | null {
+  if (
+    !isStokesSelection(selected) ||
+    selected.source.kind !== 'scalar' ||
+    !selected.source.suffix ||
+    !isSpectralStokesSuffix(selected.source.suffix) ||
+    !isSpectralStokesRgbDisplayAvailable(channelNames)
+  ) {
+    return null;
+  }
+
+  return buildSpectralStokesRgbSelection(selected.parameter);
+}
+
 function findSplitSelectionForMergedGroup(
   channelNames: string[],
   selected: DisplaySelection
@@ -393,6 +450,40 @@ function findSplitSelectionForMergedGroup(
   }
 
   return null;
+}
+
+function findSplitSelectionForMergedSpectralRgb(
+  channelNames: string[],
+  selected: DisplaySelection
+): DisplaySelection | null {
+  if (!isSpectralRgbSelection(selected)) {
+    return null;
+  }
+
+  const channel = findFirstSpectralRgbSplitChannel(channelNames, selected.seriesKey);
+  return channel
+    ? {
+        kind: 'channelMono',
+        channel,
+        alpha: null
+      }
+    : null;
+}
+
+function findSplitSelectionForMergedSpectralStokes(
+  channelNames: string[],
+  selected: DisplaySelection
+): DisplaySelection | null {
+  if (
+    !isStokesSelection(selected) ||
+    selected.source.kind !== 'spectralRgb' ||
+    !isSpectralStokesRgbDisplayAvailable(channelNames)
+  ) {
+    return null;
+  }
+
+  const suffix = detectSpectralStokesChannelGroups(channelNames)[0]?.suffix ?? null;
+  return suffix ? buildScalarStokesSelection(selected.parameter, suffix) : null;
 }
 
 function buildChannelRgbSelection(group: RgbChannelGroup): ChannelRgbSelection {

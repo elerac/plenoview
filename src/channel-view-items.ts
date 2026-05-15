@@ -1,7 +1,7 @@
 import { cloneDisplaySelection, sameDisplaySelection, serializeDisplaySelectionKey, type DisplaySelection } from './display-model';
 import { buildChannelDisplayOptions } from './display-selection';
 import { getStokesDisplayOptions } from './stokes';
-import { getSpectralRgbDisplayOptions } from './spectral';
+import { getSpectralRgbDisplayOptions, getSpectralRgbSplitChannelNames } from './spectral';
 import type { DisplayChannelMapping } from './types';
 
 export interface ChannelViewItem {
@@ -112,15 +112,22 @@ export function getChannelViewSwatches(mapping: DisplayChannelMapping): string[]
 }
 
 function buildDisplayItems(channelNames: string[], includeSplitRgbChannels: boolean): Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>[] {
+  const spectralSplitChannelNames = includeSplitRgbChannels
+    ? null
+    : getSpectralRgbSplitChannelNames(channelNames);
   const channelOptions = buildChannelDisplayOptions(channelNames, {
     includeRgbGroups: !includeSplitRgbChannels,
     includeSplitChannels: includeSplitRgbChannels
-  });
+  }).filter((option) => (
+    includeSplitRgbChannels ||
+    option.selection.kind !== 'channelMono' ||
+    !spectralSplitChannelNames?.has(option.selection.channel)
+  ));
   const stokesOptions = getStokesDisplayOptions(channelNames, {
     includeRgbGroups: !includeSplitRgbChannels,
     includeSplitChannels: includeSplitRgbChannels
   });
-  const spectralOptions = getSpectralRgbDisplayOptions(channelNames);
+  const spectralOptions = includeSplitRgbChannels ? [] : getSpectralRgbDisplayOptions(channelNames);
   return [...channelOptions, ...spectralOptions, ...stokesOptions].map((option) => ({
     value: option.key,
     label: formatChannelViewLabel(option.label),

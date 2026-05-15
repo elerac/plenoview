@@ -316,8 +316,18 @@ export function getStokesDisplayOptions(
   const options: StokesDisplayOption[] = [];
   const includeRgbGroups = config.includeRgbGroups ?? true;
   const includeSplitChannels = config.includeSplitChannels ?? false;
+  const hasSpectralStokesRgbOptions = isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames);
   const scalarChannelSets = detectScalarStokesChannelSets(channelNames);
   for (const scalarChannels of scalarChannelSets) {
+    const isSplitSpectralStokesSet = Boolean(
+      scalarChannels.suffix &&
+      hasSpectralStokesRgbOptions &&
+      isSpectralStokesSuffixValue(scalarChannels.suffix)
+    );
+    if (isSplitSpectralStokesSet && !includeSplitChannels) {
+      continue;
+    }
+
     for (const parameter of STOKES_PARAMETER_ORDER) {
       options.push(buildScalarStokesDisplayOption(parameter, scalarChannels));
     }
@@ -340,7 +350,7 @@ export function getStokesDisplayOptions(
     }
   }
 
-  if (isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames)) {
+  if (hasSpectralStokesRgbOptions && includeRgbGroups) {
     for (const parameter of STOKES_PARAMETER_ORDER) {
       options.push(buildSpectralStokesRgbDisplayOption(parameter));
     }
@@ -708,4 +718,8 @@ function isSpectralStokesRgbDisplayAvailableForChannelNames(channelNames: string
   }
 
   return completeWavelengthCount >= 2;
+}
+
+function isSpectralStokesSuffixValue(value: string | null | undefined): boolean {
+  return Boolean(value && /^\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?nm$/i.test(value));
 }

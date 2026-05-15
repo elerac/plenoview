@@ -188,6 +188,43 @@ describe('display selection', () => {
     expect(findMergedSelectionForSplitDisplay(rgbStokesNames, split)).toEqual(grouped);
   });
 
+  it('remaps grouped and split spectral Stokes selections when toggling split mode', () => {
+    const spectralStokesNames = [
+      'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
+      'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
+    ];
+    const grouped = createStokesSelection('aolp', 'stokesSpectralRgb');
+    const split = findSplitSelectionForMergedDisplay(spectralStokesNames, grouped);
+
+    expect(split).toEqual(createStokesSelection('aolp', 'stokesScalar', null, '400nm'));
+    expect(findMergedSelectionForSplitDisplay(spectralStokesNames, split)).toEqual(grouped);
+  });
+
+  it('remaps spectral RGB selections when toggling split mode', () => {
+    const channelNames = ['410nm', '500nm', '650nm'];
+    const grouped = createSpectralRgbSelection();
+    const split = findSplitSelectionForMergedDisplay(channelNames, grouped);
+
+    expect(split).toEqual(createChannelMonoSelection('410nm'));
+    expect(findMergedSelectionForSplitDisplay(channelNames, split)).toEqual(grouped);
+  });
+
+  it('remaps split spectral channels to the matching named spectral RGB series', () => {
+    const channelNames = [
+      'hoge.650nm',
+      'fuga.450nm',
+      'hoge.450nm',
+      'fuga.650nm'
+    ];
+
+    expect(findSplitSelectionForMergedDisplay(channelNames, createSpectralRgbSelection('fuga'))).toEqual(
+      createChannelMonoSelection('fuga.450nm')
+    );
+    expect(findMergedSelectionForSplitDisplay(channelNames, createChannelMonoSelection('hoge.650nm'))).toEqual(
+      createSpectralRgbSelection('hoge')
+    );
+  });
+
   it('prefers detected RGB group as default display selection', () => {
     expect(pickDefaultDisplaySelection(['AOV.X', 'HOGE.B', 'HOGE.R', 'HOGE.G'])).toEqual(
       createChannelRgbSelection('HOGE.R', 'HOGE.G', 'HOGE.B')
@@ -200,12 +237,12 @@ describe('display selection', () => {
     expect(pickDefaultDisplaySelection(['A', 'Z'])).toEqual(createChannelMonoSelection('Z', 'A'));
   });
 
-  it('uses spectral RGB as the default only for spectral-only layers without RGB groups', () => {
+  it('uses spectral RGB as the default when no RGB groups are available', () => {
     expect(pickDefaultDisplaySelection(['400nm', '500nm', '600nm', '700nm'])).toEqual(
       createSpectralRgbSelection()
     );
     expect(pickDefaultDisplaySelection(['400nm', '500nm', 'mask'])).toEqual(
-      createChannelMonoSelection('400nm')
+      createSpectralRgbSelection()
     );
     expect(pickDefaultDisplaySelection(['R', 'G', 'B', '400nm', '500nm'])).toEqual(
       createChannelRgbSelection('R', 'G', 'B')

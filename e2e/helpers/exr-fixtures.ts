@@ -67,6 +67,32 @@ export function buildSpectralExr(): Buffer {
   }
 }
 
+export function buildSpectralStokesExr(): Buffer {
+  ensureExrEncoderInitialized();
+
+  const encoder = new ExrEncoder(2, 2);
+  try {
+    encoder.addLayer(
+      null,
+      [
+        'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
+        'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
+      ],
+      new Float32Array([
+        2, -1, 0, 0, 4, 1, 0, 0,
+        2, -1, 0, 0, 4, 1, 0, 0,
+        2, -1, 0, 0, 4, 1, 0, 0,
+        2, -1, 0, 0, 4, 1, 0, 0
+      ]),
+      SamplePrecision.F32,
+      CompressionMethod.None
+    );
+    return Buffer.from(encoder.encode());
+  } finally {
+    encoder.free();
+  }
+}
+
 export function buildDuplicateWavelengthSpectralExr(): Buffer {
   ensureExrEncoderInitialized();
 

@@ -7867,6 +7867,110 @@ describe('channel thumbnail strip', () => {
     expect(document.querySelectorAll('#channel-thumbnail-strip .channel-thumbnail-image')).toHaveLength(2);
   });
 
+  it('uses Split RGB to switch spectral RGB thumbnails to wavelength channels', () => {
+    installUiFixture();
+    mockDesktopLayoutGeometry();
+
+    const onRgbGroupChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onRgbGroupChange }));
+    const channelNames = ['410nm', '500nm', '650nm'];
+    const splitToggle = document.getElementById('rgb-split-toggle-button') as HTMLButtonElement;
+    const channelSelect = document.getElementById('rgb-group-select') as HTMLSelectElement;
+    const channelThumbnailItems = buildChannelViewItems(channelNames).map((item) => ({
+      ...item,
+      thumbnailDataUrl: null
+    }));
+
+    ui.setRgbGroupOptions(channelNames, {
+      kind: 'spectralRgb',
+      seriesKey: ''
+    }, channelThumbnailItems);
+
+    expect(splitToggle.classList.contains('hidden')).toBe(false);
+    expect(splitToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).toEqual(['Spectral RGB']);
+    expect(document.querySelectorAll('#channel-thumbnail-strip .channel-thumbnail-tile')).toHaveLength(1);
+
+    splitToggle.click();
+
+    expect(splitToggle.getAttribute('aria-pressed')).toBe('true');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).toEqual([
+      '410nm',
+      '500nm',
+      '650nm'
+    ]);
+    expect(channelSelect.value).toBe('channel:410nm');
+    expect(document.querySelectorAll('#channel-thumbnail-strip .channel-thumbnail-tile')).toHaveLength(3);
+    expect(onRgbGroupChange).toHaveBeenLastCalledWith({
+      kind: 'channelMono',
+      channel: '410nm',
+      alpha: null
+    });
+
+    splitToggle.click();
+
+    expect(splitToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).toEqual(['Spectral RGB']);
+    expect(channelSelect.value).toBe('spectralRgb:');
+    expect(document.querySelectorAll('#channel-thumbnail-strip .channel-thumbnail-tile')).toHaveLength(1);
+    expect(onRgbGroupChange).toHaveBeenLastCalledWith({
+      kind: 'spectralRgb',
+      seriesKey: ''
+    });
+  });
+
+  it('uses Split RGB to switch spectral Stokes RGB thumbnails to wavelength Stokes parameters', () => {
+    installUiFixture();
+    mockDesktopLayoutGeometry();
+
+    const onRgbGroupChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onRgbGroupChange }));
+    const channelNames = [
+      'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
+      'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
+    ];
+    const splitToggle = document.getElementById('rgb-split-toggle-button') as HTMLButtonElement;
+    const channelSelect = document.getElementById('rgb-group-select') as HTMLSelectElement;
+    const channelThumbnailItems = buildChannelViewItems(channelNames).map((item) => ({
+      ...item,
+      thumbnailDataUrl: null
+    }));
+
+    ui.setRgbGroupOptions(channelNames, {
+      kind: 'stokesScalar',
+      parameter: 's1_over_s0',
+      source: { kind: 'spectralRgb' }
+    }, channelThumbnailItems);
+
+    expect(splitToggle.classList.contains('hidden')).toBe(false);
+    expect(splitToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).toContain('S1/S0 Spectral RGB');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).not.toContain('S1/S0.400nm');
+    expect(channelSelect.value).toBe('stokesSpectralRgb:s1_over_s0:group');
+
+    splitToggle.click();
+
+    expect(splitToggle.getAttribute('aria-pressed')).toBe('true');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).toContain('S1/S0.400nm');
+    expect(Array.from(channelSelect.options).map((option) => option.textContent)).not.toContain('S1/S0 Spectral RGB');
+    expect(channelSelect.value).toBe('stokesScalar:s1_over_s0:400nm');
+    expect(onRgbGroupChange).toHaveBeenLastCalledWith({
+      kind: 'stokesScalar',
+      parameter: 's1_over_s0',
+      source: { kind: 'scalar', suffix: '400nm' }
+    });
+
+    splitToggle.click();
+
+    expect(splitToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(channelSelect.value).toBe('stokesSpectralRgb:s1_over_s0:group');
+    expect(onRgbGroupChange).toHaveBeenLastCalledWith({
+      kind: 'stokesScalar',
+      parameter: 's1_over_s0',
+      source: { kind: 'spectralRgb' }
+    });
+  });
+
   it('selects a bottom thumbnail when it is dropped on the image viewer', () => {
     installUiFixture();
     mockDesktopLayoutGeometry();

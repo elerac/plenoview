@@ -1,7 +1,6 @@
 import {
   getDisplaySelectionOptionLabel,
   getStokesParameterLabel,
-  isAlphaChannel,
   isSpectralRgbSelection,
   type DisplaySelection,
   type SpectralRgbSelection,
@@ -237,6 +236,43 @@ export function isSpectralRgbDisplayAvailable(
   return detectSpectralChannelsForSeries(channelNames, selection.seriesKey).length >= MIN_SPECTRAL_CHANNEL_COUNT;
 }
 
+export function isSpectralRgbSplitChannel(channelNames: string[], channelName: string): boolean {
+  return getSpectralRgbSplitChannelNames(channelNames).has(channelName);
+}
+
+export function getSpectralRgbSplitChannelNames(channelNames: string[]): Set<string> {
+  const splitChannelNames = new Set<string>();
+  for (const channels of detectSpectralRgbChannelSeries(channelNames)) {
+    for (const channel of channels) {
+      splitChannelNames.add(channel.channelName);
+    }
+  }
+
+  return splitChannelNames;
+}
+
+export function findFirstSpectralRgbSplitChannel(
+  channelNames: string[],
+  seriesKey: string
+): string | null {
+  return detectSpectralChannelsForSeries(channelNames, seriesKey)[0]?.channelName ?? null;
+}
+
+export function findSpectralRgbSeriesKeyForChannel(
+  channelNames: string[],
+  channelName: string
+): string | null {
+  const parsed = parseSpectralChannel(channelName);
+  if (!parsed) {
+    return null;
+  }
+
+  const series = detectSpectralChannelsForSeries(channelNames, parsed.seriesKey);
+  return series.some((channel) => channel.channelName === channelName)
+    ? parsed.seriesKey
+    : null;
+}
+
 export function shouldReadSpectralRgbSeriesSigned(
   channelNames: string[],
   seriesKey: string
@@ -248,10 +284,6 @@ export function shouldReadSpectralRgbSeriesSigned(
 }
 
 export function pickDefaultSpectralRgbSelection(channelNames: string[]): SpectralRgbSelection | null {
-  if (!isSpectralOnlyLayer(channelNames)) {
-    return null;
-  }
-
   return getSpectralRgbDisplayOptions(channelNames)[0]?.selection ?? null;
 }
 
@@ -495,15 +527,6 @@ function countUniqueSpectralWavelengths(channels: readonly SpectralChannel[]): n
       .map((channel) => channel.wavelength)
       .filter((wavelength) => Number.isFinite(wavelength))
   ).size;
-}
-
-function isSpectralOnlyLayer(channelNames: string[]): boolean {
-  const nonAlphaChannels = channelNames.filter((channelName) => !isAlphaChannel(channelName));
-  return (
-    nonAlphaChannels.length > 0 &&
-    nonAlphaChannels.every((channelName) => parseSpectralChannel(channelName) !== null) &&
-    getSpectralRgbDisplayOptions(channelNames).length > 0
-  );
 }
 
 function buildSpectralRgbDisplayMapping(selection: SpectralRgbSelection): DisplayChannelMapping {

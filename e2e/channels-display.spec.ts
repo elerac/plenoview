@@ -9,7 +9,8 @@ import {
   buildRgbAuxExr,
   buildScalarAlphaExr,
   buildScalarChannelExr,
-  buildSpectralExr
+  buildSpectralExr,
+  buildSpectralStokesExr
 } from './helpers/exr-fixtures';
 import { dragBy, resolveViewerPoint, setExposureValue } from './helpers/viewer';
 
@@ -131,14 +132,15 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
 
   await expect(openedImages.locator('option:checked')).toContainText('spectral.exr', { timeout: 30000 });
   await expect(channelSelect).toBeEnabled();
-  await expect(rgbSplitToggleButton).toBeHidden();
+  await expect(rgbSplitToggleButton).toBeVisible();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'false');
   await expect(channelSelect.locator('option:checked')).toHaveText('Spectral RGB');
   await expect(channelSelect.locator('option').filter({ hasText: /^Spectral RGB$/ })).toHaveCount(1);
   await expect(channelSelect.locator('option').filter({ hasText: /^400nm,500nm,600nm$/ })).toHaveCount(0);
-  await expect(channelSelect.locator('option').filter({ hasText: /^400nm$/ })).toHaveCount(1);
-  await expect(channelSelect.locator('option').filter({ hasText: /^500nm$/ })).toHaveCount(1);
-  await expect(channelSelect.locator('option').filter({ hasText: /^600nm$/ })).toHaveCount(1);
-  await expect(channelSelect.locator('option').filter({ hasText: /^700nm$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^400nm$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^500nm$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^600nm$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^700nm$/ })).toHaveCount(0);
   await expect(spectralPanel).toBeVisible();
   await expect(page.locator('#spectral-empty-state')).toHaveText('');
   await expect(spectralPlot).toBeVisible();
@@ -146,6 +148,15 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await viewer.hover();
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['R:', 'G:', 'B:']);
   await expect(spectralPlot.locator('.spectral-point')).toHaveCount(4);
+
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(channelSelect.locator('option:checked')).toHaveText('400nm');
+  await expect(channelSelect.locator('option').filter({ hasText: /^Spectral RGB$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^400nm$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^500nm$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^600nm$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^700nm$/ })).toHaveCount(1);
 
   await channelSelect.selectOption({ label: '500nm' });
   await expect(channelSelect.locator('option:checked')).toHaveText('500nm');
@@ -176,6 +187,10 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   expect(Math.abs(resizedSpectralPlotMetrics.tickLabelHeight - initialSpectralPlotMetrics.tickLabelHeight))
     .toBeLessThan(1);
 
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(channelSelect.locator('option:checked')).toHaveText('Spectral RGB');
+
   await page.setInputFiles('#file-input', {
     name: 'duplicate_wavelength_spectral.exr',
     mimeType: 'image/exr',
@@ -188,6 +203,7 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await expect(channelSelect.locator('option:checked')).toHaveText(/^(fuga|hoge) Spectral RGB$/);
   await expect(channelSelect.locator('option').filter({ hasText: /^fuga Spectral RGB$/ })).toHaveCount(1);
   await expect(channelSelect.locator('option').filter({ hasText: /^hoge Spectral RGB$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^hoge\.414nm$/ })).toHaveCount(0);
   await expect(spectralPanel).toBeVisible();
   await viewer.hover();
   await expect(spectralPlot.locator('.spectral-point')).toHaveCount(2);
@@ -196,6 +212,12 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-channel', /^(fuga|hoge)\.453nm$/);
   await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-wavelength', '453');
 
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(channelSelect.locator('option').filter({ hasText: /^fuga Spectral RGB$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^hoge Spectral RGB$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^hoge\.414nm$/ })).toHaveCount(1);
+
   await channelSelect.selectOption({ label: 'hoge.414nm' });
   await expect(channelSelect.locator('option:checked')).toHaveText('hoge.414nm');
   await expect(spectralPlot.locator('.spectral-point')).toHaveCount(2);
@@ -203,6 +225,35 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await expect(spectralPlot.locator('.spectral-point').nth(0)).toHaveAttribute('data-wavelength', '414');
   await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-channel', 'hoge.453nm');
   await expect(spectralPlot.locator('.spectral-point').nth(1)).toHaveAttribute('data-wavelength', '453');
+
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'false');
+
+  await page.setInputFiles('#file-input', {
+    name: 'spectral_stokes.exr',
+    mimeType: 'image/exr',
+    buffer: buildSpectralStokesExr()
+  });
+
+  await expect(openedImages.locator('option:checked')).toContainText('spectral_stokes.exr', { timeout: 30000 });
+  await expect(rgbSplitToggleButton).toBeVisible();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(channelSelect.locator('option').filter({ hasText: /^S1\/S0 Spectral RGB$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^AoLP Spectral RGB$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^S1\/S0\.400nm$/ })).toHaveCount(0);
+  await channelSelect.selectOption({ label: 'S1/S0 Spectral RGB' });
+  await expect(channelSelect.locator('option:checked')).toHaveText('S1/S0 Spectral RGB');
+
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(channelSelect.locator('option').filter({ hasText: /^S1\/S0 Spectral RGB$/ })).toHaveCount(0);
+  await expect(channelSelect.locator('option').filter({ hasText: /^S1\/S0\.400nm$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option').filter({ hasText: /^AoLP\.500nm$/ })).toHaveCount(1);
+  await expect(channelSelect.locator('option:checked')).toHaveText('S1/S0.400nm');
+
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(channelSelect.locator('option:checked')).toHaveText('S1/S0 Spectral RGB');
 
   await page.setInputFiles('#file-input', {
     name: 'rgb_aux.exr',

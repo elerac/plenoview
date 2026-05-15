@@ -170,12 +170,15 @@ describe('stokes', () => {
   });
 
   it('exposes complete spectral Stokes sets as grouped spectral RGB Stokes options', () => {
-    const options = getStokesDisplayOptions([
+    const channelNames = [
       'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
       'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
-    ]);
+    ];
+    const options = getStokesDisplayOptions(channelNames);
     const spectralOptions = options.filter((option) => option.key.startsWith('stokesSpectralRgb:'));
 
+    expect(options.map((option) => option.label)).not.toContain('S1/S0.400nm');
+    expect(options.map((option) => option.label)).not.toContain('AoLP.500nm');
     expect(spectralOptions.map((option) => option.label)).toEqual([
       'S1/S0 Spectral RGB',
       'S2/S0 Spectral RGB',
@@ -194,6 +197,39 @@ describe('stokes', () => {
       displayB: 'S1/S0 Spectral RGB.B',
       displayA: null
     });
+
+    const splitOptions = getStokesDisplayOptions(channelNames, {
+      includeRgbGroups: false,
+      includeSplitChannels: true
+    });
+    expect(splitOptions.some((option) => option.key.startsWith('stokesSpectralRgb:'))).toBe(false);
+    expect(splitOptions.map((option) => option.label)).toEqual([
+      'S1/S0.400nm',
+      'S2/S0.400nm',
+      'S3/S0.400nm',
+      'AoLP.400nm',
+      'DoP.400nm',
+      'DoLP.400nm',
+      'DoCP.400nm',
+      'CoP.400nm',
+      'ToP.400nm',
+      'S1/S0.500nm',
+      'S2/S0.500nm',
+      'S3/S0.500nm',
+      'AoLP.500nm',
+      'DoP.500nm',
+      'DoLP.500nm',
+      'DoCP.500nm',
+      'CoP.500nm',
+      'ToP.500nm'
+    ]);
+
+    const mixedOptions = getStokesDisplayOptions([
+      ...channelNames,
+      'S0.Y', 'S1.Y', 'S2.Y', 'S3.Y'
+    ]);
+    expect(mixedOptions.map((option) => option.label)).toContain('S1/S0.Y');
+    expect(mixedOptions.map((option) => option.label)).not.toContain('S1/S0.400nm');
   });
 
   it('groups Stokes parameters by default colormap behavior', () => {
