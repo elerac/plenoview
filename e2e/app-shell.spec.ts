@@ -374,7 +374,6 @@ test('opens the gallery demo image and keeps core display controls stable', asyn
   const rgbSplitToggleButton = page.locator('#rgb-split-toggle-button');
   const probeCoords = page.locator('#probe-coords');
   const probeColorValues = page.locator('#probe-color-values');
-  const probeValues = page.locator('#probe-values');
   const metadataTable = page.locator('#metadata-table');
   const appMenuBar = page.locator('#app-menu-bar');
   const mainLayout = page.locator('#main-layout');
@@ -424,9 +423,7 @@ test('opens the gallery demo image and keeps core display controls stable', asyn
   await viewer.hover();
   await expect.poll(async () => await readProbeCoords(probeCoords)).not.toBeNull();
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['R:', 'G:', 'B:']);
-  await expect(probeValues).toContainText('R');
-  await expect(probeValues).toContainText('G');
-  await expect(probeValues).toContainText('B');
+  await expect(page.locator('#probe-values')).toHaveCount(0);
 
   const lockedProbePoint = await resolveViewerPoint(viewer, 0.5, 0.5);
   await page.mouse.click(lockedProbePoint.x, lockedProbePoint.y);

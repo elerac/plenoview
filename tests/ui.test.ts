@@ -219,7 +219,7 @@ describe('probe coordinate formatting', () => {
     expect(formatProbeCoordinates(null, { width: 1024, height: 100 })).toBe('x    -   y  -');
   });
 
-  it('renders lower probe raw-value rows with the shared overlay formatter', () => {
+  it('renders probe display values without the lower raw-value list', () => {
     installUiFixture();
 
     const ui = new ViewerUi(createUiCallbacks());
@@ -241,20 +241,17 @@ describe('probe coordinate formatting', () => {
       }
     );
 
-    const rows = Array.from(document.querySelectorAll('#probe-values .probe-row')).map((row) => ({
-      key: row.querySelector('.probe-key')?.textContent,
-      value: row.querySelector('.probe-value')?.textContent
-    }));
-
-    expect(rows).toEqual([
-      { key: 'big', value: '1.2e+3' },
-      { key: 'normal', value: '0.250' },
-      { key: 'tiny', value: '5.0e-4' },
-      { key: 'zero', value: '0.00' }
-    ]);
+    expect((document.getElementById('probe-coords') as HTMLElement).textContent).toBe('x 4   y 7');
+    expect(document.querySelector('#probe-values')).toBeNull();
+    expect(
+      Array.from(document.querySelectorAll('#probe-color-values .probe-color-row')).map((row) => ({
+        key: row.querySelector('.probe-color-channel')?.textContent,
+        value: row.querySelector('.probe-color-number')?.textContent
+      }))
+    ).toEqual([{ key: 'Mono:', value: '0.250' }]);
   });
 
-  it('reuses keyed probe rows when labels stay stable', () => {
+  it('reuses keyed probe display rows when labels stay stable', () => {
     installUiFixture();
 
     const ui = new ViewerUi(createUiCallbacks());
@@ -277,7 +274,6 @@ describe('probe coordinate formatting', () => {
       }
     );
 
-    const initialProbeRows = Array.from(document.querySelectorAll('#probe-values .probe-row'));
     const initialColorRows = Array.from(document.querySelectorAll('#probe-color-values .probe-color-row'));
 
     ui.setProbeReadout(
@@ -299,16 +295,11 @@ describe('probe coordinate formatting', () => {
       }
     );
 
-    const nextProbeRows = Array.from(document.querySelectorAll('#probe-values .probe-row'));
     const nextColorRows = Array.from(document.querySelectorAll('#probe-color-values .probe-color-row'));
 
-    expect(nextProbeRows).toHaveLength(2);
     expect(nextColorRows).toHaveLength(2);
-    expect(nextProbeRows[0]).toBe(initialProbeRows[0]);
-    expect(nextProbeRows[1]).toBe(initialProbeRows[1]);
     expect(nextColorRows[0]).toBe(initialColorRows[0]);
     expect(nextColorRows[1]).toBe(initialColorRows[1]);
-    expect(nextProbeRows.map((row) => row.querySelector('.probe-value')?.textContent)).toEqual(['0.300', '0.400']);
     expect(nextColorRows.map((row) => row.querySelector('.probe-color-number')?.textContent)).toEqual(['0.300', '0.500']);
   });
 });
@@ -401,7 +392,7 @@ describe('spectral inspector', () => {
 
     expect(spectralPanel.classList.contains('hidden')).toBe(false);
     expect(spectralEmptyState.classList.contains('hidden')).toBe(false);
-    expect(spectralEmptyState.textContent).toContain('Hover or lock a pixel');
+    expect(spectralEmptyState.textContent).toBe('');
     expect(spectralPlot.classList.contains('hidden')).toBe(false);
     expect(document.querySelector('#spectral-plot svg')).not.toBeNull();
     expect(document.querySelectorAll('#spectral-plot .spectral-point')).toHaveLength(0);
@@ -1212,11 +1203,12 @@ describe('roi inspector', () => {
     expect((document.getElementById('probe-mode') as HTMLElement).textContent).toBe('Locked');
     expect((document.getElementById('probe-coords') as HTMLElement).textContent).toBe('x 1   y 2');
     expect(
-      Array.from(document.querySelectorAll('#probe-values .probe-row')).map((row) => ({
-        key: row.querySelector('.probe-key')?.textContent,
-        value: row.querySelector('.probe-value')?.textContent
+      Array.from(document.querySelectorAll('#probe-color-values .probe-color-row')).map((row) => ({
+        key: row.querySelector('.probe-color-channel')?.textContent,
+        value: row.querySelector('.probe-color-number')?.textContent
       }))
-    ).toEqual([{ key: 'Y', value: '0.500' }]);
+    ).toEqual([{ key: 'Mono:', value: '0.500' }]);
+    expect(document.querySelector('#probe-values')).toBeNull();
     expect((document.getElementById('roi-bounds') as HTMLElement).textContent).toBe('x 2..5  y 3..7');
     expect((document.getElementById('roi-valid-count') as HTMLElement).textContent).toBe('Mono 18/20');
   });

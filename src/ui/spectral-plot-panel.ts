@@ -106,7 +106,7 @@ export class SpectralPlotPanel implements Disposable {
     if (readout.points.length === 0) {
       this.elements.spectralEmptyState.textContent = readout.pixel
         ? 'No finite spectral values at this pixel.'
-        : 'Hover or lock a pixel to inspect its spectrum.';
+        : '';
       this.elements.spectralEmptyState.classList.remove('hidden');
     } else {
       this.elements.spectralEmptyState.classList.add('hidden');

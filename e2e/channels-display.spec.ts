@@ -139,7 +139,7 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await expect(channelSelect.locator('option').filter({ hasText: /^600nm$/ })).toHaveCount(1);
   await expect(channelSelect.locator('option').filter({ hasText: /^700nm$/ })).toHaveCount(1);
   await expect(spectralPanel).toBeVisible();
-  await expect(page.locator('#spectral-empty-state')).toBeVisible();
+  await expect(page.locator('#spectral-empty-state')).toHaveText('');
   await expect(spectralPlot).toBeVisible();
   await expect(spectralPlot.locator('.spectral-point')).toHaveCount(0);
 

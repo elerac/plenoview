@@ -187,7 +187,6 @@ export interface Elements {
   probeColorPreview: HTMLDivElement;
   probeColorSwatch: HTMLElement;
   probeColorValues: HTMLElement;
-  probeValues: HTMLElement;
   probeToggle: HTMLButtonElement;
   probeContent: HTMLDivElement;
   spectralPanel: HTMLElement;
@@ -449,7 +448,6 @@ export type ProbeReadoutElements = Pick<
   | 'probeColorPreview'
   | 'probeColorSwatch'
   | 'probeColorValues'
-  | 'probeValues'
 >;
 
 export type SpectralPlotPanelElements = Pick<
@@ -725,7 +723,6 @@ export function resolveElements(): Elements {
     probeColorPreview: requireElement('probe-color-preview', HTMLDivElement),
     probeColorSwatch: requireElement('probe-color-swatch', HTMLElement),
     probeColorValues: requireElement('probe-color-values', HTMLElement),
-    probeValues: requireElement('probe-values', HTMLElement),
     probeToggle: requireElement('probe-toggle', HTMLButtonElement),
     probeContent: requireElement('probe-content', HTMLDivElement),
     spectralPanel: requireElement('spectral-panel', HTMLElement),

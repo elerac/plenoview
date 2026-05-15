@@ -1,4 +1,3 @@
-import { formatOverlayValue } from '../value-format';
 import type { PixelSample } from '../types';
 import type { ProbeColorPreview, ProbeDisplayValue } from '../probe';
 import type { ProbeReadoutElements } from './elements';
@@ -8,12 +7,6 @@ export interface ProbeCoordinateImageSize {
   height: number;
 }
 
-interface ProbeValueRowElements {
-  row: HTMLDivElement;
-  key: HTMLSpanElement;
-  value: HTMLSpanElement;
-}
-
 interface ProbeColorRowElements {
   row: HTMLDivElement;
   channel: HTMLSpanElement;
@@ -21,7 +14,6 @@ interface ProbeColorRowElements {
 }
 
 export class ProbeReadoutController {
-  private readonly probeValueRows = new Map<string, ProbeValueRowElements>();
   private readonly probeDisplayValueRows = new Map<string, ProbeColorRowElements>();
 
   constructor(private readonly elements: ProbeReadoutElements) {}
@@ -39,7 +31,6 @@ export class ProbeReadoutController {
       this.elements.probeColorPreview.classList.add('is-empty');
       this.elements.probeColorSwatch.style.backgroundColor = 'transparent';
       this.renderProbeDisplayValues(createEmptyProbeDisplayValues());
-      this.renderProbeValueRows([]);
       return;
     }
 
@@ -53,14 +44,6 @@ export class ProbeReadoutController {
       this.elements.probeColorSwatch.style.backgroundColor = 'transparent';
       this.renderProbeDisplayValues(createEmptyProbeDisplayValues());
     }
-
-    const channelEntries = Object.entries(sample.values).sort(([a], [b]) => a.localeCompare(b));
-    this.renderProbeValueRows(
-      channelEntries.map(([channelName, channelValue]) => ({
-        key: channelName,
-        value: formatOverlayValue(channelValue)
-      }))
-    );
   }
 
   private renderProbeDisplayValues(displayValues: ProbeDisplayValue[]): void {
@@ -98,39 +81,6 @@ export class ProbeReadoutController {
 
     pruneKeyedRows(this.probeDisplayValueRows, new Set(displayValues.map((item) => item.label)));
     syncRowOrder(this.elements.probeColorValues, orderedRows);
-  }
-
-  private renderProbeValueRows(items: Array<{ key: string; value: string }>): void {
-    const orderedRows = items.map((item) => {
-      const existing = this.probeValueRows.get(item.key);
-      if (existing) {
-        existing.key.textContent = item.key;
-        existing.value.textContent = item.value;
-        return existing.row;
-      }
-
-      const row = document.createElement('div');
-      row.className = 'probe-row';
-
-      const key = document.createElement('span');
-      key.className = 'probe-key';
-      key.textContent = item.key;
-
-      const value = document.createElement('span');
-      value.className = 'probe-value';
-      value.textContent = item.value;
-
-      row.append(key, value);
-      this.probeValueRows.set(item.key, {
-        row,
-        key,
-        value
-      });
-      return row;
-    });
-
-    pruneKeyedRows(this.probeValueRows, new Set(items.map((item) => item.key)));
-    syncRowOrder(this.elements.probeValues, orderedRows);
   }
 }
 

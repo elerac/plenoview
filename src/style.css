@@ -3139,37 +3139,6 @@ body.is-resizing-panel-rows * {
   text-overflow: ellipsis;
 }
 
-.probe-values {
-  margin-top: 0.5rem;
-  display: grid;
-  gap: 0.15rem;
-  font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
-  font-size: 0.84rem;
-  min-height: 6.25rem;
-  max-height: 6.25rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  align-content: start;
-}
-
-.probe-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.5rem;
-}
-
-.probe-key {
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.probe-value {
-  text-align: right;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .spectral-empty-state {
   color: var(--text-dim);
   font-size: 0.82rem;
