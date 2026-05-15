@@ -6749,7 +6749,7 @@ describe('display cache UI helpers', () => {
 });
 
 describe('opened files actions', () => {
-  it('renders a visible reorder grip plus reload and close actions without any pin toggle', () => {
+  it('renders thumbnails plus reload and close actions without a reorder grip or pin toggle', () => {
     installUiFixture();
 
     const ui = new ViewerUi(createUiCallbacks());
@@ -6770,9 +6770,9 @@ describe('opened files actions', () => {
     expect(document.getElementById('opened-files-reorder-hint')?.textContent).toBe(
       'Drag rows to reorder open files or drop a row on the image viewer to assign it to a pane. Press Alt+Up/Down or Option+Up/Down to reorder open files.'
     );
-    expect(openedFilesList.querySelector('.opened-file-grip')).toBeInstanceOf(HTMLSpanElement);
+    expect(openedFilesList.querySelector('.opened-file-grip')).toBeNull();
     expect(openedFilesList.querySelector('.opened-file-thumbnail')).toBeInstanceOf(HTMLImageElement);
-    expect(firstRow.childElementCount).toBe(4);
+    expect(firstRow.childElementCount).toBe(3);
     expect(firstRow.draggable).toBe(true);
     expect(actionLabels).toEqual(['Reload beauty.exr', 'Close beauty.exr']);
     expect(openedFilesList.querySelectorAll('button')).toHaveLength(2);
@@ -7083,11 +7083,10 @@ describe('opened files actions', () => {
     ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
 
     const row = document.querySelector('#opened-files-list .opened-file-row') as HTMLDivElement;
-    const grip = row.querySelector('.opened-file-grip') as HTMLElement;
     const thumbnail = row.querySelector('.file-row-icon, .opened-file-thumbnail') as HTMLElement;
     const reloadButton = row.querySelector('.opened-file-action-button--reload') as HTMLButtonElement;
 
-    for (const target of [row, grip, thumbnail, reloadButton]) {
+    for (const target of [row, thumbnail, reloadButton]) {
       target.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, button: 0 }));
       expect(document.querySelector('#opened-files-list .opened-file-rename-input')).toBeNull();
     }

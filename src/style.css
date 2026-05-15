@@ -2242,7 +2242,7 @@ body.is-resizing-panel-rows * {
 .opened-file-row {
   position: relative;
   cursor: grab;
-  grid-template-columns: 0.8rem 2rem minmax(0, 1fr) auto;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
   min-height: 2.4rem;
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
@@ -2336,35 +2336,6 @@ body.is-resizing-panel-rows * {
 .opened-file-row--drop-after::after {
   bottom: -1px;
   opacity: 1;
-}
-
-.opened-file-grip {
-  width: 0.55rem;
-  height: 1.15rem;
-  display: block;
-  justify-self: center;
-  align-self: center;
-  color: color-mix(in srgb, var(--text-dim) 85%, var(--text) 15%);
-  opacity: 0.72;
-  transition: color 120ms ease, opacity 120ms ease, transform 120ms ease;
-}
-
-.opened-file-grip::before {
-  content: "";
-  display: block;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(circle, currentColor 1.1px, transparent 1.2px) 0 0 / 0.32rem 0.32rem;
-}
-
-.opened-file-row:hover:not([aria-disabled='true']) .opened-file-grip,
-.opened-file-row:focus-visible .opened-file-grip,
-.opened-file-row[aria-selected='true'] .opened-file-grip,
-.opened-file-row--dragging .opened-file-grip {
-  color: var(--text);
-  opacity: 1;
-  transform: translateX(0.02rem);
 }
 
 .opened-file-actions {

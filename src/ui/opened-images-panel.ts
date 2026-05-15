@@ -932,7 +932,6 @@ function createOpenedFileRow(
   const row = document.createElement('div');
   row.className = 'image-browser-row opened-file-row';
 
-  const grip = createOpenedFileGrip();
   const thumbnail = createOpenedFileThumbnail(item.thumbnailDataUrl ?? null, item.thumbnailLoading === true);
 
   const label = document.createElement('span');
@@ -955,7 +954,7 @@ function createOpenedFileRow(
   });
 
   actions.append(reloadButton, closeButton);
-  row.append(grip, thumbnail, label, actions);
+  row.append(thumbnail, label, actions);
   openedFileRowRefs.set(row, { thumbnail, label, renameInput: null, reloadButton, closeButton });
   return row;
 }
@@ -1094,13 +1093,6 @@ function createOpenedFileRenameInput(item: OpenedImageOptionItem): HTMLInputElem
     event.stopPropagation();
   });
   return input;
-}
-
-function createOpenedFileGrip(): HTMLSpanElement {
-  const grip = document.createElement('span');
-  grip.className = 'opened-file-grip';
-  grip.setAttribute('aria-hidden', 'true');
-  return grip;
 }
 
 function createOpenedFileActionButton(options: {
