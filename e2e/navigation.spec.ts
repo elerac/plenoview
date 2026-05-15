@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { gotoViewerApp, openGalleryCbox } from './helpers/app';
 import { buildScalarChannelExr, buildSizedRgbExr, buildSpectralExr } from './helpers/exr-fixtures';
+import { installIdleCallbackController } from './helpers/idle-callbacks';
 import { dragBy, readProbeCoords, resolveViewerPoint } from './helpers/viewer';
 
 test('moves bottom-panel thumbnail selections with left and right arrow keys', async ({ page }) => {
@@ -32,6 +33,34 @@ test('moves bottom-panel thumbnail selections with left and right arrow keys', a
   await page.keyboard.press('ArrowLeft');
   await expect(channelSelect.locator('option:checked')).toHaveText('G');
   await expect(thumbnailTiles.nth(1)).toBeFocused();
+});
+
+test('selects a large-image bottom thumbnail on the first gesture before thumbnails finish', async ({ page }) => {
+  await installIdleCallbackController(page);
+  await gotoViewerApp(page);
+
+  const channelSelect = page.locator('#rgb-group-select');
+  const rgbSplitToggleButton = page.locator('#rgb-split-toggle-button');
+  const thumbnailTiles = page.locator('#channel-thumbnail-strip .channel-thumbnail-tile');
+
+  await page.setInputFiles('#file-input', {
+    name: 'large_rgb.exr',
+    mimeType: 'image/exr',
+    buffer: buildSizedRgbExr(512, 512)
+  });
+  await expect(page.locator('#opened-files-list .opened-file-row').filter({ hasText: 'large_rgb.exr' })).toHaveCount(1, {
+    timeout: 30000
+  });
+
+  await rgbSplitToggleButton.click();
+  await expect(rgbSplitToggleButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(thumbnailTiles).toHaveCount(3);
+  await expect(page.locator('#channel-thumbnail-strip .channel-thumbnail-placeholder')).toHaveCount(3);
+
+  await thumbnailTiles.nth(1).click();
+
+  await expect(channelSelect.locator('option:checked')).toHaveText('G');
+  await expect(thumbnailTiles.nth(1)).toHaveAttribute('aria-selected', 'true');
 });
 
 test('selects a bottom thumbnail when dragged into the image viewer', async ({ page }) => {

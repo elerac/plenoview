@@ -1,6 +1,7 @@
 import { createViewerRenderSnapshotSelector, computeViewerRenderInvalidation, ViewerRenderInvalidationFlags } from './viewer-app-render';
 import { createInitialViewerAppState, reduceViewerAppState } from './viewer-app-reducer';
 import { createViewerUiSnapshotSelector, computeViewerUiInvalidation, ViewerUiInvalidationFlags } from './viewer-app-ui';
+import { traceViewerIntent } from '../interaction-trace';
 import type {
   ViewerAppState,
   ViewerIntent,
@@ -57,6 +58,7 @@ export class ViewerAppCore {
       return;
     }
 
+    traceViewerIntent(intent);
     this.state = nextState;
     const stateTransition: ViewerStateTransition = {
       previousState,

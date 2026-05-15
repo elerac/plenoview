@@ -92,6 +92,30 @@ export class ChannelThumbnailService implements Disposable {
     return this.processJobs();
   }
 
+  promoteRequest(requestKey: string): boolean {
+    const latestRequest = this.requestState.get(requestKey);
+    if (!latestRequest) {
+      return false;
+    }
+
+    const index = this.jobs.findIndex((job) => (
+      job.requestKey === requestKey &&
+      job.token === latestRequest.token
+    ));
+    if (index < 0) {
+      return false;
+    }
+
+    if (index > 0) {
+      const [job] = this.jobs.splice(index, 1);
+      if (job) {
+        this.jobs.unshift(job);
+      }
+    }
+
+    return true;
+  }
+
   discardSession(sessionId: string): void {
     for (let index = this.jobs.length - 1; index >= 0; index -= 1) {
       if (this.jobs[index]?.sessionId === sessionId) {

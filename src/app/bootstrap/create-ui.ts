@@ -1,4 +1,5 @@
 import { DEFAULT_DISPLAY_CACHE_BUDGET_MB } from '../../display-cache';
+import { serializeChannelThumbnailRequestKey } from '../../channel-thumbnail-keys';
 import { ViewerUi, type UiCallbacks } from '../../ui/viewer-ui';
 import { imageToScreen } from '../../interaction/image-geometry';
 import { getPanoramaProjectionDiameter } from '../../interaction/panorama-geometry';
@@ -34,7 +35,9 @@ import type {
 } from '../../types';
 import type { StokesColormapDefaultGroup, StokesColormapDefaultSetting } from '../../stokes';
 import type { RenderCacheService } from '../../services/render-cache-service';
+import type { ChannelThumbnailService } from '../../services/channel-thumbnail-service';
 import type { WebGlExrRenderer } from '../../renderer';
+import type { DisplaySelection } from '../../display-model';
 
 interface InteractionInputBridge {
   setViewerKeyboardNavigationInput(input: ViewerKeyboardNavigationInput): void;
@@ -45,6 +48,7 @@ interface CreateViewerUiDependencies {
   core: ViewerAppCore;
   getSessionController: () => SessionController;
   getDisplayController: () => DisplayController;
+  getChannelThumbnailService: () => ChannelThumbnailService;
   getRenderCache: () => RenderCacheService;
   getRenderer: () => WebGlExrRenderer;
   getInteraction: () => InteractionInputBridge | null;
@@ -64,6 +68,7 @@ export function createViewerUi({
   core,
   getSessionController,
   getDisplayController,
+  getChannelThumbnailService,
   getRenderCache,
   getRenderer,
   getInteraction,
@@ -302,6 +307,7 @@ export function createViewerUi({
       getDisplayController().setActiveLayer(layerIndex);
     },
     onRgbGroupChange: (mapping) => {
+      promoteActiveChannelThumbnail(core, getChannelThumbnailService, mapping);
       void getDisplayController().applyDisplaySelection(mapping);
     },
     onVisualizationModeChange: (mode) => {
@@ -347,6 +353,30 @@ export function createViewerUi({
   };
 
   return new ViewerUi(callbacks);
+}
+
+function promoteActiveChannelThumbnail(
+  core: ViewerAppCore,
+  getChannelThumbnailService: () => ChannelThumbnailService,
+  selection: DisplaySelection
+): void {
+  const state = core.getState();
+  const activeSession = selectActiveSession(state);
+  if (!activeSession) {
+    return;
+  }
+
+  const requestKey = serializeChannelThumbnailRequestKey({
+    sessionId: activeSession.id,
+    activeLayer: state.sessionState.activeLayer,
+    selection,
+    exposureEv: state.sessionState.channelThumbnailExposureEv,
+    displayGamma: state.sessionState.channelThumbnailDisplayGamma,
+    stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
+    stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode
+  });
+
+  getChannelThumbnailService().promoteRequest(requestKey);
 }
 
 function resolveVisiblePanoramaRect(hfovDeg: number, viewport: ViewportInfo): ViewportRect | null {

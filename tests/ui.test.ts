@@ -55,6 +55,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
   delete document.documentElement.dataset.theme;
+  delete window.__openExrViewerInteractionTrace;
   window.localStorage.clear();
   resizeObserverRegistrations.length = 0;
 });
@@ -7867,6 +7868,76 @@ describe('channel thumbnail strip', () => {
     expect(document.querySelectorAll('#channel-thumbnail-strip .channel-thumbnail-image')).toHaveLength(2);
   });
 
+  it('keeps the first thumbnail pointer selection when thumbnails rerender before pointerup', () => {
+    installUiFixture();
+    mockDesktopLayoutGeometry();
+
+    const onRgbGroupChange = vi.fn();
+    const traceEvents: string[] = [];
+    window.__openExrViewerInteractionTrace = (event) => {
+      if (event.type === 'channelThumbnailPointerDown' || event.type === 'channelThumbnailPointerUp' || event.type === 'channelThumbnailClick') {
+        traceEvents.push(`${event.type}:${event.value}`);
+      }
+    };
+    const ui = new ViewerUi(createUiCallbacks({ onRgbGroupChange }));
+    const channelNames = ['beauty.R', 'beauty.G', 'beauty.B'];
+    const splitToggle = document.getElementById('rgb-split-toggle-button') as HTMLButtonElement;
+    const channelSelect = document.getElementById('rgb-group-select') as HTMLSelectElement;
+    const strip = document.getElementById('channel-thumbnail-strip') as HTMLElement;
+    const channelThumbnailItems = buildChannelViewItems(channelNames).map((item) => ({
+      ...item,
+      thumbnailDataUrl: null
+    }));
+
+    ui.setRgbGroupOptions(channelNames, {
+      kind: 'channelRgb',
+      r: 'beauty.R',
+      g: 'beauty.G',
+      b: 'beauty.B',
+      alpha: null
+    }, channelThumbnailItems);
+    splitToggle.click();
+    onRgbGroupChange.mockClear();
+
+    const greenTile = document.querySelectorAll<HTMLButtonElement>('#channel-thumbnail-strip .channel-thumbnail-tile')[1];
+    greenTile?.dispatchEvent(createPointerTestEvent('pointerdown', {
+      pointerId: 4,
+      clientX: 24,
+      clientY: 18
+    }));
+
+    ui.setRgbGroupOptions(channelNames, {
+      kind: 'channelMono',
+      channel: 'beauty.R',
+      alpha: null
+    }, channelThumbnailItems.map((item) => ({
+      ...item,
+      thumbnailDataUrl: 'data:image/png;base64,AAAA'
+    })));
+
+    strip.dispatchEvent(createPointerTestEvent('pointerup', {
+      pointerId: 4,
+      clientX: 25,
+      clientY: 19
+    }));
+
+    const rerenderedGreenTile = document.querySelectorAll<HTMLButtonElement>('#channel-thumbnail-strip .channel-thumbnail-tile')[1];
+    rerenderedGreenTile?.click();
+
+    expect(channelSelect.value).toBe('channel:beauty.G');
+    expect(onRgbGroupChange).toHaveBeenCalledTimes(1);
+    expect(onRgbGroupChange).toHaveBeenCalledWith({
+      kind: 'channelMono',
+      channel: 'beauty.G',
+      alpha: null
+    });
+    expect(traceEvents).toEqual([
+      'channelThumbnailPointerDown:channel:beauty.G',
+      'channelThumbnailPointerUp:channel:beauty.G',
+      'channelThumbnailClick:channel:beauty.G'
+    ]);
+  });
+
   it('uses Split RGB to switch spectral RGB thumbnails to wavelength channels', () => {
     installUiFixture();
     mockDesktopLayoutGeometry();
@@ -8077,8 +8148,18 @@ describe('channel thumbnail strip', () => {
 
     const tiles = Array.from(document.querySelectorAll<HTMLButtonElement>('#channel-thumbnail-strip .channel-thumbnail-tile'));
     const dataTransfer = createMockDataTransfer();
+    tiles[1]!.dispatchEvent(createPointerTestEvent('pointerdown', {
+      pointerId: 8,
+      clientX: 16,
+      clientY: 12
+    }));
     tiles[1]!.dispatchEvent(createChannelThumbnailDragEvent('dragstart', dataTransfer));
     tiles[1]!.dispatchEvent(createChannelThumbnailDragEvent('dragend', dataTransfer));
+    tiles[1]!.dispatchEvent(createPointerTestEvent('pointerup', {
+      pointerId: 8,
+      clientX: 16,
+      clientY: 12
+    }));
     tiles[1]!.click();
 
     expect(channelSelect.value).toBe('channel:beauty.R');
@@ -9902,6 +9983,43 @@ function mockChannelThumbnailStripGeometry(
   });
 
   return tiles;
+}
+
+function createPointerTestEvent(
+  type: string,
+  init: {
+    pointerId?: number;
+    clientX?: number;
+    clientY?: number;
+    button?: number;
+    isPrimary?: boolean;
+  } = {}
+): PointerEvent {
+  const eventInit = {
+    bubbles: true,
+    cancelable: true,
+    button: init.button ?? 0,
+    clientX: init.clientX ?? 0,
+    clientY: init.clientY ?? 0
+  };
+  if (typeof PointerEvent === 'function') {
+    return new PointerEvent(type, {
+      ...eventInit,
+      pointerId: init.pointerId ?? 1,
+      isPrimary: init.isPrimary ?? true
+    });
+  }
+
+  const event = new MouseEvent(type, eventInit) as PointerEvent;
+  Object.defineProperties(event, {
+    pointerId: {
+      value: init.pointerId ?? 1
+    },
+    isPrimary: {
+      value: init.isPrimary ?? true
+    }
+  });
+  return event;
 }
 
 function triggerResizeObserversForElement(element: Element): void {

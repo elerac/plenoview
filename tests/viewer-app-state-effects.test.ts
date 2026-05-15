@@ -10,7 +10,7 @@ import type { ThumbnailService } from '../src/services/thumbnail-service';
 import type { ChannelThumbnailService } from '../src/services/channel-thumbnail-service';
 import type { OpenedImageThumbnailOptions } from '../src/thumbnail';
 import { buildViewerStateForLayer, createInitialState } from '../src/viewer-store';
-import { createLayerFromChannels } from './helpers/state-fixtures';
+import { createChannelMonoSelection, createLayerFromChannels } from './helpers/state-fixtures';
 import type { DecodedExrImage, OpenedImageSession, ViewerSessionState } from '../src/types';
 
 function createDecodedImage(): DecodedExrImage {
@@ -119,6 +119,30 @@ describe('viewer app state effects', () => {
     expect(enqueue.mock.calls.every(([job]) => {
       return job.requestKey.includes('|gamma:1.8|') && job.stateSnapshot.displayGamma === 1.8;
     })).toBe(true);
+  });
+
+  it('schedules the currently selected channel thumbnail before the rest of the batch', () => {
+    const core = new ViewerAppCore();
+    const enqueue = vi.fn<ChannelThumbnailService['enqueue']>(() => Promise.resolve());
+    const channelThumbnailService = {
+      enqueue,
+      discardSession: vi.fn(),
+      clear: vi.fn()
+    } as unknown as ChannelThumbnailService;
+    const session = createSession('session-1');
+    session.state = {
+      ...session.state,
+      displaySelection: createChannelMonoSelection('G')
+    };
+
+    core.subscribeState((transition) => {
+      applyChannelThumbnailEffects(transition, core, channelThumbnailService);
+    });
+
+    core.dispatch({ type: 'sessionLoaded', session });
+
+    expect(enqueue).toHaveBeenCalled();
+    expect(enqueue.mock.calls[0]?.[0].selection).toEqual(createChannelMonoSelection('G'));
   });
 
   it('requeues opened image thumbnails when auto exposure preferences change', () => {

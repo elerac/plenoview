@@ -34,6 +34,7 @@ import {
   buildDisplayTextureRevisionKey,
   serializeDisplaySelectionLuminanceKey
 } from '../display/revision-keys';
+import { traceViewerInteraction } from '../interaction-trace';
 import {
   computeDisplaySelectionLuminanceRange,
   computeDisplaySelectionLuminanceRangeAsync,
@@ -308,6 +309,12 @@ export class RenderCacheService implements Disposable {
       });
       residentLayer = this.getOrCreateResidentLayerEntry(entry, state.activeLayer);
 
+      const prepareStartedAt = performance.now();
+      traceViewerInteraction({
+        type: 'displayChannelPrepareStart',
+        sessionId: session.id,
+        missingChannelCount: missingChannelNames.length
+      });
       const residentChannelUploads = this.renderer.ensureLayerChannelsResident(
         session.id,
         state.activeLayer,
@@ -316,6 +323,14 @@ export class RenderCacheService implements Disposable {
         layer,
         missingChannelNames
       );
+      traceViewerInteraction({
+        type: 'displayChannelPrepareEnd',
+        sessionId: session.id,
+        missingChannelCount: missingChannelNames.length,
+        textureBytes: residentChannelUploads.reduce((total, upload) => total + upload.textureBytes, 0),
+        materializedBytes: residentChannelUploads.reduce((total, upload) => total + upload.materializedBytes, 0),
+        durationMs: performance.now() - prepareStartedAt
+      });
       for (const upload of residentChannelUploads) {
         residentLayer.residentChannels.set(upload.channelName, {
           textureBytes: upload.textureBytes,

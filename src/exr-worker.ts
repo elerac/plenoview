@@ -1,4 +1,5 @@
 import { loadExr } from './exr';
+import { createPlanarChannelStorageFromInterleaved } from './channel-storage';
 import { collectDecodedImageTransferables } from './decode-transferables';
 import {
   createDecodeErrorContext,
@@ -40,7 +41,7 @@ worker.addEventListener('message', (event: MessageEvent<DecodeWorkerRequest>) =>
 
 async function decodeAndReply(request: DecodeWorkerRequest): Promise<void> {
   try {
-    const image = await loadExr(request.bytes);
+    const image = convertDecodedImageToPlanar(await loadExr(request.bytes));
     worker.postMessage(
       {
         id: request.id,
@@ -57,4 +58,29 @@ async function decodeAndReply(request: DecodeWorkerRequest): Promise<void> {
       error: createDecodeErrorPayload(error, context)
     } satisfies DecodeWorkerResponse);
   }
+}
+
+function convertDecodedImageToPlanar(image: DecodedExrImage): DecodedExrImage {
+  return {
+    ...image,
+    layers: image.layers.map((layer) => {
+      if (layer.channelStorage.kind !== 'interleaved-f32') {
+        return layer;
+      }
+
+      const { storage, finiteRangeByChannel } = createPlanarChannelStorageFromInterleaved(
+        layer.channelStorage.pixels,
+        layer.channelNames
+      );
+
+      return {
+        ...layer,
+        channelStorage: storage,
+        analysis: {
+          ...layer.analysis,
+          finiteRangeByChannel
+        }
+      };
+    })
+  };
 }

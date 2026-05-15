@@ -1,4 +1,5 @@
 import type { ChannelViewThumbnailItem } from '../channel-view-items';
+import { traceViewerInteraction } from '../interaction-trace';
 import { DisposableBag, type Disposable } from '../lifecycle';
 import type { ChannelThumbnailStripElements } from './elements';
 import {
@@ -24,6 +25,13 @@ interface ChannelThumbnailDragState {
   tile: HTMLButtonElement;
 }
 
+interface ChannelThumbnailPointerSelectionState {
+  pointerId: number;
+  value: string;
+  startX: number;
+  startY: number;
+}
+
 const tileRefs = new WeakMap<HTMLElement, ChannelThumbnailTileRefs>();
 const CHANNEL_THUMBNAIL_DRAG_MIME = 'application/x-openexr-viewer-channel-thumbnail';
 const HOVER_PREVIEW_DELAY_MS = 500;
@@ -36,6 +44,8 @@ const DEFAULT_STRIP_PADDING_BOTTOM_PX = 8.8;
 const DEFAULT_TILE_PADDING_PX = 5.12;
 const DEFAULT_TILE_GAP_PX = 3.84;
 const DEFAULT_TILE_BORDER_PX = 1;
+const POINTER_CLICK_MAX_DISTANCE_PX = 8;
+const POINTER_COMMIT_SUPPRESS_CLICK_MS = 350;
 
 export class ChannelThumbnailStrip implements Disposable {
   private readonly disposables = new DisposableBag();
@@ -50,7 +60,10 @@ export class ChannelThumbnailStrip implements Disposable {
   private hoverPreviewElement: HTMLElement | null = null;
   private hoverPreviewSessionActive = false;
   private channelThumbnailDragState: ChannelThumbnailDragState | null = null;
+  private pointerSelectionState: ChannelThumbnailPointerSelectionState | null = null;
   private suppressClickUntilMs = 0;
+  private suppressClickValue: string | null = null;
+  private suppressPointerClickUntilMs = 0;
   private disposed = false;
 
   constructor(
@@ -69,8 +82,28 @@ export class ChannelThumbnailStrip implements Disposable {
         return;
       }
 
+      const value = row.dataset.channelValue ?? '';
+      traceViewerInteraction({ type: 'channelThumbnailClick', value });
+      if (this.shouldSuppressCommittedPointerClick(value)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
       this.endHoverPreviewSession();
-      this.chooseValue(row.dataset.channelValue ?? '');
+      this.chooseValue(value);
+    });
+    this.disposables.addEventListener(this.elements.channelThumbnailStrip, 'pointerdown', (event) => {
+      this.handlePointerDown(event);
+    });
+    this.disposables.addEventListener(this.elements.channelThumbnailStrip, 'pointermove', (event) => {
+      this.handlePointerMove(event);
+    });
+    this.disposables.addEventListener(this.elements.channelThumbnailStrip, 'pointerup', (event) => {
+      this.handlePointerUp(event);
+    });
+    this.disposables.addEventListener(this.elements.channelThumbnailStrip, 'pointercancel', (event) => {
+      this.cancelPointerSelection(event.pointerId);
     });
     this.disposables.addEventListener(this.elements.channelThumbnailStrip, 'keydown', (event) => {
       this.handleKeyDown(event);
@@ -131,6 +164,7 @@ export class ChannelThumbnailStrip implements Disposable {
 
     this.disposed = true;
     this.endHoverPreviewSession();
+    this.cancelPointerSelection();
     this.finishChannelThumbnailDrag(false);
     this.disposables.dispose();
   }
@@ -252,9 +286,122 @@ export class ChannelThumbnailStrip implements Disposable {
       return;
     }
 
+    if (value === this.selectedValue) {
+      return;
+    }
+
     this.selectedValue = value;
     this.render();
     this.callbacks.onChannelViewChange(value);
+  }
+
+  private handlePointerDown(event: PointerEvent): void {
+    if (this.disposed || this.isLoading || event.button !== 0 || event.isPrimary === false) {
+      return;
+    }
+
+    const row = findClosestListRow(event.target, 'channelValue');
+    if (!(row instanceof HTMLButtonElement) || row.disabled) {
+      return;
+    }
+
+    const value = row.dataset.channelValue ?? '';
+    if (!value || !this.items.some((item) => item.value === value)) {
+      return;
+    }
+
+    this.cancelPointerSelection();
+    this.pointerSelectionState = {
+      pointerId: event.pointerId,
+      value,
+      startX: event.clientX,
+      startY: event.clientY
+    };
+    traceViewerInteraction({ type: 'channelThumbnailPointerDown', value });
+    this.setPointerCapture(event.pointerId);
+  }
+
+  private handlePointerMove(event: PointerEvent): void {
+    const pointerState = this.pointerSelectionState;
+    if (!pointerState || pointerState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = event.clientX - pointerState.startX;
+    const deltaY = event.clientY - pointerState.startY;
+    if (Math.hypot(deltaX, deltaY) > POINTER_CLICK_MAX_DISTANCE_PX) {
+      this.cancelPointerSelection(event.pointerId);
+    }
+  }
+
+  private handlePointerUp(event: PointerEvent): void {
+    const pointerState = this.pointerSelectionState;
+    if (!pointerState || pointerState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const value = pointerState.value;
+    traceViewerInteraction({ type: 'channelThumbnailPointerUp', value });
+    this.cancelPointerSelection(event.pointerId);
+    this.endHoverPreviewSession();
+    this.chooseValue(value);
+    this.suppressClickValue = value;
+    this.suppressPointerClickUntilMs = Math.max(
+      this.suppressPointerClickUntilMs,
+      performance.now() + POINTER_COMMIT_SUPPRESS_CLICK_MS
+    );
+  }
+
+  private cancelPointerSelection(pointerId?: number): void {
+    const pointerState = this.pointerSelectionState;
+    if (!pointerState) {
+      return;
+    }
+
+    this.pointerSelectionState = null;
+    this.releasePointerCapture(pointerId ?? pointerState.pointerId);
+  }
+
+  private setPointerCapture(pointerId: number): void {
+    const strip = this.elements.channelThumbnailStrip;
+    if (typeof strip.setPointerCapture !== 'function') {
+      return;
+    }
+
+    try {
+      strip.setPointerCapture(pointerId);
+    } catch {
+      // Pointer capture is best effort; browsers can reject it after cancellation.
+    }
+  }
+
+  private releasePointerCapture(pointerId: number): void {
+    const strip = this.elements.channelThumbnailStrip;
+    if (typeof strip.releasePointerCapture !== 'function') {
+      return;
+    }
+
+    try {
+      if (typeof strip.hasPointerCapture !== 'function' || strip.hasPointerCapture(pointerId)) {
+        strip.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Pointer capture may already be gone after DOM or browser cancellation.
+    }
+  }
+
+  private shouldSuppressCommittedPointerClick(value: string): boolean {
+    if (!this.suppressClickValue || this.suppressClickValue !== value) {
+      return false;
+    }
+
+    if (performance.now() >= this.suppressPointerClickUntilMs) {
+      this.suppressClickValue = null;
+      return false;
+    }
+
+    this.suppressClickValue = null;
+    return true;
   }
 
   private handleThumbnailDragStart(event: DragEvent): void {
@@ -265,6 +412,7 @@ export class ChannelThumbnailStrip implements Disposable {
       return;
     }
 
+    this.cancelPointerSelection();
     this.endHoverPreviewSession();
     this.channelThumbnailDragState = {
       value,
@@ -370,6 +518,10 @@ export class ChannelThumbnailStrip implements Disposable {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.cancelPointerSelection();
+    }
+
     const tiles = getEnabledTiles(this.elements.channelThumbnailStrip);
     if (tiles.length === 0) {
       return;
@@ -603,8 +755,7 @@ function createChannelThumbnailTile(): HTMLButtonElement {
   tile.type = 'button';
   tile.className = 'channel-thumbnail-tile image-browser-row';
 
-  const preview = document.createElement('span');
-  preview.className = 'channel-thumbnail-tile-preview';
+  const preview = createChannelThumbnailPreview(null);
 
   const label = document.createElement('span');
   label.className = 'channel-thumbnail-tile-label';
@@ -635,11 +786,7 @@ function updateChannelThumbnailTile(
   tile.draggable = !options.disabled;
   tile.title = item.label;
 
-  const nextPreview = createChannelThumbnailPreview(item.thumbnailDataUrl);
-  if (!samePreview(refs.preview, nextPreview)) {
-    tile.replaceChild(nextPreview, refs.preview);
-    refs.preview = nextPreview;
-  }
+  updateChannelThumbnailPreview(refs.preview, item.thumbnailDataUrl);
   refs.thumbnailDataUrl = item.thumbnailDataUrl;
   refs.label.textContent = item.label;
 }
@@ -649,13 +796,29 @@ function createChannelThumbnailPreview(
 ): HTMLElement {
   const preview = document.createElement('span');
   preview.className = 'channel-thumbnail-tile-preview';
+  updateChannelThumbnailPreview(preview, thumbnailDataUrl);
+  return preview;
+}
 
+function updateChannelThumbnailPreview(
+  preview: HTMLElement,
+  thumbnailDataUrl: string | null
+): void {
   if (!thumbnailDataUrl) {
+    if (preview.firstElementChild?.classList.contains('channel-thumbnail-placeholder')) {
+      return;
+    }
+
     const placeholder = document.createElement('span');
     placeholder.className = 'channel-thumbnail-placeholder';
     placeholder.setAttribute('aria-hidden', 'true');
-    preview.append(placeholder);
-    return preview;
+    preview.replaceChildren(placeholder);
+    return;
+  }
+
+  const existingImage = preview.firstElementChild;
+  if (existingImage instanceof HTMLImageElement && existingImage.src === thumbnailDataUrl) {
+    return;
   }
 
   const image = document.createElement('img');
@@ -664,30 +827,7 @@ function createChannelThumbnailPreview(
   image.alt = '';
   image.draggable = false;
   image.setAttribute('aria-hidden', 'true');
-  preview.append(image);
-  return preview;
-}
-
-function samePreview(current: HTMLElement, next: HTMLElement): boolean {
-  if (current.tagName !== next.tagName || current.className !== next.className) {
-    return false;
-  }
-
-  const currentChild = current.firstElementChild;
-  const nextChild = next.firstElementChild;
-  if (!currentChild || !nextChild) {
-    return currentChild === nextChild;
-  }
-
-  if (currentChild.tagName !== nextChild.tagName) {
-    return false;
-  }
-
-  if (currentChild instanceof HTMLImageElement && nextChild instanceof HTMLImageElement) {
-    return currentChild.src === nextChild.src;
-  }
-
-  return currentChild.className === nextChild.className;
+  preview.replaceChildren(image);
 }
 
 function getEnabledTiles(container: HTMLElement): HTMLButtonElement[] {

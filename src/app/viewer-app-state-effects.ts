@@ -1,8 +1,9 @@
-import { buildChannelViewItems } from '../channel-view-items';
+import { buildChannelViewItems, type ChannelViewItem } from '../channel-view-items';
 import {
   serializeChannelThumbnailContextKey,
   serializeChannelThumbnailRequestKey
 } from '../channel-thumbnail-keys';
+import { sameDisplaySelection, type DisplaySelection } from '../display-model';
 import { samePixel, sameRoi, sameViewState } from '../view-state';
 import { ViewerInteractionCoordinator } from '../interaction-coordinator';
 import { ChannelThumbnailService } from '../services/channel-thumbnail-service';
@@ -192,7 +193,10 @@ function scheduleActiveChannelThumbnailGeneration(
     displayGamma: state.sessionState.channelThumbnailDisplayGamma
   };
 
-  for (const item of buildChannelViewItems(layer.channelNames)) {
+  for (const item of prioritizeSelectedChannelViewItem(
+    buildChannelViewItems(layer.channelNames),
+    state.sessionState.displaySelection
+  )) {
     const requestKey = serializeChannelThumbnailRequestKey({
       sessionId: activeSession.id,
       activeLayer: state.sessionState.activeLayer,
@@ -227,6 +231,29 @@ function scheduleActiveChannelThumbnailGeneration(
       selection: item.selection
     }).catch(() => undefined);
   }
+}
+
+function prioritizeSelectedChannelViewItem(
+  items: ChannelViewItem[],
+  selected: DisplaySelection | null
+): ChannelViewItem[] {
+  if (!selected || items.length <= 1) {
+    return items;
+  }
+
+  const selectedIndex = items.findIndex((item) => sameDisplaySelection(item.selection, selected));
+  if (selectedIndex <= 0) {
+    return items;
+  }
+
+  const selectedItem = items[selectedIndex];
+  return selectedItem
+    ? [
+        selectedItem,
+        ...items.slice(0, selectedIndex),
+        ...items.slice(selectedIndex + 1)
+      ]
+    : items;
 }
 
 function shouldRefreshActiveChannelThumbnails(transition: ViewerStateTransition): boolean {

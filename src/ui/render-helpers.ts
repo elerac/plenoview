@@ -63,7 +63,24 @@ export function renderKeyedChildren<T>(
     return child;
   });
 
-  container.replaceChildren(...nextChildren);
+  const nextChildSet = new Set<HTMLElement>(nextChildren);
+  for (const child of Array.from(container.children)) {
+    if (child instanceof HTMLElement && nextChildSet.has(child)) {
+      continue;
+    }
+
+    child.remove();
+  }
+
+  for (const [index, child] of nextChildren.entries()) {
+    const current = container.children[index] ?? null;
+    if (current === child) {
+      continue;
+    }
+
+    container.insertBefore(child, current);
+  }
+
   if (container.scrollLeft !== previousScrollLeft) {
     container.scrollLeft = previousScrollLeft;
   }

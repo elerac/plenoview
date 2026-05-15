@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { serializeDisplaySelectionKey } from '../src/display-model';
 import { ChannelThumbnailService } from '../src/services/channel-thumbnail-service';
+import type { ThumbnailWindowLike } from '../src/services/thumbnail-service';
 import { createChannelViewThumbnailDataUrl } from '../src/thumbnail';
 import { DecodedExrImage, OpenedImageSession, ViewerSessionState } from '../src/types';
 import { buildViewerStateForLayer, createInitialState } from '../src/viewer-store';
@@ -44,6 +45,23 @@ function createSession(
   };
 }
 
+function createImmediateThumbnailWindowLike(): ThumbnailWindowLike {
+  return {
+    setTimeout,
+    clearTimeout,
+    requestIdleCallback: (callback) => {
+      queueMicrotask(() => {
+        callback({
+          didTimeout: false,
+          timeRemaining: () => 50
+        });
+      });
+      return 1;
+    },
+    cancelIdleCallback: () => undefined
+  };
+}
+
 describe('channel thumbnail service', () => {
   it('suppresses stale async jobs when a newer token replaces the same request key', async () => {
     const session = createSession();
@@ -57,7 +75,7 @@ describe('channel thumbnail service', () => {
       onThumbnailReady: (event) => {
         updates.push(event);
       },
-      windowLike: null,
+      windowLike: createImmediateThumbnailWindowLike(),
       createThumbnailDataUrl: ({ selection }) => {
         if (serializeDisplaySelectionKey(selection) === 'channelMono:R:') {
           return firstThumbnail;
@@ -109,7 +127,7 @@ describe('channel thumbnail service', () => {
       onThumbnailReady: (event) => {
         updates.push(`${event.requestKey}:${event.thumbnailDataUrl}`);
       },
-      windowLike: null,
+      windowLike: createImmediateThumbnailWindowLike(),
       createThumbnailDataUrl: ({ stateSnapshot }) => `exp-${stateSnapshot.exposureEv}`
     });
 
@@ -135,6 +153,72 @@ describe('channel thumbnail service', () => {
     expect(updates).toEqual([
       'request-exposure-0:exp-0',
       'request-exposure-1:exp-1'
+    ]);
+  });
+
+  it('promotes a queued clicked-channel request without interrupting active work', async () => {
+    const session = createSession();
+    const updates: string[] = [];
+    const started: string[] = [];
+    let resolveFirstThumbnail!: (value: string) => void;
+    const firstThumbnail = new Promise<string>((resolve) => {
+      resolveFirstThumbnail = resolve;
+    });
+    const service = new ChannelThumbnailService({
+      getSession: () => session,
+      onThumbnailReady: (event) => {
+        updates.push(`${event.requestKey}:${event.thumbnailDataUrl}`);
+      },
+      windowLike: createImmediateThumbnailWindowLike(),
+      createThumbnailDataUrl: ({ selection }) => {
+        const selectionKey = serializeDisplaySelectionKey(selection);
+        started.push(selectionKey);
+        if (selectionKey === 'channelMono:R:') {
+          return firstThumbnail;
+        }
+
+        return selectionKey;
+      }
+    });
+
+    const first = service.enqueue({
+      sessionId: session.id,
+      requestKey: 'request-r',
+      contextKey: 'context-r',
+      token: 1,
+      stateSnapshot: session.state,
+      selection: createChannelMonoSelection('R')
+    });
+    const second = service.enqueue({
+      sessionId: session.id,
+      requestKey: 'request-g',
+      contextKey: 'context-g',
+      token: 2,
+      stateSnapshot: session.state,
+      selection: createChannelMonoSelection('G')
+    });
+    const third = service.enqueue({
+      sessionId: session.id,
+      requestKey: 'request-b',
+      contextKey: 'context-b',
+      token: 3,
+      stateSnapshot: session.state,
+      selection: createChannelMonoSelection('B')
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(started).toEqual(['channelMono:R:']);
+    expect(service.promoteRequest('request-b')).toBe(true);
+    expect(started).toEqual(['channelMono:R:']);
+
+    resolveFirstThumbnail('channelMono:R:');
+    await Promise.all([first, second, third]);
+
+    expect(started).toEqual(['channelMono:R:', 'channelMono:B:', 'channelMono:G:']);
+    expect(updates).toEqual([
+      'request-r:channelMono:R:',
+      'request-b:channelMono:B:',
+      'request-g:channelMono:G:'
     ]);
   });
 

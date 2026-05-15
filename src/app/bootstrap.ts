@@ -77,6 +77,12 @@ export async function bootstrapApp(): Promise<AppHandle> {
       }
       return services.displayController;
     },
+    getChannelThumbnailService: () => {
+      if (!services) {
+        throw createAbortError('Viewer application has not finished initializing.');
+      }
+      return services.channelThumbnailService;
+    },
     getRenderCache: () => {
       if (!services) {
         throw createAbortError('Viewer application has not finished initializing.');
