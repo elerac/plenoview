@@ -145,7 +145,7 @@ describe('viewer app state effects', () => {
     expect(enqueue.mock.calls[0]?.[0].selection).toEqual(createChannelMonoSelection('G'));
   });
 
-  it('requeues opened image thumbnails when auto exposure preferences change', () => {
+  it('requeues opened image thumbnails when active auto exposure preferences change', () => {
     const core = new ViewerAppCore();
     const enqueue = vi.fn<(
       sessionId: string,
@@ -198,6 +198,11 @@ describe('viewer app state effects', () => {
       { autoExposureEnabled: false, autoExposurePercentile: 98.2 },
       { autoExposureEnabled: false, autoExposurePercentile: 98.2 }
     ]);
+
+    enqueue.mockClear();
+    core.dispatch({ type: 'autoExposurePercentileSet', percentile: 97.5 });
+
+    expect(enqueue).not.toHaveBeenCalled();
   });
 
   it('ensures the active colormap lut after session and layer state transitions only', () => {

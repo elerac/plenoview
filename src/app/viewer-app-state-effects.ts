@@ -278,10 +278,18 @@ function shouldRefreshOpenedImageThumbnails(transition: ViewerStateTransition): 
     return false;
   }
 
-  return (
-    transition.intent.type === 'autoExposureSet' ||
-    transition.intent.type === 'autoExposurePercentileSet'
-  );
+  if (transition.intent.type === 'autoExposureSet') {
+    return transition.previousState.autoExposureEnabled !== transition.state.autoExposureEnabled;
+  }
+
+  if (transition.intent.type === 'autoExposurePercentileSet') {
+    return (
+      transition.state.autoExposureEnabled &&
+      transition.previousState.autoExposurePercentile !== transition.state.autoExposurePercentile
+    );
+  }
+
+  return false;
 }
 
 function shouldEnsureActiveColormapLut(transition: ViewerStateTransition): boolean {

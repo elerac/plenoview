@@ -169,9 +169,9 @@ export function buildDisplaySelectionThumbnailPixels(
     useColormapPreview ? 'colormap' : 'rgb'
   );
   const sample = createThumbnailSample();
-  const stats = useColormapPreview
-    ? null
-    : computeThumbnailStats(evaluator, width, height, scalarThumbnail, sample);
+  const stats = !useColormapPreview && scalarThumbnail
+    ? computeThumbnailStats(evaluator, width, height, sample)
+    : null;
   const sampledAutoExposure = !scalarThumbnail && !useColormapPreview && options.autoExposureEnabled
     ? computeSampledThumbnailAutoExposure(
         evaluator,
@@ -234,13 +234,10 @@ export function buildDisplaySelectionThumbnailPixels(
           r = value;
           g = value;
           b = value;
-        } else if (stats) {
-          const scale = sampledAutoExposure
-            ? exposureScale
-            : (stats.rgbMax > 1 ? 1 / stats.rgbMax : 1) * exposureScale;
-          r *= scale;
-          g *= scale;
-          b *= scale;
+        } else if (!scalarThumbnail) {
+          r *= exposureScale;
+          g *= exposureScale;
+          b *= exposureScale;
         }
 
         const displayR = linearToDisplayGammaByte(r, state.displayGamma);
@@ -286,41 +283,26 @@ function computeThumbnailStats(
   evaluator: ReturnType<typeof resolveDisplaySelectionEvaluator>,
   width: number,
   height: number,
-  scalarThumbnail: boolean,
   sample: DisplayPixelValues
-): { scalarMin: number; scalarMax: number; rgbMax: number } {
+): { scalarMin: number; scalarMax: number } {
   const pixelCount = width * height;
   const sampleStep = resolveThumbnailSampleStep(pixelCount);
   let scalarMin = Number.POSITIVE_INFINITY;
   let scalarMax = Number.NEGATIVE_INFINITY;
-  let rgbMax = 0;
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += sampleStep) {
     readDisplaySelectionPixelValuesAtIndex(evaluator, pixelIndex, sample);
     const r = sample.r;
-    const g = sample.g;
-    const b = sample.b;
 
-    if (scalarThumbnail && Number.isFinite(r)) {
+    if (Number.isFinite(r)) {
       scalarMin = Math.min(scalarMin, r);
       scalarMax = Math.max(scalarMax, r);
-    }
-
-    if (Number.isFinite(r) && r > rgbMax) {
-      rgbMax = r;
-    }
-    if (Number.isFinite(g) && g > rgbMax) {
-      rgbMax = g;
-    }
-    if (Number.isFinite(b) && b > rgbMax) {
-      rgbMax = b;
     }
   }
 
   return {
     scalarMin: Number.isFinite(scalarMin) ? scalarMin : 0,
-    scalarMax: Number.isFinite(scalarMax) ? scalarMax : 0,
-    rgbMax: Math.max(rgbMax, 1e-6)
+    scalarMax: Number.isFinite(scalarMax) ? scalarMax : 0
   };
 }
 
