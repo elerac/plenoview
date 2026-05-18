@@ -8400,6 +8400,72 @@ describe('channel thumbnail strip', () => {
     expect(firstTile.style.getPropertyValue('--channel-thumbnail-tile-width')).toBe('125px');
   });
 
+  it('keeps thumbnail frame sizing stable during selection-only rerenders', () => {
+    installUiFixture();
+    mockDesktopLayoutGeometry();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    const channelNames = ['beauty.R', 'beauty.G', 'beauty.B'];
+    const channelThumbnailItems = buildChannelViewItems(channelNames).map((item) => ({
+      ...item,
+      thumbnailDataUrl: 'data:image/png;base64,AAAA'
+    }));
+    const strip = document.getElementById('channel-thumbnail-strip') as HTMLElement;
+
+    ui.setRgbGroupOptions(channelNames, {
+      kind: 'channelRgb',
+      r: 'beauty.R',
+      g: 'beauty.G',
+      b: 'beauty.B',
+      alpha: null
+    }, channelThumbnailItems);
+
+    clickChannelStackToggleForValue('group:beauty');
+
+    const tiles = Array.from(document.querySelectorAll<HTMLButtonElement>('#channel-thumbnail-strip .channel-thumbnail-tile'));
+    expect(tiles).toHaveLength(3);
+
+    strip.style.paddingTop = '6px';
+    strip.style.paddingBottom = '8px';
+    for (const tile of tiles) {
+      tile.style.padding = '4px';
+      tile.style.rowGap = '3px';
+      tile.style.border = '1px solid transparent';
+    }
+
+    mockChannelThumbnailStripGeometry({ stripHeight: 120, tileHeight: 106, labelHeight: 16 });
+    triggerResizeObserversForElement(strip);
+
+    const firstTile = tiles[0]!;
+    const firstPreview = firstTile.querySelector('.channel-thumbnail-tile-preview') as HTMLElement;
+    const initialPreviewHeight = firstPreview.style.getPropertyValue('--channel-thumbnail-preview-height');
+    const initialPreviewWidth = firstPreview.style.getPropertyValue('--channel-thumbnail-preview-width');
+    const initialTileWidth = firstTile.style.getPropertyValue('--channel-thumbnail-tile-width');
+
+    expect(initialPreviewHeight).toBe('77px');
+    expect(initialPreviewWidth).toBe('77px');
+    expect(initialTileWidth).toBe('87px');
+
+    mockChannelThumbnailStripGeometry({ stripHeight: 80, tileHeight: 66, labelHeight: 16 });
+    tiles[1]!.click();
+
+    expect(getSelectedChannelThumbnailValue()).toBe('channel:beauty.G');
+    expect(firstPreview.style.getPropertyValue('--channel-thumbnail-preview-height')).toBe(initialPreviewHeight);
+    expect(firstPreview.style.getPropertyValue('--channel-thumbnail-preview-width')).toBe(initialPreviewWidth);
+    expect(firstTile.style.getPropertyValue('--channel-thumbnail-tile-width')).toBe(initialTileWidth);
+
+    ui.setRgbGroupOptions(channelNames, {
+      kind: 'channelMono',
+      channel: 'beauty.G',
+      alpha: null
+    }, channelThumbnailItems);
+
+    expect(getSelectedChannelThumbnailValue()).toBe('channel:beauty.G');
+    expect(firstPreview.style.getPropertyValue('--channel-thumbnail-preview-height')).toBe(initialPreviewHeight);
+    expect(firstPreview.style.getPropertyValue('--channel-thumbnail-preview-width')).toBe(initialPreviewWidth);
+    expect(firstTile.style.getPropertyValue('--channel-thumbnail-tile-width')).toBe(initialTileWidth);
+  });
+
   it('uses label-only sizing while collapsed and restores thumbnail sizing after expanding', () => {
     installUiFixture();
     mockDesktopLayoutGeometry();

@@ -100,6 +100,28 @@ test('keeps bottom-panel channel thumbnail frames stable across image selection 
       };
     })
   );
+  const readPreviewRects = async (): Promise<Array<{ width: number; height: number }>> => (
+    await page.locator('#channel-thumbnail-strip .channel-thumbnail-tile-preview').evaluateAll((elements) => (
+      elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          width: rect.width,
+          height: rect.height
+        };
+      })
+    ))
+  );
+  const expectPreviewRectsStable = (
+    actual: Array<{ width: number; height: number }>,
+    expected: Array<{ width: number; height: number }>
+  ): void => {
+    expect(actual).toHaveLength(expected.length);
+    actual.forEach((rect, index) => {
+      const expectedRect = expected[index]!;
+      expect(Math.abs(rect.width - expectedRect.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(rect.height - expectedRect.height)).toBeLessThanOrEqual(1);
+    });
+  };
   const landscapePreviewRect = await readPreviewRect();
 
   await page.setInputFiles('#file-input', {
@@ -115,8 +137,16 @@ test('keeps bottom-panel channel thumbnail frames stable across image selection 
   expect(Math.abs(portraitPreviewRect.width - landscapePreviewRect.width)).toBeLessThanOrEqual(1);
   expect(Math.abs(portraitPreviewRect.height - landscapePreviewRect.height)).toBeLessThanOrEqual(1);
 
+  await expect(thumbnailTiles).toHaveCount(3);
+  const expandedPreviewRects = await readPreviewRects();
+
   await thumbnailTiles.nth(1).click();
   await expect(thumbnailTiles.nth(1)).toHaveAttribute('aria-selected', 'true');
+  expectPreviewRectsStable(await readPreviewRects(), expandedPreviewRects);
+
+  await thumbnailTiles.nth(2).click();
+  await expect(thumbnailTiles.nth(2)).toHaveAttribute('aria-selected', 'true');
+  expectPreviewRectsStable(await readPreviewRects(), expandedPreviewRects);
 });
 
 test('defers channel thumbnail exposure refresh until slider changes are committed', async ({ page }) => {

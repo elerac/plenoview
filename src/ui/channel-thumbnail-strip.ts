@@ -239,11 +239,23 @@ export class ChannelThumbnailStrip implements Disposable {
       return;
     }
 
-    this.hasActiveImage = true;
-    this.items = [...items];
-    this.selectedValue = this.items.some((item) => item.value === selectedValue)
+    const nextItems = [...items];
+    const nextSelectedValue = nextItems.some((item) => item.value === selectedValue)
       ? selectedValue
-      : (this.items[0]?.value ?? '');
+      : (nextItems[0]?.value ?? '');
+    const canSyncSelectionOnly =
+      this.hasActiveImage &&
+      !this.isLoading &&
+      canSyncChannelThumbnailSelectionOnly(this.elements.channelThumbnailStrip, this.items, nextItems);
+
+    this.hasActiveImage = true;
+    this.items = nextItems;
+    this.selectedValue = nextSelectedValue;
+    if (canSyncSelectionOnly) {
+      this.syncSelectionOnly();
+      return;
+    }
+
     this.render();
   }
 
@@ -313,8 +325,20 @@ export class ChannelThumbnailStrip implements Disposable {
     }
 
     this.selectedValue = value;
-    this.render();
+    this.syncSelectionOnly();
     this.callbacks.onChannelViewChange(value);
+  }
+
+  private syncSelectionOnly(): void {
+    this.endHoverPreviewSession();
+    for (const tile of this.elements.channelThumbnailStrip.querySelectorAll<HTMLButtonElement>('.channel-thumbnail-tile')) {
+      tile.setAttribute('aria-selected', tile.dataset.channelValue === this.selectedValue ? 'true' : 'false');
+    }
+
+    this.applyChannelThumbnailDragState();
+    if (isFocusWithinElement(this.elements.channelThumbnailStrip)) {
+      focusSelectedTile(this.elements.channelThumbnailStrip, { preventScroll: true });
+    }
   }
 
   private handlePointerDown(event: PointerEvent): void {
@@ -947,6 +971,60 @@ function getThumbnailImageRect(preview: HTMLElement): DOMRect {
 
 function getEnabledTiles(container: HTMLElement): HTMLButtonElement[] {
   return Array.from(container.querySelectorAll<HTMLButtonElement>('.channel-thumbnail-tile')).filter((tile) => !tile.disabled);
+}
+
+function canSyncChannelThumbnailSelectionOnly(
+  container: HTMLElement,
+  currentItems: readonly ChannelViewStackedThumbnailItem[],
+  nextItems: readonly ChannelViewStackedThumbnailItem[]
+): boolean {
+  if (currentItems.length === 0 || !sameChannelThumbnailRenderItems(currentItems, nextItems)) {
+    return false;
+  }
+
+  const tiles = Array.from(container.querySelectorAll<HTMLButtonElement>('.channel-thumbnail-tile'));
+  return (
+    tiles.length === nextItems.length &&
+    tiles.every((tile, index) => tile.dataset.channelValue === nextItems[index]?.value)
+  );
+}
+
+function sameChannelThumbnailRenderItems(
+  currentItems: readonly ChannelViewStackedThumbnailItem[],
+  nextItems: readonly ChannelViewStackedThumbnailItem[]
+): boolean {
+  return (
+    currentItems.length === nextItems.length &&
+    currentItems.every((item, index) => {
+      const next = nextItems[index];
+      return Boolean(
+        next &&
+        item.value === next.value &&
+        item.label === next.label &&
+        item.thumbnailDataUrl === next.thumbnailDataUrl &&
+        sameChannelThumbnailStack(item.stack, next.stack)
+      );
+    })
+  );
+}
+
+function sameChannelThumbnailStack(
+  current: ChannelViewStackedThumbnailItem['stack'],
+  next: ChannelViewStackedThumbnailItem['stack']
+): boolean {
+  if (!current || !next) {
+    return current === next;
+  }
+
+  return (
+    current.key === next.key &&
+    current.parentValue === next.parentValue &&
+    current.role === next.role &&
+    current.index === next.index &&
+    current.count === next.count &&
+    current.childValues.length === next.childValues.length &&
+    current.childValues.every((value, index) => value === next.childValues[index])
+  );
 }
 
 function findClosestStackToggle(target: EventTarget | null, container: HTMLElement): HTMLButtonElement | null {
