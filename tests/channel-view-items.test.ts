@@ -8,6 +8,7 @@ import {
   selectStackedChannelViewItems,
   selectVisibleChannelViewItems
 } from '../src/channel-view-items';
+import { createDefaultStokesParameterVisibilitySettings } from '../src/stokes';
 import { createChannelMonoSelection, createSpectralRgbSelection, createStokesSelection } from './helpers/state-fixtures';
 
 describe('channel view items', () => {
@@ -177,5 +178,32 @@ describe('channel view items', () => {
       'stokesRgb:aolp:G',
       'stokesRgb:aolp:B'
     ]);
+  });
+
+  it('omits disabled Stokes parameter groups from channel items and stacks', () => {
+    const channelNames = [
+      'S0.R', 'S0.G', 'S0.B',
+      'S1.R', 'S1.G', 'S1.B',
+      'S2.R', 'S2.G', 'S2.B',
+      'S3.R', 'S3.G', 'S3.B'
+    ];
+    const items = buildChannelViewItems(channelNames, {
+      stokesParameterVisibility: {
+        ...createDefaultStokesParameterVisibilitySettings(),
+        aolp: false,
+        degree: false
+      }
+    });
+    const labels = items.map((item) => item.label);
+    const values = items.map((item) => item.value);
+
+    expect(labels).not.toContain('AoLP.(R,G,B)');
+    expect(labels).not.toContain('DoP.(R,G,B)');
+    expect(labels).not.toContain('DoLP.(R,G,B)');
+    expect(labels).not.toContain('DoCP.(R,G,B)');
+    expect(values).toContain('stokesRgb:s1_over_s0:group');
+    expect(values).toContain('stokesRgb:cop:group');
+    expect(buildChannelViewStacks(channelNames, items).some((stack) => stack.parentValue === 'stokesRgb:aolp:group'))
+      .toBe(false);
   });
 });

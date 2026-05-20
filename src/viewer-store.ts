@@ -1,7 +1,7 @@
 import { DEFAULT_COLORMAP_ID } from './colormaps';
 import { DEFAULT_DISPLAY_GAMMA } from './color';
 import { DEFAULT_PANORAMA_HFOV_DEG } from './interaction/panorama-geometry';
-import { resolveDisplaySelectionForLayer } from './display-selection';
+import { resolveDisplaySelectionForLayer, type DisplaySelectionAvailabilityConfig } from './display-selection';
 import {
   DEFAULT_STOKES_AOLP_DEGREE_MODULATION_MODE,
   createDefaultStokesDegreeModulation
@@ -106,7 +106,8 @@ export function pickValidLayerIndex(layerCount: number, requestedIndex: number):
 export function buildViewerStateForLayer(
   currentState: ViewerSessionState,
   decoded: DecodedExrImage,
-  requestedLayerIndex: number = currentState.activeLayer
+  requestedLayerIndex: number = currentState.activeLayer,
+  config: DisplaySelectionAvailabilityConfig = {}
 ): ViewerSessionState {
   const activeLayer = pickValidLayerIndex(decoded.layers.length, requestedLayerIndex);
   const layer = decoded.layers[activeLayer];
@@ -121,7 +122,7 @@ export function buildViewerStateForLayer(
   return {
     ...currentState,
     activeLayer,
-    displaySelection: resolveDisplaySelectionForLayer(layer.channelNames, currentState.displaySelection)
+    displaySelection: resolveDisplaySelectionForLayer(layer.channelNames, currentState.displaySelection, config)
   };
 }
 

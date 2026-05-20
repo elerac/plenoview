@@ -13,6 +13,7 @@ import {
   sameStokesControl
 } from './viewer-app-equality';
 import { sameStokesColormapDefaultSettings } from '../stokes-colormap-settings';
+import { sameStokesParameterVisibilitySettings } from '../stokes-parameter-visibility-settings';
 import { sameViewerPaneLayout } from '../viewer-pane-layout';
 import {
   buildExportTarget,
@@ -51,7 +52,8 @@ export const enum ViewerUiInvalidationFlags {
   ClearPanels = 1 << 19,
   StokesColormapDefaults = 1 << 20,
   DisplayGamma = 1 << 21,
-  ViewerPaneLayout = 1 << 22
+  ViewerPaneLayout = 1 << 22,
+  StokesParameterVisibility = 1 << 23
 }
 
 export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => ViewerUiSnapshot {
@@ -100,6 +102,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       visualizationMode: state.sessionState.visualizationMode,
       stokesDegreeModulationControl: selectStokesControl(state),
       stokesColormapDefaults: state.stokesColormapDefaults,
+      stokesParameterVisibility: state.stokesParameterVisibility,
       activeColormapId: state.sessionState.activeColormapId,
       defaultColormapId: state.defaultColormapId,
       activeColormapLut,
@@ -207,6 +210,10 @@ export function computeViewerUiInvalidation(
 
   if (!sameStokesColormapDefaultSettings(previous.stokesColormapDefaults, next.stokesColormapDefaults)) {
     flags |= ViewerUiInvalidationFlags.StokesColormapDefaults;
+  }
+
+  if (!sameStokesParameterVisibilitySettings(previous.stokesParameterVisibility, next.stokesParameterVisibility)) {
+    flags |= ViewerUiInvalidationFlags.StokesParameterVisibility;
   }
 
   if (previous.activeColormapId !== next.activeColormapId) {
@@ -439,6 +446,7 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     a.visualizationMode === b.visualizationMode &&
     sameStokesControl(a.stokesDegreeModulationControl, b.stokesDegreeModulationControl) &&
     sameStokesColormapDefaultSettings(a.stokesColormapDefaults, b.stokesColormapDefaults) &&
+    sameStokesParameterVisibilitySettings(a.stokesParameterVisibility, b.stokesParameterVisibility) &&
     a.activeColormapId === b.activeColormapId &&
     a.defaultColormapId === b.defaultColormapId &&
     a.activeColormapLut === b.activeColormapLut &&

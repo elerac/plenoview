@@ -1,5 +1,6 @@
 import { cloneViewerSessionState } from '../../session-state';
 import { createInteractionState } from '../../view-state';
+import { buildViewerStateForLayer } from '../../viewer-store';
 import {
   assignActiveViewerPaneSession,
   assignViewerPaneSession,
@@ -162,7 +163,8 @@ export function sessionReducer(
         selectActiveSession(state)?.decoded ?? null,
         {
           autoFitViewport: state.autoFitImageOnSelect ? intent.viewport ?? null : null,
-          autoFitInsets: state.autoFitImageOnSelect ? intent.fitInsets ?? null : null
+          autoFitInsets: state.autoFitImageOnSelect ? intent.fitInsets ?? null : null,
+          stokesParameterVisibility: state.stokesParameterVisibility
         }
       );
       const sessionsWithCurrentState = updateActiveSessionStoredState(
@@ -190,7 +192,12 @@ export function sessionReducer(
         return state;
       }
 
-      const nextSessionState = cloneViewerSessionState(nextSession.state);
+      const nextSessionState = buildViewerStateForLayer(
+        cloneViewerSessionState(nextSession.state),
+        nextSession.decoded,
+        nextSession.state.activeLayer,
+        { stokesParameterVisibility: state.stokesParameterVisibility }
+      );
       return {
         ...state,
         sessions: updateActiveSessionStoredState(state.sessions, state.activeSessionId, state.sessionState),
@@ -302,7 +309,8 @@ export function sessionReducer(
       const nextSessionState = buildSwitchedSessionState(
         nextSession,
         state.sessionState,
-        removedSession?.decoded ?? null
+        removedSession?.decoded ?? null,
+        { stokesParameterVisibility: state.stokesParameterVisibility }
       );
       return {
         ...state,

@@ -337,6 +337,9 @@ export function createViewerUi({
     ) => {
       void getDisplayController().setStokesColormapDefaultSetting(group, setting);
     },
+    onStokesParameterVisibilityChange: (group, enabled) => {
+      getDisplayController().setStokesParameterVisibility(group, enabled);
+    },
     onClearRoi: () => {
       core.dispatch({
         type: 'roiSet',
@@ -346,6 +349,7 @@ export function createViewerUi({
     onResetSettings: () => {
       getRenderCache().setBudgetMb(DEFAULT_DISPLAY_CACHE_BUDGET_MB);
       void getDisplayController().resetStokesColormapDefaults();
+      getDisplayController().resetStokesParameterVisibility();
     },
     onResetView: () => {
       getSessionController().resetActiveSessionState();

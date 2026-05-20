@@ -75,8 +75,16 @@ export function applyUiEffects(ui: ViewerUi, transition: ViewerUiTransition): vo
     ui.setColormapOptions(snapshot.colormapOptions, snapshot.defaultColormapId);
   }
 
-  if (invalidation & (ViewerUiInvalidationFlags.ColormapOptions | ViewerUiInvalidationFlags.StokesColormapDefaults)) {
-    ui.setStokesDefaultSettingsOptions(snapshot.colormapOptions, snapshot.stokesColormapDefaults);
+  if (invalidation & (
+    ViewerUiInvalidationFlags.ColormapOptions |
+    ViewerUiInvalidationFlags.StokesColormapDefaults |
+    ViewerUiInvalidationFlags.StokesParameterVisibility
+  )) {
+    ui.setStokesDefaultSettingsOptions(
+      snapshot.colormapOptions,
+      snapshot.stokesColormapDefaults,
+      snapshot.stokesParameterVisibility
+    );
   }
 
   if (invalidation & ViewerUiInvalidationFlags.ColormapGradient) {

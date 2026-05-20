@@ -465,6 +465,10 @@ output {
   outline-color: #ff8b85;
 }
 
+.app-menu-setting-table tr.is-stokes-disabled {
+  opacity: 0.62;
+}
+
 .app-menu-setting-checkbox,
 .app-menu-setting-modulation-cell {
   display: inline-flex;
@@ -478,6 +482,19 @@ output {
 
 .app-menu-setting-na {
   color: var(--text-dim);
+}
+
+#stokes-default-settings-table select {
+  min-width: 6rem;
+}
+
+#stokes-default-settings-table th,
+#stokes-default-settings-table td {
+  padding-inline: 0.26rem;
+}
+
+#stokes-default-settings-table input[type="number"] {
+  width: 4.6rem;
 }
 
 .app-menu-setting-label {

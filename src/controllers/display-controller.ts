@@ -12,8 +12,10 @@ import {
 import {
   cloneDisplaySelection,
   isStokesSelection,
+  sameDisplaySelection,
   type DisplaySelection
 } from '../display-model';
+import { pickDefaultDisplaySelection } from '../display-selection';
 import {
   AsyncOperationGate,
   createAbortError,
@@ -25,8 +27,10 @@ import {
 import {
   cloneStokesColormapDefaultSetting,
   createDefaultStokesColormapDefaultSettings,
+  createDefaultStokesParameterVisibilitySettings,
   getStokesColormapDefaultGroup,
   getStokesDisplayColormapDefault,
+  isStokesParameterVisible,
   type StokesColormapDefaultGroup,
   type StokesColormapDefaultSetting
 } from '../stokes';
@@ -34,6 +38,10 @@ import {
   readStoredStokesColormapDefaults,
   saveStoredStokesColormapDefaults
 } from '../stokes-colormap-settings';
+import {
+  readStoredStokesParameterVisibilitySettings,
+  saveStoredStokesParameterVisibilitySettings
+} from '../stokes-parameter-visibility-settings';
 import { ViewerAppCore } from '../app/viewer-app-core';
 import {
   selectActiveSession,
@@ -76,6 +84,10 @@ export class DisplayController implements Disposable {
         type: 'stokesColormapDefaultsSet',
         settings: readStoredStokesColormapDefaults(registry)
       });
+      this.core.dispatch({
+        type: 'stokesParameterVisibilitySet',
+        settings: readStoredStokesParameterVisibilitySettings()
+      });
 
       const requestId = this.core.issueRequestId();
       this.core.dispatch({
@@ -105,24 +117,25 @@ export class DisplayController implements Disposable {
       return;
     }
 
-    const activeSession = selectActiveSession(this.core.getState());
+    const initialState = this.core.getState();
+    const activeSession = selectActiveSession(initialState);
+    const resolvedSelection = this.resolveVisibleDisplaySelection(selection, initialState);
     if (!activeSession) {
       this.selectionTransitionGate.invalidate('Display selection request was superseded.');
       this.core.dispatch({
         type: 'displaySelectionSet',
-        displaySelection: cloneDisplaySelection(selection)
+        displaySelection: cloneDisplaySelection(resolvedSelection)
       });
       return;
     }
 
     const transitionGuard = this.selectionTransitionGate.begin('Display selection request was superseded.');
-    const initialState = this.core.getState();
-    const stokesDefaults = getStokesDisplayColormapDefault(selection, initialState.stokesColormapDefaults);
+    const stokesDefaults = getStokesDisplayColormapDefault(resolvedSelection, initialState.stokesColormapDefaults);
     const restoreState = captureRestorableVisualizationState(initialState.sessionState);
     if (!stokesDefaults) {
       this.core.dispatch({
         type: 'displaySelectionSet',
-        displaySelection: cloneDisplaySelection(selection)
+        displaySelection: cloneDisplaySelection(resolvedSelection)
       });
       await this.ensureActiveColormapLutLoaded();
       return;
@@ -144,25 +157,26 @@ export class DisplayController implements Disposable {
       }
 
       const latestState = this.core.getState();
+      const latestSelection = this.resolveVisibleDisplaySelection(resolvedSelection, latestState);
       const latestStokesDefaults = getStokesDisplayColormapDefault(
-        selection,
+        latestSelection,
         latestState.stokesColormapDefaults
       );
       const keepManualColormap = this.manualColormapOverrideTransitionIds.has(transitionRequestId);
       const keepGroupedColormap = shouldPreserveStokesColormapState(
         latestState.sessionState.displaySelection,
-        selection
+        latestSelection
       );
       if (!latestStokesDefaults) {
         this.core.dispatch({
           type: 'displaySelectionSet',
-          displaySelection: cloneDisplaySelection(selection),
-          restoreState
+          displaySelection: cloneDisplaySelection(latestSelection),
+          restoreState: sameDisplaySelection(latestSelection, resolvedSelection) ? restoreState : null
         });
       } else if (keepManualColormap || keepGroupedColormap) {
         this.core.dispatch({
           type: 'displaySelectionSet',
-          displaySelection: cloneDisplaySelection(selection),
+          displaySelection: cloneDisplaySelection(latestSelection),
           restoreState
         });
       } else if (latestState.colormapRegistry) {
@@ -203,7 +217,7 @@ export class DisplayController implements Disposable {
         });
         this.core.dispatch({
           type: 'displaySelectionSet',
-          displaySelection: cloneDisplaySelection(selection),
+          displaySelection: cloneDisplaySelection(latestSelection),
           restoreState
         });
       }
@@ -429,6 +443,35 @@ export class DisplayController implements Disposable {
     await this.setActiveColormap(colormapId);
   }
 
+  setStokesParameterVisibility(group: StokesColormapDefaultGroup, enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const settings = {
+      ...this.core.getState().stokesParameterVisibility,
+      [group]: enabled
+    };
+    saveStoredStokesParameterVisibilitySettings(settings);
+    this.core.dispatch({
+      type: 'stokesParameterVisibilityGroupSet',
+      group,
+      enabled
+    });
+  }
+
+  resetStokesParameterVisibility(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const defaults = createDefaultStokesParameterVisibilitySettings();
+    saveStoredStokesParameterVisibilitySettings(defaults);
+    this.core.dispatch({
+      type: 'stokesParameterVisibilityReset'
+    });
+  }
+
   async ensureActiveColormapLutLoaded(): Promise<void> {
     if (this.disposed) {
       return;
@@ -582,6 +625,23 @@ export class DisplayController implements Disposable {
     return isStokesSelection(selection)
       ? getStokesColormapDefaultGroup(selection.parameter)
       : null;
+  }
+
+  private resolveVisibleDisplaySelection(
+    selection: DisplaySelection | null,
+    state = this.core.getState()
+  ): DisplaySelection | null {
+    if (!selection) {
+      return null;
+    }
+
+    if (!isStokesSelection(selection) || isStokesParameterVisible(selection.parameter, state.stokesParameterVisibility)) {
+      return selection;
+    }
+
+    const activeSession = selectActiveSession(state);
+    const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
+    return layer ? pickDefaultDisplaySelection(layer.channelNames) : null;
   }
 
   private isSelectionTransitionCurrent(

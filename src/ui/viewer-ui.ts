@@ -90,10 +90,13 @@ import {
   STOKES_COLORMAP_DEFAULT_GROUPS,
   cloneStokesColormapDefaultSetting,
   cloneStokesColormapDefaultSettings,
+  cloneStokesParameterVisibilitySettings,
   createDefaultStokesColormapDefaultSettings,
+  createDefaultStokesParameterVisibilitySettings,
   type StokesColormapDefaultGroup,
   type StokesColormapDefaultSetting,
-  type StokesColormapDefaultSettings
+  type StokesColormapDefaultSettings,
+  type StokesParameterVisibilitySettings
 } from '../stokes';
 import { TopBarTooltipController } from './top-bar-tooltip-controller';
 import { TopMenuController } from './top-menu-controller';
@@ -264,6 +267,7 @@ export interface UiCallbacks {
   onStokesDegreeModulationToggle: () => void;
   onStokesAolpDegreeModulationModeChange: (mode: StokesAolpDegreeModulationMode) => void;
   onStokesDefaultSettingChange: (group: StokesColormapDefaultGroup, setting: StokesColormapDefaultSetting) => void;
+  onStokesParameterVisibilityChange: (group: StokesColormapDefaultGroup, enabled: boolean) => void;
   onClearRoi: () => void;
   onResetSettings: () => void;
   onResetView: () => void;
@@ -272,6 +276,7 @@ export interface UiCallbacks {
 export type ChannelThumbnailOptionItem = ChannelViewThumbnailItem;
 
 interface StokesDefaultSettingRowElements {
+  enabledCheckbox: HTMLInputElement;
   colormapSelect: HTMLSelectElement;
   vminInput: HTMLInputElement;
   vmaxInput: HTMLInputElement;
@@ -329,6 +334,7 @@ export class ViewerUi implements Disposable {
   private currentChannelSelection: DisplaySelection | null = null;
   private stokesColormapOptions: Array<{ id: string; label: string }> = [];
   private stokesColormapDefaults: StokesColormapDefaultSettings = createDefaultStokesColormapDefaultSettings();
+  private stokesParameterVisibility: StokesParameterVisibilitySettings = createDefaultStokesParameterVisibilitySettings();
   private viewerMode: ViewerMode = 'image';
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
@@ -629,7 +635,7 @@ export class ViewerUi implements Disposable {
     this.disposables.addDisposable(this.viewerBackgroundController);
     this.disposables.addDisposable(this.themeController);
     this.clearImageBrowserPanels();
-    this.setStokesDefaultSettingsOptions([], this.stokesColormapDefaults);
+    this.setStokesDefaultSettingsOptions([], this.stokesColormapDefaults, this.stokesParameterVisibility);
     this.setViewerMode('image');
     this.setAutoFitImageOnSelect(readStoredAutoFitImageOnSelect(), false);
     this.callbacks.onAutoFitImageOnSelectChange(this.autoFitImageOnSelect);
@@ -1007,7 +1013,8 @@ export class ViewerUi implements Disposable {
 
   setStokesDefaultSettingsOptions(
     items: Array<{ id: string; label: string }>,
-    defaults: StokesColormapDefaultSettings
+    defaults: StokesColormapDefaultSettings,
+    visibility: StokesParameterVisibilitySettings = createDefaultStokesParameterVisibilitySettings()
   ): void {
     if (this.disposed) {
       return;
@@ -1015,6 +1022,7 @@ export class ViewerUi implements Disposable {
 
     this.stokesColormapOptions = items.map((item) => ({ ...item }));
     this.stokesColormapDefaults = cloneStokesColormapDefaultSettings(defaults);
+    this.stokesParameterVisibility = cloneStokesParameterVisibilitySettings(visibility);
     const selectOptions = items.map((item) => ({
       value: item.id,
       label: item.label
@@ -1030,18 +1038,27 @@ export class ViewerUi implements Disposable {
 
       syncSelectOptions(row.colormapSelect, selectOptions);
       row.colormapSelect.value = findColormapOptionIdByLabel(items, setting.colormapLabel) ?? '';
-      row.colormapSelect.disabled = items.length === 0;
+      const enabled = visibility[group] !== false;
+      const tableRow = row.enabledCheckbox.closest('tr');
+      tableRow?.classList.toggle('is-stokes-disabled', !enabled);
+      row.enabledCheckbox.checked = enabled;
+      row.colormapSelect.disabled = items.length === 0 || !enabled;
       row.vminInput.value = formatStokesDefaultNumber(setting.range.min);
       row.vmaxInput.value = formatStokesDefaultNumber(setting.range.max);
+      row.vminInput.disabled = !enabled;
+      row.vmaxInput.disabled = !enabled;
       row.vminInput.removeAttribute('aria-invalid');
       row.vmaxInput.removeAttribute('aria-invalid');
       row.zeroCenteredCheckbox.checked = setting.zeroCentered;
+      row.zeroCenteredCheckbox.disabled = !enabled;
 
       if (row.modulationCheckbox) {
         row.modulationCheckbox.checked = Boolean(setting.modulation?.enabled);
+        row.modulationCheckbox.disabled = !enabled;
       }
       if (row.aolpModeSelect) {
         row.aolpModeSelect.value = setting.modulation?.aolpMode ?? 'value';
+        row.aolpModeSelect.disabled = !enabled;
       }
 
       if (focusedControl && !focusedControl.disabled) {
@@ -2622,7 +2639,8 @@ export class ViewerUi implements Disposable {
       this.callbacks.onImageLoadWorkersChange(this.imageLoadWorkers);
       this.setStokesDefaultSettingsOptions(
         this.stokesColormapOptions,
-        createDefaultStokesColormapDefaultSettings()
+        createDefaultStokesColormapDefaultSettings(),
+        createDefaultStokesParameterVisibilitySettings()
       );
       this.callbacks.onResetSettings();
     });
@@ -2779,6 +2797,19 @@ export class ViewerUi implements Disposable {
       return;
     }
 
+    this.disposables.addEventListener(row.enabledCheckbox, 'change', () => {
+      this.stokesParameterVisibility = {
+        ...this.stokesParameterVisibility,
+        [group]: row.enabledCheckbox.checked
+      };
+      this.setStokesDefaultSettingsOptions(
+        this.stokesColormapOptions,
+        this.stokesColormapDefaults,
+        this.stokesParameterVisibility
+      );
+      this.callbacks.onStokesParameterVisibilityChange(group, row.enabledCheckbox.checked);
+    });
+
     this.disposables.addEventListener(row.colormapSelect, 'change', () => {
       if (row.colormapSelect.disabled || !row.colormapSelect.value) {
         return;
@@ -2894,16 +2925,18 @@ export class ViewerUi implements Disposable {
     }
 
     const colormapSelect = row.querySelector<HTMLSelectElement>('[data-stokes-control="colormap"]');
+    const enabledCheckbox = row.querySelector<HTMLInputElement>('[data-stokes-control="enabled"]');
     const vminInput = row.querySelector<HTMLInputElement>('[data-stokes-control="vmin"]');
     const vmaxInput = row.querySelector<HTMLInputElement>('[data-stokes-control="vmax"]');
     const zeroCenteredCheckbox = row.querySelector<HTMLInputElement>('[data-stokes-control="zeroCentered"]');
-    if (!colormapSelect || !vminInput || !vmaxInput || !zeroCenteredCheckbox) {
+    if (!enabledCheckbox || !colormapSelect || !vminInput || !vmaxInput || !zeroCenteredCheckbox) {
       return null;
     }
 
     const modulationCheckbox = row.querySelector<HTMLInputElement>('[data-stokes-control="modulation"]');
     const aolpModeSelect = row.querySelector<HTMLSelectElement>('[data-stokes-control="aolpMode"]');
     const controls = [
+      enabledCheckbox,
       colormapSelect,
       vminInput,
       vmaxInput,
@@ -2912,6 +2945,7 @@ export class ViewerUi implements Disposable {
       ...(aolpModeSelect ? [aolpModeSelect] : [])
     ];
     return {
+      enabledCheckbox,
       colormapSelect,
       vminInput,
       vmaxInput,

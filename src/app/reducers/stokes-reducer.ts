@@ -6,15 +6,21 @@ import {
   cloneDisplaySelection,
   isStokesSelection
 } from '../../display-model';
+import { pickDefaultDisplaySelection } from '../../display-selection';
 import {
   cloneStokesColormapDefaultSetting,
   cloneStokesColormapDefaultSettings,
+  cloneStokesParameterVisibilitySettings,
   createDefaultStokesColormapDefaultSettings,
+  createDefaultStokesParameterVisibilitySettings,
   getStokesDisplayColormapDefault,
+  isStokesParameterVisible,
   isStokesDegreeModulationParameter,
-  type StokesColormapDefaultSetting
+  type StokesColormapDefaultSetting,
+  type StokesParameterVisibilitySettings
 } from '../../stokes';
 import { sameStokesColormapDefaultSettings } from '../../stokes-colormap-settings';
+import { sameStokesParameterVisibilitySettings } from '../../stokes-parameter-visibility-settings';
 import type { ViewerSessionState } from '../../types';
 import { selectActiveSession } from '../viewer-app-selectors';
 import type {
@@ -110,6 +116,15 @@ export function stokesReducer(
             stokesColormapDefaults: defaults
           };
     }
+    case 'stokesParameterVisibilitySet':
+      return reduceStokesParameterVisibilitySet(state, intent.settings);
+    case 'stokesParameterVisibilityGroupSet':
+      return reduceStokesParameterVisibilitySet(state, {
+        ...state.stokesParameterVisibility,
+        [intent.group]: intent.enabled
+      });
+    case 'stokesParameterVisibilityReset':
+      return reduceStokesParameterVisibilitySet(state, createDefaultStokesParameterVisibilitySettings());
     case 'sessionClosed':
       return sessionExists(context.initialState, intent.sessionId)
         ? removeStokesRestoreState(state, intent.sessionId)
@@ -132,7 +147,11 @@ function reduceDisplaySelectionSet(
 ): ViewerAppState {
   const activeSession = selectActiveSession(state);
   const currentState = state.sessionState;
-  const selection = cloneDisplaySelection(intent.displaySelection);
+  const selection = resolveSelectionForStokesVisibility(
+    state,
+    cloneDisplaySelection(intent.displaySelection),
+    state.stokesParameterVisibility
+  );
   const stokesDefaults = getStokesDisplayColormapDefault(selection, state.stokesColormapDefaults);
   let patch: Partial<ViewerSessionState> = {
     displaySelection: selection
@@ -180,6 +199,60 @@ function reduceDisplaySelectionSet(
   return patchSessionState(nextState, patch, {
     resetDisplayRangeContext: true
   });
+}
+
+function reduceStokesParameterVisibilitySet(
+  state: ViewerAppState,
+  settings: StokesParameterVisibilitySettings
+): ViewerAppState {
+  const nextVisibility = cloneStokesParameterVisibilitySettings(settings);
+  if (sameStokesParameterVisibilitySettings(state.stokesParameterVisibility, nextVisibility)) {
+    return state;
+  }
+
+  const nextState = {
+    ...state,
+    stokesParameterVisibility: nextVisibility
+  };
+  const fallbackPatch = buildDisabledActiveStokesFallbackPatch(nextState, nextVisibility);
+  return fallbackPatch
+    ? patchSessionState(nextState, fallbackPatch, {
+        clearHover: true,
+        resetDisplayRangeContext: true
+      })
+    : nextState;
+}
+
+function buildDisabledActiveStokesFallbackPatch(
+  state: ViewerAppState,
+  settings: StokesParameterVisibilitySettings
+): Partial<ViewerSessionState> | null {
+  const selection = state.sessionState.displaySelection;
+  if (!isStokesSelection(selection) || isStokesParameterVisible(selection.parameter, settings)) {
+    return null;
+  }
+
+  const activeSession = selectActiveSession(state);
+  const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
+  const fallbackSelection = layer ? pickDefaultDisplaySelection(layer.channelNames) : null;
+  return {
+    displaySelection: fallbackSelection,
+    ...resolveStokesDisplayRestoreState(state, activeSession?.id ?? null)
+  };
+}
+
+function resolveSelectionForStokesVisibility(
+  state: ViewerAppState,
+  selection: ViewerSessionState['displaySelection'],
+  settings: StokesParameterVisibilitySettings
+): ViewerSessionState['displaySelection'] {
+  if (!isStokesSelection(selection) || isStokesParameterVisible(selection.parameter, settings)) {
+    return selection;
+  }
+
+  const activeSession = selectActiveSession(state);
+  const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
+  return layer ? pickDefaultDisplaySelection(layer.channelNames) : null;
 }
 
 function buildStokesDefaultModulationPatch(

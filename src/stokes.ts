@@ -29,6 +29,7 @@ export interface StokesColormapDefaultSetting {
   modulation: StokesColormapDefaultModulation | null;
 }
 export type StokesColormapDefaultSettings = Record<StokesColormapDefaultGroup, StokesColormapDefaultSetting>;
+export type StokesParameterVisibilitySettings = Record<StokesColormapDefaultGroup, boolean>;
 export type RgbStokesComponent = 'R' | 'G' | 'B';
 
 export interface StokesColormapDefault {
@@ -41,6 +42,7 @@ export interface StokesColormapDefault {
 export interface StokesDisplayOptionsConfig {
   includeRgbGroups?: boolean;
   includeSplitChannels?: boolean;
+  parameterVisibility?: StokesParameterVisibilitySettings;
 }
 
 export interface ScalarStokesChannels {
@@ -130,6 +132,13 @@ export const DEFAULT_STOKES_COLORMAP_DEFAULT_SETTINGS: StokesColormapDefaultSett
     modulation: null
   }
 };
+export const DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS: StokesParameterVisibilitySettings = {
+  aolp: true,
+  degree: true,
+  cop: true,
+  top: true,
+  normalized: true
+};
 
 const STOKES_COLORMAP_DEFAULT_GROUP_LABELS: Record<StokesColormapDefaultGroup, string> = {
   aolp: 'AoLP',
@@ -156,6 +165,10 @@ export function createDefaultStokesColormapDefaultSettings(): StokesColormapDefa
   return cloneStokesColormapDefaultSettings(DEFAULT_STOKES_COLORMAP_DEFAULT_SETTINGS);
 }
 
+export function createDefaultStokesParameterVisibilitySettings(): StokesParameterVisibilitySettings {
+  return cloneStokesParameterVisibilitySettings(DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS);
+}
+
 export function cloneStokesColormapDefaultSetting(
   setting: StokesColormapDefaultSetting
 ): StokesColormapDefaultSetting {
@@ -176,6 +189,18 @@ export function cloneStokesColormapDefaultSettings(
     cop: cloneStokesColormapDefaultSetting(settings.cop),
     top: cloneStokesColormapDefaultSetting(settings.top),
     normalized: cloneStokesColormapDefaultSetting(settings.normalized)
+  };
+}
+
+export function cloneStokesParameterVisibilitySettings(
+  settings: StokesParameterVisibilitySettings
+): StokesParameterVisibilitySettings {
+  return {
+    aolp: Boolean(settings.aolp),
+    degree: Boolean(settings.degree),
+    cop: Boolean(settings.cop),
+    top: Boolean(settings.top),
+    normalized: Boolean(settings.normalized)
   };
 }
 
@@ -323,6 +348,7 @@ export function getStokesDisplayOptions(
   const options: StokesDisplayOption[] = [];
   const includeRgbGroups = config.includeRgbGroups ?? true;
   const includeSplitChannels = config.includeSplitChannels ?? false;
+  const parameterVisibility = config.parameterVisibility ?? DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS;
   const spectralStokesCapabilities = getSpectralStokesRgbCapabilitiesForChannelNames(channelNames);
   const hasSpectralStokesRgbOptions = spectralStokesCapabilities.available;
   const scalarChannelSets = detectScalarStokesChannelSets(channelNames);
@@ -336,14 +362,14 @@ export function getStokesDisplayOptions(
       continue;
     }
 
-    for (const parameter of getAvailableStokesParameters(hasCompleteScalarStokesS3(scalarChannels))) {
+    for (const parameter of getAvailableStokesParameters(hasCompleteScalarStokesS3(scalarChannels), parameterVisibility)) {
       options.push(buildScalarStokesDisplayOption(parameter, scalarChannels));
     }
   }
 
   const rgbChannels = detectRgbStokesChannels(channelNames);
   if (rgbChannels) {
-    for (const parameter of getAvailableStokesParameters(hasCompleteRgbStokesS3(rgbChannels))) {
+    for (const parameter of getAvailableStokesParameters(hasCompleteRgbStokesS3(rgbChannels), parameterVisibility)) {
       if (includeRgbGroups) {
         options.push(buildRgbStokesGroupDisplayOption(parameter, rgbChannels));
       }
@@ -359,7 +385,7 @@ export function getStokesDisplayOptions(
   }
 
   if (hasSpectralStokesRgbOptions && includeRgbGroups) {
-    for (const parameter of getAvailableStokesParameters(spectralStokesCapabilities.hasS3)) {
+    for (const parameter of getAvailableStokesParameters(spectralStokesCapabilities.hasS3, parameterVisibility)) {
       options.push(buildSpectralStokesRgbDisplayOption(parameter));
     }
   }
@@ -400,6 +426,14 @@ export function getStokesColormapDefaultGroup(
   return parameter;
 }
 
+export function isStokesParameterVisible(
+  parameter: StokesParameter | null,
+  settings: StokesParameterVisibilitySettings = DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS
+): boolean {
+  const group = getStokesColormapDefaultGroup(parameter);
+  return group ? settings[group] !== false : true;
+}
+
 export function resolveStokesColormapDefaultLabel(
   parameter: StokesParameter | null,
   settings: StokesColormapDefaultSettings = DEFAULT_STOKES_COLORMAP_DEFAULT_SETTINGS
@@ -435,10 +469,15 @@ export function getStokesDisplayColormapDefault(
 
 export function isStokesDisplayAvailable(
   channelNames: string[],
-  selection: DisplaySelection | null
+  selection: DisplaySelection | null,
+  parameterVisibility: StokesParameterVisibilitySettings = DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS
 ): boolean {
   if (!isStokesSelection(selection)) {
     return true;
+  }
+
+  if (!isStokesParameterVisible(selection.parameter, parameterVisibility)) {
+    return false;
   }
 
   if (selection.source.kind === 'scalar') {
@@ -746,8 +785,14 @@ function buildSpectralStokesRgbDisplayOption(parameter: StokesParameter): Stokes
   };
 }
 
-function getAvailableStokesParameters(hasS3: boolean): StokesParameter[] {
-  return STOKES_PARAMETER_ORDER.filter((parameter) => isStokesParameterAvailable(parameter, hasS3));
+function getAvailableStokesParameters(
+  hasS3: boolean,
+  parameterVisibility: StokesParameterVisibilitySettings
+): StokesParameter[] {
+  return STOKES_PARAMETER_ORDER.filter((parameter) => (
+    isStokesParameterAvailable(parameter, hasS3) &&
+    isStokesParameterVisible(parameter, parameterVisibility)
+  ));
 }
 
 function isStokesParameterAvailable(parameter: StokesParameter, hasS3: boolean): boolean {

@@ -733,7 +733,8 @@ export class SessionController implements Disposable {
       currentSessionState: currentState.sessionState,
       hasActiveSession: Boolean(activeSession),
       previousImage: activeSession?.decoded ?? null,
-      autoFitImageOnSelect: currentState.autoFitImageOnSelect
+      autoFitImageOnSelect: currentState.autoFitImageOnSelect,
+      stokesParameterVisibility: currentState.stokesParameterVisibility
     });
 
     this.core.dispatch({
@@ -757,7 +758,12 @@ export class SessionController implements Disposable {
       const baseState = this.getActiveSessionId() === sessionId
         ? this.core.getState().sessionState
         : session.state;
-      const reloadedSession = buildReloadedSession(session, decoded, baseState);
+      const reloadedSession = buildReloadedSession(
+        session,
+        decoded,
+        baseState,
+        this.core.getState().stokesParameterVisibility
+      );
       this.core.dispatch({
         type: 'sessionReloaded',
         sessionId,

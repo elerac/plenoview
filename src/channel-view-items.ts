@@ -4,7 +4,7 @@ import {
   findMergedSelectionForSplitDisplay,
   findSplitSelectionForMergedDisplay
 } from './display-selection';
-import { getStokesDisplayOptions } from './stokes';
+import { getStokesDisplayOptions, type StokesParameterVisibilitySettings } from './stokes';
 import { getSpectralRgbDisplayOptions, getSpectralRgbSplitChannelNames } from './spectral';
 import type { DisplayChannelMapping } from './types';
 
@@ -44,9 +44,16 @@ export type ChannelViewStackedItem<T extends ChannelViewItem = ChannelViewItem> 
 
 export type ChannelViewStackedThumbnailItem = ChannelViewStackedItem<ChannelViewThumbnailItem>;
 
-export function buildChannelViewItems(channelNames: string[]): ChannelViewItem[] {
-  const mergedItems = buildDisplayItems(channelNames, false);
-  const splitItems = buildDisplayItems(channelNames, true);
+export interface ChannelViewItemsConfig {
+  stokesParameterVisibility?: StokesParameterVisibilitySettings;
+}
+
+export function buildChannelViewItems(
+  channelNames: string[],
+  config: ChannelViewItemsConfig = {}
+): ChannelViewItem[] {
+  const mergedItems = buildDisplayItems(channelNames, false, config);
+  const splitItems = buildDisplayItems(channelNames, true, config);
   const itemsByValue = new Map<string, ChannelViewItem>();
   const buildCollisionKey = (item: Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>): string =>
     `${item.value}::${item.selectionKey}`;
@@ -225,7 +232,11 @@ export function getChannelViewSwatches(mapping: DisplayChannelMapping): string[]
   return uniqueChannels.slice(0, 3).map(getRepresentativeChannelColor);
 }
 
-function buildDisplayItems(channelNames: string[], includeSplitRgbChannels: boolean): Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>[] {
+function buildDisplayItems(
+  channelNames: string[],
+  includeSplitRgbChannels: boolean,
+  config: ChannelViewItemsConfig
+): Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>[] {
   const spectralSplitChannelNames = includeSplitRgbChannels
     ? null
     : getSpectralRgbSplitChannelNames(channelNames);
@@ -239,7 +250,8 @@ function buildDisplayItems(channelNames: string[], includeSplitRgbChannels: bool
   ));
   const stokesOptions = getStokesDisplayOptions(channelNames, {
     includeRgbGroups: !includeSplitRgbChannels,
-    includeSplitChannels: includeSplitRgbChannels
+    includeSplitChannels: includeSplitRgbChannels,
+    parameterVisibility: config.stokesParameterVisibility
   });
   const spectralOptions = includeSplitRgbChannels ? [] : getSpectralRgbDisplayOptions(channelNames);
   return [...channelOptions, ...spectralOptions, ...stokesOptions].map((option) => ({

@@ -4,7 +4,8 @@ import {
   buildScalarStokesSelection,
   buildSpectralStokesRgbSelection,
   detectRgbStokesChannels,
-  isStokesDisplayAvailable
+  isStokesDisplayAvailable,
+  type StokesParameterVisibilitySettings
 } from './stokes';
 import {
   buildSpectralRgbSelection,
@@ -53,6 +54,10 @@ export interface ChannelDisplayOptionsConfig {
   includeAlphaCompanions?: boolean;
 }
 
+export interface DisplaySelectionAvailabilityConfig {
+  stokesParameterVisibility?: StokesParameterVisibilitySettings;
+}
+
 export function pickDefaultDisplaySelection(channelNames: string[]): DisplaySelection | null {
   const names = [...channelNames];
   const rgbGroups = extractRgbChannelGroups(names);
@@ -76,7 +81,8 @@ export function pickDefaultDisplaySelection(channelNames: string[]): DisplaySele
 
 export function resolveDisplaySelectionForLayer(
   channelNames: string[],
-  currentSelection: DisplaySelection | null
+  currentSelection: DisplaySelection | null,
+  config: DisplaySelectionAvailabilityConfig = {}
 ): DisplaySelection | null {
   if (!currentSelection) {
     return pickDefaultDisplaySelection(channelNames);
@@ -88,7 +94,7 @@ export function resolveDisplaySelectionForLayer(
   }
 
   if (isStokesSelection(currentSelection)) {
-    return isStokesDisplayAvailable(channelNames, currentSelection)
+    return isStokesDisplayAvailable(channelNames, currentSelection, config.stokesParameterVisibility)
       ? currentSelection
       : pickDefaultDisplaySelection(channelNames);
   }

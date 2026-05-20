@@ -194,7 +194,9 @@ function scheduleActiveChannelThumbnailGeneration(
   };
 
   for (const item of prioritizeSelectedChannelViewItem(
-    buildChannelViewItems(layer.channelNames),
+    buildChannelViewItems(layer.channelNames, {
+      stokesParameterVisibility: state.stokesParameterVisibility
+    }),
     state.sessionState.displaySelection
   )) {
     const requestKey = serializeChannelThumbnailRequestKey({

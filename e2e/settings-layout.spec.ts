@@ -759,18 +759,23 @@ test('stacks Stokes Defaults settings on narrow viewports without horizontal cli
     }
 
     const targetControlIds = [
+      'stokes-default-aolp-enabled-checkbox',
       'stokes-default-aolp-vmax-input',
       'stokes-default-aolp-zero-center-checkbox',
       'stokes-default-aolp-modulation-checkbox',
       'stokes-default-aolp-modulation-mode-select',
+      'stokes-default-degree-enabled-checkbox',
       'stokes-default-degree-vmax-input',
       'stokes-default-degree-zero-center-checkbox',
+      'stokes-default-cop-enabled-checkbox',
       'stokes-default-cop-vmax-input',
       'stokes-default-cop-zero-center-checkbox',
       'stokes-default-cop-modulation-checkbox',
+      'stokes-default-top-enabled-checkbox',
       'stokes-default-top-vmax-input',
       'stokes-default-top-zero-center-checkbox',
       'stokes-default-top-modulation-checkbox',
+      'stokes-default-normalized-enabled-checkbox',
       'stokes-default-normalized-vmax-input',
       'stokes-default-normalized-zero-center-checkbox'
     ];
@@ -789,7 +794,7 @@ test('stacks Stokes Defaults settings on narrow viewports without horizontal cli
         const content = getComputedStyle(cell, '::before').content;
         return content.replace(/^"|"$/g, '');
       })
-      .filter((label) => label === 'vmax' || label === 'Zero Center' || label === 'Modulation');
+      .filter((label) => label === 'Enabled' || label === 'vmax' || label === 'Zero Center' || label === 'Modulation');
 
     return {
       tableDisplay: getComputedStyle(table).display,
@@ -803,7 +808,7 @@ test('stacks Stokes Defaults settings on narrow viewports without horizontal cli
   expect(layout.tableDisplay).toBe('grid');
   expect(layout.wrapScrollWidth).toBeLessThanOrEqual(layout.wrapClientWidth + 1);
   expect(layout.clippedControls).toEqual([]);
-  expect(layout.responsiveLabels).toEqual(expect.arrayContaining(['vmax', 'Zero Center', 'Modulation']));
+  expect(layout.responsiveLabels).toEqual(expect.arrayContaining(['Enabled', 'vmax', 'Zero Center', 'Modulation']));
 });
 
 test('persists Spectrum lattice as animated idle and frozen active chrome', async ({ page }) => {

@@ -7,6 +7,7 @@ import {
 } from '../display/revision-keys';
 import { sameDisplayLuminanceRange } from '../colormap-range';
 import { sameDisplaySelection } from '../display-model';
+import { resolveDisplaySelectionForLayer } from '../display-selection';
 import {
   createEmptyRoiInteractionState,
   mergeRenderState,
@@ -246,15 +247,21 @@ function selectPaneRenderSources(
     if (!layer) {
       continue;
     }
+    const visibleRenderState = {
+      ...renderState,
+      displaySelection: resolveDisplaySelectionForLayer(layer.channelNames, renderState.displaySelection, {
+        stokesParameterVisibility: state.stokesParameterVisibility
+      })
+    };
 
     sources.push({
       path: [...pane.path],
       active: pane.active,
       session,
-      activeLayer: renderState.activeLayer,
+      activeLayer: visibleRenderState.activeLayer,
       layer,
-      renderState,
-      colormapLut: selectColormapLutById(state, renderState.activeColormapId)
+      renderState: visibleRenderState,
+      colormapLut: selectColormapLutById(state, visibleRenderState.activeColormapId)
     });
   }
 

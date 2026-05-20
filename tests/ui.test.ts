@@ -31,7 +31,10 @@ import {
   SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM,
   SPECTRUM_LATTICE_MOTION_STORAGE_KEY
 } from '../src/spectrum-lattice-motion';
-import { createDefaultStokesColormapDefaultSettings } from '../src/stokes';
+import {
+  createDefaultStokesColormapDefaultSettings,
+  createDefaultStokesParameterVisibilitySettings
+} from '../src/stokes';
 import { AUTO_EXPOSURE_PERCENTILE } from '../src/auto-exposure';
 import {
   getDefaultImageLoadWorkers,
@@ -2334,6 +2337,15 @@ describe('view menu', () => {
       'ToP',
       'Normalized'
     ]);
+    expect(Array.from(document.querySelectorAll('#stokes-default-settings-table thead th')).map((cell) => cell.textContent?.trim())).toEqual([
+      'Parameter',
+      'Enabled',
+      'Colormap',
+      'vmin',
+      'vmax',
+      'Zero Center',
+      'Modulation'
+    ]);
     expect(Array.from(themeSelect.options).map((option) => option.textContent)).toEqual([
       'Default',
       'Spectrum lattice'
@@ -2356,10 +2368,16 @@ describe('view menu', () => {
     installUiFixture();
 
     const onStokesDefaultSettingChange = vi.fn();
-    const ui = new ViewerUi(createUiCallbacks({ onStokesDefaultSettingChange }));
+    const onStokesParameterVisibilityChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({
+      onStokesDefaultSettingChange,
+      onStokesParameterVisibilityChange
+    }));
     const defaults = createDefaultStokesColormapDefaultSettings();
+    const visibility = createDefaultStokesParameterVisibilitySettings();
     const aolpSelect = document.getElementById('stokes-default-aolp-colormap-select') as HTMLSelectElement;
     const degreeSelect = document.getElementById('stokes-default-degree-colormap-select') as HTMLSelectElement;
+    const degreeEnabledCheckbox = document.getElementById('stokes-default-degree-enabled-checkbox') as HTMLInputElement;
     const degreeVminInput = document.getElementById('stokes-default-degree-vmin-input') as HTMLInputElement;
     const degreeVmaxInput = document.getElementById('stokes-default-degree-vmax-input') as HTMLInputElement;
     const normalizedZeroCenterCheckbox = document.getElementById(
@@ -2386,6 +2404,9 @@ describe('view menu', () => {
         colormapLabel: 'RdBu',
         range: { min: 0.2, max: 0.8 }
       }
+    }, {
+      ...visibility,
+      degree: false
     });
 
     expect(Array.from(aolpSelect.options).map((option) => option.textContent)).toEqual([
@@ -2396,11 +2417,23 @@ describe('view menu', () => {
     ]);
     expect(aolpSelect.value).toBe('1');
     expect(degreeSelect.value).toBe('3');
+    expect(degreeEnabledCheckbox.checked).toBe(false);
+    expect(degreeSelect.disabled).toBe(true);
+    expect(degreeVminInput.disabled).toBe(true);
+    expect(degreeVmaxInput.disabled).toBe(true);
     expect(degreeVminInput.value).toBe('0.2');
     expect(degreeVmaxInput.value).toBe('0.8');
     expect(normalizedZeroCenterCheckbox.checked).toBe(true);
     expect(aolpModulationCheckbox.checked).toBe(false);
     expect(aolpModeSelect.value).toBe('value');
+
+    degreeEnabledCheckbox.checked = true;
+    degreeEnabledCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onStokesParameterVisibilityChange).toHaveBeenLastCalledWith('degree', true);
+    expect(degreeSelect.disabled).toBe(false);
+    expect(degreeVminInput.disabled).toBe(false);
+    expect(degreeVmaxInput.disabled).toBe(false);
 
     degreeSelect.value = '2';
     degreeSelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2928,26 +2961,31 @@ describe('view menu', () => {
     const settingsDialog = document.getElementById('settings-dialog') as HTMLElement;
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
     const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
+    const aolpEnabled = document.getElementById('stokes-default-aolp-enabled-checkbox') as HTMLInputElement;
     const aolpSelect = document.getElementById('stokes-default-aolp-colormap-select') as HTMLSelectElement;
     const aolpVmin = document.getElementById('stokes-default-aolp-vmin-input') as HTMLInputElement;
     const aolpVmax = document.getElementById('stokes-default-aolp-vmax-input') as HTMLInputElement;
     const aolpZeroCenter = document.getElementById('stokes-default-aolp-zero-center-checkbox') as HTMLInputElement;
     const aolpModulation = document.getElementById('stokes-default-aolp-modulation-checkbox') as HTMLInputElement;
     const aolpMode = document.getElementById('stokes-default-aolp-modulation-mode-select') as HTMLSelectElement;
+    const degreeEnabled = document.getElementById('stokes-default-degree-enabled-checkbox') as HTMLInputElement;
     const degreeSelect = document.getElementById('stokes-default-degree-colormap-select') as HTMLSelectElement;
     const degreeVmin = document.getElementById('stokes-default-degree-vmin-input') as HTMLInputElement;
     const degreeVmax = document.getElementById('stokes-default-degree-vmax-input') as HTMLInputElement;
     const degreeZeroCenter = document.getElementById('stokes-default-degree-zero-center-checkbox') as HTMLInputElement;
+    const copEnabled = document.getElementById('stokes-default-cop-enabled-checkbox') as HTMLInputElement;
     const copSelect = document.getElementById('stokes-default-cop-colormap-select') as HTMLSelectElement;
     const copVmin = document.getElementById('stokes-default-cop-vmin-input') as HTMLInputElement;
     const copVmax = document.getElementById('stokes-default-cop-vmax-input') as HTMLInputElement;
     const copZeroCenter = document.getElementById('stokes-default-cop-zero-center-checkbox') as HTMLInputElement;
     const copModulation = document.getElementById('stokes-default-cop-modulation-checkbox') as HTMLInputElement;
+    const topEnabled = document.getElementById('stokes-default-top-enabled-checkbox') as HTMLInputElement;
     const topSelect = document.getElementById('stokes-default-top-colormap-select') as HTMLSelectElement;
     const topVmin = document.getElementById('stokes-default-top-vmin-input') as HTMLInputElement;
     const topVmax = document.getElementById('stokes-default-top-vmax-input') as HTMLInputElement;
     const topZeroCenter = document.getElementById('stokes-default-top-zero-center-checkbox') as HTMLInputElement;
     const topModulation = document.getElementById('stokes-default-top-modulation-checkbox') as HTMLInputElement;
+    const normalizedEnabled = document.getElementById('stokes-default-normalized-enabled-checkbox') as HTMLInputElement;
     const normalizedSelect = document.getElementById('stokes-default-normalized-colormap-select') as HTMLSelectElement;
     const normalizedVmin = document.getElementById('stokes-default-normalized-vmin-input') as HTMLInputElement;
     const normalizedVmax = document.getElementById('stokes-default-normalized-vmax-input') as HTMLInputElement;
@@ -2968,26 +3006,31 @@ describe('view menu', () => {
     expect(focusableSettingsControls).toEqual([
       themeSelect,
       spectrumMotionSelect,
+      aolpEnabled,
       aolpSelect,
       aolpVmin,
       aolpVmax,
       aolpZeroCenter,
       aolpModulation,
       aolpMode,
+      degreeEnabled,
       degreeSelect,
       degreeVmin,
       degreeVmax,
       degreeZeroCenter,
+      copEnabled,
       copSelect,
       copVmin,
       copVmax,
       copZeroCenter,
       copModulation,
+      topEnabled,
       topSelect,
       topVmin,
       topVmax,
       topZeroCenter,
       topModulation,
+      normalizedEnabled,
       normalizedSelect,
       normalizedVmin,
       normalizedVmax,
@@ -10279,6 +10322,7 @@ function createUiCallbacksBase() {
     onStokesDegreeModulationToggle: () => {},
     onStokesAolpDegreeModulationModeChange: () => {},
     onStokesDefaultSettingChange: () => {},
+    onStokesParameterVisibilityChange: () => {},
     onClearRoi: () => {},
     onResetSettings: () => {},
     onResetView: () => {}

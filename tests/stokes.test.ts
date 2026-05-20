@@ -10,6 +10,8 @@ import {
   computeStokesEang,
   computeStokesNormalizedComponent,
   createDefaultStokesColormapDefaultSettings,
+  createDefaultStokesParameterVisibilitySettings,
+  buildScalarStokesSelection,
   buildSpectralStokesRgbSelection,
   detectRgbStokesChannels,
   detectScalarStokesChannelSets,
@@ -17,6 +19,7 @@ import {
   getStokesColormapDefault,
   getStokesColormapDefaultGroup,
   getStokesDisplayOptions,
+  isStokesDisplayAvailable,
   isPhysicallyValidStokesVector,
   resolveStokesColormapDefaultLabel
 } from '../src/stokes';
@@ -169,6 +172,39 @@ describe('stokes', () => {
       displayB: 'S0.R',
       displayA: null
     });
+  });
+
+  it('filters derived Stokes parameters by visibility group', () => {
+    const channelNames = ['S0', 'S1', 'S2', 'S3'];
+    const visibility = {
+      ...createDefaultStokesParameterVisibilitySettings(),
+      degree: false,
+      normalized: false
+    };
+
+    expect(getStokesDisplayOptions(channelNames, {
+      parameterVisibility: visibility
+    }).map((option) => option.label)).toEqual([
+      'Stokes AoLP',
+      'Stokes CoP',
+      'Stokes ToP'
+    ]);
+    expect(isStokesDisplayAvailable(channelNames, buildScalarStokesSelection('dop'), visibility)).toBe(false);
+  });
+
+  it('applies visibility filtering after S3 availability filtering', () => {
+    const visibility = {
+      ...createDefaultStokesParameterVisibilitySettings(),
+      degree: false
+    };
+
+    expect(getStokesDisplayOptions(['S0', 'S1', 'S2'], {
+      parameterVisibility: visibility
+    }).map((option) => option.label)).toEqual([
+      'Stokes S1/S0',
+      'Stokes S2/S0',
+      'Stokes AoLP'
+    ]);
   });
 
   it('detects every complete non-RGB suffixed scalar Stokes channel set', () => {

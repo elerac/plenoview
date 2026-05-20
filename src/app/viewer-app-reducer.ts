@@ -1,7 +1,10 @@
 import { AUTO_EXPOSURE_PERCENTILE } from '../analysis/auto-exposure';
 import { idleResource } from '../async-resource';
 import { DEFAULT_COLORMAP_ID } from '../colormaps';
-import { createDefaultStokesColormapDefaultSettings } from '../stokes';
+import {
+  createDefaultStokesColormapDefaultSettings,
+  createDefaultStokesParameterVisibilitySettings
+} from '../stokes';
 import { createInteractionState } from '../view-state';
 import { createSinglePaneLayout } from '../viewer-pane-layout';
 import { createInitialState } from '../viewer-store';
@@ -52,6 +55,7 @@ export function createInitialViewerAppState(): ViewerAppState {
     channelThumbnailLatestRequestKeyByContextKey: {},
     stokesDisplayRestoreStates: {},
     stokesColormapDefaults: createDefaultStokesColormapDefaultSettings(),
+    stokesParameterVisibility: createDefaultStokesParameterVisibilitySettings(),
     autoFitImageOnSelect: false,
     autoExposureEnabled: false,
     autoExposurePercentile: AUTO_EXPOSURE_PERCENTILE,

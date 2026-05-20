@@ -511,6 +511,24 @@ describe('display controller shim', () => {
     expect(getLoadedColormapLut(core)).toEqual(luts['1']);
   });
 
+  it('falls back to the default channel when a Stokes group is disabled', async () => {
+    const decoded = createDecodedImage(['R', 'G', 'B', 'S0', 'S1', 'S2', 'S3']);
+    const { controller, core } = createController(createSession(decoded));
+
+    await controller.initialize();
+    await controller.applyDisplaySelection(createStokesSelection('aolp'));
+
+    controller.setStokesParameterVisibility('aolp', false);
+
+    expect(core.getState().stokesParameterVisibility.aolp).toBe(false);
+    expect(core.getState().sessionState.displaySelection).toEqual(createChannelRgbSelection('R', 'G', 'B'));
+    expect(core.getState().sessionState.visualizationMode).toBe('rgb');
+
+    await controller.applyDisplaySelection(createStokesSelection('aolp'));
+
+    expect(core.getState().sessionState.displaySelection).toEqual(createChannelRgbSelection('R', 'G', 'B'));
+  });
+
   it('resets colormap state when switching across Stokes colormap groups', async () => {
     const decoded = createDecodedImage(['R', 'G', 'B', 'S0', 'S1', 'S2', 'S3']);
     const { controller, core } = createController(createSession(decoded));

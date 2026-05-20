@@ -1,6 +1,7 @@
 import { buildChannelViewItems } from '../channel-view-items';
 import { getSuccessValue, idleResource } from '../async-resource';
 import { cloneDisplaySelection, sameDisplaySelection } from '../display-model';
+import { resolveDisplaySelectionForLayer } from '../display-selection';
 import {
   serializeChannelThumbnailContextKey,
   serializeChannelThumbnailRequestKey
@@ -169,6 +170,11 @@ export function buildExportBatchTarget(state: ViewerAppState): ExportImageBatchT
       const option = openedOptionsBySessionId.get(session.id);
       const effectiveState = session.id === state.activeSessionId ? state.sessionState : session.state;
       const layer = session.decoded.layers[effectiveState.activeLayer] ?? null;
+      const displaySelection = layer
+        ? resolveDisplaySelectionForLayer(layer.channelNames, effectiveState.displaySelection, {
+            stokesParameterVisibility: state.stokesParameterVisibility
+          })
+        : effectiveState.displaySelection;
       return {
         sessionId: session.id,
         filename: session.filename,
@@ -176,9 +182,11 @@ export function buildExportBatchTarget(state: ViewerAppState): ExportImageBatchT
         sourcePath: getBatchExportSourcePath(session),
         thumbnailDataUrl: option?.thumbnailDataUrl ?? null,
         activeLayer: effectiveState.activeLayer,
-        displaySelection: cloneDisplaySelection(effectiveState.displaySelection),
+        displaySelection: cloneDisplaySelection(displaySelection),
         channels: layer
-          ? buildChannelViewItems(layer.channelNames).map((item) => ({
+          ? buildChannelViewItems(layer.channelNames, {
+              stokesParameterVisibility: state.stokesParameterVisibility
+            }).map((item) => ({
               value: item.value,
               label: item.label,
               selectionKey: item.selectionKey,
@@ -216,7 +224,9 @@ export function buildChannelThumbnailItems(state: ViewerAppState): ViewerChannel
     return [];
   }
 
-  return buildChannelViewItems(layer.channelNames).map((item) => {
+  return buildChannelViewItems(layer.channelNames, {
+    stokesParameterVisibility: state.stokesParameterVisibility
+  }).map((item) => {
     const requestKey = serializeChannelThumbnailRequestKey({
       sessionId: session.id,
       activeLayer: state.sessionState.activeLayer,

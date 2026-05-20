@@ -14,7 +14,8 @@ import {
 } from '../session-state';
 import {
   DEFAULT_STOKES_AOLP_DEGREE_MODULATION_MODE,
-  createDefaultStokesDegreeModulation
+  createDefaultStokesDegreeModulation,
+  type StokesParameterVisibilitySettings
 } from '../stokes';
 import type {
   DecodedExrImage,
@@ -42,11 +43,13 @@ export interface BuildLoadedSessionArgs {
   hasActiveSession: boolean;
   previousImage: DecodedExrImage | null;
   autoFitImageOnSelect: boolean;
+  stokesParameterVisibility?: StokesParameterVisibilitySettings;
 }
 
 export interface BuildSwitchedSessionStateOptions {
   autoFitViewport?: ViewportInfo | null;
   autoFitInsets?: ViewportInsets | null;
+  stokesParameterVisibility?: StokesParameterVisibilitySettings;
 }
 
 export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSession {
@@ -63,7 +66,8 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
       panY: fitView.panY
     },
     args.decoded,
-    0
+    0,
+    { stokesParameterVisibility: args.stokesParameterVisibility }
   );
   const baseSession: OpenedImageSession = {
     id: args.sessionId,
@@ -77,7 +81,8 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
   const sessionState = args.hasActiveSession
     ? buildSwitchedSessionState(baseSession, args.currentSessionState, args.previousImage, {
         autoFitViewport: args.autoFitImageOnSelect ? args.viewport : null,
-        autoFitInsets: args.autoFitImageOnSelect ? args.fitInsets ?? null : null
+        autoFitInsets: args.autoFitImageOnSelect ? args.fitInsets ?? null : null,
+        stokesParameterVisibility: args.stokesParameterVisibility
       })
     : defaultSessionState;
 
@@ -90,12 +95,13 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
 export function buildReloadedSession(
   session: OpenedImageSession,
   decoded: DecodedExrImage,
-  baseState: ViewerSessionState
+  baseState: ViewerSessionState,
+  stokesParameterVisibility?: StokesParameterVisibilitySettings
 ): OpenedImageSession {
   return {
     ...session,
     decoded,
-    state: buildReloadedSessionState(baseState, session.decoded, decoded)
+    state: buildReloadedSessionState(baseState, session.decoded, decoded, stokesParameterVisibility)
   };
 }
 
@@ -129,7 +135,8 @@ export function createClearedViewerState(defaultColormapId: string): ViewerSessi
 export function buildReloadedSessionState(
   currentState: ViewerSessionState,
   previousImage: DecodedExrImage,
-  decoded: DecodedExrImage
+  decoded: DecodedExrImage,
+  stokesParameterVisibility?: StokesParameterVisibilitySettings
 ): ViewerSessionState {
   const lockedPixel = currentState.lockedPixel
     ? clampPixelToImageBounds(currentState.lockedPixel, decoded.width, decoded.height)
@@ -161,7 +168,8 @@ export function buildReloadedSessionState(
       roi
     },
     decoded,
-    currentState.activeLayer
+    currentState.activeLayer,
+    { stokesParameterVisibility }
   );
 }
 
@@ -207,7 +215,8 @@ export function buildSwitchedSessionState(
       roi
     },
     nextSession.decoded,
-    nextSession.state.activeLayer
+    nextSession.state.activeLayer,
+    { stokesParameterVisibility: options.stokesParameterVisibility }
   );
 
   if (!shouldCarryColormapState(currentState.displaySelection, nextState.displaySelection)) {

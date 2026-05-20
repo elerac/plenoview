@@ -78,7 +78,12 @@ export function displayReducer(
       if (!activeSession) {
         return state;
       }
-      const nextSessionState = buildViewerStateForLayer(state.sessionState, activeSession.decoded, intent.activeLayer);
+      const nextSessionState = buildViewerStateForLayer(
+        state.sessionState,
+        activeSession.decoded,
+        intent.activeLayer,
+        { stokesParameterVisibility: state.stokesParameterVisibility }
+      );
       if (
         nextSessionState.activeLayer === state.sessionState.activeLayer &&
         sameDisplaySelection(nextSessionState.displaySelection, state.sessionState.displaySelection)

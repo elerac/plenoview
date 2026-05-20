@@ -27,7 +27,8 @@ import type {
 import type {
   StokesColormapDefaultGroup,
   StokesColormapDefaultSetting,
-  StokesColormapDefaultSettings
+  StokesColormapDefaultSettings,
+  StokesParameterVisibilitySettings
 } from '../stokes';
 import type {
   ViewerPaneLayoutState,
@@ -166,6 +167,7 @@ export interface ViewerAppState {
   channelThumbnailLatestRequestKeyByContextKey: Record<string, string>;
   stokesDisplayRestoreStates: Record<string, RestorableVisualizationState>;
   stokesColormapDefaults: StokesColormapDefaultSettings;
+  stokesParameterVisibility: StokesParameterVisibilitySettings;
   autoFitImageOnSelect: boolean;
   autoExposureEnabled: boolean;
   autoExposurePercentile: number;
@@ -211,6 +213,9 @@ export type ViewerIntent =
   | { type: 'stokesColormapDefaultSettingSet'; group: StokesColormapDefaultGroup; setting: StokesColormapDefaultSetting }
   | { type: 'stokesActiveColormapDefaultApplied'; setting: StokesColormapDefaultSetting }
   | { type: 'stokesColormapDefaultsReset' }
+  | { type: 'stokesParameterVisibilitySet'; settings: StokesParameterVisibilitySettings }
+  | { type: 'stokesParameterVisibilityGroupSet'; group: StokesColormapDefaultGroup; enabled: boolean }
+  | { type: 'stokesParameterVisibilityReset' }
   | { type: 'lockedPixelToggled'; pixel: ViewerSessionState['lockedPixel'] }
   | { type: 'roiSet'; roi: ViewerSessionState['roi'] }
   | { type: 'viewerStateEdited'; patch: Partial<ViewerViewState> }
@@ -322,6 +327,7 @@ export interface ViewerUiSnapshot {
   visualizationMode: ViewerSessionState['visualizationMode'];
   stokesDegreeModulationControl: StokesDegreeModulationControlModel | null;
   stokesColormapDefaults: StokesColormapDefaultSettings;
+  stokesParameterVisibility: StokesParameterVisibilitySettings;
   activeColormapId: string;
   defaultColormapId: string;
   activeColormapLut: ColormapLut | null;
