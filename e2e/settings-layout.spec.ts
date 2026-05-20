@@ -794,7 +794,7 @@ test('stacks Stokes Defaults settings on narrow viewports without horizontal cli
         const content = getComputedStyle(cell, '::before').content;
         return content.replace(/^"|"$/g, '');
       })
-      .filter((label) => label === 'Enabled' || label === 'vmax' || label === 'Zero Center' || label === 'Modulation');
+      .filter((label) => label === 'vmax' || label === 'Zero Center' || label === 'Modulation');
 
     return {
       tableDisplay: getComputedStyle(table).display,
@@ -808,7 +808,7 @@ test('stacks Stokes Defaults settings on narrow viewports without horizontal cli
   expect(layout.tableDisplay).toBe('grid');
   expect(layout.wrapScrollWidth).toBeLessThanOrEqual(layout.wrapClientWidth + 1);
   expect(layout.clippedControls).toEqual([]);
-  expect(layout.responsiveLabels).toEqual(expect.arrayContaining(['Enabled', 'vmax', 'Zero Center', 'Modulation']));
+  expect(layout.responsiveLabels).toEqual(expect.arrayContaining(['vmax', 'Zero Center', 'Modulation']));
 });
 
 test('persists Spectrum lattice as animated idle and frozen active chrome', async ({ page }) => {

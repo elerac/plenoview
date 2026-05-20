@@ -511,6 +511,12 @@ output {
   gap: 0.32rem;
 }
 
+.app-menu-setting-row-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
 .app-menu-setting-modulation-cell select {
   min-width: 5.8rem;
 }

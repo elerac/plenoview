@@ -2344,7 +2344,6 @@ describe('view menu', () => {
     ]);
     expect(Array.from(document.querySelectorAll('#stokes-default-settings-table thead th')).map((cell) => cell.textContent?.trim())).toEqual([
       'Parameter',
-      'Enabled',
       'Colormap',
       'vmin',
       'vmax',
