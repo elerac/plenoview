@@ -47,6 +47,8 @@ export function readExportPixels(
     const options = {
       compositeCheckerboard: false,
       alphaOutputMode: preserveAlpha ? 'straight' : 'opaque',
+      warnInvalidValues: false,
+      invalidValueWarningPhase: 0,
       ...exportRender.options,
       viewportLeft: 0,
       viewportTop: 0

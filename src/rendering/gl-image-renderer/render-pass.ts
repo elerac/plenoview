@@ -154,6 +154,14 @@ function setCommonUniforms(
   gl.uniform1i(uniforms.stokesParameter, resolveStokesParameterUniformValue(state.activeBinding.stokesParameter));
   gl.uniform1i(uniforms.maskInvalidStokesVectors, viewerState.maskInvalidStokesVectors !== false ? 1 : 0);
   gl.uniform1i(
+    uniforms.warnInvalidValues,
+    (options.warnInvalidValues ?? viewerState.invalidValueWarningEnabled) ? 1 : 0
+  );
+  gl.uniform1f(
+    uniforms.invalidValueWarningPhase,
+    options.invalidValueWarningPhase ?? viewerState.invalidValueWarningPhase ?? state.invalidValueWarningPhase
+  );
+  gl.uniform1i(
     uniforms.useStokesDegreeModulation,
     isStokesDegreeModulationEnabled(viewerState.displaySelection, viewerState.stokesDegreeModulation) ? 1 : 0
   );

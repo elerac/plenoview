@@ -98,6 +98,14 @@ export class GlImageRenderer implements Disposable {
     setColormapTexture(this.state, entryCount, rgba8);
   }
 
+  setInvalidValueWarningPhase(phase: number): void {
+    if (this.state.disposed) {
+      return;
+    }
+
+    this.state.invalidValueWarningPhase = phase >= 0.5 ? 1 : 0;
+  }
+
   clearColormapTexture(): void {
     if (this.state.disposed) {
       return;

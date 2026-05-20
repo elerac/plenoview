@@ -15,9 +15,13 @@ describe('shader source regressions', () => {
     expect(source).not.toMatch(/\bsample\./);
     expect(source).toContain('uniform float uDisplayGamma;');
     expect(source).toContain('uniform bool uMaskInvalidStokesVectors;');
+    expect(source).toContain('uniform bool uWarnInvalidValues;');
+    expect(source).toContain('uniform float uInvalidValueWarningPhase;');
     expect(source).toContain('linearToDisplayGamma');
     expect(source).toContain('sign(linear) * pow(abs(linear)');
     expect(source).toContain('uMaskInvalidStokesVectors && !isPhysicallyValidStokesVector');
+    expect(source).toContain('bool invalidValue;');
+    expect(source).toContain('applyInvalidValueWarning');
     expect(source).toContain('DISPLAY_MODE_STOKES_SPECTRAL_RGB');
     expect(source).toContain('readSpectralStokesRgbDisplaySample');
   });

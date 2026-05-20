@@ -47,6 +47,11 @@ import {
   readStoredStokesInvalidVectorMaskSetting,
   saveStoredStokesInvalidVectorMaskSetting
 } from '../stokes-invalid-vector-mask-settings';
+import {
+  DEFAULT_INVALID_VALUE_WARNING_ENABLED,
+  readStoredInvalidValueWarningSetting,
+  saveStoredInvalidValueWarningSetting
+} from '../invalid-value-warning-settings';
 import { ViewerAppCore } from '../app/viewer-app-core';
 import {
   selectActiveSession,
@@ -96,6 +101,10 @@ export class DisplayController implements Disposable {
       this.core.dispatch({
         type: 'maskInvalidStokesVectorsSet',
         enabled: readStoredStokesInvalidVectorMaskSetting()
+      });
+      this.core.dispatch({
+        type: 'invalidValueWarningSet',
+        enabled: readStoredInvalidValueWarningSetting()
       });
 
       const requestId = this.core.issueRequestId();
@@ -495,6 +504,22 @@ export class DisplayController implements Disposable {
 
   resetMaskInvalidStokesVectors(): void {
     this.setMaskInvalidStokesVectors(DEFAULT_MASK_INVALID_STOKES_VECTORS);
+  }
+
+  setInvalidValueWarningEnabled(enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    saveStoredInvalidValueWarningSetting(enabled);
+    this.core.dispatch({
+      type: 'invalidValueWarningSet',
+      enabled
+    });
+  }
+
+  resetInvalidValueWarning(): void {
+    this.setInvalidValueWarningEnabled(DEFAULT_INVALID_VALUE_WARNING_ENABLED);
   }
 
   async ensureActiveColormapLutLoaded(): Promise<void> {

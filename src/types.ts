@@ -177,6 +177,8 @@ export interface ViewerInteractionState {
 
 export interface ViewerRenderState extends ViewerSessionState {
   maskInvalidStokesVectors?: boolean;
+  invalidValueWarningEnabled?: boolean;
+  invalidValueWarningPhase?: number;
   hoveredPixel: ImagePixel | null;
   draftRoi: ImageRoi | null;
   roiInteraction: ViewerRoiInteractionState;

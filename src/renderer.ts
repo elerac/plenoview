@@ -111,6 +111,14 @@ export class WebGlExrRenderer implements Disposable {
     this.imageRenderer.setColormapTexture(entryCount, rgba8);
   }
 
+  setInvalidValueWarningPhase(phase: number): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.imageRenderer.setInvalidValueWarningPhase(phase);
+  }
+
   clearColormapTexture(): void {
     if (this.disposed) {
       return;

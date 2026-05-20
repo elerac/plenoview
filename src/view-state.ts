@@ -8,9 +8,12 @@ import type {
 } from './types';
 import { sameImageRoi } from './roi';
 import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from './stokes';
+import { DEFAULT_INVALID_VALUE_WARNING_ENABLED } from './invalid-value-warning-settings';
 
 export interface MergeRenderStateOptions {
   maskInvalidStokesVectors?: boolean;
+  invalidValueWarningEnabled?: boolean;
+  invalidValueWarningPhase?: number;
 }
 
 export function pickViewState(state: ViewerViewState): ViewerViewState {
@@ -42,6 +45,8 @@ export function mergeRenderState(
     ...sessionState,
     ...interactionState.view,
     maskInvalidStokesVectors: options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
+    invalidValueWarningEnabled: options.invalidValueWarningEnabled ?? DEFAULT_INVALID_VALUE_WARNING_ENABLED,
+    ...(options.invalidValueWarningPhase === undefined ? {} : { invalidValueWarningPhase: options.invalidValueWarningPhase }),
     hoveredPixel: interactionState.hoveredPixel,
     draftRoi: interactionState.draftRoi,
     roiInteraction: interactionState.roiInteraction

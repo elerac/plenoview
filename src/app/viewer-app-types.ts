@@ -170,6 +170,7 @@ export interface ViewerAppState {
   stokesColormapDefaults: StokesColormapDefaultSettings;
   stokesParameterVisibility: StokesParameterVisibilitySettings;
   maskInvalidStokesVectors: boolean;
+  invalidValueWarningEnabled: boolean;
   autoFitImageOnSelect: boolean;
   autoExposureEnabled: boolean;
   autoExposurePercentile: number;
@@ -219,6 +220,7 @@ export type ViewerIntent =
   | { type: 'stokesParameterVisibilityGroupSet'; group: StokesColormapDefaultGroup; enabled: boolean }
   | { type: 'stokesParameterVisibilityReset' }
   | { type: 'maskInvalidStokesVectorsSet'; enabled: boolean }
+  | { type: 'invalidValueWarningSet'; enabled: boolean }
   | { type: 'lockedPixelToggled'; pixel: ViewerSessionState['lockedPixel'] }
   | { type: 'roiSet'; roi: ViewerSessionState['roi'] }
   | { type: 'viewerStateEdited'; patch: Partial<ViewerViewState> }
@@ -332,6 +334,7 @@ export interface ViewerUiSnapshot {
   stokesColormapDefaults: StokesColormapDefaultSettings;
   stokesParameterVisibility: StokesParameterVisibilitySettings;
   maskInvalidStokesVectors: boolean;
+  invalidValueWarningEnabled: boolean;
   activeColormapId: string;
   defaultColormapId: string;
   activeColormapLut: ColormapLut | null;

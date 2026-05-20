@@ -47,6 +47,11 @@ export function uiPreferencesReducer(
         imageStatsResource: idleResource(),
         autoExposureResource: idleResource()
       };
+    case 'invalidValueWarningSet':
+      return state.invalidValueWarningEnabled === intent.enabled ? state : {
+        ...state,
+        invalidValueWarningEnabled: intent.enabled
+      };
     case 'viewerPaneReset': {
       const viewerPaneLayout = resetViewerPaneLayout(state.activeSessionId);
       return sameViewerPaneLayout(state.viewerPaneLayout, viewerPaneLayout) ? state : {

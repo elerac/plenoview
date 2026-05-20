@@ -20,6 +20,8 @@ uniform int uColormapEntryCount;
 uniform int uDisplayMode;
 uniform int uStokesParameter;
 uniform bool uMaskInvalidStokesVectors;
+uniform bool uWarnInvalidValues;
+uniform float uInvalidValueWarningPhase;
 uniform bool uUseStokesDegreeModulation;
 uniform int uStokesDegreeModulationMode;
 uniform bool uUseImageAlpha;
@@ -58,15 +60,25 @@ const float REC709_LUMINANCE_WEIGHT_G = 0.7152;
 const float REC709_LUMINANCE_WEIGHT_B = 0.0722;
 const float DISPLAY_GAMMA_MIN = 0.01;
 const float STOKES_VECTOR_VALIDITY_ATOL = 1.0e-8;
+const vec3 INVALID_VALUE_WARNING_COLOR = vec3(1.0, 0.0, 1.0);
 
 struct DisplaySample {
   vec3 linear;
   float alpha;
   vec4 stokes;
+  bool invalidValue;
 };
 
 bool isFiniteValue(float value) {
   return !(isnan(value) || isinf(value));
+}
+
+bool hasInvalidValue(vec3 value) {
+  return !isFiniteValue(value.r) || !isFiniteValue(value.g) || !isFiniteValue(value.b);
+}
+
+bool hasInvalidValue(vec4 value) {
+  return !isFiniteValue(value.x) || !isFiniteValue(value.y) || !isFiniteValue(value.z) || !isFiniteValue(value.w);
 }
 
 float nanValue() {
@@ -361,6 +373,14 @@ float computeStokesDegreeModulationDisplayValue(int parameter, float s0, float s
   return isFiniteValue(value) ? clamp(value, 0.0, 1.0) : 0.0;
 }
 
+vec4 applyInvalidValueWarning(vec4 color, bool invalidValue) {
+  if (uWarnInvalidValues && invalidValue && uInvalidValueWarningPhase >= 0.5) {
+    return vec4(INVALID_VALUE_WARNING_COLOR, 1.0);
+  }
+
+  return color;
+}
+
 float readSource0(ivec2 pixel) {
   return texelFetch(uSourceTextures[0], pixel, 0).r;
 }
@@ -509,68 +529,68 @@ vec3 readSpectralStokesRgbDisplaySample(ivec2 pixel) {
 }
 
 DisplaySample createEmptySample() {
-  return DisplaySample(vec3(0.0), 1.0, vec4(0.0));
+  return DisplaySample(vec3(0.0), 1.0, vec4(0.0), false);
 }
 
 DisplaySample readDisplaySample(ivec2 pixel) {
   if (uDisplayMode == DISPLAY_MODE_CHANNEL_RGB) {
+    vec3 rgb = vec3(readSource0(pixel), readSource1(pixel), readSource2(pixel));
+    float alpha = readSource3(pixel);
     return DisplaySample(
-      vec3(
-        sanitizeDisplayValue(readSource0(pixel)),
-        sanitizeDisplayValue(readSource1(pixel)),
-        sanitizeDisplayValue(readSource2(pixel))
-      ),
-      uUseImageAlpha ? sanitizeAlphaValue(readSource3(pixel)) : 1.0,
-      vec4(0.0)
+      sanitizeDisplayColor(rgb),
+      uUseImageAlpha ? sanitizeAlphaValue(alpha) : 1.0,
+      vec4(0.0),
+      hasInvalidValue(rgb) || (uUseImageAlpha && !isFiniteValue(alpha))
     );
   }
 
   if (uDisplayMode == DISPLAY_MODE_CHANNEL_MONO) {
-    float value = sanitizeDisplayValue(readSource0(pixel));
+    float value = readSource0(pixel);
+    float alpha = readSource3(pixel);
     return DisplaySample(
-      vec3(value),
-      uUseImageAlpha ? sanitizeAlphaValue(readSource3(pixel)) : 1.0,
-      vec4(0.0)
+      vec3(sanitizeDisplayValue(value)),
+      uUseImageAlpha ? sanitizeAlphaValue(alpha) : 1.0,
+      vec4(0.0),
+      !isFiniteValue(value) || (uUseImageAlpha && !isFiniteValue(alpha))
     );
   }
 
   if (uDisplayMode == DISPLAY_MODE_SPECTRAL_RGB) {
     vec3 spectralRgb = texelFetch(uSourceTextures[0], pixel, 0).rgb;
     return DisplaySample(
-      vec3(
-        sanitizeDisplayValue(spectralRgb.r),
-        sanitizeDisplayValue(spectralRgb.g),
-        sanitizeDisplayValue(spectralRgb.b)
-      ),
+      sanitizeDisplayColor(spectralRgb),
       1.0,
-      vec4(0.0)
+      vec4(0.0),
+      hasInvalidValue(spectralRgb)
     );
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_DIRECT) {
     vec4 stokes = readDirectStokesSample(pixel);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
-    return DisplaySample(vec3(value), 1.0, stokes);
+    return DisplaySample(vec3(value), 1.0, stokes, hasInvalidValue(stokes) || !isFiniteValue(value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_RGB) {
-    return DisplaySample(readRgbStokesDisplaySample(pixel), 1.0, vec4(0.0));
+    vec3 value = readRgbStokesDisplaySample(pixel);
+    return DisplaySample(value, 1.0, vec4(0.0), hasInvalidValue(value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_RGB_LUMINANCE) {
     vec4 stokes = readRgbLuminanceStokesSample(pixel);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
-    return DisplaySample(vec3(value), 1.0, stokes);
+    return DisplaySample(vec3(value), 1.0, stokes, hasInvalidValue(stokes) || !isFiniteValue(value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_SPECTRAL_RGB) {
-    return DisplaySample(readSpectralStokesRgbDisplaySample(pixel), 1.0, vec4(0.0));
+    vec3 value = readSpectralStokesRgbDisplaySample(pixel);
+    return DisplaySample(value, 1.0, vec4(0.0), hasInvalidValue(value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_SPECTRAL_RGB_LUMINANCE) {
     vec4 stokes = readSpectralStokesRgbLuminanceSample(pixel);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
-    return DisplaySample(vec3(value), 1.0, stokes);
+    return DisplaySample(vec3(value), 1.0, stokes, hasInvalidValue(stokes) || !isFiniteValue(value));
   }
 
   return createEmptySample();
@@ -595,13 +615,17 @@ void main() {
     vec3 color = sampleColormap(luminance, uColormapMin, uColormapMax);
     if (uUseStokesDegreeModulation) {
       vec3 hsv = rgbToHsv(color);
-      float modulation = computeStokesDegreeModulationDisplayValue(
+      float modulationValue = computeStokesDegreeModulationValue(
         uStokesParameter,
         displaySample.stokes.x,
         displaySample.stokes.y,
         displaySample.stokes.z,
         displaySample.stokes.w
       );
+      if (!isFiniteValue(modulationValue)) {
+        displaySample.invalidValue = true;
+      }
+      float modulation = isFiniteValue(modulationValue) ? clamp(modulationValue, 0.0, 1.0) : 0.0;
       if (uStokesDegreeModulationMode == STOKES_DEGREE_MODULATION_MODE_SATURATION) {
         hsv.y *= modulation;
       } else {
@@ -609,11 +633,11 @@ void main() {
       }
       color = hsvToRgb(hsv);
     }
-    outColor = encodeOutputColor(screen, color, imageAlpha);
+    outColor = applyInvalidValueWarning(encodeOutputColor(screen, color, imageAlpha), displaySample.invalidValue);
     return;
   }
 
   linear *= exp2(uExposure);
   vec3 color = sanitizeDisplayColor(linearToDisplayGamma(linear));
-  outColor = encodeOutputColor(screen, color, imageAlpha);
+  outColor = applyInvalidValueWarning(encodeOutputColor(screen, color, imageAlpha), displaySample.invalidValue);
 }

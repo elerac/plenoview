@@ -249,7 +249,8 @@ export function createImageExportPixelsResolver({
 
     assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
     const renderState = mergeRenderState(state.sessionState, state.interactionState, {
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      invalidValueWarningEnabled: state.invalidValueWarningEnabled
     });
     getRenderCache().prepareActiveSession(activeSession, renderState);
     if (options.signal) {
@@ -326,7 +327,8 @@ export async function handleExportImage(
         region: request,
         session: sourceSession,
         renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
-          maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors
+          maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors,
+          invalidValueWarningEnabled: stateSnapshot.invalidValueWarningEnabled
         })
       });
       const zipBlob = createZipBlob({
@@ -490,7 +492,8 @@ export async function handleExportScreenshotRegions(
           region,
           session: sourceSession,
           renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
-            maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors
+            maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors,
+            invalidValueWarningEnabled: stateSnapshot.invalidValueWarningEnabled
           }),
           batch: {
             archiveFilename: request.archiveFilename,
@@ -900,13 +903,15 @@ async function resolveBatchEntryExportResult({
   const renderState = screenshotRegion
     ? {
       ...mergeRenderState(exportState.state, createInteractionState(exportState.state), {
-        maskInvalidStokesVectors: appState.maskInvalidStokesVectors
+        maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+        invalidValueWarningEnabled: appState.invalidValueWarningEnabled
       }),
       viewerMode: appState.sessionState.viewerMode,
       ...appState.interactionState.view
     }
     : mergeRenderState(exportState.state, createInteractionState(exportState.state), {
-      maskInvalidStokesVectors: appState.maskInvalidStokesVectors
+      maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+      invalidValueWarningEnabled: appState.invalidValueWarningEnabled
     });
 
   renderCache.prepareActiveSession(session, renderState);
@@ -1241,7 +1246,8 @@ function restoreActiveRendererBinding(
     renderer.setColormapTexture(activeColormapLut.entryCount, activeColormapLut.rgba8);
   }
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
-    maskInvalidStokesVectors: state.maskInvalidStokesVectors
+    maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+    invalidValueWarningEnabled: state.invalidValueWarningEnabled
   });
   renderCache.prepareActiveSession(activeSession, renderState);
   renderer.renderImage(renderState);

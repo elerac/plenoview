@@ -212,7 +212,8 @@ function createRenderStateSelector(): (state: ViewerAppState) => ViewerRenderSna
   let previousResult: ViewerRenderSnapshot['renderState'] | null = null;
   return (state) => {
     const nextResult = mergeRenderState(state.sessionState, state.interactionState, {
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      invalidValueWarningEnabled: state.invalidValueWarningEnabled
     });
     if (previousResult && sameViewerRenderState(previousResult, nextResult)) {
       return previousResult;
@@ -244,7 +245,7 @@ function selectPaneRenderSources(
     const usesLiveState = session.id === state.activeSessionId;
     const renderState = usesLiveState
       ? activeRenderState
-      : createStoredPaneRenderState(session.state, state.maskInvalidStokesVectors);
+      : createStoredPaneRenderState(session.state, state.maskInvalidStokesVectors, state.invalidValueWarningEnabled);
     const layer = session.decoded.layers[renderState.activeLayer] ?? null;
     if (!layer) {
       continue;
@@ -272,11 +273,13 @@ function selectPaneRenderSources(
 
 function createStoredPaneRenderState(
   sessionState: ViewerAppState['sessionState'],
-  maskInvalidStokesVectors: boolean
+  maskInvalidStokesVectors: boolean,
+  invalidValueWarningEnabled: boolean
 ): ViewerRenderState {
   return {
     ...sessionState,
     maskInvalidStokesVectors,
+    invalidValueWarningEnabled,
     hoveredPixel: null,
     draftRoi: null,
     roiInteraction: createEmptyRoiInteractionState()
@@ -683,7 +686,8 @@ function buildViewerStateReadout(
   activeSession: OpenedImageSession | null
 ): ViewerRenderSnapshot['viewerStateReadout'] {
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
-    maskInvalidStokesVectors: state.maskInvalidStokesVectors
+    maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+    invalidValueWarningEnabled: state.invalidValueWarningEnabled
   });
   return {
     hasActiveImage: Boolean(activeSession),
@@ -815,6 +819,7 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
     previous.exposureEv === next.exposureEv &&
     previous.displayGamma === next.displayGamma &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
+    previous.invalidValueWarningEnabled === next.invalidValueWarningEnabled &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     previous.visualizationMode === next.visualizationMode &&
     sameViewState(previous, next)
@@ -847,6 +852,7 @@ function samePaneValueOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
     previous.viewerMode === next.viewerMode &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
+    previous.invalidValueWarningEnabled === next.invalidValueWarningEnabled &&
     sameViewState(previous, next)
   );
 }
@@ -857,6 +863,7 @@ function samePaneProbeOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
   return (
     previous.viewerMode === next.viewerMode &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
+    previous.invalidValueWarningEnabled === next.invalidValueWarningEnabled &&
     samePixel(previous.lockedPixel, next.lockedPixel) &&
     samePixel(previous.hoveredPixel, next.hoveredPixel) &&
     sameRoi(previous.roi, next.roi) &&
@@ -885,6 +892,7 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.stokesDegreeModulation.top === b.stokesDegreeModulation.top &&
     a.stokesAolpDegreeModulationMode === b.stokesAolpDegreeModulationMode &&
     a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
+    a.invalidValueWarningEnabled === b.invalidValueWarningEnabled &&
     a.activeLayer === b.activeLayer &&
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&
     samePixel(a.lockedPixel, b.lockedPixel) &&

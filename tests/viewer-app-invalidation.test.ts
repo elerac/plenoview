@@ -126,6 +126,23 @@ describe('viewer app lanes', () => {
     expect(createRenderFlags(state, nextState)).toBe(ViewerRenderInvalidationFlags.None);
   });
 
+  it('exposes invalid value warning through UI and image render lanes', () => {
+    const state = createActiveState();
+    const nextState = {
+      ...state,
+      invalidValueWarningEnabled: false
+    };
+    const selectUiSnapshot = createViewerUiSnapshotSelector();
+    const snapshot = selectUiSnapshot(nextState);
+    const uiFlags = createUiFlags(state, nextState);
+    const renderFlags = createRenderFlags(state, nextState);
+
+    expect(snapshot.invalidValueWarningEnabled).toBe(false);
+    expect(hasUiFlag(uiFlags, ViewerUiInvalidationFlags.InvalidValueWarning)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.ResourcePrepare)).toBe(false);
+  });
+
   it('exposes ruler visibility through UI and ruler render lanes only', () => {
     const state = createActiveState();
     const nextState = {

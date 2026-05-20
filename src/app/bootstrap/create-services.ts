@@ -4,6 +4,7 @@ import { ViewerInteractionCoordinator } from '../../interaction-coordinator';
 import { WebGlExrRenderer } from '../../renderer';
 import { resolveRulerFitInsets } from '../../ruler-layout';
 import { ChannelThumbnailService } from '../../services/channel-thumbnail-service';
+import { InvalidValueWarningRenderLoop } from '../../services/invalid-value-warning-render-loop';
 import { LoadQueueService } from '../../services/load-queue';
 import { RenderCacheService } from '../../services/render-cache-service';
 import { ThumbnailService } from '../../services/thumbnail-service';
@@ -17,6 +18,7 @@ export interface BootstrapServices {
   renderCache: RenderCacheService;
   thumbnailService: ThumbnailService;
   channelThumbnailService: ChannelThumbnailService;
+  invalidValueWarningRenderLoop: InvalidValueWarningRenderLoop;
   sessionController: SessionController;
   interactionCoordinator: ViewerInteractionCoordinator;
   displayController: DisplayController;
@@ -112,6 +114,11 @@ export function createBootstrapServices({
       });
     }
   });
+  const invalidValueWarningRenderLoop = new InvalidValueWarningRenderLoop({
+    renderer,
+    renderCache,
+    getPanes: () => ui.getViewerPaneRenderInfos()
+  });
   const sessionController = new SessionController({
     core,
     loadQueue,
@@ -148,6 +155,7 @@ export function createBootstrapServices({
     renderCache,
     thumbnailService,
     channelThumbnailService,
+    invalidValueWarningRenderLoop,
     sessionController,
     interactionCoordinator,
     displayController
@@ -160,6 +168,7 @@ export function disposeBootstrapServices(services: Partial<BootstrapServices>): 
   services.sessionController?.dispose();
   services.thumbnailService?.dispose();
   services.channelThumbnailService?.dispose();
+  services.invalidValueWarningRenderLoop?.dispose();
   services.renderCache?.dispose();
   services.renderer?.dispose();
   disposeDecodeWorker();

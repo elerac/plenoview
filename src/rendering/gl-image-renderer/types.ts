@@ -18,6 +18,8 @@ export interface CommonUniforms {
   displayMode: WebGLUniformLocation;
   stokesParameter: WebGLUniformLocation;
   maskInvalidStokesVectors: WebGLUniformLocation;
+  warnInvalidValues: WebGLUniformLocation;
+  invalidValueWarningPhase: WebGLUniformLocation;
   useStokesDegreeModulation: WebGLUniformLocation;
   stokesDegreeModulationMode: WebGLUniformLocation;
   useImageAlpha: WebGLUniformLocation;
@@ -60,6 +62,8 @@ export type AlphaOutputMode = 'opaque' | 'straight' | 'premultiplied';
 export interface RenderPassOptions {
   compositeCheckerboard: boolean;
   alphaOutputMode: AlphaOutputMode;
+  warnInvalidValues?: boolean;
+  invalidValueWarningPhase?: number;
   viewportWidth?: number;
   viewportHeight?: number;
   viewportLeft?: number;
@@ -103,6 +107,7 @@ export interface GlImageRendererState {
   imageSize: { width: number; height: number } | null;
   colormapTextureSize: { width: number; height: number };
   colormapEntryCount: number;
+  invalidValueWarningPhase: number;
   activeBinding: DisplaySourceBinding;
   disposed: boolean;
 }

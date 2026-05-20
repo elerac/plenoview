@@ -415,6 +415,8 @@ describe('gl image renderer', () => {
     const state = {
       ...createInitialState(),
       displayGamma: 1.8,
+      invalidValueWarningEnabled: true,
+      invalidValueWarningPhase: 1,
       displaySelection: createChannelRgbSelection('R', 'G', 'B', 'A'),
       hoveredPixel: null,
       draftRoi: null,
@@ -435,6 +437,8 @@ describe('gl image renderer', () => {
     expect(lastUniform1iValue(gl, 'uCompositeCheckerboard')).toBe(1);
     expect(lastUniform1iValue(gl, 'uAlphaOutputMode')).toBe(0);
     expect(lastUniform1fValue(gl, 'uDisplayGamma')).toBe(1.8);
+    expect(lastUniform1iValue(gl, 'uWarnInvalidValues')).toBe(1);
+    expect(lastUniform1fValue(gl, 'uInvalidValueWarningPhase')).toBe(1);
 
     gl.uniform1i.mockClear();
     gl.readPixels.mockImplementation((_x, _y, _width, _height, _format, _type, data: Uint8ClampedArray) => {
@@ -449,6 +453,44 @@ describe('gl image renderer', () => {
 
     expect(lastUniform1iValue(gl, 'uCompositeCheckerboard')).toBe(0);
     expect(lastUniform1iValue(gl, 'uAlphaOutputMode')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uWarnInvalidValues')).toBe(0);
+  });
+
+  it('keeps the renderer-owned invalid value warning phase across ordinary redraws', () => {
+    const { renderer, gl } = createHarness();
+    const layer = createInterleavedLayerFromChannels({
+      R: [Number.NaN],
+      G: [0],
+      B: [0]
+    });
+    const state = {
+      ...createInitialState(),
+      invalidValueWarningEnabled: true,
+      displaySelection: createChannelRgbSelection('R', 'G', 'B'),
+      hoveredPixel: null,
+      draftRoi: null,
+      roiInteraction: createEmptyRoiInteractionState()
+    };
+
+    renderer.ensureLayerChannelsResident('session-1', 0, 1, 1, layer, ['R', 'G', 'B']);
+    renderer.setDisplaySelectionBindings(
+      'session-1',
+      0,
+      1,
+      1,
+      buildDisplaySourceBinding(layer, state.displaySelection)
+    );
+    renderer.setInvalidValueWarningPhase(1);
+    renderer.render(state);
+
+    expect(lastUniform1fValue(gl, 'uInvalidValueWarningPhase')).toBe(1);
+
+    renderer.render({
+      ...state,
+      hoveredPixel: { ix: 0, iy: 0 }
+    });
+
+    expect(lastUniform1fValue(gl, 'uInvalidValueWarningPhase')).toBe(1);
   });
 
   it('keeps full-image RGB exports opaque while making screenshot backgrounds transparent', () => {

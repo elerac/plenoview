@@ -31,6 +31,8 @@ export function getCommonUniforms(gl: WebGL2RenderingContext, program: WebGLProg
     displayMode: getRequiredUniformLocation(gl, program, 'uDisplayMode'),
     stokesParameter: getRequiredUniformLocation(gl, program, 'uStokesParameter'),
     maskInvalidStokesVectors: getRequiredUniformLocation(gl, program, 'uMaskInvalidStokesVectors'),
+    warnInvalidValues: getRequiredUniformLocation(gl, program, 'uWarnInvalidValues'),
+    invalidValueWarningPhase: getRequiredUniformLocation(gl, program, 'uInvalidValueWarningPhase'),
     useStokesDegreeModulation: getRequiredUniformLocation(gl, program, 'uUseStokesDegreeModulation'),
     stokesDegreeModulationMode: getRequiredUniformLocation(gl, program, 'uStokesDegreeModulationMode'),
     useImageAlpha: getRequiredUniformLocation(gl, program, 'uUseImageAlpha'),

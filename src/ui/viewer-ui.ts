@@ -147,6 +147,7 @@ import {
   readStoredImageLoadWorkers,
   saveStoredImageLoadWorkers
 } from '../image-load-workers';
+import { DEFAULT_INVALID_VALUE_WARNING_ENABLED } from '../invalid-value-warning-settings';
 
 const AUTO_FIT_IMAGE_ON_SELECT_STORAGE_KEY = 'openexr-viewer:auto-fit-image-on-select:v1';
 const AUTO_EXPOSURE_STORAGE_KEY = 'openexr-viewer:auto-exposure:v1';
@@ -270,6 +271,7 @@ export interface UiCallbacks {
   onStokesDefaultSettingChange: (group: StokesColormapDefaultGroup, setting: StokesColormapDefaultSetting) => void;
   onStokesParameterVisibilityChange: (group: StokesColormapDefaultGroup, enabled: boolean) => void;
   onMaskInvalidStokesVectorsChange: (enabled: boolean) => void;
+  onInvalidValueWarningChange: (enabled: boolean) => void;
   onClearRoi: () => void;
   onResetSettings: () => void;
   onResetView: () => void;
@@ -338,6 +340,7 @@ export class ViewerUi implements Disposable {
   private stokesColormapDefaults: StokesColormapDefaultSettings = createDefaultStokesColormapDefaultSettings();
   private stokesParameterVisibility: StokesParameterVisibilitySettings = createDefaultStokesParameterVisibilitySettings();
   private maskInvalidStokesVectors = DEFAULT_MASK_INVALID_STOKES_VECTORS;
+  private invalidValueWarningEnabled = DEFAULT_INVALID_VALUE_WARNING_ENABLED;
   private viewerMode: ViewerMode = 'image';
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
@@ -1085,6 +1088,15 @@ export class ViewerUi implements Disposable {
 
     this.maskInvalidStokesVectors = enabled;
     this.elements.stokesInvalidVectorMaskCheckbox.checked = enabled;
+  }
+
+  setInvalidValueWarningEnabled(enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.invalidValueWarningEnabled = enabled;
+    this.elements.invalidValueWarningCheckbox.checked = enabled;
   }
 
   setActiveColormap(activeId: string): void {
@@ -2636,6 +2648,11 @@ export class ViewerUi implements Disposable {
       this.callbacks.onMaskInvalidStokesVectorsChange(this.maskInvalidStokesVectors);
     });
 
+    this.disposables.addEventListener(this.elements.invalidValueWarningCheckbox, 'change', () => {
+      this.setInvalidValueWarningEnabled(this.elements.invalidValueWarningCheckbox.checked);
+      this.callbacks.onInvalidValueWarningChange(this.invalidValueWarningEnabled);
+    });
+
     this.disposables.addEventListener(this.elements.spectrumLatticeMotionSelect, 'change', () => {
       this.setSpectrumLatticeMotionPreference(
         parseSpectrumLatticeMotionPreference(this.elements.spectrumLatticeMotionSelect.value)
@@ -2669,6 +2686,8 @@ export class ViewerUi implements Disposable {
       );
       this.setMaskInvalidStokesVectors(DEFAULT_MASK_INVALID_STOKES_VECTORS);
       this.callbacks.onMaskInvalidStokesVectorsChange(this.maskInvalidStokesVectors);
+      this.setInvalidValueWarningEnabled(DEFAULT_INVALID_VALUE_WARNING_ENABLED);
+      this.callbacks.onInvalidValueWarningChange(this.invalidValueWarningEnabled);
       this.callbacks.onResetSettings();
     });
 

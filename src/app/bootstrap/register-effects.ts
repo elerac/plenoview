@@ -48,6 +48,7 @@ export function registerBootstrapEffects({
     }
 
     applyRenderEffects(core, ui, services.renderer, services.renderCache, transition);
+    services.invalidValueWarningRenderLoop.sync(transition.snapshot.paneRenderSources);
   }));
 
   return unsubscribers;

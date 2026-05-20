@@ -251,7 +251,8 @@ export function createViewerUi({
       const state = core.getState();
       const activeSession = selectActiveSession(state);
       const renderState = mergeRenderState(state.sessionState, state.interactionState, {
-        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
       return {
         viewerMode: renderState.viewerMode,
@@ -280,7 +281,8 @@ export function createViewerUi({
 
       const viewport = getRenderer().getViewport();
       const renderState = mergeRenderState(state.sessionState, state.interactionState, {
-        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
       if (renderState.viewerMode === 'panorama') {
         return resolveVisiblePanoramaRect(renderState.panoramaHfovDeg, viewport);
@@ -347,6 +349,9 @@ export function createViewerUi({
     onMaskInvalidStokesVectorsChange: (enabled) => {
       getDisplayController().setMaskInvalidStokesVectors(enabled);
     },
+    onInvalidValueWarningChange: (enabled) => {
+      getDisplayController().setInvalidValueWarningEnabled(enabled);
+    },
     onClearRoi: () => {
       core.dispatch({
         type: 'roiSet',
@@ -358,6 +363,7 @@ export function createViewerUi({
       void getDisplayController().resetStokesColormapDefaults();
       getDisplayController().resetStokesParameterVisibility();
       getDisplayController().resetMaskInvalidStokesVectors();
+      getDisplayController().resetInvalidValueWarning();
     },
     onResetView: () => {
       getSessionController().resetActiveSessionState();

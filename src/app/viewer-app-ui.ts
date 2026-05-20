@@ -54,7 +54,8 @@ export const enum ViewerUiInvalidationFlags {
   DisplayGamma = 1 << 21,
   ViewerPaneLayout = 1 << 22,
   StokesParameterVisibility = 1 << 23,
-  MaskInvalidStokesVectors = 1 << 24
+  MaskInvalidStokesVectors = 1 << 24,
+  InvalidValueWarning = 1 << 25
 }
 
 export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => ViewerUiSnapshot {
@@ -105,6 +106,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       stokesColormapDefaults: state.stokesColormapDefaults,
       stokesParameterVisibility: state.stokesParameterVisibility,
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      invalidValueWarningEnabled: state.invalidValueWarningEnabled,
       activeColormapId: state.sessionState.activeColormapId,
       defaultColormapId: state.defaultColormapId,
       activeColormapLut,
@@ -220,6 +222,10 @@ export function computeViewerUiInvalidation(
 
   if (previous.maskInvalidStokesVectors !== next.maskInvalidStokesVectors) {
     flags |= ViewerUiInvalidationFlags.MaskInvalidStokesVectors;
+  }
+
+  if (previous.invalidValueWarningEnabled !== next.invalidValueWarningEnabled) {
+    flags |= ViewerUiInvalidationFlags.InvalidValueWarning;
   }
 
   if (previous.activeColormapId !== next.activeColormapId) {
@@ -454,6 +460,7 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     sameStokesColormapDefaultSettings(a.stokesColormapDefaults, b.stokesColormapDefaults) &&
     sameStokesParameterVisibilitySettings(a.stokesParameterVisibility, b.stokesParameterVisibility) &&
     a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
+    a.invalidValueWarningEnabled === b.invalidValueWarningEnabled &&
     a.activeColormapId === b.activeColormapId &&
     a.defaultColormapId === b.defaultColormapId &&
     a.activeColormapLut === b.activeColormapLut &&

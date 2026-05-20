@@ -41,6 +41,7 @@ export interface Elements {
   imageLoadWorkersInput: HTMLInputElement;
   autoExposurePercentileInput: HTMLInputElement;
   stokesInvalidVectorMaskCheckbox: HTMLInputElement;
+  invalidValueWarningCheckbox: HTMLInputElement;
   stokesDefaultSettingsTable: HTMLTableElement;
   resetSettingsButton: HTMLButtonElement;
   imageViewerMenuItem: HTMLButtonElement;
@@ -554,6 +555,7 @@ export function resolveElements(): Elements {
     imageLoadWorkersInput: requireElement('image-load-workers-input', HTMLInputElement),
     autoExposurePercentileInput: requireElement('auto-exposure-percentile-input', HTMLInputElement),
     stokesInvalidVectorMaskCheckbox: requireElement('stokes-invalid-vector-mask-checkbox', HTMLInputElement),
+    invalidValueWarningCheckbox: requireElement('invalid-value-warning-checkbox', HTMLInputElement),
     stokesDefaultSettingsTable: requireElement('stokes-default-settings-table', HTMLTableElement),
     resetSettingsButton: requireElement('reset-settings-button', HTMLButtonElement),
     imageViewerMenuItem: requireElement('image-viewer-menu-item', HTMLButtonElement),

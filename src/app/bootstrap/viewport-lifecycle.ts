@@ -37,7 +37,8 @@ export function createViewerInteraction({
     getState: () => {
       const state = core.getState();
       return mergeRenderState(state.sessionState, state.interactionState, {
-        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
     },
     getViewport: () => ui.getActiveViewerPane().viewport,
@@ -122,7 +123,8 @@ export function initializeViewportLifecycle({
     if (selectActiveSession(core.getState())) {
       const state = core.getState();
       renderer.render(mergeRenderState(state.sessionState, interactionCoordinator.getState(), {
-        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        invalidValueWarningEnabled: state.invalidValueWarningEnabled
       }));
     } else {
       renderer.clearImage();

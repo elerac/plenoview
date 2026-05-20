@@ -50,6 +50,7 @@ export function createGlImageRendererState(glCanvas: HTMLCanvasElement): GlImage
     imageSize: null,
     colormapTextureSize: { width: 1, height: 1 },
     colormapEntryCount: 0,
+    invalidValueWarningPhase: 0,
     activeBinding: createEmptyDisplaySourceBinding(),
     disposed: false
   };
