@@ -35,5 +35,16 @@ jobs:
       - name: Run Playwright tests
         run: npm run test:e2e
 
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Build static site
         run: npm run build
