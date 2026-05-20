@@ -33,6 +33,7 @@ export interface BuildSpectralPresentationArgs {
   sessionState: ViewerSessionState;
   interactionState: ViewerInteractionState;
   stokesColormapDefaults?: StokesColormapDefaultSettings;
+  maskInvalidStokesVectors?: boolean;
 }
 
 export function buildSpectralPlotReadoutModel(args: BuildSpectralPresentationArgs): SpectralPlotReadoutModel {
@@ -114,7 +115,12 @@ function resolveSpectralPlotSource(args: BuildSpectralPresentationArgs): Spectra
       return {
         channels: buildSpectralStokesChannels(groups, selection.parameter),
         yAxis: resolveSpectralStokesYAxis(selection, stokesDefaults),
-        buildPoints: (sample) => buildSpectralStokesPlotPoints(sample, groups, selection.parameter)
+        buildPoints: (sample) => buildSpectralStokesPlotPoints(
+          sample,
+          groups,
+          selection.parameter,
+          { maskInvalidStokesVectors: args.maskInvalidStokesVectors }
+        )
       };
     }
   }
@@ -129,7 +135,12 @@ function resolveSpectralPlotSource(args: BuildSpectralPresentationArgs): Spectra
       return {
         channels: buildSpectralStokesChannels(groups, selection.parameter),
         yAxis: resolveSpectralStokesYAxis(selection, stokesDefaults),
-        buildPoints: (sample) => buildSpectralStokesPlotPoints(sample, groups, selection.parameter)
+        buildPoints: (sample) => buildSpectralStokesPlotPoints(
+          sample,
+          groups,
+          selection.parameter,
+          { maskInvalidStokesVectors: args.maskInvalidStokesVectors }
+        )
       };
     }
   }

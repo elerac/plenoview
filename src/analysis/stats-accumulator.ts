@@ -94,7 +94,8 @@ export function createDisplaySelectionStatsAccumulators(
               sample.s0,
               sample.s1,
               sample.s2,
-              sample.s3
+              sample.s3,
+              evaluator.stokesOptions
             );
           }
         )
@@ -104,17 +105,20 @@ export function createDisplaySelectionStatsAccumulators(
         createStatsAccumulator('R', (pixelIndex) => computeRawStokesDisplayValueForChannels(
           evaluator.parameter,
           evaluator.r,
-          pixelIndex
+          pixelIndex,
+          evaluator.stokesOptions
         )),
         createStatsAccumulator('G', (pixelIndex) => computeRawStokesDisplayValueForChannels(
           evaluator.parameter,
           evaluator.g,
-          pixelIndex
+          pixelIndex,
+          evaluator.stokesOptions
         )),
         createStatsAccumulator('B', (pixelIndex) => computeRawStokesDisplayValueForChannels(
           evaluator.parameter,
           evaluator.b,
-          pixelIndex
+          pixelIndex,
+          evaluator.stokesOptions
         ))
       ];
     case 'stokesRgbLuminance':
@@ -128,7 +132,8 @@ export function createDisplaySelectionStatsAccumulators(
               sample.s0,
               sample.s1,
               sample.s2,
-              sample.s3
+              sample.s3,
+              evaluator.stokesOptions
             );
           }
         )
@@ -139,19 +144,22 @@ export function createDisplaySelectionStatsAccumulators(
           evaluator.parameter,
           evaluator.channels,
           pixelIndex,
-          'r'
+          'r',
+          evaluator.stokesOptions
         )),
         createStatsAccumulator('G', (pixelIndex) => computeRawSpectralStokesRgbDisplayValueForComponent(
           evaluator.parameter,
           evaluator.channels,
           pixelIndex,
-          'g'
+          'g',
+          evaluator.stokesOptions
         )),
         createStatsAccumulator('B', (pixelIndex) => computeRawSpectralStokesRgbDisplayValueForComponent(
           evaluator.parameter,
           evaluator.channels,
           pixelIndex,
-          'b'
+          'b',
+          evaluator.stokesOptions
         ))
       ];
     case 'stokesSpectralRgbLuminance':
@@ -165,7 +173,8 @@ export function createDisplaySelectionStatsAccumulators(
               sample.s0,
               sample.s1,
               sample.s2,
-              sample.s3
+              sample.s3,
+              evaluator.stokesOptions
             );
           }
         )

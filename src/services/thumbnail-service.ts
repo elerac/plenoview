@@ -356,5 +356,8 @@ function cloneThumbnailOptions(options: OpenedImageThumbnailOptions): OpenedImag
   if (Number.isFinite(options.autoExposurePercentile)) {
     cloned.autoExposurePercentile = options.autoExposurePercentile;
   }
+  if (options.maskInvalidStokesVectors !== undefined) {
+    cloned.maskInvalidStokesVectors = options.maskInvalidStokesVectors === true;
+  }
   return cloned;
 }

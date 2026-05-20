@@ -25,6 +25,7 @@ interface ChannelThumbnailJob {
   token: number;
   stateSnapshot: ViewerSessionState;
   selection: DisplaySelection;
+  maskInvalidStokesVectors?: boolean;
 }
 
 type MaybePromise<T> = T | Promise<T>;
@@ -45,6 +46,7 @@ export interface ChannelThumbnailServiceDependencies {
     layer: DecodedLayer;
     stateSnapshot: ViewerSessionState;
     selection: DisplaySelection;
+    maskInvalidStokesVectors?: boolean;
     colormapRegistry: ColormapRegistry | null;
     abortSignal: AbortSignal;
   }) => MaybePromise<string | null>;
@@ -228,6 +230,7 @@ export class ChannelThumbnailService implements Disposable {
         layer,
         stateSnapshot: job.stateSnapshot,
         selection: job.selection,
+        maskInvalidStokesVectors: job.maskInvalidStokesVectors,
         colormapRegistry: this.getColormapRegistry(),
         abortSignal: this.abortController.signal
       });
@@ -332,6 +335,7 @@ function defaultCreateThumbnailDataUrl({
   session,
   stateSnapshot,
   selection,
+  maskInvalidStokesVectors,
   colormapRegistry,
   abortSignal,
   findColormapIdByLabel: resolveColormapId,
@@ -341,6 +345,7 @@ function defaultCreateThumbnailDataUrl({
   layer: DecodedLayer;
   stateSnapshot: ViewerSessionState;
   selection: DisplaySelection;
+  maskInvalidStokesVectors?: boolean;
   colormapRegistry: ColormapRegistry | null;
   abortSignal: AbortSignal;
   findColormapIdByLabel: typeof findColormapIdByLabel;
@@ -350,6 +355,7 @@ function defaultCreateThumbnailDataUrl({
     session,
     stateSnapshot,
     selection,
+    maskInvalidStokesVectors,
     colormapRegistry,
     abortSignal,
     findColormapIdByLabel: resolveColormapId,
@@ -361,6 +367,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
   session,
   stateSnapshot,
   selection,
+  maskInvalidStokesVectors,
   colormapRegistry,
   abortSignal,
   findColormapIdByLabel: resolveColormapId,
@@ -369,6 +376,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
   session: OpenedImageSession;
   stateSnapshot: ViewerSessionState;
   selection: DisplaySelection;
+  maskInvalidStokesVectors?: boolean;
   colormapRegistry: ColormapRegistry | null;
   abortSignal: AbortSignal;
   findColormapIdByLabel: typeof findColormapIdByLabel;
@@ -377,6 +385,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
   const preview = await resolveChannelThumbnailPreview({
     selection,
     stateSnapshot,
+    maskInvalidStokesVectors,
     colormapRegistry,
     abortSignal,
     findColormapIdByLabel: resolveColormapId,
@@ -386,7 +395,8 @@ async function createChannelViewThumbnailDataUrlWithPreview({
     session.decoded,
     stateSnapshot,
     selection,
-    preview
+    preview,
+    { maskInvalidStokesVectors }
   );
 }
 
@@ -423,6 +433,7 @@ function cloneViewerState(state: ViewerSessionState): ViewerSessionState {
 async function resolveChannelThumbnailPreview(args: {
   selection: DisplaySelection;
   stateSnapshot: ViewerSessionState;
+  maskInvalidStokesVectors?: boolean;
   colormapRegistry: ColormapRegistry | null;
   abortSignal: AbortSignal;
   findColormapIdByLabel: typeof findColormapIdByLabel;
@@ -450,6 +461,7 @@ async function resolveChannelThumbnailPreview(args: {
     colormapRange: cloneDisplayLuminanceRange(stokesDefaults.range),
     colormapLut,
     stokesDegreeModulation: { ...args.stateSnapshot.stokesDegreeModulation },
-    stokesAolpDegreeModulationMode: args.stateSnapshot.stokesAolpDegreeModulationMode
+    stokesAolpDegreeModulationMode: args.stateSnapshot.stokesAolpDegreeModulationMode,
+    maskInvalidStokesVectors: args.maskInvalidStokesVectors
   };
 }

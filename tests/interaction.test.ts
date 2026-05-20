@@ -38,6 +38,7 @@ const state: ViewerState = {
   colormapZeroCentered: false,
   stokesDegreeModulation: { aolp: false, cop: true, top: true },
   stokesAolpDegreeModulationMode: 'value',
+  maskInvalidStokesVectors: true,
   zoom: 16,
   panX: 100,
   panY: 200,

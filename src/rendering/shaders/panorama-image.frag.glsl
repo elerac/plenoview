@@ -17,6 +17,7 @@ uniform ivec2 uColormapTextureSize;
 uniform int uColormapEntryCount;
 uniform int uDisplayMode;
 uniform int uStokesParameter;
+uniform bool uMaskInvalidStokesVectors;
 uniform bool uUseStokesDegreeModulation;
 uniform int uStokesDegreeModulationMode;
 uniform bool uUseImageAlpha;
@@ -86,6 +87,18 @@ bool isPhysicallyValidStokesVector(float s0, float s1, float s2, float s3) {
   }
 
   return s0 * s0 - (s1 * s1 + s2 * s2 + s3 * s3) >= -abs(STOKES_VECTOR_VALIDITY_ATOL);
+}
+
+bool hasFiniteStokesVectorComponents(float s0, float s1, float s2, float s3) {
+  return isFiniteValue(s0) && isFiniteValue(s1) && isFiniteValue(s2) && isFiniteValue(s3);
+}
+
+bool shouldRejectStokesVector(float s0, float s1, float s2, float s3) {
+  if (!hasFiniteStokesVectorComponents(s0, s1, s2, s3)) {
+    return true;
+  }
+
+  return uMaskInvalidStokesVectors && !isPhysicallyValidStokesVector(s0, s1, s2, s3);
 }
 
 float sanitizeDisplayValue(float value) {
@@ -292,7 +305,7 @@ float computeStokesNormalizedComponent(float s0, float component) {
 }
 
 float computeStokesDisplayValue(int parameter, float s0, float s1, float s2, float s3) {
-  if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+  if (shouldRejectStokesVector(s0, s1, s2, s3)) {
     return nanValue();
   }
 
@@ -328,7 +341,7 @@ float computeStokesDisplayValue(int parameter, float s0, float s1, float s2, flo
 }
 
 float computeStokesDegreeModulationValue(int parameter, float s0, float s1, float s2, float s3) {
-  if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+  if (shouldRejectStokesVector(s0, s1, s2, s3)) {
     return nanValue();
   }
 

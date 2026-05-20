@@ -40,6 +40,7 @@ export interface Elements {
   spectrumLatticeMotionSelect: HTMLSelectElement;
   imageLoadWorkersInput: HTMLInputElement;
   autoExposurePercentileInput: HTMLInputElement;
+  stokesInvalidVectorMaskCheckbox: HTMLInputElement;
   stokesDefaultSettingsTable: HTMLTableElement;
   resetSettingsButton: HTMLButtonElement;
   imageViewerMenuItem: HTMLButtonElement;
@@ -552,6 +553,7 @@ export function resolveElements(): Elements {
     spectrumLatticeMotionSelect: requireElement('spectrum-lattice-motion-select', HTMLSelectElement),
     imageLoadWorkersInput: requireElement('image-load-workers-input', HTMLInputElement),
     autoExposurePercentileInput: requireElement('auto-exposure-percentile-input', HTMLInputElement),
+    stokesInvalidVectorMaskCheckbox: requireElement('stokes-invalid-vector-mask-checkbox', HTMLInputElement),
     stokesDefaultSettingsTable: requireElement('stokes-default-settings-table', HTMLTableElement),
     resetSettingsButton: requireElement('reset-settings-button', HTMLButtonElement),
     imageViewerMenuItem: requireElement('image-viewer-menu-item', HTMLButtonElement),

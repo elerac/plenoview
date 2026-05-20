@@ -54,6 +54,7 @@ import type {
   DisplayLuminanceRange,
   ImageStats,
   OpenedImageSession,
+  ViewerRenderState,
   ViewerSessionState
 } from '../types';
 import { createAbortError, isAbortError, throwIfAborted, type Disposable } from '../lifecycle';
@@ -130,6 +131,7 @@ interface RenderCacheRenderer {
     layer: DecodedLayer,
     selection: ViewerSessionState['displaySelection'],
     visualizationMode: ViewerSessionState['visualizationMode'],
+    maskInvalidStokesVectors: boolean | undefined,
     textureRevisionKey: string,
     binding: ReturnType<typeof buildDisplaySourceBinding>
   ) => void;
@@ -167,6 +169,7 @@ interface PendingDisplayLuminanceRangeJob {
   activeLayer: number;
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: DisplaySelection | null;
+  maskInvalidStokesVectors?: boolean;
   width: number;
   height: number;
   layer: DecodedLayer;
@@ -180,6 +183,7 @@ interface PendingImageStatsJob {
   activeLayer: number;
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: DisplaySelection | null;
+  maskInvalidStokesVectors?: boolean;
   width: number;
   height: number;
   layer: DecodedLayer;
@@ -193,6 +197,7 @@ interface PendingAutoExposureJob {
   activeLayer: number;
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: DisplaySelection | null;
+  maskInvalidStokesVectors?: boolean;
   percentile: number;
   width: number;
   height: number;
@@ -204,6 +209,10 @@ type PendingAnalysisJob =
   | PendingDisplayLuminanceRangeJob
   | PendingImageStatsJob
   | PendingAutoExposureJob;
+
+type RenderCacheDisplayState =
+  Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'> &
+  Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors'>>;
 
 const DISPLAY_LUMINANCE_RANGE_IDLE_TIMEOUT_MS = 250;
 const DISPLAY_LUMINANCE_RANGE_IDLE_FALLBACK_DELAY_MS = 64;
@@ -269,7 +278,10 @@ export class RenderCacheService implements Disposable {
     this.syncDisplayCacheUsageUi();
   }
 
-  prepareActiveSession(session: OpenedImageSession, state: ViewerSessionState): PrepareActiveSessionResult {
+  prepareActiveSession(
+    session: OpenedImageSession,
+    state: ViewerSessionState & Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors'>>
+  ): PrepareActiveSessionResult {
     if (this.disposed) {
       return {
         textureRevisionKey: '',
@@ -329,6 +341,7 @@ export class RenderCacheService implements Disposable {
         layer,
         state.displaySelection,
         state.visualizationMode,
+        state.maskInvalidStokesVectors,
         textureRevisionKey,
         binding
       );
@@ -349,7 +362,7 @@ export class RenderCacheService implements Disposable {
 
   requestDisplayLuminanceRange(
     session: OpenedImageSession,
-    state: Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'>,
+    state: RenderCacheDisplayState,
     requestId: number | null = null
   ): RequestDisplayLuminanceRangeResult {
     if (this.disposed) {
@@ -402,6 +415,7 @@ export class RenderCacheService implements Disposable {
       activeLayer: state.activeLayer,
       visualizationMode: state.visualizationMode,
       displaySelection: cloneDisplaySelection(state.displaySelection),
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       width: session.decoded.width,
       height: session.decoded.height,
       layer,
@@ -423,7 +437,7 @@ export class RenderCacheService implements Disposable {
 
   requestImageStats(
     session: OpenedImageSession,
-    state: Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'>,
+    state: RenderCacheDisplayState,
     requestId: number | null = null
   ): RequestImageStatsResult {
     if (this.disposed) {
@@ -476,6 +490,7 @@ export class RenderCacheService implements Disposable {
       activeLayer: state.activeLayer,
       visualizationMode: state.visualizationMode,
       displaySelection: cloneDisplaySelection(state.displaySelection),
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       width: session.decoded.width,
       height: session.decoded.height,
       layer,
@@ -497,7 +512,7 @@ export class RenderCacheService implements Disposable {
 
   requestAutoExposure(
     session: OpenedImageSession,
-    state: Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'>,
+    state: RenderCacheDisplayState,
     requestId: number | null = null,
     percentile = AUTO_EXPOSURE_PERCENTILE
   ): RequestAutoExposureResult {
@@ -533,7 +548,8 @@ export class RenderCacheService implements Disposable {
       session.decoded.height,
       state.displaySelection,
       state.visualizationMode,
-      percentile
+      percentile,
+      { maskInvalidStokesVectors: state.maskInvalidStokesVectors }
     );
 
     this.cancelSupersededAutoExposureJobs(session.id, revisionKey);
@@ -561,6 +577,7 @@ export class RenderCacheService implements Disposable {
       activeLayer: state.activeLayer,
       visualizationMode: state.visualizationMode,
       displaySelection: cloneDisplaySelection(state.displaySelection),
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       percentile,
       width: session.decoded.width,
       height: session.decoded.height,
@@ -584,7 +601,7 @@ export class RenderCacheService implements Disposable {
 
   getCachedLuminanceRange(
     sessionId: string,
-    state: Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'>
+    state: RenderCacheDisplayState
   ): DisplayLuminanceRange | null {
     if (this.disposed) {
       return null;
@@ -601,7 +618,7 @@ export class RenderCacheService implements Disposable {
 
   getCachedImageStats(
     sessionId: string,
-    state: Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'>
+    state: RenderCacheDisplayState
   ): ImageStats | null {
     if (this.disposed) {
       return null;
@@ -618,7 +635,7 @@ export class RenderCacheService implements Disposable {
 
   resolveDisplayLuminanceRange(
     session: OpenedImageSession,
-    state: Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'>
+    state: RenderCacheDisplayState
   ): DisplayLuminanceRange | null {
     if (this.disposed) {
       return null;
@@ -641,7 +658,8 @@ export class RenderCacheService implements Disposable {
       session.decoded.width,
       session.decoded.height,
       state.displaySelection,
-      state.visualizationMode
+      state.visualizationMode,
+      state.maskInvalidStokesVectors
     );
     entry.luminanceRangeByRevision.set(
       revisionKey,
@@ -786,6 +804,7 @@ export class RenderCacheService implements Disposable {
             job.height,
             job.displaySelection,
             job.visualizationMode,
+            job.maskInvalidStokesVectors,
             job.controller.signal
           );
 
@@ -863,7 +882,10 @@ export class RenderCacheService implements Disposable {
             job.height,
             job.displaySelection,
             job.visualizationMode,
-            this.createAnalysisComputeOptions(job.controller.signal)
+            {
+              ...this.createAnalysisComputeOptions(job.controller.signal),
+              maskInvalidStokesVectors: job.maskInvalidStokesVectors
+            }
           );
 
           if (!this.isImageStatsJobCurrent(job)) {
@@ -941,7 +963,10 @@ export class RenderCacheService implements Disposable {
             job.displaySelection,
             job.visualizationMode,
             job.percentile,
-            this.createAnalysisComputeOptions(job.controller.signal)
+            {
+              ...this.createAnalysisComputeOptions(job.controller.signal),
+              maskInvalidStokesVectors: job.maskInvalidStokesVectors
+            }
           );
 
           if (!this.isAutoExposureJobCurrent(job)) {
@@ -1700,9 +1725,14 @@ export class RenderCacheService implements Disposable {
     width: number,
     height: number,
     selection: DisplaySelection | null,
-    visualizationMode: ViewerSessionState['visualizationMode']
+    visualizationMode: ViewerSessionState['visualizationMode'],
+    maskInvalidStokesVectors?: boolean
   ): DisplayLuminanceRange | null {
-    const selectionKey = serializeDisplaySelectionLuminanceKey(selection, visualizationMode);
+    const selectionKey = serializeDisplaySelectionLuminanceKey(
+      selection,
+      visualizationMode,
+      { maskInvalidStokesVectors }
+    );
     if (Object.prototype.hasOwnProperty.call(layer.analysis.displayLuminanceRangeBySelectionKey, selectionKey)) {
       return layer.analysis.displayLuminanceRangeBySelectionKey[selectionKey] ?? null;
     }
@@ -1716,7 +1746,14 @@ export class RenderCacheService implements Disposable {
         layer.analysis.finiteRangeByChannel[selection.channel] = range;
       }
     } else {
-      range = computeDisplaySelectionLuminanceRange(layer, width, height, selection, visualizationMode);
+      range = computeDisplaySelectionLuminanceRange(
+        layer,
+        width,
+        height,
+        selection,
+        visualizationMode,
+        { maskInvalidStokesVectors }
+      );
     }
 
     layer.analysis.displayLuminanceRangeBySelectionKey[selectionKey] = range;
@@ -1729,10 +1766,15 @@ export class RenderCacheService implements Disposable {
     height: number,
     selection: DisplaySelection | null,
     visualizationMode: ViewerSessionState['visualizationMode'],
+    maskInvalidStokesVectors: boolean | undefined,
     signal: AbortSignal
   ): Promise<DisplayLuminanceRange | null> {
     throwIfAborted(signal, 'Render cache job was cancelled.');
-    const selectionKey = serializeDisplaySelectionLuminanceKey(selection, visualizationMode);
+    const selectionKey = serializeDisplaySelectionLuminanceKey(
+      selection,
+      visualizationMode,
+      { maskInvalidStokesVectors }
+    );
     if (Object.prototype.hasOwnProperty.call(layer.analysis.displayLuminanceRangeBySelectionKey, selectionKey)) {
       return layer.analysis.displayLuminanceRangeBySelectionKey[selectionKey] ?? null;
     }
@@ -1753,7 +1795,10 @@ export class RenderCacheService implements Disposable {
       height,
       selection,
       visualizationMode,
-      this.createAnalysisComputeOptions(signal)
+      {
+        ...this.createAnalysisComputeOptions(signal),
+        maskInvalidStokesVectors
+      }
     );
 
     return range;
@@ -1763,7 +1808,11 @@ export class RenderCacheService implements Disposable {
     job: PendingDisplayLuminanceRangeJob,
     range: DisplayLuminanceRange | null
   ): void {
-    const selectionKey = serializeDisplaySelectionLuminanceKey(job.displaySelection, job.visualizationMode);
+    const selectionKey = serializeDisplaySelectionLuminanceKey(
+      job.displaySelection,
+      job.visualizationMode,
+      { maskInvalidStokesVectors: job.maskInvalidStokesVectors }
+    );
     if (job.displaySelection?.kind === 'channelMono') {
       job.layer.analysis.finiteRangeByChannel[job.displaySelection.channel] = range;
     }

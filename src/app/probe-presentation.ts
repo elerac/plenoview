@@ -21,6 +21,7 @@ export interface BuildProbePresentationArgs {
   interactionState: ViewerInteractionState;
   activeColormapLut: ColormapLut | null;
   activeDisplayLuminanceRange: DisplayLuminanceRange | null;
+  maskInvalidStokesVectors?: boolean;
 }
 
 export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeReadoutModel {
@@ -60,7 +61,8 @@ export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeR
     args.activeSession.decoded.height,
     targetPixel,
     args.sessionState.displaySelection,
-    args.sessionState.visualizationMode
+    args.sessionState.visualizationMode,
+    { maskInvalidStokesVectors: args.maskInvalidStokesVectors }
   );
 
   return {

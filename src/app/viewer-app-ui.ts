@@ -53,7 +53,8 @@ export const enum ViewerUiInvalidationFlags {
   StokesColormapDefaults = 1 << 20,
   DisplayGamma = 1 << 21,
   ViewerPaneLayout = 1 << 22,
-  StokesParameterVisibility = 1 << 23
+  StokesParameterVisibility = 1 << 23,
+  MaskInvalidStokesVectors = 1 << 24
 }
 
 export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => ViewerUiSnapshot {
@@ -103,6 +104,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       stokesDegreeModulationControl: selectStokesControl(state),
       stokesColormapDefaults: state.stokesColormapDefaults,
       stokesParameterVisibility: state.stokesParameterVisibility,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       activeColormapId: state.sessionState.activeColormapId,
       defaultColormapId: state.defaultColormapId,
       activeColormapLut,
@@ -214,6 +216,10 @@ export function computeViewerUiInvalidation(
 
   if (!sameStokesParameterVisibilitySettings(previous.stokesParameterVisibility, next.stokesParameterVisibility)) {
     flags |= ViewerUiInvalidationFlags.StokesParameterVisibility;
+  }
+
+  if (previous.maskInvalidStokesVectors !== next.maskInvalidStokesVectors) {
+    flags |= ViewerUiInvalidationFlags.MaskInvalidStokesVectors;
   }
 
   if (previous.activeColormapId !== next.activeColormapId) {
@@ -447,6 +453,7 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     sameStokesControl(a.stokesDegreeModulationControl, b.stokesDegreeModulationControl) &&
     sameStokesColormapDefaultSettings(a.stokesColormapDefaults, b.stokesColormapDefaults) &&
     sameStokesParameterVisibilitySettings(a.stokesParameterVisibility, b.stokesParameterVisibility) &&
+    a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
     a.activeColormapId === b.activeColormapId &&
     a.defaultColormapId === b.defaultColormapId &&
     a.activeColormapLut === b.activeColormapLut &&

@@ -30,6 +30,7 @@ export function getCommonUniforms(gl: WebGL2RenderingContext, program: WebGLProg
     colormapEntryCount: getRequiredUniformLocation(gl, program, 'uColormapEntryCount'),
     displayMode: getRequiredUniformLocation(gl, program, 'uDisplayMode'),
     stokesParameter: getRequiredUniformLocation(gl, program, 'uStokesParameter'),
+    maskInvalidStokesVectors: getRequiredUniformLocation(gl, program, 'uMaskInvalidStokesVectors'),
     useStokesDegreeModulation: getRequiredUniformLocation(gl, program, 'uUseStokesDegreeModulation'),
     stokesDegreeModulationMode: getRequiredUniformLocation(gl, program, 'uStokesDegreeModulationMode'),
     useImageAlpha: getRequiredUniformLocation(gl, program, 'uUseImageAlpha'),

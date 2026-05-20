@@ -6,6 +6,7 @@ import {
   type SpectralRgbSelection,
   type StokesParameter
 } from './display-model';
+import type { StokesComputationOptions } from './stokes';
 import { computeRawStokesDisplayValue } from './stokes/stokes-display';
 import type { DisplayChannelMapping, PixelSample } from './types';
 
@@ -405,7 +406,8 @@ export function buildSpectralStokesChannels(
 export function buildSpectralStokesPlotPoints(
   sample: PixelSample | null,
   groups: readonly SpectralStokesChannelGroup[],
-  parameter: StokesParameter
+  parameter: StokesParameter,
+  options: StokesComputationOptions = {}
 ): SpectralPlotPoint[] {
   if (!sample) {
     return [];
@@ -424,7 +426,8 @@ export function buildSpectralStokesPlotPoints(
         sample.values[group.s0],
         sample.values[group.s1],
         sample.values[group.s2],
-        group.s3 ? sample.values[group.s3] : 0
+        group.s3 ? sample.values[group.s3] : 0,
+        options
       );
       return Number.isFinite(intensity)
         ? { ...channel, intensity }

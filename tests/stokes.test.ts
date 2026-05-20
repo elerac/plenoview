@@ -525,4 +525,24 @@ describe('stokes', () => {
     expect(computeStokesDegreeModulationValue('dolp', 1, 2, 0, 0)).toBeNull();
     expect(computeStokesDegreeModulationDisplayValue('aolp', 1, 2, 0, 0)).toBeNaN();
   });
+
+  it('can compute finite physically invalid Stokes vectors when masking is disabled', () => {
+    const options = { maskInvalidStokesVectors: false };
+
+    expect(computeStokesDisplayValue('aolp', 1, 2, 0, 0, options)).toBe(0);
+    expect(computeStokesDisplayValue('dolp', 1, 2, 0, 0, options)).toBe(2);
+    expect(computeStokesDisplayValue('dop', 1, 2, 0, 0, options)).toBe(2);
+    expect(computeStokesDisplayValue('s1_over_s0', 1, 2, 0, 0, options)).toBe(2);
+    expect(computeStokesDegreeModulationValue('aolp', 1, 2, 0, 0, options)).toBe(2);
+    expect(computeStokesDegreeModulationDisplayValue('aolp', 1, 2, 0, 0, options)).toBe(1);
+  });
+
+  it('keeps undefined Stokes formulas as NaN when physical masking is disabled', () => {
+    const options = { maskInvalidStokesVectors: false };
+
+    expect(computeStokesDisplayValue('dolp', 0, 2, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('s1_over_s0', 0, 2, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('aolp', 1, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('aolp', Number.NaN, 2, 0, 0, options)).toBeNaN();
+  });
 });

@@ -10,6 +10,7 @@ export interface BuildRoiPresentationArgs {
   activeSession: OpenedImageSession | null;
   activeLayer: DecodedLayer | null;
   sessionState: ViewerSessionState;
+  maskInvalidStokesVectors?: boolean;
 }
 
 export function buildRoiReadoutModel(args: BuildRoiPresentationArgs): RoiReadoutModel {
@@ -29,7 +30,8 @@ export function buildRoiReadoutModel(args: BuildRoiPresentationArgs): RoiReadout
       args.activeSession.decoded.height,
       roi,
       args.sessionState.displaySelection,
-      args.sessionState.visualizationMode
+      args.sessionState.visualizationMode,
+      { maskInvalidStokesVectors: args.maskInvalidStokesVectors }
     )
   };
 }

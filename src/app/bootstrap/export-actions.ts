@@ -238,15 +238,20 @@ export function createImageExportPixelsResolver({
           colormapRange: state.sessionState.colormapRange,
           colormapLut: selectActiveColormapLut(state),
           stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
-          stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode
-        }
+          stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors
+        },
+        { maskInvalidStokesVectors: state.maskInvalidStokesVectors }
       );
       assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
       return pixels;
     }
 
     assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
-    getRenderCache().prepareActiveSession(activeSession, state.sessionState);
+    const renderState = mergeRenderState(state.sessionState, state.interactionState, {
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+    });
+    getRenderCache().prepareActiveSession(activeSession, renderState);
     if (options.signal) {
       throwIfAborted(options.signal);
     }
@@ -265,7 +270,7 @@ export function createImageExportPixelsResolver({
         : null;
 
     return getRenderer().readExportPixels({
-      state: mergeRenderState(state.sessionState, state.interactionState),
+      state: renderState,
       sourceWidth: activeSession.decoded.width,
       sourceHeight: activeSession.decoded.height,
       ...(screenshotRegion ? {
@@ -320,7 +325,9 @@ export async function handleExportImage(
         pngCompressionLevel: request.pngCompressionLevel,
         region: request,
         session: sourceSession,
-        renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState)
+        renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
+          maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors
+        })
       });
       const zipBlob = createZipBlob({
         [request.filename]: new Uint8Array(await blob.arrayBuffer()),
@@ -482,7 +489,9 @@ export async function handleExportScreenshotRegions(
           pngCompressionLevel: request.pngCompressionLevel,
           region,
           session: sourceSession,
-          renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState),
+          renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
+            maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors
+          }),
           batch: {
             archiveFilename: request.archiveFilename,
             sessionId: sourceSession.id,
@@ -880,10 +889,6 @@ async function resolveBatchEntryExportResult({
   }
 
   assertSessionCurrent(getCurrentState(), session, signal);
-  renderCache.prepareActiveSession(session, exportState.state);
-  throwIfAborted(signal, abortMessage);
-  assertSessionCurrent(getCurrentState(), session, signal);
-
   const screenshotRegion = entry.mode === 'screenshot' ? entry : null;
   const requestedWidth = screenshotRegion?.outputWidth ?? session.decoded.width;
   const requestedHeight = screenshotRegion?.outputHeight ?? session.decoded.height;
@@ -894,11 +899,19 @@ async function resolveBatchEntryExportResult({
       : null;
   const renderState = screenshotRegion
     ? {
-      ...mergeRenderState(exportState.state, createInteractionState(exportState.state)),
+      ...mergeRenderState(exportState.state, createInteractionState(exportState.state), {
+        maskInvalidStokesVectors: appState.maskInvalidStokesVectors
+      }),
       viewerMode: appState.sessionState.viewerMode,
       ...appState.interactionState.view
     }
-    : mergeRenderState(exportState.state, createInteractionState(exportState.state));
+    : mergeRenderState(exportState.state, createInteractionState(exportState.state), {
+      maskInvalidStokesVectors: appState.maskInvalidStokesVectors
+    });
+
+  renderCache.prepareActiveSession(session, renderState);
+  throwIfAborted(signal, abortMessage);
+  assertSessionCurrent(getCurrentState(), session, signal);
 
   const pixels = renderer.readExportPixels({
     state: renderState,
@@ -1057,7 +1070,8 @@ async function resolveBatchEntryExportState({
     const rangeState = {
       activeLayer: entry.activeLayer,
       displaySelection: selection,
-      visualizationMode
+      visualizationMode,
+      maskInvalidStokesVectors: appState.maskInvalidStokesVectors
     };
     const displayLuminanceRange = rangeStrategy === 'sampledPreview'
       ? resolvePreviewDisplayLuminanceRange(renderCache, session, layer, rangeState)
@@ -1098,6 +1112,7 @@ function resolvePreviewDisplayLuminanceRange(
     activeLayer: number;
     displaySelection: ViewerSessionState['displaySelection'];
     visualizationMode: VisualizationMode;
+    maskInvalidStokesVectors?: boolean;
   }
 ): DisplayLuminanceRange | null {
   const cachedRange = renderCache.getCachedLuminanceRange(session.id, state);
@@ -1110,7 +1125,8 @@ function resolvePreviewDisplayLuminanceRange(
     session.decoded.width,
     session.decoded.height,
     state.displaySelection,
-    state.visualizationMode
+    state.visualizationMode,
+    { maskInvalidStokesVectors: state.maskInvalidStokesVectors }
   );
 }
 
@@ -1119,14 +1135,17 @@ function computeSampledDisplayLuminanceRange(
   width: number,
   height: number,
   selection: ViewerSessionState['displaySelection'],
-  visualizationMode: VisualizationMode
+  visualizationMode: VisualizationMode,
+  options: { maskInvalidStokesVectors?: boolean } = {}
 ): DisplayLuminanceRange | null {
   const pixelCount = Math.max(0, width * height);
   if (pixelCount === 0) {
     return null;
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    maskInvalidStokesVectors: options.maskInvalidStokesVectors
+  });
   const sample = createDisplayPixelValues();
   const sampleStep = Math.max(1, Math.ceil(pixelCount / PREVIEW_LUMINANCE_RANGE_MAX_SAMPLES));
   let min = Number.POSITIVE_INFINITY;
@@ -1221,8 +1240,11 @@ function restoreActiveRendererBinding(
   if (activeColormapLut) {
     renderer.setColormapTexture(activeColormapLut.entryCount, activeColormapLut.rgba8);
   }
-  renderCache.prepareActiveSession(activeSession, state.sessionState);
-  renderer.renderImage(mergeRenderState(state.sessionState, state.interactionState));
+  const renderState = mergeRenderState(state.sessionState, state.interactionState, {
+    maskInvalidStokesVectors: state.maskInvalidStokesVectors
+  });
+  renderCache.prepareActiveSession(activeSession, renderState);
+  renderer.renderImage(renderState);
 }
 
 function assertActiveSessionCurrent(

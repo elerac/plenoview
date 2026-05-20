@@ -143,7 +143,8 @@ function scheduleThumbnailGeneration(
     token,
     {
       autoExposureEnabled: state.autoExposureEnabled,
-      autoExposurePercentile: state.autoExposurePercentile
+      autoExposurePercentile: state.autoExposurePercentile,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     }
   ).catch(() => undefined);
 }
@@ -206,7 +207,8 @@ function scheduleActiveChannelThumbnailGeneration(
       exposureEv: state.sessionState.channelThumbnailExposureEv,
       displayGamma: state.sessionState.channelThumbnailDisplayGamma,
       stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
-      stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode
+      stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     });
     if (
       Object.prototype.hasOwnProperty.call(state.channelThumbnailsByRequestKey, requestKey)
@@ -230,7 +232,8 @@ function scheduleActiveChannelThumbnailGeneration(
       ),
       token,
       stateSnapshot,
-      selection: item.selection
+      selection: item.selection,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     }).catch(() => undefined);
   }
 }
@@ -271,7 +274,8 @@ function shouldRefreshActiveChannelThumbnails(transition: ViewerStateTransition)
     transition.previousState.sessionState.stokesDegreeModulation.aolp !== transition.state.sessionState.stokesDegreeModulation.aolp ||
     transition.previousState.sessionState.stokesDegreeModulation.cop !== transition.state.sessionState.stokesDegreeModulation.cop ||
     transition.previousState.sessionState.stokesDegreeModulation.top !== transition.state.sessionState.stokesDegreeModulation.top ||
-    transition.previousState.sessionState.stokesAolpDegreeModulationMode !== transition.state.sessionState.stokesAolpDegreeModulationMode
+    transition.previousState.sessionState.stokesAolpDegreeModulationMode !== transition.state.sessionState.stokesAolpDegreeModulationMode ||
+    transition.previousState.maskInvalidStokesVectors !== transition.state.maskInvalidStokesVectors
   );
 }
 
@@ -289,6 +293,10 @@ function shouldRefreshOpenedImageThumbnails(transition: ViewerStateTransition): 
       transition.state.autoExposureEnabled &&
       transition.previousState.autoExposurePercentile !== transition.state.autoExposurePercentile
     );
+  }
+
+  if (transition.intent.type === 'maskInvalidStokesVectorsSet') {
+    return transition.previousState.maskInvalidStokesVectors !== transition.state.maskInvalidStokesVectors;
   }
 
   return false;

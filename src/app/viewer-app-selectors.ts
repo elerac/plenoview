@@ -234,7 +234,8 @@ export function buildChannelThumbnailItems(state: ViewerAppState): ViewerChannel
       exposureEv: state.sessionState.channelThumbnailExposureEv,
       displayGamma: state.sessionState.channelThumbnailDisplayGamma,
       stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
-      stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode
+      stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     });
     const contextKey = serializeChannelThumbnailContextKey(
       session.id,

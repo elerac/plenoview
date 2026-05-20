@@ -22,30 +22,30 @@ describe('display revision keys', () => {
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 1,
       displaySelection: createStokesSelection('aolp', 'stokesRgb', 'G')
-    })).toBe('1:stokesAngle:aolp:rgbComponent:G');
+    })).toBe('1:stokesAngle:aolp:rgbComponent:G:maskInvalidStokesVectors:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 2,
       displaySelection: createStokesSelection('dolp', 'stokesRgb'),
       visualizationMode: 'rgb'
-    })).toBe('2:stokesScalar:dolp:rgbLuminance:rgb');
+    })).toBe('2:stokesScalar:dolp:rgbLuminance:rgb:maskInvalidStokesVectors:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 2,
       displaySelection: createStokesSelection('dolp', 'stokesRgb'),
       visualizationMode: 'colormap'
-    })).toBe('2:stokesScalar:dolp:rgbLuminance:colormap');
+    })).toBe('2:stokesScalar:dolp:rgbLuminance:colormap:maskInvalidStokesVectors:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 2,
       displaySelection: createStokesSelection('dolp', 'stokesScalar', null, '500nm')
-    })).toBe('2:stokesScalar:dolp:scalar:500nm');
+    })).toBe('2:stokesScalar:dolp:scalar:500nm:maskInvalidStokesVectors:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 3,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       visualizationMode: 'colormap'
-    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:colormap');
+    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:colormap:maskInvalidStokesVectors:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 4,
@@ -68,19 +68,19 @@ describe('display revision keys', () => {
       activeLayer: 3,
       displaySelection: createStokesSelection('aolp', 'stokesRgb'),
       visualizationMode: 'rgb'
-    })).toBe('3:stokesAngle:aolp:rgbLuminance:rgb');
+    })).toBe('3:stokesAngle:aolp:rgbLuminance:rgb:maskInvalidStokesVectors:true');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 3,
       displaySelection: createStokesSelection('aolp', 'stokesRgb'),
       visualizationMode: 'colormap'
-    })).toBe('3:stokesAngle:aolp:rgbLuminance:colormap');
+    })).toBe('3:stokesAngle:aolp:rgbLuminance:colormap:maskInvalidStokesVectors:true');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 3,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       visualizationMode: 'rgb'
-    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:rgb');
+    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:true');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 4,
@@ -93,6 +93,20 @@ describe('display revision keys', () => {
       activeLayer: 0,
       displaySelection: createChannelRgbSelection('R', 'G', 'B')
     })).toBe('0:channelRgb:R:G:B::autoExposure:rgbMax:p99.5');
+  });
+
+  it('includes Stokes invalid-vector masking in Stokes revision keys only', () => {
+    expect(buildDisplayTextureRevisionKey({
+      activeLayer: 1,
+      displaySelection: createStokesSelection('dolp'),
+      maskInvalidStokesVectors: false
+    })).toBe('1:stokesScalar:dolp:scalar:maskInvalidStokesVectors:false');
+
+    expect(buildDisplayTextureRevisionKey({
+      activeLayer: 1,
+      displaySelection: createChannelMonoSelection('Y'),
+      maskInvalidStokesVectors: false
+    })).toBe('1:channelMono:Y:');
   });
 
   it('matches revision keys used by viewer state', () => {

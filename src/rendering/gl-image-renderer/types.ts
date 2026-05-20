@@ -17,6 +17,7 @@ export interface CommonUniforms {
   colormapEntryCount: WebGLUniformLocation;
   displayMode: WebGLUniformLocation;
   stokesParameter: WebGLUniformLocation;
+  maskInvalidStokesVectors: WebGLUniformLocation;
   useStokesDegreeModulation: WebGLUniformLocation;
   stokesDegreeModulationMode: WebGLUniformLocation;
   useImageAlpha: WebGLUniformLocation;

@@ -250,7 +250,9 @@ export function createViewerUi({
     getScreenshotSelectionContext: () => {
       const state = core.getState();
       const activeSession = selectActiveSession(state);
-      const renderState = mergeRenderState(state.sessionState, state.interactionState);
+      const renderState = mergeRenderState(state.sessionState, state.interactionState, {
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      });
       return {
         viewerMode: renderState.viewerMode,
         view: {
@@ -277,7 +279,9 @@ export function createViewerUi({
       }
 
       const viewport = getRenderer().getViewport();
-      const renderState = mergeRenderState(state.sessionState, state.interactionState);
+      const renderState = mergeRenderState(state.sessionState, state.interactionState, {
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      });
       if (renderState.viewerMode === 'panorama') {
         return resolveVisiblePanoramaRect(renderState.panoramaHfovDeg, viewport);
       }
@@ -340,6 +344,9 @@ export function createViewerUi({
     onStokesParameterVisibilityChange: (group, enabled) => {
       getDisplayController().setStokesParameterVisibility(group, enabled);
     },
+    onMaskInvalidStokesVectorsChange: (enabled) => {
+      getDisplayController().setMaskInvalidStokesVectors(enabled);
+    },
     onClearRoi: () => {
       core.dispatch({
         type: 'roiSet',
@@ -350,6 +357,7 @@ export function createViewerUi({
       getRenderCache().setBudgetMb(DEFAULT_DISPLAY_CACHE_BUDGET_MB);
       void getDisplayController().resetStokesColormapDefaults();
       getDisplayController().resetStokesParameterVisibility();
+      getDisplayController().resetMaskInvalidStokesVectors();
     },
     onResetView: () => {
       getSessionController().resetActiveSessionState();
@@ -377,7 +385,8 @@ function promoteActiveChannelThumbnail(
     exposureEv: state.sessionState.channelThumbnailExposureEv,
     displayGamma: state.sessionState.channelThumbnailDisplayGamma,
     stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
-    stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode
+    stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+    maskInvalidStokesVectors: state.maskInvalidStokesVectors
   });
 
   getChannelThumbnailService().promoteRequest(requestKey);

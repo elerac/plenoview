@@ -87,6 +87,10 @@ export function applyUiEffects(ui: ViewerUi, transition: ViewerUiTransition): vo
     );
   }
 
+  if (invalidation & ViewerUiInvalidationFlags.MaskInvalidStokesVectors) {
+    ui.setMaskInvalidStokesVectors(snapshot.maskInvalidStokesVectors);
+  }
+
   if (invalidation & ViewerUiInvalidationFlags.ColormapGradient) {
     ui.setColormapGradient(snapshot.activeColormapLut);
   }

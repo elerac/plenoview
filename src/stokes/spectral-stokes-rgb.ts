@@ -20,7 +20,8 @@ import {
 } from '../spectral-color';
 import {
   computeStokesDegreeModulationValue,
-  computeStokesDisplayValue
+  computeStokesDisplayValue,
+  type StokesComputationOptions
 } from '../stokes';
 import type { DecodedLayer, VisualizationMode } from '../types';
 import { computeRawStokesDisplayValue, type StokesSample } from './stokes-display';
@@ -71,26 +72,28 @@ export function readSpectralStokesRgbSampleAtIndex(
 export function computeSpectralStokesRgbDisplayValues(
   parameter: StokesParameter,
   channels: ResolvedSpectralStokesRgbChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  options: StokesComputationOptions = {}
 ): SpectralRgbSample {
   const sample = readSpectralStokesRgbSampleAtIndex(channels, pixelIndex);
   return {
-    r: computeStokesDisplayValueForRgbComponent(parameter, sample, 'r'),
-    g: computeStokesDisplayValueForRgbComponent(parameter, sample, 'g'),
-    b: computeStokesDisplayValueForRgbComponent(parameter, sample, 'b')
+    r: computeStokesDisplayValueForRgbComponent(parameter, sample, 'r', options),
+    g: computeStokesDisplayValueForRgbComponent(parameter, sample, 'g', options),
+    b: computeStokesDisplayValueForRgbComponent(parameter, sample, 'b', options)
   };
 }
 
 export function computeRawSpectralStokesRgbDisplayValues(
   parameter: StokesParameter,
   channels: ResolvedSpectralStokesRgbChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  options: StokesComputationOptions = {}
 ): SpectralRgbSample {
   const sample = readSpectralStokesRgbSampleAtIndex(channels, pixelIndex);
   return {
-    r: computeRawStokesDisplayValueForRgbComponent(parameter, sample, 'r'),
-    g: computeRawStokesDisplayValueForRgbComponent(parameter, sample, 'g'),
-    b: computeRawStokesDisplayValueForRgbComponent(parameter, sample, 'b')
+    r: computeRawStokesDisplayValueForRgbComponent(parameter, sample, 'r', options),
+    g: computeRawStokesDisplayValueForRgbComponent(parameter, sample, 'g', options),
+    b: computeRawStokesDisplayValueForRgbComponent(parameter, sample, 'b', options)
   };
 }
 
@@ -98,12 +101,14 @@ export function computeSpectralStokesRgbDisplayValueForComponent(
   parameter: StokesParameter,
   channels: ResolvedSpectralStokesRgbChannels,
   pixelIndex: number,
-  component: SpectralRgbComponent
+  component: SpectralRgbComponent,
+  options: StokesComputationOptions = {}
 ): number {
   return computeStokesDisplayValueForRgbComponent(
     parameter,
     readSpectralStokesRgbSampleAtIndex(channels, pixelIndex),
-    component
+    component,
+    options
   );
 }
 
@@ -111,12 +116,14 @@ export function computeRawSpectralStokesRgbDisplayValueForComponent(
   parameter: StokesParameter,
   channels: ResolvedSpectralStokesRgbChannels,
   pixelIndex: number,
-  component: SpectralRgbComponent
+  component: SpectralRgbComponent,
+  options: StokesComputationOptions = {}
 ): number {
   return computeRawStokesDisplayValueForRgbComponent(
     parameter,
     readSpectralStokesRgbSampleAtIndex(channels, pixelIndex),
-    component
+    component,
+    options
   );
 }
 
@@ -138,7 +145,8 @@ export function appendSpectralStokesRgbSampleValues(
   flatIndex: number,
   selection: StokesSelection,
   values: Record<string, number>,
-  visualizationMode: VisualizationMode
+  visualizationMode: VisualizationMode,
+  options: StokesComputationOptions = {}
 ): void {
   if (selection.source.kind !== 'spectralRgb') {
     return;
@@ -159,13 +167,15 @@ export function appendSpectralStokesRgbSampleValues(
       values[`${valueLabel}.${label}`] = computeStokesDisplayValueForRgbComponent(
         selection.parameter,
         sample,
-        component
+        component,
+        options
       );
       if (degreeLabel) {
         const degreeValue = computeStokesDegreeModulationValueForRgbComponent(
           selection.parameter,
           sample,
-          component
+          component,
+          options
         );
         if (degreeValue !== null) {
           values[`${degreeLabel}.${label}`] = degreeValue;
@@ -181,7 +191,8 @@ export function appendSpectralStokesRgbSampleValues(
     monoSample.s0,
     monoSample.s1,
     monoSample.s2,
-    monoSample.s3
+    monoSample.s3,
+    options
   );
   if (degreeLabel) {
     const degreeValue = computeStokesDegreeModulationValue(
@@ -189,7 +200,8 @@ export function appendSpectralStokesRgbSampleValues(
       monoSample.s0,
       monoSample.s1,
       monoSample.s2,
-      monoSample.s3
+      monoSample.s3,
+      options
     );
     if (degreeValue !== null) {
       values[degreeLabel] = degreeValue;
@@ -228,42 +240,48 @@ function createSpectralRgbSample(): SpectralRgbSample {
 function computeStokesDisplayValueForRgbComponent(
   parameter: StokesParameter,
   sample: SpectralStokesRgbSample,
-  component: SpectralRgbComponent
+  component: SpectralRgbComponent,
+  options: StokesComputationOptions = {}
 ): number {
   return computeStokesDisplayValue(
     parameter,
     sample.s0[component],
     sample.s1[component],
     sample.s2[component],
-    sample.s3[component]
+    sample.s3[component],
+    options
   );
 }
 
 function computeRawStokesDisplayValueForRgbComponent(
   parameter: StokesParameter,
   sample: SpectralStokesRgbSample,
-  component: SpectralRgbComponent
+  component: SpectralRgbComponent,
+  options: StokesComputationOptions = {}
 ): number {
   return computeRawStokesDisplayValue(
     parameter,
     sample.s0[component],
     sample.s1[component],
     sample.s2[component],
-    sample.s3[component]
+    sample.s3[component],
+    options
   );
 }
 
 function computeStokesDegreeModulationValueForRgbComponent(
   parameter: StokesParameter,
   sample: SpectralStokesRgbSample,
-  component: SpectralRgbComponent
+  component: SpectralRgbComponent,
+  options: StokesComputationOptions = {}
 ): number | null {
   return computeStokesDegreeModulationValue(
     parameter,
     sample.s0[component],
     sample.s1[component],
     sample.s2[component],
-    sample.s3[component]
+    sample.s3[component],
+    options
   );
 }
 

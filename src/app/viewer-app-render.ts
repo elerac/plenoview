@@ -211,7 +211,9 @@ export function computeViewerRenderInvalidation(
 function createRenderStateSelector(): (state: ViewerAppState) => ViewerRenderSnapshot['renderState'] {
   let previousResult: ViewerRenderSnapshot['renderState'] | null = null;
   return (state) => {
-    const nextResult = mergeRenderState(state.sessionState, state.interactionState);
+    const nextResult = mergeRenderState(state.sessionState, state.interactionState, {
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+    });
     if (previousResult && sameViewerRenderState(previousResult, nextResult)) {
       return previousResult;
     }
@@ -242,7 +244,7 @@ function selectPaneRenderSources(
     const usesLiveState = session.id === state.activeSessionId;
     const renderState = usesLiveState
       ? activeRenderState
-      : createStoredPaneRenderState(session.state);
+      : createStoredPaneRenderState(session.state, state.maskInvalidStokesVectors);
     const layer = session.decoded.layers[renderState.activeLayer] ?? null;
     if (!layer) {
       continue;
@@ -268,9 +270,13 @@ function selectPaneRenderSources(
   return sources;
 }
 
-function createStoredPaneRenderState(sessionState: ViewerAppState['sessionState']): ViewerRenderState {
+function createStoredPaneRenderState(
+  sessionState: ViewerAppState['sessionState'],
+  maskInvalidStokesVectors: boolean
+): ViewerRenderState {
   return {
     ...sessionState,
+    maskInvalidStokesVectors,
     hoveredPixel: null,
     draftRoi: null,
     roiInteraction: createEmptyRoiInteractionState()
@@ -297,6 +303,7 @@ function createProbeReadoutSelector(): (
   let previousActiveColormapLut: ViewerRenderSnapshot['activeColormapLut'] = null;
   let previousStokesDegreeModulation = { aolp: false, cop: false, top: false };
   let previousStokesAolpDegreeModulationMode: ViewerAppState['sessionState']['stokesAolpDegreeModulationMode'] = 'value';
+  let previousMaskInvalidStokesVectors = true;
   let previousResult = buildProbeReadoutModel({
     activeSession: null,
     activeLayer: null,
@@ -325,6 +332,7 @@ function createProbeReadoutSelector(): (
       state.sessionState.exposureEv === previousExposureEv &&
       state.sessionState.displayGamma === previousDisplayGamma &&
       state.sessionState.visualizationMode === previousVisualizationMode &&
+      state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
       (
         !usesColormap || (
           sameDisplayLuminanceRange(state.sessionState.colormapRange, previousColormapRange) &&
@@ -356,13 +364,15 @@ function createProbeReadoutSelector(): (
     previousActiveColormapLut = activeColormapLut;
     previousStokesDegreeModulation = nextStokesDegreeModulation;
     previousStokesAolpDegreeModulationMode = state.sessionState.stokesAolpDegreeModulationMode;
+    previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
     previousResult = buildProbeReadoutModel({
       activeSession,
       activeLayer,
       sessionState: state.sessionState,
       interactionState: state.interactionState,
       activeColormapLut,
-      activeDisplayLuminanceRange
+      activeDisplayLuminanceRange,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     });
     return previousResult;
   };
@@ -381,6 +391,7 @@ function createSpectralPlotReadoutSelector(): (
   let previousHoveredPixel: ViewerAppState['interactionState']['hoveredPixel'] = null;
   let previousDisplaySelection: ViewerAppState['sessionState']['displaySelection'] = null;
   let previousStokesColormapDefaults: ViewerAppState['stokesColormapDefaults'] | null = null;
+  let previousMaskInvalidStokesVectors = true;
   let previousResult = buildSpectralPlotReadoutModel({
     activeSession: null,
     activeLayer: null,
@@ -400,6 +411,7 @@ function createSpectralPlotReadoutSelector(): (
       samePixel(state.sessionState.lockedPixel, previousLockedPixel) &&
       samePixel(state.interactionState.hoveredPixel, previousHoveredPixel) &&
       sameDisplaySelection(state.sessionState.displaySelection, previousDisplaySelection) &&
+      state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
       previousStokesColormapDefaults !== null &&
       sameStokesColormapDefaultSettings(state.stokesColormapDefaults, previousStokesColormapDefaults)
     ) {
@@ -413,13 +425,15 @@ function createSpectralPlotReadoutSelector(): (
     previousLockedPixel = state.sessionState.lockedPixel;
     previousHoveredPixel = state.interactionState.hoveredPixel;
     previousDisplaySelection = state.sessionState.displaySelection;
+    previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
     previousStokesColormapDefaults = state.stokesColormapDefaults;
     previousResult = buildSpectralPlotReadoutModel({
       activeSession,
       activeLayer,
       sessionState: state.sessionState,
       interactionState: state.interactionState,
-      stokesColormapDefaults: state.stokesColormapDefaults
+      stokesColormapDefaults: state.stokesColormapDefaults,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     });
     return previousResult;
   };
@@ -437,6 +451,7 @@ function createResourceTargetSelector(): (
           activeLayer: state.sessionState.activeLayer,
           visualizationMode: state.sessionState.visualizationMode,
           displaySelection: state.sessionState.displaySelection,
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors,
           decodedRef: activeSession.decoded
         }
       : null;
@@ -459,6 +474,7 @@ function createRoiReadoutSelector(): (
   let previousRoi: ViewerAppState['sessionState']['roi'] = null;
   let previousDisplaySelection: ViewerAppState['sessionState']['displaySelection'] = null;
   let previousVisualizationMode: ViewerAppState['sessionState']['visualizationMode'] = 'rgb';
+  let previousMaskInvalidStokesVectors = true;
   let previousResult = buildRoiReadoutModel({
     activeSession: null,
     activeLayer: null,
@@ -472,6 +488,7 @@ function createRoiReadoutSelector(): (
       activeLayer === previousLayer &&
       sameRoi(state.sessionState.roi, previousRoi) &&
       state.sessionState.visualizationMode === previousVisualizationMode &&
+      state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
       sameDisplaySelection(state.sessionState.displaySelection, previousDisplaySelection)
     ) {
       return previousResult;
@@ -482,10 +499,12 @@ function createRoiReadoutSelector(): (
     previousRoi = state.sessionState.roi;
     previousVisualizationMode = state.sessionState.visualizationMode;
     previousDisplaySelection = state.sessionState.displaySelection;
+    previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
     previousResult = buildRoiReadoutModel({
       activeSession,
       activeLayer,
-      sessionState: state.sessionState
+      sessionState: state.sessionState,
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors
     });
     return previousResult;
   };
@@ -552,11 +571,13 @@ function createDisplayRangeRequestSelector(): (
           activeLayer: state.sessionState.activeLayer,
           visualizationMode: effectiveVisualizationMode,
           displaySelection: state.sessionState.displaySelection,
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors,
           decodedRef: activeSession.decoded,
           requestKey: `${activeSession.id}:${buildDisplayLuminanceRevisionKey({
             activeLayer: state.sessionState.activeLayer,
             displaySelection: state.sessionState.displaySelection,
-            visualizationMode: effectiveVisualizationMode
+            visualizationMode: effectiveVisualizationMode,
+            maskInvalidStokesVectors: state.maskInvalidStokesVectors
           })}`
         }
       : null;
@@ -582,11 +603,13 @@ function createImageStatsRequestSelector(): (
           activeLayer: state.sessionState.activeLayer,
           visualizationMode: state.sessionState.visualizationMode,
           displaySelection: state.sessionState.displaySelection,
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors,
           decodedRef: activeSession.decoded,
           requestKey: `${activeSession.id}:${buildDisplayImageStatsRevisionKey({
             activeLayer: state.sessionState.activeLayer,
             displaySelection: state.sessionState.displaySelection,
-            visualizationMode: state.sessionState.visualizationMode
+            visualizationMode: state.sessionState.visualizationMode,
+            maskInvalidStokesVectors: state.maskInvalidStokesVectors
           })}`
         }
       : null;
@@ -613,13 +636,15 @@ function createAutoExposureRequestSelector(): (
           activeLayer: state.sessionState.activeLayer,
           visualizationMode: 'rgb' as const,
           displaySelection: state.sessionState.displaySelection,
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors,
           decodedRef: activeSession.decoded,
           percentile: state.autoExposurePercentile,
           source: AUTO_EXPOSURE_SOURCE,
           requestKey: `${activeSession.id}:${buildDisplayAutoExposureRevisionKey({
             activeLayer: state.sessionState.activeLayer,
             displaySelection: state.sessionState.displaySelection,
-            visualizationMode: 'rgb'
+            visualizationMode: 'rgb',
+            maskInvalidStokesVectors: state.maskInvalidStokesVectors
           }, state.autoExposurePercentile)}`
         }
       : null;
@@ -657,7 +682,9 @@ function buildViewerStateReadout(
   state: ViewerAppState,
   activeSession: OpenedImageSession | null
 ): ViewerRenderSnapshot['viewerStateReadout'] {
-  const renderState = mergeRenderState(state.sessionState, state.interactionState);
+  const renderState = mergeRenderState(state.sessionState, state.interactionState, {
+    maskInvalidStokesVectors: state.maskInvalidStokesVectors
+  });
   return {
     hasActiveImage: Boolean(activeSession),
     viewerMode: renderState.viewerMode,
@@ -750,6 +777,7 @@ function samePaneResourceInputs(
 ): boolean {
   return samePaneRenderSourcesBy(a, b, (source, other) => (
     source.renderState.visualizationMode === other.renderState.visualizationMode &&
+    source.renderState.maskInvalidStokesVectors === other.renderState.maskInvalidStokesVectors &&
     sameDisplaySelection(source.renderState.displaySelection, other.renderState.displaySelection)
   ));
 }
@@ -786,6 +814,7 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
     previous.viewerMode === next.viewerMode &&
     previous.exposureEv === next.exposureEv &&
     previous.displayGamma === next.displayGamma &&
+    previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     previous.visualizationMode === next.visualizationMode &&
     sameViewState(previous, next)
@@ -817,6 +846,7 @@ function samePaneValueOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
   return (
     previous.viewerMode === next.viewerMode &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
+    previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
     sameViewState(previous, next)
   );
 }
@@ -826,6 +856,7 @@ function samePaneProbeOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
   const next = b.renderState;
   return (
     previous.viewerMode === next.viewerMode &&
+    previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
     samePixel(previous.lockedPixel, next.lockedPixel) &&
     samePixel(previous.hoveredPixel, next.hoveredPixel) &&
     sameRoi(previous.roi, next.roi) &&
@@ -853,6 +884,7 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.stokesDegreeModulation.cop === b.stokesDegreeModulation.cop &&
     a.stokesDegreeModulation.top === b.stokesDegreeModulation.top &&
     a.stokesAolpDegreeModulationMode === b.stokesAolpDegreeModulationMode &&
+    a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
     a.activeLayer === b.activeLayer &&
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&
     samePixel(a.lockedPixel, b.lockedPixel) &&

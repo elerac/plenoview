@@ -10,7 +10,7 @@ import {
   resolveDisplaySelectionEvaluator,
   type DisplayPixelValues
 } from '../display/evaluator';
-import { isStokesDisplayAvailable } from '../stokes';
+import { isStokesDisplayAvailable, type StokesComputationOptions } from '../stokes';
 import { appendSpectralStokesRgbSampleValues } from '../stokes/spectral-stokes-rgb';
 import { appendStokesSampleValues } from '../stokes/stokes-display';
 import { isSpectralRgbDisplayAvailable } from '../spectral';
@@ -23,14 +23,15 @@ export function readDisplaySelectionPixelValues(
   pixel: ImagePixel,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  output?: DisplayPixelValues
+  output?: DisplayPixelValues,
+  stokesOptions: StokesComputationOptions = {}
 ): DisplayPixelValues | null {
   if (pixel.ix < 0 || pixel.iy < 0 || pixel.ix >= width || pixel.iy >= height) {
     return null;
   }
 
   return readDisplaySelectionPixelValuesAtIndex(
-    resolveDisplaySelectionEvaluator(layer, selection, visualizationMode),
+    resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions),
     pixel.iy * width + pixel.ix,
     output
   );
@@ -70,7 +71,8 @@ export function samplePixelValuesForDisplay(
   height: number,
   pixel: ImagePixel,
   selection: DisplaySelection | null,
-  visualizationMode: VisualizationMode = 'rgb'
+  visualizationMode: VisualizationMode = 'rgb',
+  stokesOptions: StokesComputationOptions = {}
 ): PixelSample | null {
   const sample = samplePixelValues(layer, width, height, pixel);
   if (!sample) {
@@ -80,15 +82,15 @@ export function samplePixelValuesForDisplay(
   const flatIndex = pixel.iy * width + pixel.ix;
   if (isStokesSelection(selection) && isStokesDisplayAvailable(layer.channelNames, selection)) {
     if (selection.source.kind === 'spectralRgb') {
-      appendSpectralStokesRgbSampleValues(layer, flatIndex, selection, sample.values, visualizationMode);
+      appendSpectralStokesRgbSampleValues(layer, flatIndex, selection, sample.values, visualizationMode, stokesOptions);
     } else {
-      appendStokesSampleValues(layer, flatIndex, selection, sample.values, visualizationMode);
+      appendStokesSampleValues(layer, flatIndex, selection, sample.values, visualizationMode, stokesOptions);
     }
   }
 
   if (isSpectralRgbSelection(selection) && isSpectralRgbDisplayAvailable(layer.channelNames, selection)) {
     const values = readDisplaySelectionPixelValuesAtIndex(
-      resolveDisplaySelectionEvaluator(layer, selection, visualizationMode),
+      resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions),
       flatIndex
     );
     const label = getDisplaySelectionOptionLabel(selection);

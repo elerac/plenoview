@@ -12,10 +12,11 @@ import {
   detectScalarStokesChannels,
   getStokesDegreeModulationLabel,
   getStokesParameterLabel,
-  isPhysicallyValidStokesVector,
+  shouldRejectStokesVector,
   type RgbStokesChannels,
   type RgbStokesComponent,
-  type ScalarStokesChannels
+  type ScalarStokesChannels,
+  type StokesComputationOptions
 } from '../stokes';
 import type { DecodedLayer, VisualizationMode } from '../types';
 
@@ -73,19 +74,21 @@ export function readScalarStokesSample(
 export function computeStokesDisplayValueForChannels(
   parameter: StokesParameter,
   channels: ResolvedScalarStokesChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  options: StokesComputationOptions = {}
 ): number {
   const sample = readScalarStokesSample(channels, pixelIndex);
-  return computeStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
+  return computeStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3, options);
 }
 
 export function computeRawStokesDisplayValueForChannels(
   parameter: StokesParameter,
   channels: ResolvedScalarStokesChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  options: StokesComputationOptions = {}
 ): number {
   const sample = readScalarStokesSample(channels, pixelIndex);
-  return computeRawStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
+  return computeRawStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3, options);
 }
 
 export function computeRgbStokesMonoValues(
@@ -123,9 +126,10 @@ export function computeRawStokesDisplayValue(
   s0: number,
   s1: number,
   s2: number,
-  s3: number
+  s3: number,
+  options: StokesComputationOptions = {}
 ): number {
-  if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+  if (shouldRejectStokesVector(s0, s1, s2, s3, options)) {
     return Number.NaN;
   }
 
@@ -155,7 +159,8 @@ export function appendStokesSampleValues(
   flatIndex: number,
   selection: StokesSelection,
   values: Record<string, number>,
-  visualizationMode: VisualizationMode
+  visualizationMode: VisualizationMode,
+  options: StokesComputationOptions = {}
 ): void {
   const label = getStokesParameterLabel(selection.parameter);
 
@@ -171,9 +176,10 @@ export function appendStokesSampleValues(
       sample.s0,
       sample.s1,
       sample.s2,
-      sample.s3
+      sample.s3,
+      options
     );
-    appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, channels.suffix ?? null);
+    appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, channels.suffix ?? null, options);
     return;
   }
 
@@ -193,9 +199,16 @@ export function appendStokesSampleValues(
       sample.s0,
       sample.s1,
       sample.s2,
-      sample.s3
+      sample.s3,
+      options
     );
-    appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, selection.source.component);
+    appendStokesDegreeModulationSampleValue(
+      selection.parameter,
+      sample,
+      values,
+      selection.source.component,
+      options
+    );
     return;
   }
 
@@ -214,16 +227,24 @@ export function appendStokesSampleValues(
         sample.s0,
         sample.s1,
         sample.s2,
-        sample.s3
+        sample.s3,
+        options
       );
-      appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, component);
+      appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, component, options);
     }
     return;
   }
 
   const sample = computeRgbStokesMonoValues(r, g, b, flatIndex);
-  values[label] = computeStokesDisplayValue(selection.parameter, sample.s0, sample.s1, sample.s2, sample.s3);
-  appendStokesDegreeModulationSampleValue(selection.parameter, sample, values);
+  values[label] = computeStokesDisplayValue(
+    selection.parameter,
+    sample.s0,
+    sample.s1,
+    sample.s2,
+    sample.s3,
+    options
+  );
+  appendStokesDegreeModulationSampleValue(selection.parameter, sample, values, null, options);
 }
 
 export function getRgbComponentChannels(
@@ -243,14 +264,15 @@ function appendStokesDegreeModulationSampleValue(
   parameter: StokesParameter,
   sample: StokesSample,
   values: Record<string, number>,
-  suffix: string | null = null
+  suffix: string | null = null,
+  options: StokesComputationOptions = {}
 ): void {
   const label = getStokesDegreeModulationLabel(parameter);
   if (!label) {
     return;
   }
 
-  const value = computeStokesDegreeModulationValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
+  const value = computeStokesDegreeModulationValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3, options);
   if (value !== null) {
     values[appendStokesLabelSuffix(label, suffix)] = value;
   }

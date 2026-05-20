@@ -4,6 +4,7 @@ import {
   type DisplaySelectionEvaluator
 } from '../display/evaluator';
 import type { Disposable } from '../lifecycle';
+import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../types';
 import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 import { buildOverlayValueLines } from './overlay-value-lines';
@@ -54,14 +55,15 @@ export class OverlayRenderer implements Disposable {
     height: number,
     layer: DecodedLayer,
     selection: ViewerState['displaySelection'],
-    visualizationMode: ViewerState['visualizationMode']
+    visualizationMode: ViewerState['visualizationMode'],
+    stokesOptions: StokesComputationOptions = {}
   ): void {
     if (this.disposed) {
       return;
     }
 
     this.imageSize = { width, height };
-    this.displayEvaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+    this.displayEvaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
   }
 
   clearImage(): void {

@@ -2,6 +2,7 @@ import { AUTO_EXPOSURE_PERCENTILE } from '../analysis/auto-exposure';
 import { idleResource } from '../async-resource';
 import { DEFAULT_COLORMAP_ID } from '../colormaps';
 import {
+  DEFAULT_MASK_INVALID_STOKES_VECTORS,
   createDefaultStokesColormapDefaultSettings,
   createDefaultStokesParameterVisibilitySettings
 } from '../stokes';
@@ -56,6 +57,7 @@ export function createInitialViewerAppState(): ViewerAppState {
     stokesDisplayRestoreStates: {},
     stokesColormapDefaults: createDefaultStokesColormapDefaultSettings(),
     stokesParameterVisibility: createDefaultStokesParameterVisibilitySettings(),
+    maskInvalidStokesVectors: DEFAULT_MASK_INVALID_STOKES_VECTORS,
     autoFitImageOnSelect: false,
     autoExposureEnabled: false,
     autoExposurePercentile: AUTO_EXPOSURE_PERCENTILE,

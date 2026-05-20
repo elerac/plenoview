@@ -7,6 +7,11 @@ import type {
   ViewerViewState
 } from './types';
 import { sameImageRoi } from './roi';
+import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from './stokes';
+
+export interface MergeRenderStateOptions {
+  maskInvalidStokesVectors?: boolean;
+}
 
 export function pickViewState(state: ViewerViewState): ViewerViewState {
   return {
@@ -30,11 +35,13 @@ export function createInteractionState(sessionState: ViewerSessionState): Viewer
 
 export function mergeRenderState(
   sessionState: ViewerSessionState,
-  interactionState: ViewerInteractionState
+  interactionState: ViewerInteractionState,
+  options: MergeRenderStateOptions = {}
 ): ViewerRenderState {
   return {
     ...sessionState,
     ...interactionState.view,
+    maskInvalidStokesVectors: options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
     hoveredPixel: interactionState.hoveredPixel,
     draftRoi: interactionState.draftRoi,
     roiInteraction: interactionState.roiInteraction

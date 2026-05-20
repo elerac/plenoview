@@ -34,7 +34,12 @@ export function createViewerInteraction({
   interactionCoordinator
 }: CreateViewerInteractionArgs): ViewerInteraction {
   return new ViewerInteraction(ui.viewerContainer, {
-    getState: () => mergeRenderState(core.getState().sessionState, core.getState().interactionState),
+    getState: () => {
+      const state = core.getState();
+      return mergeRenderState(state.sessionState, state.interactionState, {
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      });
+    },
     getViewport: () => ui.getActiveViewerPane().viewport,
     getActivePane: () => ui.getActiveViewerPane(),
     resolvePaneAtPoint: (point) => ui.resolveViewerPaneAtPoint(point),
@@ -115,7 +120,10 @@ export function initializeViewportLifecycle({
 
   const renderCurrentView = (): void => {
     if (selectActiveSession(core.getState())) {
-      renderer.render(mergeRenderState(core.getState().sessionState, interactionCoordinator.getState()));
+      const state = core.getState();
+      renderer.render(mergeRenderState(state.sessionState, interactionCoordinator.getState(), {
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      }));
     } else {
       renderer.clearImage();
     }

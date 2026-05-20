@@ -118,6 +118,7 @@ export interface ViewerResourceTarget {
   activeLayer: number;
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: ViewerSessionState['displaySelection'];
+  maskInvalidStokesVectors: boolean;
   decodedRef: OpenedImageSession['decoded'];
 }
 
@@ -168,6 +169,7 @@ export interface ViewerAppState {
   stokesDisplayRestoreStates: Record<string, RestorableVisualizationState>;
   stokesColormapDefaults: StokesColormapDefaultSettings;
   stokesParameterVisibility: StokesParameterVisibilitySettings;
+  maskInvalidStokesVectors: boolean;
   autoFitImageOnSelect: boolean;
   autoExposureEnabled: boolean;
   autoExposurePercentile: number;
@@ -216,6 +218,7 @@ export type ViewerIntent =
   | { type: 'stokesParameterVisibilitySet'; settings: StokesParameterVisibilitySettings }
   | { type: 'stokesParameterVisibilityGroupSet'; group: StokesColormapDefaultGroup; enabled: boolean }
   | { type: 'stokesParameterVisibilityReset' }
+  | { type: 'maskInvalidStokesVectorsSet'; enabled: boolean }
   | { type: 'lockedPixelToggled'; pixel: ViewerSessionState['lockedPixel'] }
   | { type: 'roiSet'; roi: ViewerSessionState['roi'] }
   | { type: 'viewerStateEdited'; patch: Partial<ViewerViewState> }
@@ -328,6 +331,7 @@ export interface ViewerUiSnapshot {
   stokesDegreeModulationControl: StokesDegreeModulationControlModel | null;
   stokesColormapDefaults: StokesColormapDefaultSettings;
   stokesParameterVisibility: StokesParameterVisibilitySettings;
+  maskInvalidStokesVectors: boolean;
   activeColormapId: string;
   defaultColormapId: string;
   activeColormapLut: ColormapLut | null;

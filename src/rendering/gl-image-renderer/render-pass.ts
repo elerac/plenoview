@@ -152,6 +152,7 @@ function setCommonUniforms(
   gl.uniform1i(uniforms.colormapEntryCount, state.colormapEntryCount);
   gl.uniform1i(uniforms.displayMode, resolveDisplaySourceModeUniformValue(state.activeBinding.mode));
   gl.uniform1i(uniforms.stokesParameter, resolveStokesParameterUniformValue(state.activeBinding.stokesParameter));
+  gl.uniform1i(uniforms.maskInvalidStokesVectors, viewerState.maskInvalidStokesVectors !== false ? 1 : 0);
   gl.uniform1i(
     uniforms.useStokesDegreeModulation,
     isStokesDegreeModulationEnabled(viewerState.displaySelection, viewerState.stokesDegreeModulation) ? 1 : 0

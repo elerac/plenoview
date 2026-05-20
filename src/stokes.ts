@@ -32,6 +32,10 @@ export type StokesColormapDefaultSettings = Record<StokesColormapDefaultGroup, S
 export type StokesParameterVisibilitySettings = Record<StokesColormapDefaultGroup, boolean>;
 export type RgbStokesComponent = 'R' | 'G' | 'B';
 
+export interface StokesComputationOptions {
+  maskInvalidStokesVectors?: boolean;
+}
+
 export interface StokesColormapDefault {
   colormapLabel: string;
   range: DisplayLuminanceRange;
@@ -92,6 +96,7 @@ export const DEFAULT_STOKES_DEGREE_MODULATION: StokesDegreeModulationState = {
   top: true
 };
 export const DEFAULT_STOKES_AOLP_DEGREE_MODULATION_MODE: StokesAolpDegreeModulationMode = 'value';
+export const DEFAULT_MASK_INVALID_STOKES_VECTORS = true;
 export const STOKES_COLORMAP_DEFAULT_GROUPS: readonly StokesColormapDefaultGroup[] = [
   'aolp',
   'degree',
@@ -548,6 +553,33 @@ export function isPhysicallyValidStokesVector(
   return s0 ** 2 - (s1 ** 2 + s2 ** 2 + s3 ** 2) >= -Math.abs(atol);
 }
 
+export function shouldMaskInvalidStokesVectors(options: StokesComputationOptions = {}): boolean {
+  return options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS;
+}
+
+export function hasFiniteStokesVectorComponents(
+  s0: number,
+  s1: number,
+  s2: number,
+  s3: number
+): boolean {
+  return Number.isFinite(s0) && Number.isFinite(s1) && Number.isFinite(s2) && Number.isFinite(s3);
+}
+
+export function shouldRejectStokesVector(
+  s0: number,
+  s1: number,
+  s2: number,
+  s3: number,
+  options: StokesComputationOptions = {}
+): boolean {
+  if (!hasFiniteStokesVectorComponents(s0, s1, s2, s3)) {
+    return true;
+  }
+
+  return shouldMaskInvalidStokesVectors(options) && !isPhysicallyValidStokesVector(s0, s1, s2, s3);
+}
+
 export function computeStokesAolp(s1: number, s2: number): number {
   if (!Number.isFinite(s1) || !Number.isFinite(s2)) {
     return Number.NaN;
@@ -625,9 +657,10 @@ export function computeStokesDisplayValue(
   s0: number,
   s1: number,
   s2: number,
-  s3: number
+  s3: number,
+  options: StokesComputationOptions = {}
 ): number {
-  if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+  if (shouldRejectStokesVector(s0, s1, s2, s3, options)) {
     return Number.NaN;
   }
 
@@ -657,21 +690,22 @@ export function computeStokesDegreeModulationValue(
   s0: number,
   s1: number,
   s2: number,
-  s3: number
+  s3: number,
+  options: StokesComputationOptions = {}
 ): number | null {
   switch (parameter) {
     case 'aolp':
-      if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+      if (shouldRejectStokesVector(s0, s1, s2, s3, options)) {
         return Number.NaN;
       }
       return computeStokesDolp(s0, s1, s2);
     case 'cop':
-      if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+      if (shouldRejectStokesVector(s0, s1, s2, s3, options)) {
         return Number.NaN;
       }
       return computeStokesDocp(s0, s3);
     case 'top':
-      if (!isPhysicallyValidStokesVector(s0, s1, s2, s3)) {
+      if (shouldRejectStokesVector(s0, s1, s2, s3, options)) {
         return Number.NaN;
       }
       return computeStokesDop(s0, s1, s2, s3);
@@ -690,9 +724,10 @@ export function computeStokesDegreeModulationDisplayValue(
   s0: number,
   s1: number,
   s2: number,
-  s3: number
+  s3: number,
+  options: StokesComputationOptions = {}
 ): number | null {
-  const value = computeStokesDegreeModulationValue(parameter, s0, s1, s2, s3);
+  const value = computeStokesDegreeModulationValue(parameter, s0, s1, s2, s3, options);
   return value === null || !Number.isFinite(value)
     ? value
     : clampStokesDegreeModulationValue(value);

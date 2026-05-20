@@ -25,6 +25,7 @@ import {
   type DisplayPixelValues
 } from './display/evaluator';
 import { isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from './stokes';
+import type { StokesComputationOptions } from './stokes';
 import {
   DecodedExrImage,
   DecodedLayer,
@@ -46,6 +47,7 @@ export interface OpenedImageThumbnailPixels {
 export interface OpenedImageThumbnailOptions {
   autoExposureEnabled?: boolean;
   autoExposurePercentile?: number;
+  maskInvalidStokesVectors?: boolean;
 }
 
 export interface ThumbnailPreviewOptions {
@@ -54,6 +56,7 @@ export interface ThumbnailPreviewOptions {
   colormapLut: ColormapLut | null;
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode?: StokesAolpDegreeModulationMode;
+  maskInvalidStokesVectors?: boolean;
 }
 
 export function createOpenedImageThumbnailDataUrl(
@@ -111,7 +114,8 @@ export function createChannelViewThumbnailDataUrl(
   decoded: DecodedExrImage,
   state: ViewerSessionState,
   selection: DisplaySelection,
-  preview: ThumbnailPreviewOptions | null = null
+  preview: ThumbnailPreviewOptions | null = null,
+  options: OpenedImageThumbnailOptions = {}
 ): string | null {
   if (typeof document === 'undefined') {
     return null;
@@ -130,7 +134,8 @@ export function createChannelViewThumbnailDataUrl(
       state,
       selection,
       CHANNEL_VIEW_THUMBNAIL_SIZE,
-      preview
+      preview,
+      options
     );
     return createOpenedImageThumbnailDataUrlFromPixels(pixels);
   } catch {
@@ -163,10 +168,14 @@ export function buildDisplaySelectionThumbnailPixels(
     preview.colormapLut
   );
   const colormapPreview = useColormapPreview ? preview : null;
+  const stokesOptions: StokesComputationOptions = {
+    maskInvalidStokesVectors: preview?.maskInvalidStokesVectors ?? options.maskInvalidStokesVectors
+  };
   const evaluator = resolveDisplaySelectionEvaluator(
     layer,
     effectiveSelection,
-    useColormapPreview ? 'colormap' : 'rgb'
+    useColormapPreview ? 'colormap' : 'rgb',
+    stokesOptions
   );
   const sample = createThumbnailSample();
   const stats = !useColormapPreview && scalarThumbnail

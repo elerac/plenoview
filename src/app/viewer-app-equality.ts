@@ -257,6 +257,7 @@ export function sameResourceTarget(a: ViewerResourceTarget | null, b: ViewerReso
     a.sessionId === b.sessionId &&
     a.activeLayer === b.activeLayer &&
     a.visualizationMode === b.visualizationMode &&
+    a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&
     a.decodedRef === b.decodedRef
   );

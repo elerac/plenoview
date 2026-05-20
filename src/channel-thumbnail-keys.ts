@@ -1,4 +1,5 @@
 import {
+  isStokesSelection,
   serializeDisplaySelectionKey,
   type DisplaySelection,
   type StokesAolpDegreeModulationMode,
@@ -23,8 +24,12 @@ export function serializeChannelThumbnailRequestKey(args: {
   displayGamma: number;
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode: StokesAolpDegreeModulationMode;
+  maskInvalidStokesVectors?: boolean;
 }): string {
-  return `${serializeChannelThumbnailContextKey(args.sessionId, args.activeLayer, args.selection)}|exposure:${serializeFiniteNumber(args.exposureEv, 0)}|gamma:${serializeFiniteNumber(args.displayGamma, DEFAULT_DISPLAY_GAMMA)}|modulation:${serializeStokesDegreeModulationKey(args.stokesDegreeModulation)}|aolpModulation:${args.stokesAolpDegreeModulationMode}`;
+  const maskKey = isStokesThumbnailSelection(args.selection)
+    ? `|maskInvalidStokesVectors:${args.maskInvalidStokesVectors !== false ? '1' : '0'}`
+    : '';
+  return `${serializeChannelThumbnailContextKey(args.sessionId, args.activeLayer, args.selection)}|exposure:${serializeFiniteNumber(args.exposureEv, 0)}|gamma:${serializeFiniteNumber(args.displayGamma, DEFAULT_DISPLAY_GAMMA)}|modulation:${serializeStokesDegreeModulationKey(args.stokesDegreeModulation)}|aolpModulation:${args.stokesAolpDegreeModulationMode}${maskKey}`;
 }
 
 export function buildChannelThumbnailSessionPrefix(sessionId: string): string {
@@ -41,4 +46,12 @@ function serializeStokesDegreeModulationKey(modulation: StokesDegreeModulationSt
     `cop:${modulation.cop ? '1' : '0'}`,
     `top:${modulation.top ? '1' : '0'}`
   ].join(',');
+}
+
+function isStokesThumbnailSelection(selection: DisplaySelection | string): boolean {
+  if (typeof selection !== 'string') {
+    return isStokesSelection(selection);
+  }
+
+  return selection.startsWith('stokesScalar:') || selection.startsWith('stokesAngle:');
 }

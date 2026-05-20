@@ -1155,7 +1155,13 @@ describe('bootstrap app lifecycle', () => {
       outputHeight: 512
     }, abortController.signal)).resolves.toBe(pixels);
 
-    expect(mocks.renderCachePrepareActiveSession).toHaveBeenCalledWith(session, mocks.coreState.sessionState);
+    expect(mocks.renderCachePrepareActiveSession).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        ...mocks.coreState.sessionState,
+        maskInvalidStokesVectors: true
+      })
+    );
     expect(mocks.rendererReadExportPixels).toHaveBeenCalledWith(expect.objectContaining({
       sourceWidth: 1024,
       sourceHeight: 512,
@@ -1318,7 +1324,13 @@ describe('bootstrap app lifecycle', () => {
     await expect(callbacks.onCopyImageToClipboard()).resolves.toBeUndefined();
 
     expect(ClipboardItemMock.supports).toHaveBeenCalledWith('image/png');
-    expect(mocks.renderCachePrepareActiveSession).toHaveBeenCalledWith(session, mocks.coreState.sessionState);
+    expect(mocks.renderCachePrepareActiveSession).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        ...mocks.coreState.sessionState,
+        maskInvalidStokesVectors: true
+      })
+    );
     expect(mocks.rendererReadExportPixels).toHaveBeenCalledWith(expect.objectContaining({
       sourceWidth: 1024,
       sourceHeight: 512

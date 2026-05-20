@@ -3,6 +3,7 @@ import {
   readChannelValue
 } from '../channel-storage';
 import type { DisplaySelection, StokesSelection } from '../display-model';
+import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, VisualizationMode } from '../types';
 import {
   createDisplayPixelValues,
@@ -53,7 +54,8 @@ export function buildSelectedDisplayTexture(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  output?: Float32Array
+  output?: Float32Array,
+  stokesOptions: StokesComputationOptions = {}
 ): Float32Array {
   const pixelCount = width * height;
   const requiredLength = pixelCount * 4;
@@ -62,7 +64,7 @@ export function buildSelectedDisplayTexture(
     : new Float32Array(requiredLength);
 
   return fillDisplayTextureFromEvaluator(
-    resolveDisplaySelectionEvaluator(layer, selection, visualizationMode),
+    resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions),
     pixelCount,
     out
   );
@@ -74,9 +76,10 @@ export function buildStokesDisplayTexture(
   height: number,
   selection: StokesSelection,
   visualizationMode: VisualizationMode = 'rgb',
-  output?: Float32Array
+  output?: Float32Array,
+  stokesOptions: StokesComputationOptions = {}
 ): Float32Array {
-  return buildSelectedDisplayTexture(layer, width, height, selection, visualizationMode, output);
+  return buildSelectedDisplayTexture(layer, width, height, selection, visualizationMode, output, stokesOptions);
 }
 
 function fillDisplayTextureFromEvaluator(

@@ -9,6 +9,7 @@ import {
   type ViewerState
 } from '../../src/types';
 import {
+  DEFAULT_MASK_INVALID_STOKES_VECTORS,
   buildRgbStokesLuminanceSelection,
   buildRgbStokesSplitSelection,
   buildScalarStokesSelection,
@@ -136,6 +137,7 @@ export function createViewerState(overrides: Partial<ViewerState> = {}): ViewerS
   const sessionState = createViewerSessionState();
   return {
     ...sessionState,
+    maskInvalidStokesVectors: DEFAULT_MASK_INVALID_STOKES_VECTORS,
     hoveredPixel: null,
     draftRoi: null,
     roiInteraction: createInteractionState(sessionState).roiInteraction,

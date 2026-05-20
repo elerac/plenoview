@@ -1,4 +1,5 @@
 import type { DisplaySelection } from '../display-model';
+import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, VisualizationMode } from '../types';
 import {
   createDisplayPixelValues,
@@ -92,14 +93,15 @@ export function computeDisplaySelectionAutoExposure(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  percentile = AUTO_EXPOSURE_PERCENTILE
+  percentile = AUTO_EXPOSURE_PERCENTILE,
+  stokesOptions: StokesComputationOptions = {}
 ): AutoExposureResult {
   const pixelCount = Math.max(0, width * height);
   if (pixelCount === 0) {
     return createAutoExposureResult(1, percentile);
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
   const values = createDisplayPixelValues();
   const scalars = new Float32Array(pixelCount);
   let scalarCount = 0;
@@ -129,7 +131,8 @@ export function computeDisplaySelectionAutoExposurePreview(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  percentile = AUTO_EXPOSURE_PERCENTILE
+  percentile = AUTO_EXPOSURE_PERCENTILE,
+  stokesOptions: StokesComputationOptions = {}
 ): AutoExposureResult {
   const sampleWidth = resolveAutoExposurePreviewSampleSize(width);
   const sampleHeight = resolveAutoExposurePreviewSampleSize(height);
@@ -138,7 +141,7 @@ export function computeDisplaySelectionAutoExposurePreview(
     return createAutoExposureResult(1, percentile);
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
   const values = createDisplayPixelValues();
   const scalars = new Float32Array(sampleCount);
   let scalarCount = 0;
@@ -174,7 +177,7 @@ export async function computeDisplaySelectionAutoExposureAsync(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
   percentile = AUTO_EXPOSURE_PERCENTILE,
-  options: CooperativeComputeOptions = {}
+  options: CooperativeComputeOptions & StokesComputationOptions = {}
 ): Promise<AutoExposureResult> {
   throwIfCooperativeComputeAborted(options);
   const pixelCount = Math.max(0, width * height);
@@ -182,7 +185,7 @@ export async function computeDisplaySelectionAutoExposureAsync(
     return createAutoExposureResult(1, percentile);
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, options);
   const values = createDisplayPixelValues();
   const scalars = new Float32Array(pixelCount);
   let scalarCount = 0;

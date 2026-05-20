@@ -88,6 +88,7 @@ import { ThemeController } from './theme-controller';
 import { SettingsDialogController } from './settings-dialog';
 import {
   STOKES_COLORMAP_DEFAULT_GROUPS,
+  DEFAULT_MASK_INVALID_STOKES_VECTORS,
   cloneStokesColormapDefaultSetting,
   cloneStokesColormapDefaultSettings,
   cloneStokesParameterVisibilitySettings,
@@ -268,6 +269,7 @@ export interface UiCallbacks {
   onStokesAolpDegreeModulationModeChange: (mode: StokesAolpDegreeModulationMode) => void;
   onStokesDefaultSettingChange: (group: StokesColormapDefaultGroup, setting: StokesColormapDefaultSetting) => void;
   onStokesParameterVisibilityChange: (group: StokesColormapDefaultGroup, enabled: boolean) => void;
+  onMaskInvalidStokesVectorsChange: (enabled: boolean) => void;
   onClearRoi: () => void;
   onResetSettings: () => void;
   onResetView: () => void;
@@ -335,6 +337,7 @@ export class ViewerUi implements Disposable {
   private stokesColormapOptions: Array<{ id: string; label: string }> = [];
   private stokesColormapDefaults: StokesColormapDefaultSettings = createDefaultStokesColormapDefaultSettings();
   private stokesParameterVisibility: StokesParameterVisibilitySettings = createDefaultStokesParameterVisibilitySettings();
+  private maskInvalidStokesVectors = DEFAULT_MASK_INVALID_STOKES_VECTORS;
   private viewerMode: ViewerMode = 'image';
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
@@ -1065,6 +1068,15 @@ export class ViewerUi implements Disposable {
         focusedControl.focus();
       }
     }
+  }
+
+  setMaskInvalidStokesVectors(enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.maskInvalidStokesVectors = enabled;
+    this.elements.stokesInvalidVectorMaskCheckbox.checked = enabled;
   }
 
   setActiveColormap(activeId: string): void {
@@ -2611,6 +2623,11 @@ export class ViewerUi implements Disposable {
       this.bindStokesDefaultSettingRow(group);
     }
 
+    this.disposables.addEventListener(this.elements.stokesInvalidVectorMaskCheckbox, 'change', () => {
+      this.setMaskInvalidStokesVectors(this.elements.stokesInvalidVectorMaskCheckbox.checked);
+      this.callbacks.onMaskInvalidStokesVectorsChange(this.maskInvalidStokesVectors);
+    });
+
     this.disposables.addEventListener(this.elements.spectrumLatticeMotionSelect, 'change', () => {
       this.setSpectrumLatticeMotionPreference(
         parseSpectrumLatticeMotionPreference(this.elements.spectrumLatticeMotionSelect.value)
@@ -2642,6 +2659,8 @@ export class ViewerUi implements Disposable {
         createDefaultStokesColormapDefaultSettings(),
         createDefaultStokesParameterVisibilitySettings()
       );
+      this.setMaskInvalidStokesVectors(DEFAULT_MASK_INVALID_STOKES_VECTORS);
+      this.callbacks.onMaskInvalidStokesVectorsChange(this.maskInvalidStokesVectors);
       this.callbacks.onResetSettings();
     });
 

@@ -5,6 +5,7 @@ import {
   readDisplaySelectionPixelValuesAtIndex,
   resolveDisplaySelectionEvaluator
 } from '../display/evaluator';
+import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, DisplayLuminanceRange, ImageStats, VisualizationMode } from '../types';
 import {
   maybeYieldCooperativeCompute,
@@ -22,10 +23,11 @@ export function computeDisplaySelectionLuminanceRange(
   width: number,
   height: number,
   selection: DisplaySelection | null,
-  visualizationMode: VisualizationMode = 'rgb'
+  visualizationMode: VisualizationMode = 'rgb',
+  stokesOptions: StokesComputationOptions = {}
 ): DisplayLuminanceRange | null {
   const pixelCount = width * height;
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
   const values = createDisplayPixelValues();
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -60,11 +62,11 @@ export async function computeDisplaySelectionLuminanceRangeAsync(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  options: CooperativeComputeOptions = {}
+  options: CooperativeComputeOptions & StokesComputationOptions = {}
 ): Promise<DisplayLuminanceRange | null> {
   throwIfCooperativeComputeAborted(options);
   const pixelCount = width * height;
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, options);
   const values = createDisplayPixelValues();
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -101,14 +103,15 @@ export function computeDisplaySelectionImageStats(
   width: number,
   height: number,
   selection: DisplaySelection | null,
-  visualizationMode: VisualizationMode = 'rgb'
+  visualizationMode: VisualizationMode = 'rgb',
+  stokesOptions: StokesComputationOptions = {}
 ): ImageStats | null {
   const pixelCount = Math.max(0, width * height);
   if (pixelCount === 0) {
     return null;
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
   const accumulators = createDisplaySelectionStatsAccumulators(evaluator, selection);
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
@@ -131,7 +134,7 @@ export async function computeDisplaySelectionImageStatsAsync(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  options: CooperativeComputeOptions = {}
+  options: CooperativeComputeOptions & StokesComputationOptions = {}
 ): Promise<ImageStats | null> {
   throwIfCooperativeComputeAborted(options);
   const pixelCount = Math.max(0, width * height);
@@ -139,7 +142,7 @@ export async function computeDisplaySelectionImageStatsAsync(
     return null;
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, options);
   const accumulators = createDisplaySelectionStatsAccumulators(evaluator, selection);
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {

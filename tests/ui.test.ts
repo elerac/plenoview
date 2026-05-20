@@ -1856,7 +1856,8 @@ describe('panel split sizing', () => {
     window.localStorage.setItem(IMAGE_LOAD_WORKERS_STORAGE_KEY, '1');
 
     const onResetSettings = vi.fn();
-    const ui = new ViewerUi(createUiCallbacks({ onResetSettings }));
+    const onMaskInvalidStokesVectorsChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onResetSettings, onMaskInvalidStokesVectorsChange }));
     ui.setStokesDefaultSettingsOptions([
       { id: '0', label: 'Viridis' },
       { id: '1', label: 'HSV' },
@@ -1880,6 +1881,7 @@ describe('panel split sizing', () => {
     ) as HTMLInputElement;
     const imageLoadWorkersInput = document.getElementById('image-load-workers-input') as HTMLInputElement;
     const stokesAolpSelect = document.getElementById('stokes-default-aolp-colormap-select') as HTMLSelectElement;
+    const stokesMaskCheckbox = document.getElementById('stokes-invalid-vector-mask-checkbox') as HTMLInputElement;
     const imageButton = document.getElementById('image-panel-collapse-button') as HTMLButtonElement;
     const rightButton = document.getElementById('right-panel-collapse-button') as HTMLButtonElement;
     const bottomButton = document.getElementById('bottom-panel-collapse-button') as HTMLButtonElement;
@@ -1895,6 +1897,7 @@ describe('panel split sizing', () => {
     expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
     expect(imageLoadWorkersInput.value).toBe('1');
     expect(stokesAolpSelect.value).toBe('0');
+    stokesMaskCheckbox.checked = false;
     autoExposurePercentileInput.value = '97.5';
     autoExposurePercentileInput.dispatchEvent(new Event('change', { bubbles: true }));
     expect(window.localStorage.getItem(AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY)).toBe('97.5');
@@ -1902,11 +1905,13 @@ describe('panel split sizing', () => {
     resetSettingsButton.click();
 
     expect(onResetSettings).toHaveBeenCalledTimes(1);
+    expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(true);
     expect(themeSelect.value).toBe('default');
     expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_ANIMATE);
     expect(autoExposurePercentileInput.value).toBe('99.5');
     expect(imageLoadWorkersInput.value).toBe(String(getDefaultImageLoadWorkers()));
     expect(stokesAolpSelect.value).toBe('1');
+    expect(stokesMaskCheckbox.checked).toBe(true);
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBeNull();
@@ -2485,6 +2490,27 @@ describe('view menu', () => {
     });
   });
 
+  it('renders and dispatches the invalid Stokes vector mask setting from Settings', () => {
+    installUiFixture();
+
+    const onMaskInvalidStokesVectorsChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onMaskInvalidStokesVectorsChange }));
+    const checkbox = document.getElementById('stokes-invalid-vector-mask-checkbox') as HTMLInputElement;
+
+    expect(checkbox).not.toBeNull();
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox.closest('#settings-dialog')).toBe(document.getElementById('settings-dialog'));
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(false);
+
+    ui.setMaskInvalidStokesVectors(true);
+
+    expect(checkbox.checked).toBe(true);
+  });
+
   it('applies and persists the Spectrum lattice theme from Settings', () => {
     installUiFixture();
 
@@ -2961,6 +2987,7 @@ describe('view menu', () => {
     const settingsDialog = document.getElementById('settings-dialog') as HTMLElement;
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
     const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
+    const stokesMaskCheckbox = document.getElementById('stokes-invalid-vector-mask-checkbox') as HTMLInputElement;
     const aolpEnabled = document.getElementById('stokes-default-aolp-enabled-checkbox') as HTMLInputElement;
     const aolpSelect = document.getElementById('stokes-default-aolp-colormap-select') as HTMLSelectElement;
     const aolpVmin = document.getElementById('stokes-default-aolp-vmin-input') as HTMLInputElement;
@@ -3006,6 +3033,7 @@ describe('view menu', () => {
     expect(focusableSettingsControls).toEqual([
       themeSelect,
       spectrumMotionSelect,
+      stokesMaskCheckbox,
       aolpEnabled,
       aolpSelect,
       aolpVmin,
@@ -10323,6 +10351,7 @@ function createUiCallbacksBase() {
     onStokesAolpDegreeModulationModeChange: () => {},
     onStokesDefaultSettingChange: () => {},
     onStokesParameterVisibilityChange: () => {},
+    onMaskInvalidStokesVectorsChange: () => {},
     onClearRoi: () => {},
     onResetSettings: () => {},
     onResetView: () => {}

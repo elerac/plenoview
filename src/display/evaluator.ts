@@ -3,7 +3,12 @@ import {
   readChannelValue,
   type ChannelReadView
 } from '../channel-storage';
-import { computeStokesDegreeModulationDisplayValue, computeStokesDisplayValue } from '../stokes';
+import {
+  DEFAULT_MASK_INVALID_STOKES_VECTORS,
+  computeStokesDegreeModulationDisplayValue,
+  computeStokesDisplayValue,
+  type StokesComputationOptions
+} from '../stokes';
 import {
   computeRawStokesDisplayValue,
   computeRawStokesDisplayValueForChannels,
@@ -46,6 +51,8 @@ export interface DisplayPixelValues {
   a: number;
 }
 
+type ResolvedStokesComputationOptions = Required<Pick<StokesComputationOptions, 'maskInvalidStokesVectors'>>;
+
 export type DisplaySelectionEvaluator =
   | {
       kind: 'empty';
@@ -76,6 +83,7 @@ export type DisplaySelectionEvaluator =
       binding: DisplaySourceBinding;
       parameter: NonNullable<DisplaySourceBinding['stokesParameter']>;
       stokes: ResolvedScalarStokesChannels;
+      stokesOptions: ResolvedStokesComputationOptions;
     }
   | {
       kind: 'stokesRgb';
@@ -84,6 +92,7 @@ export type DisplaySelectionEvaluator =
       r: ResolvedScalarStokesChannels;
       g: ResolvedScalarStokesChannels;
       b: ResolvedScalarStokesChannels;
+      stokesOptions: ResolvedStokesComputationOptions;
     }
   | {
       kind: 'stokesRgbLuminance';
@@ -92,32 +101,42 @@ export type DisplaySelectionEvaluator =
       r: ResolvedScalarStokesChannels;
       g: ResolvedScalarStokesChannels;
       b: ResolvedScalarStokesChannels;
+      stokesOptions: ResolvedStokesComputationOptions;
     }
   | {
       kind: 'stokesSpectralRgb';
       binding: DisplaySourceBinding;
       parameter: NonNullable<DisplaySourceBinding['stokesParameter']>;
       channels: ResolvedSpectralStokesRgbChannels;
+      stokesOptions: ResolvedStokesComputationOptions;
     }
   | {
       kind: 'stokesSpectralRgbLuminance';
       binding: DisplaySourceBinding;
       parameter: NonNullable<DisplaySourceBinding['stokesParameter']>;
       channels: ResolvedSpectralStokesRgbChannels;
+      stokesOptions: ResolvedStokesComputationOptions;
     };
 
 export function resolveDisplaySelectionEvaluator(
   layer: DecodedLayer,
   selection: Parameters<typeof buildDisplaySourceBinding>[1],
-  visualizationMode: VisualizationMode = 'rgb'
+  visualizationMode: VisualizationMode = 'rgb',
+  stokesOptions: StokesComputationOptions = {}
 ): DisplaySelectionEvaluator {
-  return createDisplaySelectionEvaluator(layer, buildDisplaySourceBinding(layer, selection, visualizationMode));
+  return createDisplaySelectionEvaluator(
+    layer,
+    buildDisplaySourceBinding(layer, selection, visualizationMode),
+    stokesOptions
+  );
 }
 
 export function createDisplaySelectionEvaluator(
   layer: DecodedLayer,
-  binding: DisplaySourceBinding
+  binding: DisplaySourceBinding,
+  stokesOptions: StokesComputationOptions = {}
 ): DisplaySelectionEvaluator {
+  const resolvedStokesOptions = resolveStokesComputationOptions(stokesOptions);
   switch (binding.mode) {
     case 'empty':
       return {
@@ -143,15 +162,15 @@ export function createDisplaySelectionEvaluator(
     case 'spectralRgb':
       return createSpectralRgbEvaluator(layer, binding);
     case 'stokesDirect':
-      return createStokesDirectEvaluator(layer, binding);
+      return createStokesDirectEvaluator(layer, binding, resolvedStokesOptions);
     case 'stokesRgb':
-      return createRgbStokesEvaluator(layer, binding, 'stokesRgb');
+      return createRgbStokesEvaluator(layer, binding, 'stokesRgb', resolvedStokesOptions);
     case 'stokesRgbLuminance':
-      return createRgbStokesEvaluator(layer, binding, 'stokesRgbLuminance');
+      return createRgbStokesEvaluator(layer, binding, 'stokesRgbLuminance', resolvedStokesOptions);
     case 'stokesSpectralRgb':
-      return createSpectralStokesRgbEvaluator(layer, binding, 'stokesSpectralRgb');
+      return createSpectralStokesRgbEvaluator(layer, binding, 'stokesSpectralRgb', resolvedStokesOptions);
     case 'stokesSpectralRgbLuminance':
-      return createSpectralStokesRgbEvaluator(layer, binding, 'stokesSpectralRgbLuminance');
+      return createSpectralStokesRgbEvaluator(layer, binding, 'stokesSpectralRgbLuminance', resolvedStokesOptions);
   }
 }
 
@@ -189,7 +208,8 @@ export function readDisplaySelectionPixelValuesAtIndex(
       return writeStokesDisplayPixel(
         out,
         evaluator.parameter,
-        readScalarStokesSample(evaluator.stokes, pixelIndex)
+        readScalarStokesSample(evaluator.stokes, pixelIndex),
+        evaluator.stokesOptions
       );
     case 'stokesRgb':
       return writeRgbStokesDisplayPixel(
@@ -198,26 +218,30 @@ export function readDisplaySelectionPixelValuesAtIndex(
         evaluator.r,
         evaluator.g,
         evaluator.b,
-        pixelIndex
+        pixelIndex,
+        evaluator.stokesOptions
       );
     case 'stokesRgbLuminance':
       return writeStokesDisplayPixel(
         out,
         evaluator.parameter,
-        computeRgbStokesMonoValues(evaluator.r, evaluator.g, evaluator.b, pixelIndex)
+        computeRgbStokesMonoValues(evaluator.r, evaluator.g, evaluator.b, pixelIndex),
+        evaluator.stokesOptions
       );
     case 'stokesSpectralRgb':
       return writeSpectralStokesRgbDisplayPixel(
         out,
         evaluator.parameter,
         evaluator.channels,
-        pixelIndex
+        pixelIndex,
+        evaluator.stokesOptions
       );
     case 'stokesSpectralRgbLuminance':
       return writeStokesDisplayPixel(
         out,
         evaluator.parameter,
-        computeSpectralStokesRgbMonoValues(evaluator.channels, pixelIndex)
+        computeSpectralStokesRgbMonoValues(evaluator.channels, pixelIndex),
+        evaluator.stokesOptions
       );
   }
 }
@@ -256,7 +280,8 @@ export function readDisplaySelectionOverlayPixelValuesAtIndex(
       return writeRawStokesDisplayPixel(
         out,
         evaluator.parameter,
-        readScalarStokesSample(evaluator.stokes, pixelIndex)
+        readScalarStokesSample(evaluator.stokes, pixelIndex),
+        evaluator.stokesOptions
       );
     case 'stokesRgb':
       return writeRawRgbStokesDisplayPixel(
@@ -265,26 +290,30 @@ export function readDisplaySelectionOverlayPixelValuesAtIndex(
         evaluator.r,
         evaluator.g,
         evaluator.b,
-        pixelIndex
+        pixelIndex,
+        evaluator.stokesOptions
       );
     case 'stokesRgbLuminance':
       return writeRawStokesDisplayPixel(
         out,
         evaluator.parameter,
-        computeRgbStokesMonoValues(evaluator.r, evaluator.g, evaluator.b, pixelIndex)
+        computeRgbStokesMonoValues(evaluator.r, evaluator.g, evaluator.b, pixelIndex),
+        evaluator.stokesOptions
       );
     case 'stokesSpectralRgb':
       return writeRawSpectralStokesRgbDisplayPixel(
         out,
         evaluator.parameter,
         evaluator.channels,
-        pixelIndex
+        pixelIndex,
+        evaluator.stokesOptions
       );
     case 'stokesSpectralRgbLuminance':
       return writeRawStokesDisplayPixel(
         out,
         evaluator.parameter,
-        computeSpectralStokesRgbMonoValues(evaluator.channels, pixelIndex)
+        computeSpectralStokesRgbMonoValues(evaluator.channels, pixelIndex),
+        evaluator.stokesOptions
       );
   }
 }
@@ -323,7 +352,8 @@ export function readDisplaySelectionSnapshotPixelValuesAtIndex(
       return writeStokesSnapshotDisplayPixel(
         out,
         evaluator.parameter,
-        readScalarStokesSample(evaluator.stokes, pixelIndex)
+        readScalarStokesSample(evaluator.stokes, pixelIndex),
+        evaluator.stokesOptions
       );
     case 'stokesRgb':
       return writeRgbStokesSnapshotDisplayPixel(
@@ -332,26 +362,30 @@ export function readDisplaySelectionSnapshotPixelValuesAtIndex(
         evaluator.r,
         evaluator.g,
         evaluator.b,
-        pixelIndex
+        pixelIndex,
+        evaluator.stokesOptions
       );
     case 'stokesRgbLuminance':
       return writeStokesSnapshotDisplayPixel(
         out,
         evaluator.parameter,
-        computeRgbStokesMonoValues(evaluator.r, evaluator.g, evaluator.b, pixelIndex)
+        computeRgbStokesMonoValues(evaluator.r, evaluator.g, evaluator.b, pixelIndex),
+        evaluator.stokesOptions
       );
     case 'stokesSpectralRgb':
       return writeSpectralStokesRgbSnapshotDisplayPixel(
         out,
         evaluator.parameter,
         evaluator.channels,
-        pixelIndex
+        pixelIndex,
+        evaluator.stokesOptions
       );
     case 'stokesSpectralRgbLuminance':
       return writeStokesSnapshotDisplayPixel(
         out,
         evaluator.parameter,
-        computeSpectralStokesRgbMonoValues(evaluator.channels, pixelIndex)
+        computeSpectralStokesRgbMonoValues(evaluator.channels, pixelIndex),
+        evaluator.stokesOptions
       );
   }
 }
@@ -374,7 +408,8 @@ export function createDisplayPixelValues(): DisplayPixelValues {
 
 function createStokesDirectEvaluator(
   layer: DecodedLayer,
-  binding: DisplaySourceBinding
+  binding: DisplaySourceBinding,
+  stokesOptions: ResolvedStokesComputationOptions
 ): DisplaySelectionEvaluator {
   const parameter = binding.stokesParameter;
   if (!parameter) {
@@ -388,7 +423,8 @@ function createStokesDirectEvaluator(
     kind: 'stokesDirect',
     binding,
     parameter,
-    stokes: resolveStokesChannelArraysFromSlots(layer, binding.slots, 0)
+    stokes: resolveStokesChannelArraysFromSlots(layer, binding.slots, 0),
+    stokesOptions
   };
 }
 
@@ -410,7 +446,8 @@ function createSpectralRgbEvaluator(
 function createRgbStokesEvaluator(
   layer: DecodedLayer,
   binding: DisplaySourceBinding,
-  kind: 'stokesRgb' | 'stokesRgbLuminance'
+  kind: 'stokesRgb' | 'stokesRgbLuminance',
+  stokesOptions: ResolvedStokesComputationOptions
 ): DisplaySelectionEvaluator {
   const parameter = binding.stokesParameter;
   if (!parameter) {
@@ -426,14 +463,16 @@ function createRgbStokesEvaluator(
     parameter,
     r: resolveStokesChannelArraysFromSlots(layer, binding.slots, 0),
     g: resolveStokesChannelArraysFromSlots(layer, binding.slots, 4),
-    b: resolveStokesChannelArraysFromSlots(layer, binding.slots, 8)
+    b: resolveStokesChannelArraysFromSlots(layer, binding.slots, 8),
+    stokesOptions
   };
 }
 
 function createSpectralStokesRgbEvaluator(
   layer: DecodedLayer,
   binding: DisplaySourceBinding,
-  kind: 'stokesSpectralRgb' | 'stokesSpectralRgbLuminance'
+  kind: 'stokesSpectralRgb' | 'stokesSpectralRgbLuminance',
+  stokesOptions: ResolvedStokesComputationOptions
 ): DisplaySelectionEvaluator {
   const parameter = binding.stokesParameter;
   if (!parameter) {
@@ -447,7 +486,16 @@ function createSpectralStokesRgbEvaluator(
     kind,
     binding,
     parameter,
-    channels: resolveSpectralStokesRgbChannelArrays(layer)
+    channels: resolveSpectralStokesRgbChannelArrays(layer),
+    stokesOptions
+  };
+}
+
+function resolveStokesComputationOptions(
+  options: StokesComputationOptions
+): ResolvedStokesComputationOptions {
+  return {
+    maskInvalidStokesVectors: options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS
   };
 }
 
@@ -478,9 +526,10 @@ function writeSpectralRgbDisplayPixel(
 function writeStokesDisplayPixel(
   output: DisplayPixelValues,
   parameter: NonNullable<DisplaySourceBinding['stokesParameter']>,
-  sample: StokesSample
+  sample: StokesSample,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
-  const value = computeStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
+  const value = computeStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3, stokesOptions);
   return setDisplayPixelValues(output, value, value, value, 1);
 }
 
@@ -490,13 +539,14 @@ function writeRgbStokesDisplayPixel(
   r: ResolvedScalarStokesChannels,
   g: ResolvedScalarStokesChannels,
   b: ResolvedScalarStokesChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
   return setDisplayPixelValues(
     output,
-    computeStokesDisplayValueForChannels(parameter, r, pixelIndex),
-    computeStokesDisplayValueForChannels(parameter, g, pixelIndex),
-    computeStokesDisplayValueForChannels(parameter, b, pixelIndex),
+    computeStokesDisplayValueForChannels(parameter, r, pixelIndex, stokesOptions),
+    computeStokesDisplayValueForChannels(parameter, g, pixelIndex, stokesOptions),
+    computeStokesDisplayValueForChannels(parameter, b, pixelIndex, stokesOptions),
     1
   );
 }
@@ -505,18 +555,20 @@ function writeSpectralStokesRgbDisplayPixel(
   output: DisplayPixelValues,
   parameter: NonNullable<DisplaySourceBinding['stokesParameter']>,
   channels: ResolvedSpectralStokesRgbChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
-  const values = computeSpectralStokesRgbDisplayValues(parameter, channels, pixelIndex);
+  const values = computeSpectralStokesRgbDisplayValues(parameter, channels, pixelIndex, stokesOptions);
   return setDisplayPixelValues(output, values.r, values.g, values.b, 1);
 }
 
 function writeRawStokesDisplayPixel(
   output: DisplayPixelValues,
   parameter: NonNullable<DisplaySourceBinding['stokesParameter']>,
-  sample: StokesSample
+  sample: StokesSample,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
-  const value = computeRawStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
+  const value = computeRawStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3, stokesOptions);
   return setDisplayPixelValues(output, value, value, value, 1);
 }
 
@@ -526,13 +578,14 @@ function writeRawRgbStokesDisplayPixel(
   r: ResolvedScalarStokesChannels,
   g: ResolvedScalarStokesChannels,
   b: ResolvedScalarStokesChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
   return setDisplayPixelValues(
     output,
-    computeRawStokesDisplayValueForChannels(parameter, r, pixelIndex),
-    computeRawStokesDisplayValueForChannels(parameter, g, pixelIndex),
-    computeRawStokesDisplayValueForChannels(parameter, b, pixelIndex),
+    computeRawStokesDisplayValueForChannels(parameter, r, pixelIndex, stokesOptions),
+    computeRawStokesDisplayValueForChannels(parameter, g, pixelIndex, stokesOptions),
+    computeRawStokesDisplayValueForChannels(parameter, b, pixelIndex, stokesOptions),
     1
   );
 }
@@ -541,24 +594,27 @@ function writeRawSpectralStokesRgbDisplayPixel(
   output: DisplayPixelValues,
   parameter: NonNullable<DisplaySourceBinding['stokesParameter']>,
   channels: ResolvedSpectralStokesRgbChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
-  const values = computeRawSpectralStokesRgbDisplayValues(parameter, channels, pixelIndex);
+  const values = computeRawSpectralStokesRgbDisplayValues(parameter, channels, pixelIndex, stokesOptions);
   return setDisplayPixelValues(output, values.r, values.g, values.b, 1);
 }
 
 function writeStokesSnapshotDisplayPixel(
   output: DisplayPixelValues,
   parameter: NonNullable<DisplaySourceBinding['stokesParameter']>,
-  sample: StokesSample
+  sample: StokesSample,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
-  const value = computeStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3);
+  const value = computeStokesDisplayValue(parameter, sample.s0, sample.s1, sample.s2, sample.s3, stokesOptions);
   const modulation = computeStokesDegreeModulationDisplayValue(
     parameter,
     sample.s0,
     sample.s1,
     sample.s2,
-    sample.s3
+    sample.s3,
+    stokesOptions
   );
   return setDisplayPixelValues(output, value, value, value, modulation ?? 1);
 }
@@ -569,13 +625,14 @@ function writeRgbStokesSnapshotDisplayPixel(
   r: ResolvedScalarStokesChannels,
   g: ResolvedScalarStokesChannels,
   b: ResolvedScalarStokesChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
   return setDisplayPixelValues(
     output,
-    computeStokesDisplayValueForChannels(parameter, r, pixelIndex),
-    computeStokesDisplayValueForChannels(parameter, g, pixelIndex),
-    computeStokesDisplayValueForChannels(parameter, b, pixelIndex),
+    computeStokesDisplayValueForChannels(parameter, r, pixelIndex, stokesOptions),
+    computeStokesDisplayValueForChannels(parameter, g, pixelIndex, stokesOptions),
+    computeStokesDisplayValueForChannels(parameter, b, pixelIndex, stokesOptions),
     1
   );
 }
@@ -584,9 +641,10 @@ function writeSpectralStokesRgbSnapshotDisplayPixel(
   output: DisplayPixelValues,
   parameter: NonNullable<DisplaySourceBinding['stokesParameter']>,
   channels: ResolvedSpectralStokesRgbChannels,
-  pixelIndex: number
+  pixelIndex: number,
+  stokesOptions: StokesComputationOptions
 ): DisplayPixelValues {
-  const values = computeSpectralStokesRgbDisplayValues(parameter, channels, pixelIndex);
+  const values = computeSpectralStokesRgbDisplayValues(parameter, channels, pixelIndex, stokesOptions);
   return setDisplayPixelValues(output, values.r, values.g, values.b, 1);
 }
 

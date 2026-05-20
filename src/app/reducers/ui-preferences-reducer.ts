@@ -39,6 +39,14 @@ export function uiPreferencesReducer(
         ...state,
         rulersVisible: intent.enabled
       };
+    case 'maskInvalidStokesVectorsSet':
+      return state.maskInvalidStokesVectors === intent.enabled ? state : {
+        ...state,
+        maskInvalidStokesVectors: intent.enabled,
+        displayRangeResource: idleResource(),
+        imageStatsResource: idleResource(),
+        autoExposureResource: idleResource()
+      };
     case 'viewerPaneReset': {
       const viewerPaneLayout = resetViewerPaneLayout(state.activeSessionId);
       return sameViewerPaneLayout(state.viewerPaneLayout, viewerPaneLayout) ? state : {

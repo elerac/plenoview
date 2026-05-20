@@ -66,8 +66,8 @@ export function applyRenderEffects(
   }
 
   if ((invalidation & ViewerRenderInvalidationFlags.ResourcePrepare) && activeSession) {
-    renderCache.prepareActiveSession(activeSession, state.sessionState);
-    synchronizeCachedDisplayRange(core, renderCache, activeSession.id, state.sessionState);
+    renderCache.prepareActiveSession(activeSession, snapshot.renderState);
+    synchronizeCachedDisplayRange(core, renderCache, activeSession.id, snapshot.renderState);
   }
 
   if (
@@ -235,7 +235,7 @@ function synchronizeCachedDisplayRange(
   core: ViewerAppCore,
   renderCache: RenderCacheService,
   sessionId: string,
-  sessionState: ViewerRenderTransition['state']['sessionState']
+  sessionState: ViewerRenderTransition['snapshot']['renderState']
 ): void {
   const cachedRange = renderCache.getCachedLuminanceRange(sessionId, sessionState);
   const activeRange = selectActiveDisplayLuminanceRange(core.getState());

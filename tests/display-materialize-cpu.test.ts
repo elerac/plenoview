@@ -98,6 +98,26 @@ describe('display CPU materialization', () => {
     expect(sample?.values.AoLP).toBeNaN();
   });
 
+  it('can materialize and probe physically invalid Stokes values when masking is disabled', () => {
+    const layer = createLayerFromChannels({
+      S0: [1],
+      S1: [2],
+      S2: [0],
+      S3: [0]
+    }, 'invalid-stokes-unmasked');
+    const selection = createStokesSelection('dolp');
+    const stokesOptions = { maskInvalidStokesVectors: false };
+
+    const texture = buildSelectedDisplayTexture(layer, 1, 1, selection, 'rgb', undefined, stokesOptions);
+    const sample = samplePixelValuesForDisplay(layer, 1, 1, { ix: 0, iy: 0 }, selection, 'rgb', stokesOptions);
+
+    expect(texture[0]).toBe(2);
+    expect(texture[1]).toBe(2);
+    expect(texture[2]).toBe(2);
+    expect(texture[3]).toBe(1);
+    expect(sample?.values.DoLP).toBe(2);
+  });
+
   it('fills scalar Stokes angle display values with NaN for unpolarized vectors', () => {
     const layer = createLayerFromChannels({
       S0: [1],
