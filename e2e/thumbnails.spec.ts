@@ -53,8 +53,11 @@ test('keeps the previous thumbnail visible until reload thumbnails are regenerat
 
   await setExposureValue(exposureValue, '2.0');
   await expect(exposureValue).toHaveValue('2.0');
+  await flushAllIdleCallbacks(page);
+  await expect.poll(async () => await getPendingIdleCallbackCount(page)).toBe(0);
 
   await reloadOpenedFileButton.click();
+  await expect(openedFileRow).toHaveAttribute('aria-busy', 'true');
   await expect.poll(async () => await getPendingIdleCallbackCount(page)).not.toBe(0);
   await expect(thumbnail).toHaveAttribute('src', initialThumbnailSrc ?? '');
   await expect(openedFileRow.locator('.file-row-icon')).toHaveCount(0);

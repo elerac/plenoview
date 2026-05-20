@@ -7119,6 +7119,27 @@ describe('opened files actions', () => {
     expect(row.querySelector('.file-row-icon')).toBeNull();
   });
 
+  it('keeps a stale opened-file thumbnail visible while a refreshed thumbnail is loading', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([{
+      id: 'session-1',
+      label: 'beauty.exr',
+      thumbnailDataUrl: 'data:image/png;base64,AAAA',
+      thumbnailLoading: true
+    }], 'session-1');
+
+    const row = document.querySelector('#opened-files-list .opened-file-row') as HTMLDivElement;
+    const thumbnail = row.querySelector('.opened-file-thumbnail') as HTMLImageElement;
+
+    expect(row.getAttribute('aria-busy')).toBe('true');
+    expect(thumbnail).toBeInstanceOf(HTMLImageElement);
+    expect(thumbnail.src).toBe('data:image/png;base64,AAAA');
+    expect(row.querySelector('.opened-file-thumbnail-loading')).toBeNull();
+    expect(row.querySelector('.file-row-icon')).toBeNull();
+  });
+
   it('renders path-aware opened file labels in the row and compatibility select', () => {
     installUiFixture();
 
@@ -7790,6 +7811,38 @@ describe('opened files reordering', () => {
     expect(dragImage.querySelector('.file-row-icon')).toBeInstanceOf(HTMLSpanElement);
     expect(dragImage.querySelector('.opened-file-drag-image-thumbnail')).toBeNull();
     expect(dataTransfer.setDragImage).toHaveBeenCalledWith(dragImage, 16, 16);
+
+    secondRow.dispatchEvent(createOpenedFileDragEvent('dragend', dataTransfer));
+
+    expect(document.querySelector('.opened-file-drag-image')).toBeNull();
+  });
+
+  it('uses a stale thumbnail for the open-file native drag image while a refreshed thumbnail is loading', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([
+      { id: 'session-1', label: 'first.exr' },
+      {
+        id: 'session-2',
+        label: 'second.exr',
+        thumbnailDataUrl: 'data:image/png;base64,AAAA',
+        thumbnailLoading: true
+      }
+    ], 'session-1');
+
+    const rows = mockOpenedFilesListGeometry();
+    const secondRow = rows[1] as HTMLDivElement;
+    const dataTransfer = createMockDataTransfer();
+
+    secondRow.dispatchEvent(createOpenedFileDragEvent('dragstart', dataTransfer));
+
+    const dragImage = document.querySelector('.opened-file-drag-image') as HTMLDivElement;
+    const thumbnail = dragImage.querySelector('.opened-file-drag-image-thumbnail') as HTMLImageElement;
+    expect(thumbnail).toBeInstanceOf(HTMLImageElement);
+    expect(thumbnail.src).toBe('data:image/png;base64,AAAA');
+    expect(dragImage.querySelector('.opened-file-thumbnail-loading')).toBeNull();
+    expect(dragImage.querySelector('.file-row-icon')).toBeNull();
 
     secondRow.dispatchEvent(createOpenedFileDragEvent('dragend', dataTransfer));
 

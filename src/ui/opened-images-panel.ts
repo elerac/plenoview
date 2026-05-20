@@ -1145,7 +1145,7 @@ function createOpenedFileDragImage(item: OpenedImageOptionItem): HTMLDivElement 
 
   const visual = document.createElement('span');
   visual.className = 'opened-file-drag-image-visual';
-  if (item.thumbnailDataUrl && item.thumbnailLoading !== true) {
+  if (item.thumbnailDataUrl) {
     const image = document.createElement('img');
     image.className = 'opened-file-drag-image-thumbnail';
     image.src = item.thumbnailDataUrl;
@@ -1369,6 +1369,16 @@ function createOpenedFileActionIcon(iconName: 'reload' | 'close'): SVGSVGElement
 }
 
 function createOpenedFileThumbnail(thumbnailDataUrl: string | null, loading = false): HTMLElement {
+  if (thumbnailDataUrl) {
+    const image = document.createElement('img');
+    image.className = 'opened-file-thumbnail';
+    image.src = thumbnailDataUrl;
+    image.alt = '';
+    image.draggable = false;
+    image.setAttribute('aria-hidden', 'true');
+    return image;
+  }
+
   if (loading) {
     const indicator = document.createElement('span');
     indicator.className = 'opened-file-thumbnail-loading';
@@ -1378,20 +1388,10 @@ function createOpenedFileThumbnail(thumbnailDataUrl: string | null, loading = fa
     return indicator;
   }
 
-  if (!thumbnailDataUrl) {
-    const icon = document.createElement('span');
-    icon.className = 'file-row-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    return icon;
-  }
-
-  const image = document.createElement('img');
-  image.className = 'opened-file-thumbnail';
-  image.src = thumbnailDataUrl;
-  image.alt = '';
-  image.draggable = false;
-  image.setAttribute('aria-hidden', 'true');
-  return image;
+  const icon = document.createElement('span');
+  icon.className = 'file-row-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  return icon;
 }
 
 function createOpenedFileThumbnailLoadingIcon(): SVGSVGElement {

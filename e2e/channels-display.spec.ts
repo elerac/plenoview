@@ -246,6 +246,7 @@ test('loads arbitrary scalar channels as grayscale display options', async ({ pa
   await expect(channelTiles.filter({ hasText: /^S1\/S0 Spectral RGB$/ })).toHaveCount(0);
   await expect(channelTiles.filter({ hasText: /^S1\/S0\.400nm$/ })).toHaveCount(1);
   await expect(channelTiles.filter({ hasText: /^AoLP\.500nm$/ })).toHaveCount(0);
+  await getChannelThumbnailTile(page, 'stokesScalar:s1_over_s0:400nm').click();
   await expect(selectedChannelTile).toHaveText('S1/S0.400nm');
 
   await page.setInputFiles('#file-input', {

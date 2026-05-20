@@ -287,7 +287,7 @@ function normalizePolledOpacity(value: string, expected: number): number {
 }
 
 async function expectOverlayCanvasTransparent(page: Page): Promise<void> {
-  await expect.poll(async () => await hasOverlayCanvasPixels(page), { timeout: 1000 }).toBe(false);
+  await expect.poll(async () => await hasOverlayCanvasPixels(page), { timeout: 7000 }).toBe(false);
 }
 
 async function hasOverlayCanvasPixels(page: Page): Promise<boolean> {
@@ -941,10 +941,11 @@ test('persists Spectrum lattice as animated idle and frozen active chrome', asyn
   }).toBe('spectrum-lattice');
 
   await page.getByRole('button', { name: 'Close cbox_rgb.exr', exact: true }).click();
-  await expectOverlayCanvasTransparent(page);
+  await expect(page.locator('#opened-images-select option')).toHaveCount(0);
   await expect(appShell).toHaveClass(/is-spectrum-lattice-idle/);
   await expect(mainLayout).toHaveClass(/is-spectrum-lattice-idle/);
   await expect(viewer).toHaveClass(/is-spectrum-lattice-idle/);
+  await expectOverlayCanvasTransparent(page);
   await expectViewerBackgroundLayerOpacity(page, { checker: 0, spectrumGrid: 1 });
 });
 

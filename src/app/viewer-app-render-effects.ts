@@ -173,9 +173,6 @@ export function applyRenderEffects(
   }
 
   if (snapshot.paneRenderSources.length === 0) {
-    if (invalidation & ViewerRenderInvalidationFlags.ResourceClearImage) {
-      renderer.clearImage();
-    }
     deferredAutoExposureDispatch?.();
     return;
   }

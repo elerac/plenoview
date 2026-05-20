@@ -155,4 +155,27 @@ describe('viewer app render effects', () => {
     expect(exposureCalls).toEqual([0, -2]);
     expect(core.getState().sessionState.exposureEv).toBe(-2);
   });
+
+  it('clears rendered image surfaces when the final active session closes', () => {
+    const core = new ViewerAppCore();
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+    const renderCache = createRenderCacheMock();
+    core.subscribeRender((transition) => {
+      applyRenderEffects(
+        core,
+        ui,
+        renderer as unknown as WebGlExrRenderer,
+        renderCache as unknown as RenderCacheService,
+        transition
+      );
+    });
+    const session = createSession('session-1');
+    core.dispatch({ type: 'sessionLoaded', session });
+    renderer.clearImage.mockClear();
+
+    core.dispatch({ type: 'sessionClosed', sessionId: session.id });
+
+    expect(renderer.clearImage).toHaveBeenCalledTimes(1);
+  });
 });

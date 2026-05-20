@@ -219,10 +219,11 @@ test('keeps a newly opened image centered after collapsed bottom channel labels 
     return height >= 32 && height <= 36;
   }).toBe(true);
 
-  const center = await resolveViewerPoint(viewer, 0.5, 0.5);
-  await page.mouse.move(center.x, center.y);
-
-  await expect.poll(async () => await readProbeCoords(probeCoords), { timeout: 5000 }).toEqual({
+  await expect.poll(async () => {
+    const center = await resolveViewerPoint(viewer, 0.5, 0.5);
+    await page.mouse.move(center.x, center.y);
+    return await readProbeCoords(probeCoords);
+  }, { timeout: 5000 }).toEqual({
     x: 128,
     y: 128
   });
