@@ -44,12 +44,14 @@ export interface BuildLoadedSessionArgs {
   previousImage: DecodedExrImage | null;
   autoFitImageOnSelect: boolean;
   stokesParameterVisibility?: StokesParameterVisibilitySettings;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export interface BuildSwitchedSessionStateOptions {
   autoFitViewport?: ViewportInfo | null;
   autoFitInsets?: ViewportInsets | null;
   stokesParameterVisibility?: StokesParameterVisibilitySettings;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSession {
@@ -67,7 +69,10 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
     },
     args.decoded,
     0,
-    { stokesParameterVisibility: args.stokesParameterVisibility }
+    {
+      stokesParameterVisibility: args.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
+    }
   );
   const baseSession: OpenedImageSession = {
     id: args.sessionId,
@@ -82,7 +87,8 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
     ? buildSwitchedSessionState(baseSession, args.currentSessionState, args.previousImage, {
         autoFitViewport: args.autoFitImageOnSelect ? args.viewport : null,
         autoFitInsets: args.autoFitImageOnSelect ? args.fitInsets ?? null : null,
-        stokesParameterVisibility: args.stokesParameterVisibility
+        stokesParameterVisibility: args.stokesParameterVisibility,
+        spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
       })
     : defaultSessionState;
 
@@ -96,12 +102,19 @@ export function buildReloadedSession(
   session: OpenedImageSession,
   decoded: DecodedExrImage,
   baseState: ViewerSessionState,
-  stokesParameterVisibility?: StokesParameterVisibilitySettings
+  stokesParameterVisibility?: StokesParameterVisibilitySettings,
+  spectralRgbGroupingEnabled?: boolean
 ): OpenedImageSession {
   return {
     ...session,
     decoded,
-    state: buildReloadedSessionState(baseState, session.decoded, decoded, stokesParameterVisibility)
+    state: buildReloadedSessionState(
+      baseState,
+      session.decoded,
+      decoded,
+      stokesParameterVisibility,
+      spectralRgbGroupingEnabled
+    )
   };
 }
 
@@ -136,7 +149,8 @@ export function buildReloadedSessionState(
   currentState: ViewerSessionState,
   previousImage: DecodedExrImage,
   decoded: DecodedExrImage,
-  stokesParameterVisibility?: StokesParameterVisibilitySettings
+  stokesParameterVisibility?: StokesParameterVisibilitySettings,
+  spectralRgbGroupingEnabled?: boolean
 ): ViewerSessionState {
   const lockedPixel = currentState.lockedPixel
     ? clampPixelToImageBounds(currentState.lockedPixel, decoded.width, decoded.height)
@@ -169,7 +183,7 @@ export function buildReloadedSessionState(
     },
     decoded,
     currentState.activeLayer,
-    { stokesParameterVisibility }
+    { stokesParameterVisibility, spectralRgbGroupingEnabled }
   );
 }
 
@@ -216,7 +230,10 @@ export function buildSwitchedSessionState(
     },
     nextSession.decoded,
     nextSession.state.activeLayer,
-    { stokesParameterVisibility: options.stokesParameterVisibility }
+    {
+      stokesParameterVisibility: options.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
+    }
   );
 
   if (!shouldCarryColormapState(currentState.displaySelection, nextState.displaySelection)) {
@@ -272,7 +289,8 @@ export function buildResetSessionState(
   currentState: ViewerSessionState,
   defaultColormapId: string,
   viewport: ViewportInfo,
-  fitInsets?: ViewportInsets
+  fitInsets?: ViewportInsets,
+  options: Pick<BuildSwitchedSessionStateOptions, 'stokesParameterVisibility' | 'spectralRgbGroupingEnabled'> = {}
 ): ViewerSessionState {
   if (!activeSession) {
     return createClearedViewerState(defaultColormapId);
@@ -288,7 +306,11 @@ export function buildResetSessionState(
       panY: fitView.panY
     },
     activeSession.decoded,
-    0
+    0,
+    {
+      stokesParameterVisibility: options.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
+    }
   );
 }
 

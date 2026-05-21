@@ -15,7 +15,7 @@ import {
   sameDisplaySelection,
   type DisplaySelection
 } from '../display-model';
-import { pickDefaultDisplaySelection } from '../display-selection';
+import { resolveDisplaySelectionForLayer } from '../display-selection';
 import {
   AsyncOperationGate,
   createAbortError,
@@ -31,7 +31,6 @@ import {
   createDefaultStokesParameterVisibilitySettings,
   getStokesColormapDefaultGroup,
   getStokesDisplayColormapDefault,
-  isStokesParameterVisible,
   type StokesColormapDefaultGroup,
   type StokesColormapDefaultSetting
 } from '../stokes';
@@ -47,6 +46,11 @@ import {
   readStoredStokesInvalidVectorMaskSetting,
   saveStoredStokesInvalidVectorMaskSetting
 } from '../stokes-invalid-vector-mask-settings';
+import {
+  DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED,
+  readStoredSpectralRgbGroupingSetting,
+  saveStoredSpectralRgbGroupingSetting
+} from '../spectral-default-settings';
 import {
   DEFAULT_INVALID_VALUE_WARNING_ENABLED,
   readStoredInvalidValueWarningSetting,
@@ -101,6 +105,10 @@ export class DisplayController implements Disposable {
       this.core.dispatch({
         type: 'maskInvalidStokesVectorsSet',
         enabled: readStoredStokesInvalidVectorMaskSetting()
+      });
+      this.core.dispatch({
+        type: 'spectralRgbGroupingSet',
+        enabled: readStoredSpectralRgbGroupingSetting()
       });
       this.core.dispatch({
         type: 'invalidValueWarningSet',
@@ -506,6 +514,22 @@ export class DisplayController implements Disposable {
     this.setMaskInvalidStokesVectors(DEFAULT_MASK_INVALID_STOKES_VECTORS);
   }
 
+  setSpectralRgbGroupingEnabled(enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    saveStoredSpectralRgbGroupingSetting(enabled);
+    this.core.dispatch({
+      type: 'spectralRgbGroupingSet',
+      enabled
+    });
+  }
+
+  resetSpectralRgbGroupingEnabled(): void {
+    this.setSpectralRgbGroupingEnabled(DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED);
+  }
+
   setInvalidValueWarningEnabled(enabled: boolean): void {
     if (this.disposed) {
       return;
@@ -685,13 +709,16 @@ export class DisplayController implements Disposable {
       return null;
     }
 
-    if (!isStokesSelection(selection) || isStokesParameterVisible(selection.parameter, state.stokesParameterVisibility)) {
+    const activeSession = selectActiveSession(state);
+    const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
+    if (!layer) {
       return selection;
     }
 
-    const activeSession = selectActiveSession(state);
-    const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
-    return layer ? pickDefaultDisplaySelection(layer.channelNames) : null;
+    return resolveDisplaySelectionForLayer(layer.channelNames, selection, {
+      stokesParameterVisibility: state.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+    });
   }
 
   private isSelectionTransitionCurrent(

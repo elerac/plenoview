@@ -11,11 +11,12 @@ import {
 import type { ViewerState, VisualizationMode } from '../types';
 
 type StokesMaskRevisionState = Partial<Pick<ViewerState, 'maskInvalidStokesVectors'>>;
+type SpectralRgbGroupingRevisionState = Partial<Pick<ViewerState, 'spectralRgbGroupingEnabled'>>;
 
 function serializeDisplaySelectionRevisionKey(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode,
-  state: StokesMaskRevisionState = {}
+  state: StokesMaskRevisionState & SpectralRgbGroupingRevisionState = {}
 ): string {
   if (!selection) {
     return 'none';
@@ -25,13 +26,13 @@ function serializeDisplaySelectionRevisionKey(
   const key = isGroupedRgbStokesSelection(selection)
     ? `${baseKey}:${visualizationMode}`
     : baseKey;
-  return appendStokesMaskRevisionKey(key, selection, state);
+  return appendSpectralRgbGroupingRevisionKey(appendStokesMaskRevisionKey(key, selection, state), selection, state);
 }
 
 export function serializeDisplaySelectionLuminanceKey(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  state: StokesMaskRevisionState = {}
+  state: StokesMaskRevisionState & SpectralRgbGroupingRevisionState = {}
 ): string {
   if (!selection) {
     return 'none';
@@ -52,7 +53,7 @@ export function serializeDisplaySelectionLuminanceKey(
 
 export function buildDisplayTextureRevisionKey(
   state: Pick<ViewerState, 'activeLayer' | 'displaySelection'> &
-    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors'>>
+    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>>
 ): string {
   return [
     state.activeLayer,
@@ -62,7 +63,7 @@ export function buildDisplayTextureRevisionKey(
 
 export function buildDisplayLuminanceRevisionKey(
   state: Pick<ViewerState, 'activeLayer' | 'displaySelection'> &
-    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors'>>
+    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>>
 ): string {
   return [
     state.activeLayer,
@@ -72,7 +73,7 @@ export function buildDisplayLuminanceRevisionKey(
 
 export function buildDisplayImageStatsRevisionKey(
   state: Pick<ViewerState, 'activeLayer' | 'displaySelection'> &
-    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors'>>
+    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>>
 ): string {
   return [
     state.activeLayer,
@@ -82,7 +83,7 @@ export function buildDisplayImageStatsRevisionKey(
 
 export function buildDisplayAutoExposureRevisionKey(
   state: Pick<ViewerState, 'activeLayer' | 'displaySelection'> &
-    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors'>>,
+    Partial<Pick<ViewerState, 'visualizationMode' | 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>>,
   percentile = AUTO_EXPOSURE_PERCENTILE
 ): string {
   return [
@@ -102,4 +103,17 @@ function appendStokesMaskRevisionKey(
   }
 
   return `${key}:maskInvalidStokesVectors:${state.maskInvalidStokesVectors !== false}`;
+}
+
+function appendSpectralRgbGroupingRevisionKey(
+  key: string,
+  selection: DisplaySelection,
+  state: SpectralRgbGroupingRevisionState
+): string {
+  const affectsSelection = selection.kind === 'spectralRgb' || (
+    isStokesSelection(selection) && selection.source.kind === 'spectralRgb'
+  );
+  return affectsSelection
+    ? `${key}:spectralRgbGrouping:${state.spectralRgbGroupingEnabled !== false}`
+    : key;
 }

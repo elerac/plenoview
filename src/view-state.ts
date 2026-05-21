@@ -9,9 +9,11 @@ import type {
 import { sameImageRoi } from './roi';
 import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from './stokes';
 import { DEFAULT_INVALID_VALUE_WARNING_ENABLED } from './invalid-value-warning-settings';
+import { DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED } from './spectral-default-settings';
 
 export interface MergeRenderStateOptions {
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   invalidValueWarningEnabled?: boolean;
   invalidValueWarningPhase?: number;
 }
@@ -45,6 +47,7 @@ export function mergeRenderState(
     ...sessionState,
     ...interactionState.view,
     maskInvalidStokesVectors: options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
+    spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled ?? DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED,
     invalidValueWarningEnabled: options.invalidValueWarningEnabled ?? DEFAULT_INVALID_VALUE_WARNING_ENABLED,
     ...(options.invalidValueWarningPhase === undefined ? {} : { invalidValueWarningPhase: options.invalidValueWarningPhase }),
     hoveredPixel: interactionState.hoveredPixel,

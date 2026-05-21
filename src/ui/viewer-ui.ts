@@ -148,6 +148,7 @@ import {
   saveStoredImageLoadWorkers
 } from '../image-load-workers';
 import { DEFAULT_INVALID_VALUE_WARNING_ENABLED } from '../invalid-value-warning-settings';
+import { DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED, saveStoredSpectralRgbGroupingSetting } from '../spectral-default-settings';
 
 const AUTO_FIT_IMAGE_ON_SELECT_STORAGE_KEY = 'openexr-viewer:auto-fit-image-on-select:v1';
 const AUTO_EXPOSURE_STORAGE_KEY = 'openexr-viewer:auto-exposure:v1';
@@ -271,6 +272,7 @@ export interface UiCallbacks {
   onStokesDefaultSettingChange: (group: StokesColormapDefaultGroup, setting: StokesColormapDefaultSetting) => void;
   onStokesParameterVisibilityChange: (group: StokesColormapDefaultGroup, enabled: boolean) => void;
   onMaskInvalidStokesVectorsChange: (enabled: boolean) => void;
+  onSpectralRgbGroupingChange: (enabled: boolean) => void;
   onInvalidValueWarningChange: (enabled: boolean) => void;
   onClearRoi: () => void;
   onResetSettings: () => void;
@@ -340,6 +342,7 @@ export class ViewerUi implements Disposable {
   private stokesColormapDefaults: StokesColormapDefaultSettings = createDefaultStokesColormapDefaultSettings();
   private stokesParameterVisibility: StokesParameterVisibilitySettings = createDefaultStokesParameterVisibilitySettings();
   private maskInvalidStokesVectors = DEFAULT_MASK_INVALID_STOKES_VECTORS;
+  private spectralRgbGroupingEnabled = DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED;
   private invalidValueWarningEnabled = DEFAULT_INVALID_VALUE_WARNING_ENABLED;
   private viewerMode: ViewerMode = 'image';
   private autoFitImageOnSelect = false;
@@ -1088,6 +1091,18 @@ export class ViewerUi implements Disposable {
 
     this.maskInvalidStokesVectors = enabled;
     this.elements.stokesInvalidVectorMaskCheckbox.checked = enabled;
+  }
+
+  setSpectralRgbGroupingEnabled(enabled: boolean, persist = false): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.spectralRgbGroupingEnabled = enabled;
+    this.elements.spectralRgbGroupingCheckbox.checked = enabled;
+    if (persist) {
+      saveStoredSpectralRgbGroupingSetting(enabled);
+    }
   }
 
   setInvalidValueWarningEnabled(enabled: boolean): void {
@@ -2669,6 +2684,11 @@ export class ViewerUi implements Disposable {
       this.callbacks.onMaskInvalidStokesVectorsChange(this.maskInvalidStokesVectors);
     });
 
+    this.disposables.addEventListener(this.elements.spectralRgbGroupingCheckbox, 'change', () => {
+      this.setSpectralRgbGroupingEnabled(this.elements.spectralRgbGroupingCheckbox.checked, true);
+      this.callbacks.onSpectralRgbGroupingChange(this.spectralRgbGroupingEnabled);
+    });
+
     this.disposables.addEventListener(this.elements.spectrumLatticeMotionSelect, 'change', () => {
       this.setSpectrumLatticeMotionPreference(
         parseSpectrumLatticeMotionPreference(this.elements.spectrumLatticeMotionSelect.value)
@@ -2702,6 +2722,8 @@ export class ViewerUi implements Disposable {
       );
       this.setMaskInvalidStokesVectors(DEFAULT_MASK_INVALID_STOKES_VECTORS);
       this.callbacks.onMaskInvalidStokesVectorsChange(this.maskInvalidStokesVectors);
+      this.setSpectralRgbGroupingEnabled(DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED, true);
+      this.callbacks.onSpectralRgbGroupingChange(this.spectralRgbGroupingEnabled);
       this.setInvalidValueWarningEnabled(DEFAULT_INVALID_VALUE_WARNING_ENABLED);
       this.callbacks.onInvalidValueWarningChange(this.invalidValueWarningEnabled);
       this.callbacks.onResetSettings();

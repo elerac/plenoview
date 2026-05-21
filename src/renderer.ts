@@ -88,6 +88,7 @@ export class WebGlExrRenderer implements Disposable {
     selection: ViewerState['displaySelection'],
     visualizationMode: ViewerState['visualizationMode'],
     maskInvalidStokesVectors: ViewerState['maskInvalidStokesVectors'] | undefined,
+    spectralRgbGroupingEnabled: ViewerState['spectralRgbGroupingEnabled'] | undefined,
     _textureRevisionKey: string,
     binding: DisplaySourceBinding
   ): void {
@@ -97,7 +98,8 @@ export class WebGlExrRenderer implements Disposable {
 
     this.imageRenderer.setDisplaySelectionBindings(sessionId, layerIndex, width, height, binding);
     this.overlayRenderer.setDisplaySelectionContext(width, height, layer, selection, visualizationMode, {
-      maskInvalidStokesVectors
+      maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled
     });
     this.probeOverlayRenderer.setImagePresent(true);
     this.rulerOverlayRenderer.setImageSize(width, height);

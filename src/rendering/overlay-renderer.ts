@@ -1,10 +1,10 @@
 import {
   readDisplaySelectionOverlayPixelValuesAtIndex,
   resolveDisplaySelectionEvaluator,
+  type DisplayEvaluationOptions,
   type DisplaySelectionEvaluator
 } from '../display/evaluator';
 import type { Disposable } from '../lifecycle';
-import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../types';
 import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 import { buildOverlayValueLines } from './overlay-value-lines';
@@ -56,7 +56,7 @@ export class OverlayRenderer implements Disposable {
     layer: DecodedLayer,
     selection: ViewerState['displaySelection'],
     visualizationMode: ViewerState['visualizationMode'],
-    stokesOptions: StokesComputationOptions = {}
+    stokesOptions: DisplayEvaluationOptions = {}
   ): void {
     if (this.disposed) {
       return;

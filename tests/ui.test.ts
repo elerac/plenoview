@@ -40,6 +40,7 @@ import {
   getDefaultImageLoadWorkers,
   IMAGE_LOAD_WORKERS_STORAGE_KEY
 } from '../src/image-load-workers';
+import { SPECTRAL_RGB_GROUPING_STORAGE_KEY } from '../src/spectral-default-settings';
 
 const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'openexr-viewer:auto-exposure-percentile:v1';
 const RULERS_VISIBLE_STORAGE_KEY = 'openexr-viewer:rulers-visible:v1';
@@ -1876,13 +1877,16 @@ describe('panel split sizing', () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, SPECTRUM_LATTICE_THEME_ID);
     window.localStorage.setItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY, SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
     window.localStorage.setItem(IMAGE_LOAD_WORKERS_STORAGE_KEY, '1');
+    window.localStorage.setItem(SPECTRAL_RGB_GROUPING_STORAGE_KEY, 'false');
 
     const onResetSettings = vi.fn();
     const onMaskInvalidStokesVectorsChange = vi.fn();
+    const onSpectralRgbGroupingChange = vi.fn();
     const onInvalidValueWarningChange = vi.fn();
     const ui = new ViewerUi(createUiCallbacks({
       onResetSettings,
       onMaskInvalidStokesVectorsChange,
+      onSpectralRgbGroupingChange,
       onInvalidValueWarningChange
     }));
     ui.setStokesDefaultSettingsOptions([
@@ -1909,6 +1913,7 @@ describe('panel split sizing', () => {
     const imageLoadWorkersInput = document.getElementById('image-load-workers-input') as HTMLInputElement;
     const stokesAolpSelect = document.getElementById('stokes-default-aolp-colormap-select') as HTMLSelectElement;
     const stokesMaskCheckbox = document.getElementById('stokes-invalid-vector-mask-checkbox') as HTMLInputElement;
+    const spectralGroupingCheckbox = document.getElementById('spectral-rgb-grouping-checkbox') as HTMLInputElement;
     const invalidValueWarningButton = document.getElementById(
       'app-invalid-value-warning-button'
     ) as HTMLButtonElement;
@@ -1928,6 +1933,7 @@ describe('panel split sizing', () => {
     expect(imageLoadWorkersInput.value).toBe('1');
     expect(stokesAolpSelect.value).toBe('0');
     stokesMaskCheckbox.checked = false;
+    spectralGroupingCheckbox.checked = false;
     invalidValueWarningButton.click();
     expect(invalidValueWarningButton.getAttribute('aria-pressed')).toBe('false');
     onInvalidValueWarningChange.mockClear();
@@ -1939,6 +1945,7 @@ describe('panel split sizing', () => {
 
     expect(onResetSettings).toHaveBeenCalledTimes(1);
     expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(true);
+    expect(onSpectralRgbGroupingChange).toHaveBeenCalledWith(true);
     expect(onInvalidValueWarningChange).toHaveBeenCalledWith(true);
     expect(themeSelect.value).toBe('default');
     expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_ANIMATE);
@@ -1946,12 +1953,14 @@ describe('panel split sizing', () => {
     expect(imageLoadWorkersInput.value).toBe(String(getDefaultImageLoadWorkers()));
     expect(stokesAolpSelect.value).toBe('1');
     expect(stokesMaskCheckbox.checked).toBe(true);
+    expect(spectralGroupingCheckbox.checked).toBe(true);
     expect(invalidValueWarningButton.getAttribute('aria-pressed')).toBe('true');
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(IMAGE_LOAD_WORKERS_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(SPECTRAL_RGB_GROUPING_STORAGE_KEY)).toBeNull();
     expect(imageButton.getAttribute('aria-expanded')).toBe('true');
     expect(rightButton.getAttribute('aria-expanded')).toBe('true');
     expect(bottomButton.getAttribute('aria-expanded')).toBe('true');
@@ -2374,6 +2383,7 @@ describe('view menu', () => {
     expect(labels).toEqual([
       'Theme',
       'Spectrum lattice motion',
+      'Spectral Defaults',
       'Stokes Defaults',
       'Auto Exposure Percentile',
       'Image Load Workers',
@@ -2563,6 +2573,31 @@ describe('view menu', () => {
     expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(false);
 
     ui.setMaskInvalidStokesVectors(true);
+
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it('renders and dispatches the Spectral Defaults grouping setting from Settings', () => {
+    installUiFixture();
+
+    const onSpectralRgbGroupingChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onSpectralRgbGroupingChange }));
+    const control = document.getElementById('spectral-default-settings-control') as HTMLElement;
+    const checkbox = document.getElementById('spectral-rgb-grouping-checkbox') as HTMLInputElement;
+
+    expect(control).not.toBeNull();
+    expect(control.closest('#settings-dialog')).toBe(document.getElementById('settings-dialog'));
+    expect(checkbox).not.toBeNull();
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox.closest('#spectral-default-settings-control')).toBe(control);
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onSpectralRgbGroupingChange).toHaveBeenCalledWith(false);
+    expect(window.localStorage.getItem(SPECTRAL_RGB_GROUPING_STORAGE_KEY)).toBe('false');
+
+    ui.setSpectralRgbGroupingEnabled(true);
 
     expect(checkbox.checked).toBe(true);
   });
@@ -3052,6 +3087,7 @@ describe('view menu', () => {
     const settingsDialog = document.getElementById('settings-dialog') as HTMLElement;
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
     const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
+    const spectralGroupingCheckbox = document.getElementById('spectral-rgb-grouping-checkbox') as HTMLInputElement;
     const stokesMaskCheckbox = document.getElementById('stokes-invalid-vector-mask-checkbox') as HTMLInputElement;
     const aolpEnabled = document.getElementById('stokes-default-aolp-enabled-checkbox') as HTMLInputElement;
     const aolpSelect = document.getElementById('stokes-default-aolp-colormap-select') as HTMLSelectElement;
@@ -3098,6 +3134,7 @@ describe('view menu', () => {
     expect(focusableSettingsControls).toEqual([
       themeSelect,
       spectrumMotionSelect,
+      spectralGroupingCheckbox,
       stokesMaskCheckbox,
       aolpEnabled,
       aolpSelect,
@@ -10593,6 +10630,7 @@ function createUiCallbacksBase() {
     onStokesDefaultSettingChange: () => {},
     onStokesParameterVisibilityChange: () => {},
     onMaskInvalidStokesVectorsChange: () => {},
+    onSpectralRgbGroupingChange: () => {},
     onInvalidValueWarningChange: () => {},
     onClearRoi: () => {},
     onResetSettings: () => {},

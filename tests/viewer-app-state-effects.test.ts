@@ -177,8 +177,18 @@ describe('viewer app state effects', () => {
     expect(enqueue).toHaveBeenCalledTimes(2);
     expect(enqueue.mock.calls.map(([sessionId]) => sessionId)).toEqual(['session-1', 'session-2']);
     expect(enqueue.mock.calls.map((call) => call[3])).toEqual([
-      { autoExposureEnabled: true, autoExposurePercentile: 99.5, maskInvalidStokesVectors: true },
-      { autoExposureEnabled: true, autoExposurePercentile: 99.5, maskInvalidStokesVectors: true }
+      {
+        autoExposureEnabled: true,
+        autoExposurePercentile: 99.5,
+        maskInvalidStokesVectors: true,
+        spectralRgbGroupingEnabled: true
+      },
+      {
+        autoExposureEnabled: true,
+        autoExposurePercentile: 99.5,
+        maskInvalidStokesVectors: true,
+        spectralRgbGroupingEnabled: true
+      }
     ]);
 
     enqueue.mockClear();
@@ -186,8 +196,18 @@ describe('viewer app state effects', () => {
 
     expect(enqueue).toHaveBeenCalledTimes(2);
     expect(enqueue.mock.calls.map((call) => call[3])).toEqual([
-      { autoExposureEnabled: true, autoExposurePercentile: 98.2, maskInvalidStokesVectors: true },
-      { autoExposureEnabled: true, autoExposurePercentile: 98.2, maskInvalidStokesVectors: true }
+      {
+        autoExposureEnabled: true,
+        autoExposurePercentile: 98.2,
+        maskInvalidStokesVectors: true,
+        spectralRgbGroupingEnabled: true
+      },
+      {
+        autoExposureEnabled: true,
+        autoExposurePercentile: 98.2,
+        maskInvalidStokesVectors: true,
+        spectralRgbGroupingEnabled: true
+      }
     ]);
 
     enqueue.mockClear();
@@ -195,8 +215,18 @@ describe('viewer app state effects', () => {
 
     expect(enqueue).toHaveBeenCalledTimes(2);
     expect(enqueue.mock.calls.map((call) => call[3])).toEqual([
-      { autoExposureEnabled: false, autoExposurePercentile: 98.2, maskInvalidStokesVectors: true },
-      { autoExposureEnabled: false, autoExposurePercentile: 98.2, maskInvalidStokesVectors: true }
+      {
+        autoExposureEnabled: false,
+        autoExposurePercentile: 98.2,
+        maskInvalidStokesVectors: true,
+        spectralRgbGroupingEnabled: true
+      },
+      {
+        autoExposureEnabled: false,
+        autoExposurePercentile: 98.2,
+        maskInvalidStokesVectors: true,
+        spectralRgbGroupingEnabled: true
+      }
     ]);
 
     enqueue.mockClear();

@@ -424,6 +424,70 @@ describe('render cache service', () => {
     ]);
   });
 
+  it('does not request or prewarm derived spectral RGB sources when grouping is disabled', async () => {
+    const decoded = createDecodedImage(2, 1, {
+      '410nm': 0.2,
+      '500nm': 0.8,
+      '650nm': 0.3
+    });
+    const session = createSession('session-1', decoded);
+    const splitState = {
+      ...session.state,
+      displaySelection: createChannelMonoSelection('410nm'),
+      spectralRgbGroupingEnabled: false
+    };
+    const derivedState = {
+      ...session.state,
+      displaySelection: createSpectralRgbSelection(),
+      spectralRgbGroupingEnabled: false
+    };
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+    const { windowLike, flush } = createRenderCacheWindowLike();
+    const service = new RenderCacheService({
+      ui,
+      renderer,
+      windowLike,
+      getActiveSessionId: () => session.id
+    });
+
+    service.prepareActiveSession(session, splitState);
+    await flush();
+    service.prepareActiveSession(session, derivedState);
+    await flush();
+
+    expect(renderer.ensureLayerChannelsResident).toHaveBeenCalledTimes(1);
+    expect(renderer.ensureLayerChannelsResident).toHaveBeenCalledWith(
+      session.id,
+      0,
+      2,
+      1,
+      decoded.layers[0],
+      ['410nm']
+    );
+    expect(renderer.ensureLayerChannelsResident).not.toHaveBeenCalledWith(
+      session.id,
+      0,
+      2,
+      1,
+      decoded.layers[0],
+      ['__spectralRgb:']
+    );
+    expect(renderer.setDisplaySelectionBindings).toHaveBeenLastCalledWith(
+      session.id,
+      0,
+      2,
+      1,
+      decoded.layers[0],
+      createSpectralRgbSelection(),
+      'rgb',
+      undefined,
+      false,
+      '0:spectralRgb::spectralRgbGrouping:false',
+      expect.objectContaining({ mode: 'empty' })
+    );
+  });
+
   it('cancels stale spectral RGB prewarm when the active session changes before idle', async () => {
     const first = createSession('first', createDecodedImage(2, 1, {
       '410nm': 0.2,

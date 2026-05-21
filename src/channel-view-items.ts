@@ -46,6 +46,7 @@ export type ChannelViewStackedThumbnailItem = ChannelViewStackedItem<ChannelView
 
 export interface ChannelViewItemsConfig {
   stokesParameterVisibility?: StokesParameterVisibilitySettings;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export function buildChannelViewItems(
@@ -237,9 +238,12 @@ function buildDisplayItems(
   includeSplitRgbChannels: boolean,
   config: ChannelViewItemsConfig
 ): Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>[] {
+  const spectralRgbGroupingEnabled = config.spectralRgbGroupingEnabled !== false;
   const spectralSplitChannelNames = includeSplitRgbChannels
     ? null
-    : getSpectralRgbSplitChannelNames(channelNames);
+    : spectralRgbGroupingEnabled
+      ? getSpectralRgbSplitChannelNames(channelNames)
+      : new Set<string>();
   const channelOptions = buildChannelDisplayOptions(channelNames, {
     includeRgbGroups: !includeSplitRgbChannels,
     includeSplitChannels: includeSplitRgbChannels
@@ -251,9 +255,12 @@ function buildDisplayItems(
   const stokesOptions = getStokesDisplayOptions(channelNames, {
     includeRgbGroups: !includeSplitRgbChannels,
     includeSplitChannels: includeSplitRgbChannels,
-    parameterVisibility: config.stokesParameterVisibility
+    parameterVisibility: config.stokesParameterVisibility,
+    spectralRgbGroupingEnabled
   });
-  const spectralOptions = includeSplitRgbChannels ? [] : getSpectralRgbDisplayOptions(channelNames);
+  const spectralOptions = includeSplitRgbChannels || !spectralRgbGroupingEnabled
+    ? []
+    : getSpectralRgbDisplayOptions(channelNames);
   return [...channelOptions, ...spectralOptions, ...stokesOptions].map((option) => ({
     value: option.key,
     label: formatChannelViewLabel(option.label),

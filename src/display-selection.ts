@@ -56,18 +56,24 @@ export interface ChannelDisplayOptionsConfig {
 
 export interface DisplaySelectionAvailabilityConfig {
   stokesParameterVisibility?: StokesParameterVisibilitySettings;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
-export function pickDefaultDisplaySelection(channelNames: string[]): DisplaySelection | null {
+export function pickDefaultDisplaySelection(
+  channelNames: string[],
+  config: DisplaySelectionAvailabilityConfig = {}
+): DisplaySelection | null {
   const names = [...channelNames];
   const rgbGroups = extractRgbChannelGroups(names);
   if (rgbGroups.length > 0) {
     return buildChannelRgbSelection(rgbGroups[0]);
   }
 
-  const spectralRgbSelection = pickDefaultSpectralRgbSelection(names);
-  if (spectralRgbSelection) {
-    return spectralRgbSelection;
+  if (config.spectralRgbGroupingEnabled !== false) {
+    const spectralRgbSelection = pickDefaultSpectralRgbSelection(names);
+    if (spectralRgbSelection) {
+      return spectralRgbSelection;
+    }
   }
 
   const grayscaleChannel = pickGrayscaleDisplayChannel(names);
@@ -85,27 +91,32 @@ export function resolveDisplaySelectionForLayer(
   config: DisplaySelectionAvailabilityConfig = {}
 ): DisplaySelection | null {
   if (!currentSelection) {
-    return pickDefaultDisplaySelection(channelNames);
+    return pickDefaultDisplaySelection(channelNames, config);
   }
 
   if (isChannelSelection(currentSelection)) {
     const normalized = normalizeChannelSelection(channelNames, currentSelection);
-    return normalized ?? pickDefaultDisplaySelection(channelNames);
+    return normalized ?? pickDefaultDisplaySelection(channelNames, config);
   }
 
   if (isStokesSelection(currentSelection)) {
-    return isStokesDisplayAvailable(channelNames, currentSelection, config.stokesParameterVisibility)
+    return isStokesDisplayAvailable(
+      channelNames,
+      currentSelection,
+      config.stokesParameterVisibility,
+      config.spectralRgbGroupingEnabled !== false
+    )
       ? currentSelection
-      : pickDefaultDisplaySelection(channelNames);
+      : pickDefaultDisplaySelection(channelNames, config);
   }
 
   if (isSpectralRgbSelection(currentSelection)) {
-    return isSpectralRgbDisplayAvailable(channelNames, currentSelection)
+    return config.spectralRgbGroupingEnabled !== false && isSpectralRgbDisplayAvailable(channelNames, currentSelection)
       ? currentSelection
-      : pickDefaultDisplaySelection(channelNames);
+      : pickDefaultDisplaySelection(channelNames, config);
   }
 
-  return pickDefaultDisplaySelection(channelNames);
+  return pickDefaultDisplaySelection(channelNames, config);
 }
 
 export function extractRgbChannelGroups(channelNames: string[]): RgbChannelGroup[] {

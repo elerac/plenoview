@@ -253,6 +253,7 @@ export function createViewerUi({
       const activeSession = selectActiveSession(state);
       const renderState = mergeRenderState(state.sessionState, state.interactionState, {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
       return {
@@ -283,6 +284,7 @@ export function createViewerUi({
       const viewport = getRenderer().getViewport();
       const renderState = mergeRenderState(state.sessionState, state.interactionState, {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
       if (renderState.viewerMode === 'panorama') {
@@ -350,6 +352,9 @@ export function createViewerUi({
     onMaskInvalidStokesVectorsChange: (enabled) => {
       getDisplayController().setMaskInvalidStokesVectors(enabled);
     },
+    onSpectralRgbGroupingChange: (enabled) => {
+      getDisplayController().setSpectralRgbGroupingEnabled(enabled);
+    },
     onInvalidValueWarningChange: (enabled) => {
       saveStoredInvalidValueWarningSetting(enabled);
       core.dispatch({ type: 'invalidValueWarningSet', enabled });
@@ -365,6 +370,7 @@ export function createViewerUi({
       void getDisplayController().resetStokesColormapDefaults();
       getDisplayController().resetStokesParameterVisibility();
       getDisplayController().resetMaskInvalidStokesVectors();
+      getDisplayController().resetSpectralRgbGroupingEnabled();
       getDisplayController().resetInvalidValueWarning();
     },
     onResetView: () => {
@@ -394,7 +400,8 @@ function promoteActiveChannelThumbnail(
     displayGamma: state.sessionState.channelThumbnailDisplayGamma,
     stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
     stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
-    maskInvalidStokesVectors: state.maskInvalidStokesVectors
+    maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
   });
 
   getChannelThumbnailService().promoteRequest(requestKey);

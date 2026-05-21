@@ -144,7 +144,8 @@ function scheduleThumbnailGeneration(
     {
       autoExposureEnabled: state.autoExposureEnabled,
       autoExposurePercentile: state.autoExposurePercentile,
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
     }
   ).catch(() => undefined);
 }
@@ -196,7 +197,8 @@ function scheduleActiveChannelThumbnailGeneration(
 
   for (const item of prioritizeSelectedChannelViewItem(
     buildChannelViewItems(layer.channelNames, {
-      stokesParameterVisibility: state.stokesParameterVisibility
+      stokesParameterVisibility: state.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
     }),
     state.sessionState.displaySelection
   )) {
@@ -233,7 +235,8 @@ function scheduleActiveChannelThumbnailGeneration(
       token,
       stateSnapshot,
       selection: item.selection,
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
     }).catch(() => undefined);
   }
 }
@@ -275,7 +278,8 @@ function shouldRefreshActiveChannelThumbnails(transition: ViewerStateTransition)
     transition.previousState.sessionState.stokesDegreeModulation.cop !== transition.state.sessionState.stokesDegreeModulation.cop ||
     transition.previousState.sessionState.stokesDegreeModulation.top !== transition.state.sessionState.stokesDegreeModulation.top ||
     transition.previousState.sessionState.stokesAolpDegreeModulationMode !== transition.state.sessionState.stokesAolpDegreeModulationMode ||
-    transition.previousState.maskInvalidStokesVectors !== transition.state.maskInvalidStokesVectors
+    transition.previousState.maskInvalidStokesVectors !== transition.state.maskInvalidStokesVectors ||
+    transition.previousState.spectralRgbGroupingEnabled !== transition.state.spectralRgbGroupingEnabled
   );
 }
 
@@ -297,6 +301,10 @@ function shouldRefreshOpenedImageThumbnails(transition: ViewerStateTransition): 
 
   if (transition.intent.type === 'maskInvalidStokesVectorsSet') {
     return transition.previousState.maskInvalidStokesVectors !== transition.state.maskInvalidStokesVectors;
+  }
+
+  if (transition.intent.type === 'spectralRgbGroupingSet') {
+    return transition.previousState.spectralRgbGroupingEnabled !== transition.state.spectralRgbGroupingEnabled;
   }
 
   return false;

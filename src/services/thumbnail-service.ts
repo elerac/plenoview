@@ -359,5 +359,8 @@ function cloneThumbnailOptions(options: OpenedImageThumbnailOptions): OpenedImag
   if (options.maskInvalidStokesVectors !== undefined) {
     cloned.maskInvalidStokesVectors = options.maskInvalidStokesVectors === true;
   }
+  if (options.spectralRgbGroupingEnabled !== undefined) {
+    cloned.spectralRgbGroupingEnabled = options.spectralRgbGroupingEnabled !== false;
+  }
   return cloned;
 }

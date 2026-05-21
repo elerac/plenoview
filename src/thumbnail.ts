@@ -22,10 +22,10 @@ import {
   readDisplaySelectionPixelValuesAtIndex,
   readDisplaySelectionSnapshotPixelValuesAtIndex,
   resolveDisplaySelectionEvaluator,
+  type DisplayEvaluationOptions,
   type DisplayPixelValues
 } from './display/evaluator';
 import { isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from './stokes';
-import type { StokesComputationOptions } from './stokes';
 import {
   DecodedExrImage,
   DecodedLayer,
@@ -48,6 +48,7 @@ export interface OpenedImageThumbnailOptions {
   autoExposureEnabled?: boolean;
   autoExposurePercentile?: number;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export interface ThumbnailPreviewOptions {
@@ -57,6 +58,7 @@ export interface ThumbnailPreviewOptions {
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode?: StokesAolpDegreeModulationMode;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export function createOpenedImageThumbnailDataUrl(
@@ -168,8 +170,9 @@ export function buildDisplaySelectionThumbnailPixels(
     preview.colormapLut
   );
   const colormapPreview = useColormapPreview ? preview : null;
-  const stokesOptions: StokesComputationOptions = {
-    maskInvalidStokesVectors: preview?.maskInvalidStokesVectors ?? options.maskInvalidStokesVectors
+  const stokesOptions: DisplayEvaluationOptions = {
+    maskInvalidStokesVectors: preview?.maskInvalidStokesVectors ?? options.maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled: preview?.spectralRgbGroupingEnabled ?? options.spectralRgbGroupingEnabled
   };
   const evaluator = resolveDisplaySelectionEvaluator(
     layer,

@@ -11,6 +11,7 @@ export interface BuildRoiPresentationArgs {
   activeLayer: DecodedLayer | null;
   sessionState: ViewerSessionState;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export function buildRoiReadoutModel(args: BuildRoiPresentationArgs): RoiReadoutModel {
@@ -31,7 +32,10 @@ export function buildRoiReadoutModel(args: BuildRoiPresentationArgs): RoiReadout
       roi,
       args.sessionState.displaySelection,
       args.sessionState.visualizationMode,
-      { maskInvalidStokesVectors: args.maskInvalidStokesVectors }
+      {
+        maskInvalidStokesVectors: args.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
+      }
     )
   };
 }

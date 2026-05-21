@@ -178,7 +178,8 @@ export function buildExportBatchTarget(state: ViewerAppState): ExportImageBatchT
       const layer = session.decoded.layers[effectiveState.activeLayer] ?? null;
       const displaySelection = layer
         ? resolveDisplaySelectionForLayer(layer.channelNames, effectiveState.displaySelection, {
-            stokesParameterVisibility: state.stokesParameterVisibility
+            stokesParameterVisibility: state.stokesParameterVisibility,
+            spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
           })
         : effectiveState.displaySelection;
       return {
@@ -191,7 +192,8 @@ export function buildExportBatchTarget(state: ViewerAppState): ExportImageBatchT
         displaySelection: cloneDisplaySelection(displaySelection),
         channels: layer
           ? buildChannelViewItems(layer.channelNames, {
-              stokesParameterVisibility: state.stokesParameterVisibility
+              stokesParameterVisibility: state.stokesParameterVisibility,
+              spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
             }).map((item) => ({
               value: item.value,
               label: item.label,
@@ -231,7 +233,8 @@ export function buildChannelThumbnailItems(state: ViewerAppState): ViewerChannel
   }
 
   return buildChannelViewItems(layer.channelNames, {
-    stokesParameterVisibility: state.stokesParameterVisibility
+    stokesParameterVisibility: state.stokesParameterVisibility,
+    spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
   }).map((item) => {
     const requestKey = serializeChannelThumbnailRequestKey({
       sessionId: session.id,

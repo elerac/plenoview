@@ -26,6 +26,7 @@ interface ChannelThumbnailJob {
   stateSnapshot: ViewerSessionState;
   selection: DisplaySelection;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 type MaybePromise<T> = T | Promise<T>;
@@ -47,6 +48,7 @@ export interface ChannelThumbnailServiceDependencies {
     stateSnapshot: ViewerSessionState;
     selection: DisplaySelection;
     maskInvalidStokesVectors?: boolean;
+    spectralRgbGroupingEnabled?: boolean;
     colormapRegistry: ColormapRegistry | null;
     abortSignal: AbortSignal;
   }) => MaybePromise<string | null>;
@@ -231,6 +233,7 @@ export class ChannelThumbnailService implements Disposable {
         stateSnapshot: job.stateSnapshot,
         selection: job.selection,
         maskInvalidStokesVectors: job.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: job.spectralRgbGroupingEnabled,
         colormapRegistry: this.getColormapRegistry(),
         abortSignal: this.abortController.signal
       });
@@ -336,6 +339,7 @@ function defaultCreateThumbnailDataUrl({
   stateSnapshot,
   selection,
   maskInvalidStokesVectors,
+  spectralRgbGroupingEnabled,
   colormapRegistry,
   abortSignal,
   findColormapIdByLabel: resolveColormapId,
@@ -346,6 +350,7 @@ function defaultCreateThumbnailDataUrl({
   stateSnapshot: ViewerSessionState;
   selection: DisplaySelection;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   colormapRegistry: ColormapRegistry | null;
   abortSignal: AbortSignal;
   findColormapIdByLabel: typeof findColormapIdByLabel;
@@ -356,6 +361,7 @@ function defaultCreateThumbnailDataUrl({
     stateSnapshot,
     selection,
     maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled,
     colormapRegistry,
     abortSignal,
     findColormapIdByLabel: resolveColormapId,
@@ -368,6 +374,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
   stateSnapshot,
   selection,
   maskInvalidStokesVectors,
+  spectralRgbGroupingEnabled,
   colormapRegistry,
   abortSignal,
   findColormapIdByLabel: resolveColormapId,
@@ -377,6 +384,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
   stateSnapshot: ViewerSessionState;
   selection: DisplaySelection;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   colormapRegistry: ColormapRegistry | null;
   abortSignal: AbortSignal;
   findColormapIdByLabel: typeof findColormapIdByLabel;
@@ -386,6 +394,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
     selection,
     stateSnapshot,
     maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled,
     colormapRegistry,
     abortSignal,
     findColormapIdByLabel: resolveColormapId,
@@ -396,7 +405,7 @@ async function createChannelViewThumbnailDataUrlWithPreview({
     stateSnapshot,
     selection,
     preview,
-    { maskInvalidStokesVectors }
+    { maskInvalidStokesVectors, spectralRgbGroupingEnabled }
   );
 }
 
@@ -416,7 +425,8 @@ function cloneJob(job: ChannelThumbnailJob): ChannelThumbnailJob {
   return {
     ...job,
     stateSnapshot: cloneViewerState(job.stateSnapshot),
-    selection: cloneDisplaySelection(job.selection) ?? job.selection
+    selection: cloneDisplaySelection(job.selection) ?? job.selection,
+    spectralRgbGroupingEnabled: job.spectralRgbGroupingEnabled
   };
 }
 
@@ -434,6 +444,7 @@ async function resolveChannelThumbnailPreview(args: {
   selection: DisplaySelection;
   stateSnapshot: ViewerSessionState;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   colormapRegistry: ColormapRegistry | null;
   abortSignal: AbortSignal;
   findColormapIdByLabel: typeof findColormapIdByLabel;
@@ -462,6 +473,7 @@ async function resolveChannelThumbnailPreview(args: {
     colormapLut,
     stokesDegreeModulation: { ...args.stateSnapshot.stokesDegreeModulation },
     stokesAolpDegreeModulationMode: args.stateSnapshot.stokesAolpDegreeModulationMode,
-    maskInvalidStokesVectors: args.maskInvalidStokesVectors
+    maskInvalidStokesVectors: args.maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
   };
 }

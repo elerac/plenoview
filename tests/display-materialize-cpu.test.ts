@@ -280,6 +280,25 @@ describe('display CPU materialization', () => {
     expect(sample?.values['Spectral RGB.B']).toBeCloseTo(texture[2] ?? 0, 6);
   });
 
+  it('does not materialize derived spectral RGB values when grouping is disabled', () => {
+    const layer = createLayerFromChannels({
+      '410nm': [0.1],
+      '500nm': [0.8],
+      '650nm': [0.2]
+    }, 'spectral');
+    const selection = createSpectralRgbSelection();
+
+    const texture = buildSelectedDisplayTexture(layer, 1, 1, selection, 'rgb', undefined, {
+      spectralRgbGroupingEnabled: false
+    });
+    const sample = samplePixelValuesForDisplay(layer, 1, 1, { ix: 0, iy: 0 }, selection, 'rgb', {
+      spectralRgbGroupingEnabled: false
+    });
+
+    expect(Array.from(texture)).toEqual([0, 0, 0, 1]);
+    expect(sample?.values['Spectral RGB.R']).toBeUndefined();
+  });
+
   it('builds signed spectral Stokes RGB display textures before deriving Stokes parameters', () => {
     const channelValues: Record<string, number[]> = {};
     for (let wavelength = 380; wavelength <= 780; wavelength += 20) {

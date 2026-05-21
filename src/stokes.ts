@@ -47,6 +47,7 @@ export interface StokesDisplayOptionsConfig {
   includeRgbGroups?: boolean;
   includeSplitChannels?: boolean;
   parameterVisibility?: StokesParameterVisibilitySettings;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export interface ScalarStokesChannels {
@@ -354,8 +355,9 @@ export function getStokesDisplayOptions(
   const includeRgbGroups = config.includeRgbGroups ?? true;
   const includeSplitChannels = config.includeSplitChannels ?? false;
   const parameterVisibility = config.parameterVisibility ?? DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS;
+  const spectralRgbGroupingEnabled = config.spectralRgbGroupingEnabled !== false;
   const spectralStokesCapabilities = getSpectralStokesRgbCapabilitiesForChannelNames(channelNames);
-  const hasSpectralStokesRgbOptions = spectralStokesCapabilities.available;
+  const hasSpectralStokesRgbOptions = spectralRgbGroupingEnabled && spectralStokesCapabilities.available;
   const scalarChannelSets = detectScalarStokesChannelSets(channelNames);
   for (const scalarChannels of scalarChannelSets) {
     const isSplitSpectralStokesSet = Boolean(
@@ -475,7 +477,8 @@ export function getStokesDisplayColormapDefault(
 export function isStokesDisplayAvailable(
   channelNames: string[],
   selection: DisplaySelection | null,
-  parameterVisibility: StokesParameterVisibilitySettings = DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS
+  parameterVisibility: StokesParameterVisibilitySettings = DEFAULT_STOKES_PARAMETER_VISIBILITY_SETTINGS,
+  spectralRgbGroupingEnabled = true
 ): boolean {
   if (!isStokesSelection(selection)) {
     return true;
@@ -491,6 +494,10 @@ export function isStokesDisplayAvailable(
   }
 
   if (selection.source.kind === 'spectralRgb') {
+    if (!spectralRgbGroupingEnabled) {
+      return false;
+    }
+
     const capabilities = getSpectralStokesRgbCapabilitiesForChannelNames(channelNames);
     return capabilities.available && isStokesParameterAvailable(selection.parameter, capabilities.hasS3);
   }

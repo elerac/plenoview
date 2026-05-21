@@ -1,10 +1,10 @@
 import type { DisplaySelection } from '../display-model';
-import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, VisualizationMode } from '../types';
 import {
   createDisplayPixelValues,
   readDisplaySelectionPixelValuesAtIndex,
   resolveDisplaySelectionEvaluator,
+  type DisplayEvaluationOptions,
   type DisplayPixelValues,
   type DisplaySelectionEvaluator
 } from '../display/evaluator';
@@ -94,7 +94,7 @@ export function computeDisplaySelectionAutoExposure(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
   percentile = AUTO_EXPOSURE_PERCENTILE,
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): AutoExposureResult {
   const pixelCount = Math.max(0, width * height);
   if (pixelCount === 0) {
@@ -132,7 +132,7 @@ export function computeDisplaySelectionAutoExposurePreview(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
   percentile = AUTO_EXPOSURE_PERCENTILE,
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): AutoExposureResult {
   const sampleWidth = resolveAutoExposurePreviewSampleSize(width);
   const sampleHeight = resolveAutoExposurePreviewSampleSize(height);
@@ -177,7 +177,7 @@ export async function computeDisplaySelectionAutoExposureAsync(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
   percentile = AUTO_EXPOSURE_PERCENTILE,
-  options: CooperativeComputeOptions & StokesComputationOptions = {}
+  options: CooperativeComputeOptions & DisplayEvaluationOptions = {}
 ): Promise<AutoExposureResult> {
   throwIfCooperativeComputeAborted(options);
   const pixelCount = Math.max(0, width * height);

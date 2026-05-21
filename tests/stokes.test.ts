@@ -336,6 +336,21 @@ describe('stokes', () => {
     expect(mixedOptions.map((option) => option.label)).not.toContain('S1/S0.400nm');
   });
 
+  it('does not group spectral Stokes RGB when spectral grouping is disabled', () => {
+    const channelNames = [
+      'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
+      'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
+    ];
+    const options = getStokesDisplayOptions(channelNames, {
+      spectralRgbGroupingEnabled: false
+    });
+
+    expect(options.some((option) => option.key.startsWith('stokesSpectralRgb:'))).toBe(false);
+    expect(options.map((option) => option.label)).toContain('S1/S0.400nm');
+    expect(options.map((option) => option.label)).toContain('AoLP.500nm');
+    expect(options.map((option) => option.label)).not.toContain('S1/S0 Spectral RGB');
+  });
+
   it('exposes linear-only spectral Stokes options without S3-derived entries', () => {
     const channelNames = [
       'S0.400nm', 'S1.400nm', 'S2.400nm',

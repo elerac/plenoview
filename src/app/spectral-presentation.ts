@@ -34,6 +34,7 @@ export interface BuildSpectralPresentationArgs {
   interactionState: ViewerInteractionState;
   stokesColormapDefaults?: StokesColormapDefaultSettings;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export function buildSpectralPlotReadoutModel(args: BuildSpectralPresentationArgs): SpectralPlotReadoutModel {
@@ -108,7 +109,11 @@ type SpectralPlotSource = Pick<SpectralPlotReadoutModel, 'channels' | 'yAxis'> &
 
 function resolveSpectralPlotSource(args: BuildSpectralPresentationArgs): SpectralPlotSource | null {
   const selection = args.sessionState.displaySelection;
-  if (isStokesSelection(selection) && selection.source.kind === 'spectralRgb') {
+  if (
+    isStokesSelection(selection) &&
+    selection.source.kind === 'spectralRgb' &&
+    args.spectralRgbGroupingEnabled !== false
+  ) {
     const groups = detectSpectralStokesChannelGroups(args.activeLayer!.channelNames);
     if (groups.length >= 2) {
       const stokesDefaults = args.stokesColormapDefaults ?? createDefaultStokesColormapDefaultSettings();
@@ -148,7 +153,7 @@ function resolveSpectralPlotSource(args: BuildSpectralPresentationArgs): Spectra
   const preferredSpectralChannelName = selection?.kind === 'channelMono'
     ? selection.channel
     : null;
-  const spectralChannels = isSpectralRgbSelection(selection)
+  const spectralChannels = isSpectralRgbSelection(selection) && args.spectralRgbGroupingEnabled !== false
     ? detectSpectralChannelsForSeries(args.activeLayer!.channelNames, selection.seriesKey)
     : detectSpectralChannels(args.activeLayer!.channelNames, preferredSpectralChannelName);
   return spectralChannels.length > 0

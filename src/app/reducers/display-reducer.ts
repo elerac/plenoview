@@ -82,7 +82,10 @@ export function displayReducer(
         state.sessionState,
         activeSession.decoded,
         intent.activeLayer,
-        { stokesParameterVisibility: state.stokesParameterVisibility }
+        {
+          stokesParameterVisibility: state.stokesParameterVisibility,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+        }
       );
       if (
         nextSessionState.activeLayer === state.sessionState.activeLayer &&

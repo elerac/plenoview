@@ -259,6 +259,7 @@ export function sameResourceTarget(a: ViewerResourceTarget | null, b: ViewerReso
     a.activeLayer === b.activeLayer &&
     a.visualizationMode === b.visualizationMode &&
     a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
+    a.spectralRgbGroupingEnabled === b.spectralRgbGroupingEnabled &&
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&
     a.decodedRef === b.decodedRef
   );

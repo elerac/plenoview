@@ -30,7 +30,8 @@ import type { DecodedLayer, VisualizationMode } from '../types';
 import {
   buildDisplaySourceBinding,
   createEmptyDisplaySourceBinding,
-  type DisplaySourceBinding
+  type DisplaySourceBinding,
+  type DisplaySourceBindingConfig
 } from './bindings';
 import {
   buildReflectanceSpectralRgbCoefficients,
@@ -52,6 +53,8 @@ export interface DisplayPixelValues {
 }
 
 type ResolvedStokesComputationOptions = Required<Pick<StokesComputationOptions, 'maskInvalidStokesVectors'>>;
+
+export interface DisplayEvaluationOptions extends StokesComputationOptions, DisplaySourceBindingConfig {}
 
 export type DisplaySelectionEvaluator =
   | {
@@ -122,19 +125,19 @@ export function resolveDisplaySelectionEvaluator(
   layer: DecodedLayer,
   selection: Parameters<typeof buildDisplaySourceBinding>[1],
   visualizationMode: VisualizationMode = 'rgb',
-  stokesOptions: StokesComputationOptions = {}
+  options: DisplayEvaluationOptions = {}
 ): DisplaySelectionEvaluator {
   return createDisplaySelectionEvaluator(
     layer,
-    buildDisplaySourceBinding(layer, selection, visualizationMode),
-    stokesOptions
+    buildDisplaySourceBinding(layer, selection, visualizationMode, options),
+    options
   );
 }
 
 export function createDisplaySelectionEvaluator(
   layer: DecodedLayer,
   binding: DisplaySourceBinding,
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): DisplaySelectionEvaluator {
   const resolvedStokesOptions = resolveStokesComputationOptions(stokesOptions);
   switch (binding.mode) {

@@ -94,6 +94,22 @@ describe('channel view items', () => {
     expect(findSelectedChannelViewItem(items, createSpectralRgbSelection())?.label).toBe('Spectral RGB');
   });
 
+  it('shows spectral wavelength channels individually when spectral RGB grouping is disabled', () => {
+    const items = buildChannelViewItems(['410nm', '500nm', '650nm'], {
+      spectralRgbGroupingEnabled: false
+    });
+    const values = selectVisibleChannelViewItems(items, false).map((item) => item.value);
+
+    expect(hasSplitChannelViewItems(items)).toBe(false);
+    expect(values).toEqual([
+      'channel:410nm',
+      'channel:500nm',
+      'channel:650nm'
+    ]);
+    expect(values.some((value) => value.startsWith('spectralRgb:'))).toBe(false);
+    expect(findSelectedChannelViewItem(items, createSpectralRgbSelection())).toBeNull();
+  });
+
   it('derives spectral RGB stack children and expands one stack at a time', () => {
     const channelNames = ['410nm', '500nm', '650nm', 'mask'];
     const items = buildChannelViewItems(channelNames);
@@ -160,6 +176,25 @@ describe('channel view items', () => {
     expect(splitVisible.map((item) => item.label)).not.toContain('S1/S0 Spectral RGB');
     expect(findSelectedChannelViewItem(items, createStokesSelection('s1_over_s0', 'stokesSpectralRgb'))?.value)
       .toBe('stokesSpectralRgb:s1_over_s0:group');
+  });
+
+  it('keeps spectral Stokes wavelength entries ungrouped when spectral RGB grouping is disabled', () => {
+    const items = buildChannelViewItems([
+      'S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm',
+      'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'
+    ], {
+      spectralRgbGroupingEnabled: false
+    });
+    const values = selectVisibleChannelViewItems(items, false).map((item) => item.value);
+    const labels = selectVisibleChannelViewItems(items, false).map((item) => item.label);
+
+    expect(values.some((value) => value.startsWith('spectralRgb:'))).toBe(false);
+    expect(values.some((value) => value.startsWith('stokesSpectralRgb:'))).toBe(false);
+    expect(labels).toContain('S1/S0.400nm');
+    expect(labels).toContain('AoLP.500nm');
+    expect(labels).not.toContain('S1/S0 Spectral RGB');
+    expect(findSelectedChannelViewItem(items, createStokesSelection('s1_over_s0', 'stokesSpectralRgb')))
+      .toBeNull();
   });
 
   it('derives existing Stokes grouped views as stacks', () => {

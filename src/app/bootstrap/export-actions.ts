@@ -239,9 +239,13 @@ export function createImageExportPixelsResolver({
           colormapLut: selectActiveColormapLut(state),
           stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
           stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
-          maskInvalidStokesVectors: state.maskInvalidStokesVectors
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
         },
-        { maskInvalidStokesVectors: state.maskInvalidStokesVectors }
+        {
+          maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+        }
       );
       assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
       return pixels;
@@ -250,6 +254,7 @@ export function createImageExportPixelsResolver({
     assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
     const renderState = mergeRenderState(state.sessionState, state.interactionState, {
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       invalidValueWarningEnabled: state.invalidValueWarningEnabled
     });
     getRenderCache().prepareActiveSession(activeSession, renderState);
@@ -328,6 +333,7 @@ export async function handleExportImage(
         session: sourceSession,
         renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
           maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: stateSnapshot.spectralRgbGroupingEnabled,
           invalidValueWarningEnabled: stateSnapshot.invalidValueWarningEnabled
         })
       });
@@ -493,6 +499,7 @@ export async function handleExportScreenshotRegions(
           session: sourceSession,
           renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
             maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors,
+            spectralRgbGroupingEnabled: stateSnapshot.spectralRgbGroupingEnabled,
             invalidValueWarningEnabled: stateSnapshot.invalidValueWarningEnabled
           }),
           batch: {
@@ -904,6 +911,7 @@ async function resolveBatchEntryExportResult({
     ? {
       ...mergeRenderState(exportState.state, createInteractionState(exportState.state), {
         maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled,
         invalidValueWarningEnabled: appState.invalidValueWarningEnabled
       }),
       viewerMode: appState.sessionState.viewerMode,
@@ -911,6 +919,7 @@ async function resolveBatchEntryExportResult({
     }
     : mergeRenderState(exportState.state, createInteractionState(exportState.state), {
       maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled,
       invalidValueWarningEnabled: appState.invalidValueWarningEnabled
     });
 
@@ -1004,7 +1013,13 @@ async function resolveBatchEntryPreviewPixels({
       colormapRange: exportState.state.colormapRange,
       colormapLut: exportState.lut,
       stokesDegreeModulation: exportState.state.stokesDegreeModulation,
-      stokesAolpDegreeModulationMode: exportState.state.stokesAolpDegreeModulationMode
+      stokesAolpDegreeModulationMode: exportState.state.stokesAolpDegreeModulationMode,
+      maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled
+    },
+    {
+      maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled
     }
   );
   throwIfAborted(signal, abortMessage);
@@ -1076,7 +1091,8 @@ async function resolveBatchEntryExportState({
       activeLayer: entry.activeLayer,
       displaySelection: selection,
       visualizationMode,
-      maskInvalidStokesVectors: appState.maskInvalidStokesVectors
+      maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled
     };
     const displayLuminanceRange = rangeStrategy === 'sampledPreview'
       ? resolvePreviewDisplayLuminanceRange(renderCache, session, layer, rangeState)
@@ -1118,6 +1134,7 @@ function resolvePreviewDisplayLuminanceRange(
     displaySelection: ViewerSessionState['displaySelection'];
     visualizationMode: VisualizationMode;
     maskInvalidStokesVectors?: boolean;
+    spectralRgbGroupingEnabled?: boolean;
   }
 ): DisplayLuminanceRange | null {
   const cachedRange = renderCache.getCachedLuminanceRange(session.id, state);
@@ -1131,7 +1148,10 @@ function resolvePreviewDisplayLuminanceRange(
     session.decoded.height,
     state.displaySelection,
     state.visualizationMode,
-    { maskInvalidStokesVectors: state.maskInvalidStokesVectors }
+    {
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+    }
   );
 }
 
@@ -1141,7 +1161,7 @@ function computeSampledDisplayLuminanceRange(
   height: number,
   selection: ViewerSessionState['displaySelection'],
   visualizationMode: VisualizationMode,
-  options: { maskInvalidStokesVectors?: boolean } = {}
+  options: { maskInvalidStokesVectors?: boolean; spectralRgbGroupingEnabled?: boolean } = {}
 ): DisplayLuminanceRange | null {
   const pixelCount = Math.max(0, width * height);
   if (pixelCount === 0) {
@@ -1149,7 +1169,8 @@ function computeSampledDisplayLuminanceRange(
   }
 
   const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
-    maskInvalidStokesVectors: options.maskInvalidStokesVectors
+    maskInvalidStokesVectors: options.maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
   });
   const sample = createDisplayPixelValues();
   const sampleStep = Math.max(1, Math.ceil(pixelCount / PREVIEW_LUMINANCE_RANGE_MAX_SAMPLES));
@@ -1247,6 +1268,7 @@ function restoreActiveRendererBinding(
   }
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
     invalidValueWarningEnabled: state.invalidValueWarningEnabled
   });
   renderCache.prepareActiveSession(activeSession, renderState);

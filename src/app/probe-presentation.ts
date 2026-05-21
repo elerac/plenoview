@@ -22,6 +22,7 @@ export interface BuildProbePresentationArgs {
   activeColormapLut: ColormapLut | null;
   activeDisplayLuminanceRange: DisplayLuminanceRange | null;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }
 
 export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeReadoutModel {
@@ -62,7 +63,10 @@ export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeR
     targetPixel,
     args.sessionState.displaySelection,
     args.sessionState.visualizationMode,
-    { maskInvalidStokesVectors: args.maskInvalidStokesVectors }
+    {
+      maskInvalidStokesVectors: args.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
+    }
   );
 
   return {

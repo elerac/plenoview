@@ -8,9 +8,10 @@ import {
 import {
   readDisplaySelectionPixelValuesAtIndex,
   resolveDisplaySelectionEvaluator,
+  type DisplayEvaluationOptions,
   type DisplayPixelValues
 } from '../display/evaluator';
-import { isStokesDisplayAvailable, type StokesComputationOptions } from '../stokes';
+import { isStokesDisplayAvailable } from '../stokes';
 import { appendSpectralStokesRgbSampleValues } from '../stokes/spectral-stokes-rgb';
 import { appendStokesSampleValues } from '../stokes/stokes-display';
 import { isSpectralRgbDisplayAvailable } from '../spectral';
@@ -24,7 +25,7 @@ export function readDisplaySelectionPixelValues(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
   output?: DisplayPixelValues,
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): DisplayPixelValues | null {
   if (pixel.ix < 0 || pixel.iy < 0 || pixel.ix >= width || pixel.iy >= height) {
     return null;
@@ -72,7 +73,7 @@ export function samplePixelValuesForDisplay(
   pixel: ImagePixel,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): PixelSample | null {
   const sample = samplePixelValues(layer, width, height, pixel);
   if (!sample) {
@@ -80,7 +81,15 @@ export function samplePixelValuesForDisplay(
   }
 
   const flatIndex = pixel.iy * width + pixel.ix;
-  if (isStokesSelection(selection) && isStokesDisplayAvailable(layer.channelNames, selection)) {
+  if (
+    isStokesSelection(selection) &&
+    isStokesDisplayAvailable(
+      layer.channelNames,
+      selection,
+      undefined,
+      stokesOptions.spectralRgbGroupingEnabled !== false
+    )
+  ) {
     if (selection.source.kind === 'spectralRgb') {
       appendSpectralStokesRgbSampleValues(layer, flatIndex, selection, sample.values, visualizationMode, stokesOptions);
     } else {
@@ -88,7 +97,11 @@ export function samplePixelValuesForDisplay(
     }
   }
 
-  if (isSpectralRgbSelection(selection) && isSpectralRgbDisplayAvailable(layer.channelNames, selection)) {
+  if (
+    isSpectralRgbSelection(selection) &&
+    stokesOptions.spectralRgbGroupingEnabled !== false &&
+    isSpectralRgbDisplayAvailable(layer.channelNames, selection)
+  ) {
     const values = readDisplaySelectionPixelValuesAtIndex(
       resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions),
       flatIndex

@@ -115,6 +115,37 @@ describe('display bindings', () => {
     expect(spectralStokesColormapBinding.slots).toEqual(spectralStokesBinding.slots);
   });
 
+  it('returns empty bindings for derived spectral RGB selections when grouping is disabled', () => {
+    const spectralLayer = createLayerFromChannels({
+      '400nm': [1],
+      '500nm': [1],
+      '600nm': [1]
+    });
+    const spectralStokesLayer = createLayerFromChannels({
+      'S0.400nm': [1],
+      'S1.400nm': [0.25],
+      'S2.400nm': [0],
+      'S3.400nm': [0],
+      'S0.500nm': [1],
+      'S1.500nm': [0.25],
+      'S2.500nm': [0],
+      'S3.500nm': [0]
+    });
+
+    expect(buildDisplaySourceBinding(
+      spectralLayer,
+      createSpectralRgbSelection(),
+      'rgb',
+      { spectralRgbGroupingEnabled: false }
+    ).mode).toBe('empty');
+    expect(buildDisplaySourceBinding(
+      spectralStokesLayer,
+      createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
+      'rgb',
+      { spectralRgbGroupingEnabled: false }
+    ).mode).toBe('empty');
+  });
+
   it('binds missing S3 as a zero slot for linear-only Stokes selections', () => {
     const scalarLayer = createLayerFromChannels({
       S0: [2],

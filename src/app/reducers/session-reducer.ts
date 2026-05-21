@@ -164,7 +164,8 @@ export function sessionReducer(
         {
           autoFitViewport: state.autoFitImageOnSelect ? intent.viewport ?? null : null,
           autoFitInsets: state.autoFitImageOnSelect ? intent.fitInsets ?? null : null,
-          stokesParameterVisibility: state.stokesParameterVisibility
+          stokesParameterVisibility: state.stokesParameterVisibility,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
         }
       );
       const sessionsWithCurrentState = updateActiveSessionStoredState(
@@ -196,7 +197,10 @@ export function sessionReducer(
         cloneViewerSessionState(nextSession.state),
         nextSession.decoded,
         nextSession.state.activeLayer,
-        { stokesParameterVisibility: state.stokesParameterVisibility }
+        {
+          stokesParameterVisibility: state.stokesParameterVisibility,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+        }
       );
       return {
         ...state,
@@ -346,7 +350,11 @@ export function sessionReducer(
         state.sessionState,
         state.defaultColormapId,
         intent.viewport,
-        intent.fitInsets
+        intent.fitInsets,
+        {
+          stokesParameterVisibility: state.stokesParameterVisibility,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+        }
       );
       return patchSessionState(state, nextSessionState, {
         syncInteractionView: true,

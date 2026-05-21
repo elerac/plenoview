@@ -3,9 +3,9 @@ import type { DisplaySelection } from '../display-model';
 import {
   createDisplayPixelValues,
   readDisplaySelectionPixelValuesAtIndex,
-  resolveDisplaySelectionEvaluator
+  resolveDisplaySelectionEvaluator,
+  type DisplayEvaluationOptions
 } from '../display/evaluator';
-import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, DisplayLuminanceRange, ImageStats, VisualizationMode } from '../types';
 import {
   maybeYieldCooperativeCompute,
@@ -24,7 +24,7 @@ export function computeDisplaySelectionLuminanceRange(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): DisplayLuminanceRange | null {
   const pixelCount = width * height;
   const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
@@ -62,7 +62,7 @@ export async function computeDisplaySelectionLuminanceRangeAsync(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  options: CooperativeComputeOptions & StokesComputationOptions = {}
+  options: CooperativeComputeOptions & DisplayEvaluationOptions = {}
 ): Promise<DisplayLuminanceRange | null> {
   throwIfCooperativeComputeAborted(options);
   const pixelCount = width * height;
@@ -104,7 +104,7 @@ export function computeDisplaySelectionImageStats(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): ImageStats | null {
   const pixelCount = Math.max(0, width * height);
   if (pixelCount === 0) {
@@ -134,7 +134,7 @@ export async function computeDisplaySelectionImageStatsAsync(
   height: number,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  options: CooperativeComputeOptions & StokesComputationOptions = {}
+  options: CooperativeComputeOptions & DisplayEvaluationOptions = {}
 ): Promise<ImageStats | null> {
   throwIfCooperativeComputeAborted(options);
   const pixelCount = Math.max(0, width * height);

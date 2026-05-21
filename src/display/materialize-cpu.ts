@@ -9,6 +9,7 @@ import {
   createDisplayPixelValues,
   readDisplaySelectionSnapshotPixelValuesAtIndex,
   resolveDisplaySelectionEvaluator,
+  type DisplayEvaluationOptions,
   sanitizeAlphaValue,
   sanitizeDisplayValue,
   type DisplaySelectionEvaluator
@@ -55,7 +56,7 @@ export function buildSelectedDisplayTexture(
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
   output?: Float32Array,
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): Float32Array {
   const pixelCount = width * height;
   const requiredLength = pixelCount * 4;

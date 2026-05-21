@@ -120,6 +120,7 @@ export interface ViewerResourceTarget {
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: ViewerSessionState['displaySelection'];
   maskInvalidStokesVectors: boolean;
+  spectralRgbGroupingEnabled: boolean;
   decodedRef: OpenedImageSession['decoded'];
 }
 
@@ -171,6 +172,7 @@ export interface ViewerAppState {
   stokesColormapDefaults: StokesColormapDefaultSettings;
   stokesParameterVisibility: StokesParameterVisibilitySettings;
   maskInvalidStokesVectors: boolean;
+  spectralRgbGroupingEnabled: boolean;
   invalidValueWarningEnabled: boolean;
   autoFitImageOnSelect: boolean;
   autoExposureEnabled: boolean;
@@ -221,6 +223,7 @@ export type ViewerIntent =
   | { type: 'stokesParameterVisibilityGroupSet'; group: StokesColormapDefaultGroup; enabled: boolean }
   | { type: 'stokesParameterVisibilityReset' }
   | { type: 'maskInvalidStokesVectorsSet'; enabled: boolean }
+  | { type: 'spectralRgbGroupingSet'; enabled: boolean }
   | { type: 'invalidValueWarningSet'; enabled: boolean }
   | { type: 'lockedPixelToggled'; pixel: ViewerSessionState['lockedPixel'] }
   | { type: 'roiSet'; roi: ViewerSessionState['roi'] }
@@ -335,6 +338,7 @@ export interface ViewerUiSnapshot {
   stokesColormapDefaults: StokesColormapDefaultSettings;
   stokesParameterVisibility: StokesParameterVisibilitySettings;
   maskInvalidStokesVectors: boolean;
+  spectralRgbGroupingEnabled: boolean;
   invalidValueWarningEnabled: boolean;
   activeColormapId: string;
   defaultColormapId: string;

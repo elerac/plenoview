@@ -39,6 +39,7 @@ export interface Elements {
   metadataDialogCloseButton: HTMLButtonElement;
   themeSelect: HTMLSelectElement;
   spectrumLatticeMotionSelect: HTMLSelectElement;
+  spectralRgbGroupingCheckbox: HTMLInputElement;
   imageLoadWorkersInput: HTMLInputElement;
   autoExposurePercentileInput: HTMLInputElement;
   stokesInvalidVectorMaskCheckbox: HTMLInputElement;
@@ -553,6 +554,7 @@ export function resolveElements(): Elements {
     metadataDialogCloseButton: requireElement('metadata-dialog-close-button', HTMLButtonElement),
     themeSelect: requireElement('theme-select', HTMLSelectElement),
     spectrumLatticeMotionSelect: requireElement('spectrum-lattice-motion-select', HTMLSelectElement),
+    spectralRgbGroupingCheckbox: requireElement('spectral-rgb-grouping-checkbox', HTMLInputElement),
     imageLoadWorkersInput: requireElement('image-load-workers-input', HTMLInputElement),
     autoExposurePercentileInput: requireElement('auto-exposure-percentile-input', HTMLInputElement),
     stokesInvalidVectorMaskCheckbox: requireElement('stokes-invalid-vector-mask-checkbox', HTMLInputElement),

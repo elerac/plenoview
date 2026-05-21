@@ -1,7 +1,6 @@
 import type { DisplaySelection } from '../display-model';
-import { resolveDisplaySelectionEvaluator } from '../display/evaluator';
+import { resolveDisplaySelectionEvaluator, type DisplayEvaluationOptions } from '../display/evaluator';
 import { clampImageRoiToBounds, getImageRoiHeight, getImageRoiPixelCount, getImageRoiWidth } from '../roi';
-import type { StokesComputationOptions } from '../stokes';
 import type { DecodedLayer, ImageRoi, RoiStats, VisualizationMode } from '../types';
 import {
   accumulateStatsValue,
@@ -16,7 +15,7 @@ export function computeDisplaySelectionRoiStats(
   roi: ImageRoi,
   selection: DisplaySelection | null,
   visualizationMode: VisualizationMode = 'rgb',
-  stokesOptions: StokesComputationOptions = {}
+  stokesOptions: DisplayEvaluationOptions = {}
 ): RoiStats | null {
   const clampedRoi = clampImageRoiToBounds(roi, width, height);
   if (!clampedRoi) {

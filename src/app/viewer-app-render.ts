@@ -213,6 +213,7 @@ function createRenderStateSelector(): (state: ViewerAppState) => ViewerRenderSna
   return (state) => {
     const nextResult = mergeRenderState(state.sessionState, state.interactionState, {
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       invalidValueWarningEnabled: state.invalidValueWarningEnabled
     });
     if (previousResult && sameViewerRenderState(previousResult, nextResult)) {
@@ -245,7 +246,12 @@ function selectPaneRenderSources(
     const usesLiveState = session.id === state.activeSessionId;
     const renderState = usesLiveState
       ? activeRenderState
-      : createStoredPaneRenderState(session.state, state.maskInvalidStokesVectors, state.invalidValueWarningEnabled);
+      : createStoredPaneRenderState(
+          session.state,
+          state.maskInvalidStokesVectors,
+          state.spectralRgbGroupingEnabled,
+          state.invalidValueWarningEnabled
+        );
     const layer = session.decoded.layers[renderState.activeLayer] ?? null;
     if (!layer) {
       continue;
@@ -253,7 +259,8 @@ function selectPaneRenderSources(
     const visibleRenderState = {
       ...renderState,
       displaySelection: resolveDisplaySelectionForLayer(layer.channelNames, renderState.displaySelection, {
-        stokesParameterVisibility: state.stokesParameterVisibility
+        stokesParameterVisibility: state.stokesParameterVisibility,
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
       })
     };
 
@@ -274,11 +281,13 @@ function selectPaneRenderSources(
 function createStoredPaneRenderState(
   sessionState: ViewerAppState['sessionState'],
   maskInvalidStokesVectors: boolean,
+  spectralRgbGroupingEnabled: boolean,
   invalidValueWarningEnabled: boolean
 ): ViewerRenderState {
   return {
     ...sessionState,
     maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled,
     invalidValueWarningEnabled,
     hoveredPixel: null,
     draftRoi: null,
@@ -307,6 +316,7 @@ function createProbeReadoutSelector(): (
   let previousStokesDegreeModulation = { aolp: false, cop: false, top: false };
   let previousStokesAolpDegreeModulationMode: ViewerAppState['sessionState']['stokesAolpDegreeModulationMode'] = 'value';
   let previousMaskInvalidStokesVectors = true;
+  let previousSpectralRgbGroupingEnabled = true;
   let previousResult = buildProbeReadoutModel({
     activeSession: null,
     activeLayer: null,
@@ -336,6 +346,7 @@ function createProbeReadoutSelector(): (
       state.sessionState.displayGamma === previousDisplayGamma &&
       state.sessionState.visualizationMode === previousVisualizationMode &&
       state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
+      state.spectralRgbGroupingEnabled === previousSpectralRgbGroupingEnabled &&
       (
         !usesColormap || (
           sameDisplayLuminanceRange(state.sessionState.colormapRange, previousColormapRange) &&
@@ -368,6 +379,7 @@ function createProbeReadoutSelector(): (
     previousStokesDegreeModulation = nextStokesDegreeModulation;
     previousStokesAolpDegreeModulationMode = state.sessionState.stokesAolpDegreeModulationMode;
     previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
+    previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
     previousResult = buildProbeReadoutModel({
       activeSession,
       activeLayer,
@@ -375,7 +387,8 @@ function createProbeReadoutSelector(): (
       interactionState: state.interactionState,
       activeColormapLut,
       activeDisplayLuminanceRange,
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
     });
     return previousResult;
   };
@@ -395,6 +408,7 @@ function createSpectralPlotReadoutSelector(): (
   let previousDisplaySelection: ViewerAppState['sessionState']['displaySelection'] = null;
   let previousStokesColormapDefaults: ViewerAppState['stokesColormapDefaults'] | null = null;
   let previousMaskInvalidStokesVectors = true;
+  let previousSpectralRgbGroupingEnabled = true;
   let previousResult = buildSpectralPlotReadoutModel({
     activeSession: null,
     activeLayer: null,
@@ -415,6 +429,7 @@ function createSpectralPlotReadoutSelector(): (
       samePixel(state.interactionState.hoveredPixel, previousHoveredPixel) &&
       sameDisplaySelection(state.sessionState.displaySelection, previousDisplaySelection) &&
       state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
+      state.spectralRgbGroupingEnabled === previousSpectralRgbGroupingEnabled &&
       previousStokesColormapDefaults !== null &&
       sameStokesColormapDefaultSettings(state.stokesColormapDefaults, previousStokesColormapDefaults)
     ) {
@@ -429,6 +444,7 @@ function createSpectralPlotReadoutSelector(): (
     previousHoveredPixel = state.interactionState.hoveredPixel;
     previousDisplaySelection = state.sessionState.displaySelection;
     previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
+    previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
     previousStokesColormapDefaults = state.stokesColormapDefaults;
     previousResult = buildSpectralPlotReadoutModel({
       activeSession,
@@ -436,7 +452,8 @@ function createSpectralPlotReadoutSelector(): (
       sessionState: state.sessionState,
       interactionState: state.interactionState,
       stokesColormapDefaults: state.stokesColormapDefaults,
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
     });
     return previousResult;
   };
@@ -455,6 +472,7 @@ function createResourceTargetSelector(): (
           visualizationMode: state.sessionState.visualizationMode,
           displaySelection: state.sessionState.displaySelection,
           maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
           decodedRef: activeSession.decoded
         }
       : null;
@@ -478,6 +496,7 @@ function createRoiReadoutSelector(): (
   let previousDisplaySelection: ViewerAppState['sessionState']['displaySelection'] = null;
   let previousVisualizationMode: ViewerAppState['sessionState']['visualizationMode'] = 'rgb';
   let previousMaskInvalidStokesVectors = true;
+  let previousSpectralRgbGroupingEnabled = true;
   let previousResult = buildRoiReadoutModel({
     activeSession: null,
     activeLayer: null,
@@ -492,6 +511,7 @@ function createRoiReadoutSelector(): (
       sameRoi(state.sessionState.roi, previousRoi) &&
       state.sessionState.visualizationMode === previousVisualizationMode &&
       state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
+      state.spectralRgbGroupingEnabled === previousSpectralRgbGroupingEnabled &&
       sameDisplaySelection(state.sessionState.displaySelection, previousDisplaySelection)
     ) {
       return previousResult;
@@ -503,11 +523,13 @@ function createRoiReadoutSelector(): (
     previousVisualizationMode = state.sessionState.visualizationMode;
     previousDisplaySelection = state.sessionState.displaySelection;
     previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
+    previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
     previousResult = buildRoiReadoutModel({
       activeSession,
       activeLayer,
       sessionState: state.sessionState,
-      maskInvalidStokesVectors: state.maskInvalidStokesVectors
+      maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
     });
     return previousResult;
   };
@@ -575,12 +597,14 @@ function createDisplayRangeRequestSelector(): (
           visualizationMode: effectiveVisualizationMode,
           displaySelection: state.sessionState.displaySelection,
           maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
           decodedRef: activeSession.decoded,
           requestKey: `${activeSession.id}:${buildDisplayLuminanceRevisionKey({
             activeLayer: state.sessionState.activeLayer,
             displaySelection: state.sessionState.displaySelection,
             visualizationMode: effectiveVisualizationMode,
-            maskInvalidStokesVectors: state.maskInvalidStokesVectors
+            maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+            spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
           })}`
         }
       : null;
@@ -607,12 +631,14 @@ function createImageStatsRequestSelector(): (
           visualizationMode: state.sessionState.visualizationMode,
           displaySelection: state.sessionState.displaySelection,
           maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
           decodedRef: activeSession.decoded,
           requestKey: `${activeSession.id}:${buildDisplayImageStatsRevisionKey({
             activeLayer: state.sessionState.activeLayer,
             displaySelection: state.sessionState.displaySelection,
             visualizationMode: state.sessionState.visualizationMode,
-            maskInvalidStokesVectors: state.maskInvalidStokesVectors
+            maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+            spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
           })}`
         }
       : null;
@@ -640,6 +666,7 @@ function createAutoExposureRequestSelector(): (
           visualizationMode: 'rgb' as const,
           displaySelection: state.sessionState.displaySelection,
           maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+          spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
           decodedRef: activeSession.decoded,
           percentile: state.autoExposurePercentile,
           source: AUTO_EXPOSURE_SOURCE,
@@ -647,7 +674,8 @@ function createAutoExposureRequestSelector(): (
             activeLayer: state.sessionState.activeLayer,
             displaySelection: state.sessionState.displaySelection,
             visualizationMode: 'rgb',
-            maskInvalidStokesVectors: state.maskInvalidStokesVectors
+            maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+            spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
           }, state.autoExposurePercentile)}`
         }
       : null;
@@ -687,6 +715,7 @@ function buildViewerStateReadout(
 ): ViewerRenderSnapshot['viewerStateReadout'] {
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+    spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
     invalidValueWarningEnabled: state.invalidValueWarningEnabled
   });
   return {
@@ -712,6 +741,7 @@ function sameImageStatsRequest(
     a?.sessionId === b?.sessionId &&
     a?.activeLayer === b?.activeLayer &&
     a?.visualizationMode === b?.visualizationMode &&
+    a?.spectralRgbGroupingEnabled === b?.spectralRgbGroupingEnabled &&
     a?.decodedRef === b?.decodedRef &&
     sameDisplaySelection(a?.displaySelection ?? null, b?.displaySelection ?? null)
   );
@@ -726,6 +756,7 @@ function sameAutoExposureRequest(
     a?.sessionId === b?.sessionId &&
     a?.activeLayer === b?.activeLayer &&
     a?.visualizationMode === b?.visualizationMode &&
+    a?.spectralRgbGroupingEnabled === b?.spectralRgbGroupingEnabled &&
     a?.decodedRef === b?.decodedRef &&
     a?.percentile === b?.percentile &&
     a?.source === b?.source &&
@@ -782,6 +813,7 @@ function samePaneResourceInputs(
   return samePaneRenderSourcesBy(a, b, (source, other) => (
     source.renderState.visualizationMode === other.renderState.visualizationMode &&
     source.renderState.maskInvalidStokesVectors === other.renderState.maskInvalidStokesVectors &&
+    source.renderState.spectralRgbGroupingEnabled === other.renderState.spectralRgbGroupingEnabled &&
     sameDisplaySelection(source.renderState.displaySelection, other.renderState.displaySelection)
   ));
 }
@@ -892,6 +924,7 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.stokesDegreeModulation.top === b.stokesDegreeModulation.top &&
     a.stokesAolpDegreeModulationMode === b.stokesAolpDegreeModulationMode &&
     a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
+    a.spectralRgbGroupingEnabled === b.spectralRgbGroupingEnabled &&
     a.invalidValueWarningEnabled === b.invalidValueWarningEnabled &&
     a.activeLayer === b.activeLayer &&
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&

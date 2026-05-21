@@ -132,6 +132,7 @@ interface RenderCacheRenderer {
     selection: ViewerSessionState['displaySelection'],
     visualizationMode: ViewerSessionState['visualizationMode'],
     maskInvalidStokesVectors: boolean | undefined,
+    spectralRgbGroupingEnabled: boolean | undefined,
     textureRevisionKey: string,
     binding: ReturnType<typeof buildDisplaySourceBinding>
   ) => void;
@@ -170,6 +171,7 @@ interface PendingDisplayLuminanceRangeJob {
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: DisplaySelection | null;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   width: number;
   height: number;
   layer: DecodedLayer;
@@ -184,6 +186,7 @@ interface PendingImageStatsJob {
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: DisplaySelection | null;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   width: number;
   height: number;
   layer: DecodedLayer;
@@ -198,6 +201,7 @@ interface PendingAutoExposureJob {
   visualizationMode: ViewerSessionState['visualizationMode'];
   displaySelection: DisplaySelection | null;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   percentile: number;
   width: number;
   height: number;
@@ -212,7 +216,7 @@ type PendingAnalysisJob =
 
 type RenderCacheDisplayState =
   Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'> &
-  Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors'>>;
+  Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>>;
 
 const DISPLAY_LUMINANCE_RANGE_IDLE_TIMEOUT_MS = 250;
 const DISPLAY_LUMINANCE_RANGE_IDLE_FALLBACK_DELAY_MS = 64;
@@ -280,7 +284,7 @@ export class RenderCacheService implements Disposable {
 
   prepareActiveSession(
     session: OpenedImageSession,
-    state: ViewerSessionState & Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors'>>
+    state: ViewerSessionState & Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>>
   ): PrepareActiveSessionResult {
     if (this.disposed) {
       return {
@@ -306,7 +310,9 @@ export class RenderCacheService implements Disposable {
     }
 
     const textureRevisionKey = buildDisplayTextureRevisionKey(state);
-    const binding = buildDisplaySourceBinding(layer, state.displaySelection, state.visualizationMode);
+    const binding = buildDisplaySourceBinding(layer, state.displaySelection, state.visualizationMode, {
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+    });
     const requiredChannelNames = getDisplaySourceBindingChannelNames(binding).filter((channelName) => {
       return isDerivedDisplaySourceName(channelName) ||
         layer.channelStorage.channelIndexByName[channelName] !== undefined;
@@ -316,6 +322,7 @@ export class RenderCacheService implements Disposable {
       state.activeLayer,
       layer,
       state.displaySelection,
+      state.spectralRgbGroupingEnabled !== false,
       requiredChannelNames
     );
     const { missingChannelNames } = this.ensureResidentChannels({
@@ -342,6 +349,7 @@ export class RenderCacheService implements Disposable {
         state.displaySelection,
         state.visualizationMode,
         state.maskInvalidStokesVectors,
+        state.spectralRgbGroupingEnabled,
         textureRevisionKey,
         binding
       );
@@ -416,6 +424,7 @@ export class RenderCacheService implements Disposable {
       visualizationMode: state.visualizationMode,
       displaySelection: cloneDisplaySelection(state.displaySelection),
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       width: session.decoded.width,
       height: session.decoded.height,
       layer,
@@ -491,6 +500,7 @@ export class RenderCacheService implements Disposable {
       visualizationMode: state.visualizationMode,
       displaySelection: cloneDisplaySelection(state.displaySelection),
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       width: session.decoded.width,
       height: session.decoded.height,
       layer,
@@ -549,7 +559,10 @@ export class RenderCacheService implements Disposable {
       state.displaySelection,
       state.visualizationMode,
       percentile,
-      { maskInvalidStokesVectors: state.maskInvalidStokesVectors }
+      {
+        maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+      }
     );
 
     this.cancelSupersededAutoExposureJobs(session.id, revisionKey);
@@ -578,6 +591,7 @@ export class RenderCacheService implements Disposable {
       visualizationMode: state.visualizationMode,
       displaySelection: cloneDisplaySelection(state.displaySelection),
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       percentile,
       width: session.decoded.width,
       height: session.decoded.height,
@@ -659,7 +673,8 @@ export class RenderCacheService implements Disposable {
       session.decoded.height,
       state.displaySelection,
       state.visualizationMode,
-      state.maskInvalidStokesVectors
+      state.maskInvalidStokesVectors,
+      state.spectralRgbGroupingEnabled
     );
     entry.luminanceRangeByRevision.set(
       revisionKey,
@@ -805,6 +820,7 @@ export class RenderCacheService implements Disposable {
             job.displaySelection,
             job.visualizationMode,
             job.maskInvalidStokesVectors,
+            job.spectralRgbGroupingEnabled,
             job.controller.signal
           );
 
@@ -884,7 +900,8 @@ export class RenderCacheService implements Disposable {
             job.visualizationMode,
             {
               ...this.createAnalysisComputeOptions(job.controller.signal),
-              maskInvalidStokesVectors: job.maskInvalidStokesVectors
+              maskInvalidStokesVectors: job.maskInvalidStokesVectors,
+              spectralRgbGroupingEnabled: job.spectralRgbGroupingEnabled
             }
           );
 
@@ -965,7 +982,8 @@ export class RenderCacheService implements Disposable {
             job.percentile,
             {
               ...this.createAnalysisComputeOptions(job.controller.signal),
-              maskInvalidStokesVectors: job.maskInvalidStokesVectors
+              maskInvalidStokesVectors: job.maskInvalidStokesVectors,
+              spectralRgbGroupingEnabled: job.spectralRgbGroupingEnabled
             }
           );
 
@@ -1386,6 +1404,7 @@ export class RenderCacheService implements Disposable {
     layerIndex: number,
     layer: DecodedLayer,
     selection: DisplaySelection | null,
+    spectralRgbGroupingEnabled: boolean,
     requiredChannelNames: readonly string[]
   ): ProtectedBinding {
     if (this.getActiveSessionId() !== sessionId) {
@@ -1393,7 +1412,19 @@ export class RenderCacheService implements Disposable {
     }
 
     this.setActiveHotSourceContext(sessionId, layerIndex);
-    this.addActiveHotSourceNames(resolveSpectralRgbHotSourceNames(layer, selection));
+    if (!spectralRgbGroupingEnabled) {
+      if (this.activeHotChannelNames.size > 0) {
+        this.activeHotChannelNames.clear();
+        this.invalidateSpectralRgbPrewarm();
+      }
+      return this.createProtectedBinding(sessionId, layerIndex, requiredChannelNames);
+    }
+
+    this.addActiveHotSourceNames(resolveSpectralRgbHotSourceNames(
+      layer,
+      selection,
+      spectralRgbGroupingEnabled
+    ));
     return this.createProtectedBinding(
       sessionId,
       layerIndex,
@@ -1436,14 +1467,22 @@ export class RenderCacheService implements Disposable {
 
   private scheduleSpectralRgbPrewarm(
     session: OpenedImageSession,
-    state: ViewerSessionState,
+    state: RenderCacheDisplayState,
     layer: DecodedLayer
   ): void {
     if (this.disposed || this.getActiveSessionId() !== session.id) {
       return;
     }
 
-    const sourceName = resolvePrewarmSpectralRgbSourceName(layer, state.displaySelection);
+    if (state.spectralRgbGroupingEnabled === false) {
+      return;
+    }
+
+    const sourceName = resolvePrewarmSpectralRgbSourceName(
+      layer,
+      state.displaySelection,
+      true
+    );
     if (!sourceName) {
       return;
     }
@@ -1726,12 +1765,13 @@ export class RenderCacheService implements Disposable {
     height: number,
     selection: DisplaySelection | null,
     visualizationMode: ViewerSessionState['visualizationMode'],
-    maskInvalidStokesVectors?: boolean
+    maskInvalidStokesVectors?: boolean,
+    spectralRgbGroupingEnabled?: boolean
   ): DisplayLuminanceRange | null {
     const selectionKey = serializeDisplaySelectionLuminanceKey(
       selection,
       visualizationMode,
-      { maskInvalidStokesVectors }
+      { maskInvalidStokesVectors, spectralRgbGroupingEnabled }
     );
     if (Object.prototype.hasOwnProperty.call(layer.analysis.displayLuminanceRangeBySelectionKey, selectionKey)) {
       return layer.analysis.displayLuminanceRangeBySelectionKey[selectionKey] ?? null;
@@ -1752,7 +1792,7 @@ export class RenderCacheService implements Disposable {
         height,
         selection,
         visualizationMode,
-        { maskInvalidStokesVectors }
+        { maskInvalidStokesVectors, spectralRgbGroupingEnabled }
       );
     }
 
@@ -1767,13 +1807,14 @@ export class RenderCacheService implements Disposable {
     selection: DisplaySelection | null,
     visualizationMode: ViewerSessionState['visualizationMode'],
     maskInvalidStokesVectors: boolean | undefined,
+    spectralRgbGroupingEnabled: boolean | undefined,
     signal: AbortSignal
   ): Promise<DisplayLuminanceRange | null> {
     throwIfAborted(signal, 'Render cache job was cancelled.');
     const selectionKey = serializeDisplaySelectionLuminanceKey(
       selection,
       visualizationMode,
-      { maskInvalidStokesVectors }
+      { maskInvalidStokesVectors, spectralRgbGroupingEnabled }
     );
     if (Object.prototype.hasOwnProperty.call(layer.analysis.displayLuminanceRangeBySelectionKey, selectionKey)) {
       return layer.analysis.displayLuminanceRangeBySelectionKey[selectionKey] ?? null;
@@ -1797,7 +1838,8 @@ export class RenderCacheService implements Disposable {
       visualizationMode,
       {
         ...this.createAnalysisComputeOptions(signal),
-        maskInvalidStokesVectors
+        maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled
       }
     );
 
@@ -1811,7 +1853,10 @@ export class RenderCacheService implements Disposable {
     const selectionKey = serializeDisplaySelectionLuminanceKey(
       job.displaySelection,
       job.visualizationMode,
-      { maskInvalidStokesVectors: job.maskInvalidStokesVectors }
+      {
+        maskInvalidStokesVectors: job.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: job.spectralRgbGroupingEnabled
+      }
     );
     if (job.displaySelection?.kind === 'channelMono') {
       job.layer.analysis.finiteRangeByChannel[job.displaySelection.channel] = range;
@@ -1954,8 +1999,13 @@ function isDerivedDisplaySourceName(channelName: string): boolean {
 
 function resolveSpectralRgbHotSourceNames(
   layer: DecodedLayer,
-  selection: DisplaySelection | null
+  selection: DisplaySelection | null,
+  spectralRgbGroupingEnabled = true
 ): string[] {
+  if (!spectralRgbGroupingEnabled) {
+    return [];
+  }
+
   if (selection?.kind === 'spectralRgb') {
     return [buildSpectralRgbSourceName(selection.seriesKey)];
   }
@@ -1970,9 +2020,14 @@ function resolveSpectralRgbHotSourceNames(
 
 function resolvePrewarmSpectralRgbSourceName(
   layer: DecodedLayer,
-  selection: DisplaySelection | null
+  selection: DisplaySelection | null,
+  spectralRgbGroupingEnabled = true
 ): string | null {
-  const hotSourceNames = resolveSpectralRgbHotSourceNames(layer, selection);
+  if (!spectralRgbGroupingEnabled) {
+    return null;
+  }
+
+  const hotSourceNames = resolveSpectralRgbHotSourceNames(layer, selection, spectralRgbGroupingEnabled);
   const pairedSourceName = hotSourceNames.find(isSpectralRgbSourceName) ?? null;
   if (pairedSourceName) {
     return pairedSourceName;

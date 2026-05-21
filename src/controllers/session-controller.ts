@@ -734,7 +734,8 @@ export class SessionController implements Disposable {
       hasActiveSession: Boolean(activeSession),
       previousImage: activeSession?.decoded ?? null,
       autoFitImageOnSelect: currentState.autoFitImageOnSelect,
-      stokesParameterVisibility: currentState.stokesParameterVisibility
+      stokesParameterVisibility: currentState.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: currentState.spectralRgbGroupingEnabled
     });
 
     this.core.dispatch({
@@ -762,7 +763,8 @@ export class SessionController implements Disposable {
         session,
         decoded,
         baseState,
-        this.core.getState().stokesParameterVisibility
+        this.core.getState().stokesParameterVisibility,
+        this.core.getState().spectralRgbGroupingEnabled
       );
       this.core.dispatch({
         type: 'sessionReloaded',

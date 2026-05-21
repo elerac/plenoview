@@ -40,6 +40,10 @@ export interface DisplaySourceBinding {
   stokesParameter: StokesParameter | null;
 }
 
+export interface DisplaySourceBindingConfig {
+  spectralRgbGroupingEnabled?: boolean;
+}
+
 const EMPTY_DISPLAY_SLOTS = Object.freeze(
   Array.from({ length: DISPLAY_SOURCE_SLOT_COUNT }, () => null as string | null)
 );
@@ -56,7 +60,8 @@ export function createEmptyDisplaySourceBinding(): DisplaySourceBinding {
 export function buildDisplaySourceBinding(
   layer: DecodedLayer,
   selection: DisplaySelection | null,
-  visualizationMode: VisualizationMode = 'rgb'
+  visualizationMode: VisualizationMode = 'rgb',
+  config: DisplaySourceBindingConfig = {}
 ): DisplaySourceBinding {
   if (!selection) {
     return createEmptyDisplaySourceBinding();
@@ -78,7 +83,7 @@ export function buildDisplaySourceBinding(
         null
       );
     case 'spectralRgb':
-      return isSpectralRgbDisplayAvailable(layer.channelNames, selection)
+      return config.spectralRgbGroupingEnabled !== false && isSpectralRgbDisplayAvailable(layer.channelNames, selection)
         ? createDisplaySourceBinding(
             'spectralRgb',
             [buildSpectralRgbSourceName(selection.seriesKey)],
@@ -88,7 +93,7 @@ export function buildDisplaySourceBinding(
         : createEmptyDisplaySourceBinding();
     case 'stokesScalar':
     case 'stokesAngle':
-      return buildStokesDisplaySourceBinding(layer, selection, visualizationMode);
+      return buildStokesDisplaySourceBinding(layer, selection, visualizationMode, config);
   }
 }
 
@@ -128,9 +133,10 @@ export function createDisplaySourceBinding(
 function buildStokesDisplaySourceBinding(
   layer: DecodedLayer,
   selection: Extract<DisplaySelection, { kind: 'stokesScalar' | 'stokesAngle' }>,
-  visualizationMode: VisualizationMode
+  visualizationMode: VisualizationMode,
+  config: DisplaySourceBindingConfig
 ): DisplaySourceBinding {
-  if (!isStokesDisplayAvailable(layer.channelNames, selection)) {
+  if (!isStokesDisplayAvailable(layer.channelNames, selection, undefined, config.spectralRgbGroupingEnabled !== false)) {
     return createEmptyDisplaySourceBinding();
   }
 

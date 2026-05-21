@@ -177,6 +177,7 @@ export interface ViewerInteractionState {
 
 export interface ViewerRenderState extends ViewerSessionState {
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
   invalidValueWarningEnabled?: boolean;
   invalidValueWarningPhase?: number;
   hoveredPixel: ImagePixel | null;

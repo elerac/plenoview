@@ -7,6 +7,7 @@ import {
   createDefaultStokesColormapDefaultSettings,
   createDefaultStokesParameterVisibilitySettings
 } from '../stokes';
+import { DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED } from '../spectral-default-settings';
 import { createInteractionState } from '../view-state';
 import { createSinglePaneLayout } from '../viewer-pane-layout';
 import { createInitialState } from '../viewer-store';
@@ -59,6 +60,7 @@ export function createInitialViewerAppState(): ViewerAppState {
     stokesColormapDefaults: createDefaultStokesColormapDefaultSettings(),
     stokesParameterVisibility: createDefaultStokesParameterVisibilitySettings(),
     maskInvalidStokesVectors: DEFAULT_MASK_INVALID_STOKES_VECTORS,
+    spectralRgbGroupingEnabled: DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED,
     invalidValueWarningEnabled: DEFAULT_INVALID_VALUE_WARNING_ENABLED,
     autoFitImageOnSelect: false,
     autoExposureEnabled: false,

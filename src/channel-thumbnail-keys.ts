@@ -1,4 +1,5 @@
 import {
+  isSpectralRgbSelection,
   isStokesSelection,
   serializeDisplaySelectionKey,
   type DisplaySelection,
@@ -25,11 +26,15 @@ export function serializeChannelThumbnailRequestKey(args: {
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode: StokesAolpDegreeModulationMode;
   maskInvalidStokesVectors?: boolean;
+  spectralRgbGroupingEnabled?: boolean;
 }): string {
   const maskKey = isStokesThumbnailSelection(args.selection)
     ? `|maskInvalidStokesVectors:${args.maskInvalidStokesVectors !== false ? '1' : '0'}`
     : '';
-  return `${serializeChannelThumbnailContextKey(args.sessionId, args.activeLayer, args.selection)}|exposure:${serializeFiniteNumber(args.exposureEv, 0)}|gamma:${serializeFiniteNumber(args.displayGamma, DEFAULT_DISPLAY_GAMMA)}|modulation:${serializeStokesDegreeModulationKey(args.stokesDegreeModulation)}|aolpModulation:${args.stokesAolpDegreeModulationMode}${maskKey}`;
+  const spectralKey = isSpectralThumbnailSelection(args.selection)
+    ? `|spectralRgbGrouping:${args.spectralRgbGroupingEnabled !== false ? '1' : '0'}`
+    : '';
+  return `${serializeChannelThumbnailContextKey(args.sessionId, args.activeLayer, args.selection)}|exposure:${serializeFiniteNumber(args.exposureEv, 0)}|gamma:${serializeFiniteNumber(args.displayGamma, DEFAULT_DISPLAY_GAMMA)}|modulation:${serializeStokesDegreeModulationKey(args.stokesDegreeModulation)}|aolpModulation:${args.stokesAolpDegreeModulationMode}${maskKey}${spectralKey}`;
 }
 
 export function buildChannelThumbnailSessionPrefix(sessionId: string): string {
@@ -54,4 +59,14 @@ function isStokesThumbnailSelection(selection: DisplaySelection | string): boole
   }
 
   return selection.startsWith('stokesScalar:') || selection.startsWith('stokesAngle:');
+}
+
+function isSpectralThumbnailSelection(selection: DisplaySelection | string): boolean {
+  if (typeof selection !== 'string') {
+    return isSpectralRgbSelection(selection) || (
+      isStokesSelection(selection) && selection.source.kind === 'spectralRgb'
+    );
+  }
+
+  return selection.startsWith('spectralRgb:') || selection.includes(':spectralRgb');
 }

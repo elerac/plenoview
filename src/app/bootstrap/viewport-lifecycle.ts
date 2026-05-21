@@ -38,6 +38,7 @@ export function createViewerInteraction({
       const state = core.getState();
       return mergeRenderState(state.sessionState, state.interactionState, {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
     },
@@ -124,6 +125,7 @@ export function initializeViewportLifecycle({
       const state = core.getState();
       renderer.render(mergeRenderState(state.sessionState, interactionCoordinator.getState(), {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       }));
     } else {

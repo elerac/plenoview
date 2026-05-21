@@ -249,6 +249,22 @@ describe('display selection', () => {
     );
   });
 
+  it('falls back to wavelength channels when spectral RGB grouping is disabled', () => {
+    expect(pickDefaultDisplaySelection(['400nm', '500nm', '600nm', '700nm'], {
+      spectralRgbGroupingEnabled: false
+    })).toEqual(createChannelMonoSelection('400nm'));
+    expect(resolveDisplaySelectionForLayer(
+      ['hoge.450nm', 'hoge.550nm'],
+      createSpectralRgbSelection('hoge'),
+      { spectralRgbGroupingEnabled: false }
+    )).toEqual(createChannelMonoSelection('hoge.450nm'));
+    expect(resolveDisplaySelectionForLayer(
+      ['S0.400nm', 'S1.400nm', 'S2.400nm', 'S3.400nm', 'S0.500nm', 'S1.500nm', 'S2.500nm', 'S3.500nm'],
+      createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
+      { spectralRgbGroupingEnabled: false }
+    )).toEqual(createChannelMonoSelection('S0.400nm'));
+  });
+
   it('preserves valid channel and stokes selections per layer and falls back otherwise', () => {
     expect(resolveDisplaySelectionForLayer(['R', 'G', 'B', 'A'], createChannelRgbSelection('R', 'G', 'B'))).toEqual(
       createChannelRgbSelection('R', 'G', 'B', 'A')

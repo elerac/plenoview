@@ -45,12 +45,12 @@ describe('display revision keys', () => {
       activeLayer: 3,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       visualizationMode: 'colormap'
-    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:colormap:maskInvalidStokesVectors:true');
+    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:colormap:maskInvalidStokesVectors:true:spectralRgbGrouping:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 4,
       displaySelection: createSpectralRgbSelection('hoge')
-    })).toBe('4:spectralRgb:hoge');
+    })).toBe('4:spectralRgb:hoge:spectralRgbGrouping:true');
   });
 
   it('builds luminance revision keys that ignore alpha-only channel changes', () => {
@@ -80,12 +80,12 @@ describe('display revision keys', () => {
       activeLayer: 3,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       visualizationMode: 'rgb'
-    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:true');
+    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:true:spectralRgbGrouping:true');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 4,
       displaySelection: createSpectralRgbSelection('hoge')
-    })).toBe('4:spectralRgb:hoge');
+    })).toBe('4:spectralRgb:hoge:spectralRgbGrouping:true');
   });
 
   it('builds auto-exposure revision keys with rgb max percentile context', () => {
@@ -106,6 +106,26 @@ describe('display revision keys', () => {
       activeLayer: 1,
       displaySelection: createChannelMonoSelection('Y'),
       maskInvalidStokesVectors: false
+    })).toBe('1:channelMono:Y:');
+  });
+
+  it('includes spectral RGB grouping in spectral-derived revision keys only', () => {
+    expect(buildDisplayTextureRevisionKey({
+      activeLayer: 1,
+      displaySelection: createSpectralRgbSelection(),
+      spectralRgbGroupingEnabled: false
+    })).toBe('1:spectralRgb::spectralRgbGrouping:false');
+
+    expect(buildDisplayTextureRevisionKey({
+      activeLayer: 1,
+      displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
+      spectralRgbGroupingEnabled: false
+    })).toBe('1:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:true:spectralRgbGrouping:false');
+
+    expect(buildDisplayTextureRevisionKey({
+      activeLayer: 1,
+      displaySelection: createChannelMonoSelection('Y'),
+      spectralRgbGroupingEnabled: false
     })).toBe('1:channelMono:Y:');
   });
 

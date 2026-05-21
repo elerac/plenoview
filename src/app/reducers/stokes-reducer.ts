@@ -234,7 +234,11 @@ function buildDisabledActiveStokesFallbackPatch(
 
   const activeSession = selectActiveSession(state);
   const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
-  const fallbackSelection = layer ? pickDefaultDisplaySelection(layer.channelNames) : null;
+  const fallbackSelection = layer
+    ? pickDefaultDisplaySelection(layer.channelNames, {
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+      })
+    : null;
   return {
     displaySelection: fallbackSelection,
     ...resolveStokesDisplayRestoreState(state, activeSession?.id ?? null)
@@ -252,7 +256,11 @@ function resolveSelectionForStokesVisibility(
 
   const activeSession = selectActiveSession(state);
   const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
-  return layer ? pickDefaultDisplaySelection(layer.channelNames) : null;
+  return layer
+    ? pickDefaultDisplaySelection(layer.channelNames, {
+        spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
+      })
+    : null;
 }
 
 function buildStokesDefaultModulationPatch(
