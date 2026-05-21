@@ -71,6 +71,11 @@ struct DisplaySample {
   bool invalidValue;
 };
 
+struct StokesRgbDisplaySample {
+  vec3 value;
+  bool invalidValue;
+};
+
 bool isFiniteValue(float value) {
   return !(isnan(value) || isinf(value));
 }
@@ -384,6 +389,16 @@ vec4 applyInvalidValueWarning(vec4 color, bool invalidValue) {
   return color;
 }
 
+bool isInvalidStokesDisplayValue(vec4 stokes, float value) {
+  return shouldRejectStokesVector(stokes.x, stokes.y, stokes.z, stokes.w) || !isFiniteValue(value);
+}
+
+bool hasInvalidStokesDisplayValues(vec4 stokesR, vec4 stokesG, vec4 stokesB, vec3 value) {
+  return isInvalidStokesDisplayValue(stokesR, value.r) ||
+    isInvalidStokesDisplayValue(stokesG, value.g) ||
+    isInvalidStokesDisplayValue(stokesB, value.b);
+}
+
 float readSource0(ivec2 pixel) {
   return texelFetch(uSourceTextures[0], pixel, 0).r;
 }
@@ -482,15 +497,16 @@ vec4 readRgbLuminanceStokesSample(ivec2 pixel) {
   );
 }
 
-vec3 readRgbStokesDisplaySample(ivec2 pixel) {
+StokesRgbDisplaySample readRgbStokesDisplaySample(ivec2 pixel) {
   vec4 stokesR = vec4(readSource0(pixel), readSource1(pixel), readSource2(pixel), readSource3(pixel));
   vec4 stokesG = vec4(readSource4(pixel), readSource5(pixel), readSource6(pixel), readSource7(pixel));
   vec4 stokesB = vec4(readSource8(pixel), readSource9(pixel), readSource10(pixel), readSource11(pixel));
-  return vec3(
+  vec3 value = vec3(
     computeStokesDisplayValue(uStokesParameter, stokesR.x, stokesR.y, stokesR.z, stokesR.w),
     computeStokesDisplayValue(uStokesParameter, stokesG.x, stokesG.y, stokesG.z, stokesG.w),
     computeStokesDisplayValue(uStokesParameter, stokesB.x, stokesB.y, stokesB.z, stokesB.w)
   );
+  return StokesRgbDisplaySample(value, hasInvalidStokesDisplayValues(stokesR, stokesG, stokesB, value));
 }
 
 vec4 readSpectralStokesRgbComponentSample(ivec2 pixel, int componentIndex) {
@@ -520,15 +536,16 @@ vec4 readSpectralStokesRgbLuminanceSample(ivec2 pixel) {
   );
 }
 
-vec3 readSpectralStokesRgbDisplaySample(ivec2 pixel) {
+StokesRgbDisplaySample readSpectralStokesRgbDisplaySample(ivec2 pixel) {
   vec4 stokesR = readSpectralStokesRgbComponentSample(pixel, 0);
   vec4 stokesG = readSpectralStokesRgbComponentSample(pixel, 1);
   vec4 stokesB = readSpectralStokesRgbComponentSample(pixel, 2);
-  return vec3(
+  vec3 value = vec3(
     computeStokesDisplayValue(uStokesParameter, stokesR.x, stokesR.y, stokesR.z, stokesR.w),
     computeStokesDisplayValue(uStokesParameter, stokesG.x, stokesG.y, stokesG.z, stokesG.w),
     computeStokesDisplayValue(uStokesParameter, stokesB.x, stokesB.y, stokesB.z, stokesB.w)
   );
+  return StokesRgbDisplaySample(value, hasInvalidStokesDisplayValues(stokesR, stokesG, stokesB, value));
 }
 
 DisplaySample createEmptySample() {
@@ -571,29 +588,29 @@ DisplaySample readDisplaySample(ivec2 pixel) {
   if (uDisplayMode == DISPLAY_MODE_STOKES_DIRECT) {
     vec4 stokes = readDirectStokesSample(pixel);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
-    return DisplaySample(vec3(value), 1.0, stokes, hasInvalidValue(stokes) || !isFiniteValue(value));
+    return DisplaySample(vec3(value), 1.0, stokes, isInvalidStokesDisplayValue(stokes, value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_RGB) {
-    vec3 value = readRgbStokesDisplaySample(pixel);
-    return DisplaySample(value, 1.0, vec4(0.0), hasInvalidValue(value));
+    StokesRgbDisplaySample stokesRgb = readRgbStokesDisplaySample(pixel);
+    return DisplaySample(stokesRgb.value, 1.0, vec4(0.0), stokesRgb.invalidValue);
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_RGB_LUMINANCE) {
     vec4 stokes = readRgbLuminanceStokesSample(pixel);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
-    return DisplaySample(vec3(value), 1.0, stokes, hasInvalidValue(stokes) || !isFiniteValue(value));
+    return DisplaySample(vec3(value), 1.0, stokes, isInvalidStokesDisplayValue(stokes, value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_SPECTRAL_RGB) {
-    vec3 value = readSpectralStokesRgbDisplaySample(pixel);
-    return DisplaySample(value, 1.0, vec4(0.0), hasInvalidValue(value));
+    StokesRgbDisplaySample stokesRgb = readSpectralStokesRgbDisplaySample(pixel);
+    return DisplaySample(stokesRgb.value, 1.0, vec4(0.0), stokesRgb.invalidValue);
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_SPECTRAL_RGB_LUMINANCE) {
     vec4 stokes = readSpectralStokesRgbLuminanceSample(pixel);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
-    return DisplaySample(vec3(value), 1.0, stokes, hasInvalidValue(stokes) || !isFiniteValue(value));
+    return DisplaySample(vec3(value), 1.0, stokes, isInvalidStokesDisplayValue(stokes, value));
   }
 
   return createEmptySample();

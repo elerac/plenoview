@@ -344,6 +344,29 @@ describe('display CPU materialization', () => {
     expect(sample?.values['AoLP Spectral RGB.R']).toBeNaN();
   });
 
+  it('preserves non-finite spectral Stokes source values for derived Stokes RGB displays', () => {
+    const channelValues: Record<string, number[]> = {};
+    for (let wavelength = 380; wavelength <= 780; wavelength += 20) {
+      channelValues[`S0.${wavelength}nm`] = [1];
+      channelValues[`S1.${wavelength}nm`] = [Number.NaN];
+      channelValues[`S2.${wavelength}nm`] = [0];
+      channelValues[`S3.${wavelength}nm`] = [0];
+    }
+    const layer = createLayerFromChannels(channelValues, 'invalid-spectral-stokes-source');
+
+    const texture = buildSelectedDisplayTexture(
+      layer,
+      1,
+      1,
+      createStokesSelection('s1_over_s0', 'stokesSpectralRgb')
+    );
+
+    expect(texture[0]).toBeNaN();
+    expect(texture[1]).toBeNaN();
+    expect(texture[2]).toBeNaN();
+    expect(texture[3]).toBe(1);
+  });
+
   it('preserves signed S1/S2/S3 spectral RGB samples for spectral Stokes layers', () => {
     const channelValues: Record<string, number[]> = {};
     for (let wavelength = 380; wavelength <= 780; wavelength += 20) {

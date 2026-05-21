@@ -334,6 +334,18 @@ describe('spectral channel helpers', () => {
     expect(texture[3]).toBe(1);
   });
 
+  it('sanitizes non-finite spectral RGB channel values for normal spectral display', () => {
+    const channelValues: Record<string, number[]> = {};
+    for (let wavelength = 380; wavelength <= 780; wavelength += 20) {
+      channelValues[`${wavelength}nm`] = [Number.NaN];
+    }
+
+    const layer = createLayerFromChannels(channelValues, 'spectral-invalid');
+    const texture = buildSelectedDisplayTexture(layer, 1, 1, createSpectralRgbSelection());
+
+    expect(Array.from(texture.slice(0, 4))).toEqual([0, 0, 0, 1]);
+  });
+
   it('produces expected dominant RGB channels for peaked spectra', () => {
     const wavelengths = [410, 430, 450, 480, 510, 540, 570, 600, 630, 660, 690];
     const valuesForPeak = (peak: number): number[] => wavelengths.map((wavelength) => (

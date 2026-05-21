@@ -26,7 +26,16 @@ describe('shader source regressions', () => {
     );
     expect(source).toContain('uMaskInvalidStokesVectors && !isPhysicallyValidStokesVector');
     expect(source).toContain('bool invalidValue;');
+    expect(source).toContain('struct StokesRgbDisplaySample');
     expect(source).toContain('applyInvalidValueWarning');
+    expect(source).toContain('isInvalidStokesDisplayValue');
+    expect(source).toContain(
+      'shouldRejectStokesVector(stokes.x, stokes.y, stokes.z, stokes.w) || !isFiniteValue(value)'
+    );
+    expect(source.match(/isInvalidStokesDisplayValue\(stokes, value\)/g) ?? []).toHaveLength(3);
+    expect(source.match(/hasInvalidStokesDisplayValues\(stokesR, stokesG, stokesB, value\)/g) ?? [])
+      .toHaveLength(2);
+    expect(source).toContain('return DisplaySample(stokesRgb.value, 1.0, vec4(0.0), stokesRgb.invalidValue);');
     expect(source).toContain('DISPLAY_MODE_STOKES_SPECTRAL_RGB');
     expect(source).toContain('readSpectralStokesRgbDisplaySample');
   });

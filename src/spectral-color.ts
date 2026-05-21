@@ -23,6 +23,7 @@ export interface SpectralRgbSample {
 
 export interface ReadSpectralRgbSampleOptions {
   clamp?: boolean;
+  sanitize?: boolean;
 }
 
 const XYZ_TO_LINEAR_SRGB = [
@@ -99,17 +100,20 @@ export function readSpectralRgbSampleAtIndex(
   let g = 0;
   let b = 0;
 
+  const shouldSanitize = options.sanitize ?? true;
+
   for (const channel of channels) {
-    const value = sanitizeSpectralValue(readChannelValue(channel.view, pixelIndex));
+    const rawValue = readChannelValue(channel.view, pixelIndex);
+    const value = shouldSanitize ? sanitizeSpectralValue(rawValue) : rawValue;
     r += value * channel.r;
     g += value * channel.g;
     b += value * channel.b;
   }
 
   const shouldClamp = options.clamp ?? true;
-  out.r = shouldClamp ? clamp01(r) : sanitizeSpectralValue(r);
-  out.g = shouldClamp ? clamp01(g) : sanitizeSpectralValue(g);
-  out.b = shouldClamp ? clamp01(b) : sanitizeSpectralValue(b);
+  out.r = shouldClamp ? clamp01(r) : finalizeSpectralValue(r, shouldSanitize);
+  out.g = shouldClamp ? clamp01(g) : finalizeSpectralValue(g, shouldSanitize);
+  out.b = shouldClamp ? clamp01(b) : finalizeSpectralValue(b, shouldSanitize);
   return out;
 }
 
@@ -118,7 +122,7 @@ export function readSignedSpectralRgbSampleAtIndex(
   pixelIndex: number,
   output?: SpectralRgbSample
 ): SpectralRgbSample {
-  return readSpectralRgbSampleAtIndex(channels, pixelIndex, output, { clamp: false });
+  return readSpectralRgbSampleAtIndex(channels, pixelIndex, output, { clamp: false, sanitize: false });
 }
 
 export function trapezoidWeights(sortedWavelengthsNm: readonly number[]): number[] {
@@ -211,6 +215,10 @@ function interpolateTable<T extends readonly number[]>(
 
 function sanitizeSpectralValue(value: number): number {
   return Number.isFinite(value) ? value : 0;
+}
+
+function finalizeSpectralValue(value: number, sanitize: boolean): number {
+  return sanitize ? sanitizeSpectralValue(value) : value;
 }
 
 function clamp01(value: number): number {
