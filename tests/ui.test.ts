@@ -2546,8 +2546,13 @@ describe('view menu', () => {
 
     const onMaskInvalidStokesVectorsChange = vi.fn();
     const ui = new ViewerUi(createUiCallbacks({ onMaskInvalidStokesVectorsChange }));
+    const control = document.getElementById('stokes-invalid-vector-mask-control') as HTMLElement;
     const checkbox = document.getElementById('stokes-invalid-vector-mask-checkbox') as HTMLInputElement;
 
+    expect(control).not.toBeNull();
+    expect(control.closest('#stokes-default-settings-control')).toBe(
+      document.getElementById('stokes-default-settings-control')
+    );
     expect(checkbox).not.toBeNull();
     expect(checkbox.checked).toBe(true);
     expect(checkbox.closest('#settings-dialog')).toBe(document.getElementById('settings-dialog'));
