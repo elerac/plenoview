@@ -6,6 +6,7 @@ import {
 } from './display-selection';
 import { getStokesDisplayOptions, type StokesParameterVisibilitySettings } from './stokes';
 import { getSpectralRgbDisplayOptions, getSpectralRgbSplitChannelNames } from './spectral';
+import { getMuellerMatrixDisplayOptions } from './mueller';
 import type { DisplayChannelMapping } from './types';
 
 export interface ChannelViewItem {
@@ -258,17 +259,24 @@ function buildDisplayItems(
     parameterVisibility: config.stokesParameterVisibility,
     spectralRgbGroupingEnabled
   });
+  const muellerOptions = getMuellerMatrixDisplayOptions(channelNames, {
+    includeRgbGroups: !includeSplitRgbChannels,
+    includeSplitChannels: includeSplitRgbChannels
+  });
   const spectralOptions = includeSplitRgbChannels || !spectralRgbGroupingEnabled
     ? []
     : getSpectralRgbDisplayOptions(channelNames);
-  return [...channelOptions, ...spectralOptions, ...stokesOptions].map((option) => ({
-    value: option.key,
-    label: formatChannelViewLabel(option.label),
-    meta: formatChannelViewMeta(option.mapping),
-    swatches: getChannelViewSwatches(option.mapping),
-    selection: cloneDisplaySelection(option.selection) ?? option.selection,
-    selectionKey: serializeDisplaySelectionKey(option.selection)
-  }));
+  return [...channelOptions, ...spectralOptions, ...stokesOptions, ...muellerOptions].map((option) => {
+    const channelCount = 'channelCount' in option ? option.channelCount : undefined;
+    return {
+      value: option.key,
+      label: formatChannelViewLabel(option.label),
+      meta: formatChannelViewMeta(option.mapping, channelCount),
+      swatches: getChannelViewSwatches(option.mapping),
+      selection: cloneDisplaySelection(option.selection) ?? option.selection,
+      selectionKey: serializeDisplaySelectionKey(option.selection)
+    };
+  });
 }
 
 function compareNullableOrder(a: number | null, b: number | null): number {
@@ -316,8 +324,8 @@ function formatChannelViewLabel(label: string): string {
     .replace(/\.\(R,G,B\)/g, '.RGB');
 }
 
-function formatChannelViewMeta(mapping: DisplayChannelMapping): string {
-  const precisionCount = getDisplayMappingChannelCount(mapping);
+function formatChannelViewMeta(mapping: DisplayChannelMapping, channelCount?: number): string {
+  const precisionCount = channelCount ?? getDisplayMappingChannelCount(mapping);
   return precisionCount > 1 ? `32f x ${precisionCount}` : '32f';
 }
 

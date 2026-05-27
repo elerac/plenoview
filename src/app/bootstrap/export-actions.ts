@@ -3,6 +3,7 @@ import { findColormapIdByLabel, getColormapAsset, loadColormapLut, type Colormap
 import { cloneDisplayLuminanceRange, resolveColormapAutoRange } from '../../colormap-range';
 import { computeRec709Luminance } from '../../color';
 import { cloneDisplaySelection, isStokesSelection } from '../../display-model';
+import { resolveDisplayImageSize } from '../../display-size';
 import {
   createDisplayPixelValues,
   readDisplaySelectionPixelValuesAtIndex,
@@ -267,8 +268,13 @@ export function createImageExportPixelsResolver({
       throw createAbortError('Viewer application has been disposed.');
     }
 
-    const requestedWidth = screenshotRegion?.outputWidth ?? activeSession.decoded.width;
-    const requestedHeight = screenshotRegion?.outputHeight ?? activeSession.decoded.height;
+    const displaySize = resolveDisplayImageSize(
+      activeSession.decoded.width,
+      activeSession.decoded.height,
+      renderState.displaySelection
+    );
+    const requestedWidth = screenshotRegion?.outputWidth ?? displaySize.width;
+    const requestedHeight = screenshotRegion?.outputHeight ?? displaySize.height;
     const outputSize = options.previewMaxLongestEdge
       ? resolveBoundedImageExportSize(requestedWidth, requestedHeight, options.previewMaxLongestEdge)
       : screenshotRegion
@@ -277,8 +283,8 @@ export function createImageExportPixelsResolver({
 
     return getRenderer().readExportPixels({
       state: renderState,
-      sourceWidth: activeSession.decoded.width,
-      sourceHeight: activeSession.decoded.height,
+      sourceWidth: displaySize.width,
+      sourceHeight: displaySize.height,
       ...(screenshotRegion ? {
         screenshot: cloneScreenshotRegionCrop(screenshotRegion)
       } : {}),
@@ -900,8 +906,9 @@ async function resolveBatchEntryExportResult({
 
   assertSessionCurrent(getCurrentState(), session, signal);
   const screenshotRegion = entry.mode === 'screenshot' ? entry : null;
-  const requestedWidth = screenshotRegion?.outputWidth ?? session.decoded.width;
-  const requestedHeight = screenshotRegion?.outputHeight ?? session.decoded.height;
+  const displaySize = resolveDisplayImageSize(session.decoded.width, session.decoded.height, exportState.state.displaySelection);
+  const requestedWidth = screenshotRegion?.outputWidth ?? displaySize.width;
+  const requestedHeight = screenshotRegion?.outputHeight ?? displaySize.height;
   const outputSize = previewMaxLongestEdge
     ? resolveBoundedImageExportSize(requestedWidth, requestedHeight, previewMaxLongestEdge)
     : screenshotRegion
@@ -929,8 +936,8 @@ async function resolveBatchEntryExportResult({
 
   const pixels = renderer.readExportPixels({
     state: renderState,
-    sourceWidth: session.decoded.width,
-    sourceHeight: session.decoded.height,
+    sourceWidth: displaySize.width,
+    sourceHeight: displaySize.height,
     ...(screenshotRegion ? {
       screenshot: cloneScreenshotRegionCrop(screenshotRegion)
     } : {}),
@@ -1163,14 +1170,17 @@ function computeSampledDisplayLuminanceRange(
   visualizationMode: VisualizationMode,
   options: { maskInvalidStokesVectors?: boolean; spectralRgbGroupingEnabled?: boolean } = {}
 ): DisplayLuminanceRange | null {
-  const pixelCount = Math.max(0, width * height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = Math.max(0, displaySize.width * displaySize.height);
   if (pixelCount === 0) {
     return null;
   }
 
   const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
     maskInvalidStokesVectors: options.maskInvalidStokesVectors,
-    spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
+    spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled,
+    sourceWidth: width,
+    sourceHeight: height
   });
   const sample = createDisplayPixelValues();
   const sampleStep = Math.max(1, Math.ceil(pixelCount / PREVIEW_LUMINANCE_RANGE_MAX_SAMPLES));

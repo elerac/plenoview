@@ -5,6 +5,7 @@ import {
   mapValueToColormapRgbBytes,
   type ColormapLut
 } from '../src/colormaps';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 import { buildDisplaySelectionThumbnailPixels, buildOpenedImageThumbnailPixels } from '../src/thumbnail';
 import { createDefaultStokesDegreeModulation } from '../src/stokes';
 import {
@@ -12,6 +13,7 @@ import {
   createChannelRgbSelection,
   createInterleavedLayerFromChannels,
   createLayerFromChannels,
+  createMuellerMatrixSelection,
   createStokesSelection
 } from './helpers/state-fixtures';
 
@@ -283,6 +285,26 @@ describe('thumbnail rendering', () => {
 
     expect(readPixel(thumbnail.data, thumbnail.width, 5, 10)).toEqual([0, 0, 0, 255]);
     expect(readPixel(thumbnail.data, thumbnail.width, 35, 10)).toEqual([255, 255, 255, 255]);
+  });
+
+  it('renders Mueller matrix thumbnails with 4x grid dimensions', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, [index + 1]])
+    ), 'mueller');
+
+    const thumbnail = buildDisplaySelectionThumbnailPixels(
+      layer,
+      1,
+      1,
+      createThumbnailState(),
+      createMuellerMatrixSelection(),
+      4
+    );
+
+    expect(thumbnail.width).toBe(4);
+    expect(thumbnail.height).toBe(4);
+    expect(readPixel(thumbnail.data, thumbnail.width, 0, 0)).toEqual([0, 0, 0, 255]);
+    expect(readPixel(thumbnail.data, thumbnail.width, 3, 3)).toEqual([255, 255, 255, 255]);
   });
 
   it('renders registered scalar stokes previews through the supplied colormap', () => {

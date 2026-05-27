@@ -4,6 +4,7 @@ import {
   preserveImagePanOnViewportChange,
   type ViewportClientRect
 } from '../../interaction/image-geometry';
+import { resolveDisplayImageSize } from '../../display-size';
 import { ViewerInteraction } from '../../interaction/viewer-interaction';
 import { mergeRenderState } from '../../view-state';
 import { resolveRulerFitInsets } from '../../ruler-layout';
@@ -57,10 +58,11 @@ export function createViewerInteraction({
         return null;
       }
 
-      return {
-        width: activeSession.decoded.width,
-        height: activeSession.decoded.height
-      };
+      return resolveDisplayImageSize(
+        activeSession.decoded.width,
+        activeSession.decoded.height,
+        core.getState().sessionState.displaySelection
+      );
     },
     onViewChange: (next) => {
       interactionCoordinator.enqueueViewPatch(next);
@@ -147,17 +149,24 @@ export function initializeViewportLifecycle({
     ui.setViewerViewportRect(rect);
     activePaneClientRect = resolveActivePaneClientRect(ui, rect);
     if (previousActivePaneClientRect && state.sessionState.viewerMode === 'image') {
-      const nextViewPatch = activeSession && isFitViewForViewport(
+      const displaySize = activeSession
+        ? resolveDisplayImageSize(
+            activeSession.decoded.width,
+            activeSession.decoded.height,
+            state.sessionState.displaySelection
+          )
+        : null;
+      const nextViewPatch = activeSession && displaySize && isFitViewForViewport(
         interactionState.view,
         viewportInfoFromClientRect(previousActivePaneClientRect),
-        activeSession.decoded.width,
-        activeSession.decoded.height,
+        displaySize.width,
+        displaySize.height,
         fitInsets
       )
         ? computeFitView(
             viewportInfoFromClientRect(activePaneClientRect),
-            activeSession.decoded.width,
-            activeSession.decoded.height,
+            displaySize.width,
+            displaySize.height,
             fitInsets
           )
         : preserveImagePanOnViewportChange(interactionState.view, previousActivePaneClientRect, activePaneClientRect);

@@ -1,6 +1,7 @@
 import { buildChannelViewItems } from '../channel-view-items';
 import { getSuccessValue, idleResource } from '../async-resource';
 import { cloneDisplaySelection, sameDisplaySelection } from '../display-model';
+import { resolveDisplayImageSize } from '../display-size';
 import { resolveDisplaySelectionForLayer } from '../display-selection';
 import {
   serializeChannelThumbnailContextKey,
@@ -98,6 +99,11 @@ function buildLoadedOpenedImageEntry(
   const thumbnailResource = state.thumbnailsBySessionId[session.id] ?? idleResource<string | null>();
   const effectiveState = session.id === state.activeSessionId ? state.sessionState : session.state;
   const layer = session.decoded.layers[effectiveState.activeLayer] ?? null;
+  const displaySize = resolveDisplayImageSize(
+    session.decoded.width,
+    session.decoded.height,
+    effectiveState.displaySelection
+  );
   return {
     id: session.id,
     displayName: session.displayName,
@@ -106,7 +112,7 @@ function buildLoadedOpenedImageEntry(
     sourceDetail: getSessionSourceDetail(session),
     metadata: layer?.metadata ?? null,
     thumbnailDataUrl: getSuccessValue(thumbnailResource) ?? null,
-    thumbnailAspectRatio: resolveThumbnailAspectRatio(session.decoded.width, session.decoded.height),
+    thumbnailAspectRatio: resolveThumbnailAspectRatio(displaySize.width, displaySize.height),
     thumbnailLoading: thumbnailResource.status === 'pending' || thumbnailResource.status === 'stale',
     selectable: true
   };

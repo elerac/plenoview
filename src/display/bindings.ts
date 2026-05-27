@@ -11,6 +11,11 @@ import {
   type ScalarStokesChannels
 } from '../stokes';
 import {
+  buildMuellerMatrixSourceName,
+  buildRgbMuellerMatrixSourceName,
+  isMuellerMatrixDisplayAvailable
+} from '../mueller';
+import {
   buildSpectralStokesRgbSourceName,
   buildSpectralRgbSourceName,
   hasCompleteSpectralStokesS3,
@@ -26,6 +31,7 @@ export type DisplaySourceMode =
   | 'empty'
   | 'channelRgb'
   | 'channelMono'
+  | 'muellerMatrix'
   | 'spectralRgb'
   | 'stokesDirect'
   | 'stokesRgb'
@@ -87,6 +93,17 @@ export function buildDisplaySourceBinding(
         ? createDisplaySourceBinding(
             'spectralRgb',
             [buildSpectralRgbSourceName(selection.seriesKey)],
+            false,
+            null
+          )
+        : createEmptyDisplaySourceBinding();
+    case 'muellerMatrix':
+      return isMuellerMatrixDisplayAvailable(layer.channelNames, selection)
+        ? createDisplaySourceBinding(
+            'muellerMatrix',
+            [selection.rgb
+              ? buildRgbMuellerMatrixSourceName()
+              : buildMuellerMatrixSourceName(selection.suffix ?? null)],
             false,
             null
           )

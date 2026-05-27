@@ -1,6 +1,7 @@
 import {
   type ChannelMonoSelection,
   type ChannelRgbSelection,
+  type MuellerMatrixSelection,
   type SpectralRgbSelection,
   type StokesSelection,
   type StokesParameter,
@@ -17,6 +18,7 @@ import {
   type RgbStokesComponent
 } from '../../src/stokes';
 import { buildSpectralRgbSelection } from '../../src/spectral';
+import { buildMuellerMatrixSelection, buildRgbMuellerMatrixSelection } from '../../src/mueller';
 import { createInitialState } from '../../src/viewer-store';
 import {
   createInterleavedChannelStorage,
@@ -206,4 +208,12 @@ export function createChannelMonoSelection(
 
 export function createSpectralRgbSelection(seriesKey = ''): SpectralRgbSelection {
   return buildSpectralRgbSelection(seriesKey);
+}
+
+export function createMuellerMatrixSelection(suffix: string | null = null): MuellerMatrixSelection {
+  return buildMuellerMatrixSelection(suffix);
+}
+
+export function createRgbMuellerMatrixSelection(): MuellerMatrixSelection {
+  return buildRgbMuellerMatrixSelection();
 }

@@ -9,6 +9,7 @@ export const DISPLAY_MODE_STOKES_RGB_LUMINANCE = 5;
 export const DISPLAY_MODE_SPECTRAL_RGB = 6;
 export const DISPLAY_MODE_STOKES_SPECTRAL_RGB = 7;
 export const DISPLAY_MODE_STOKES_SPECTRAL_RGB_LUMINANCE = 8;
+export const DISPLAY_MODE_MUELLER_MATRIX = 9;
 
 export const ALPHA_OUTPUT_OPAQUE = 0;
 export const ALPHA_OUTPUT_STRAIGHT = 1;
@@ -36,6 +37,8 @@ export function resolveDisplaySourceModeUniformValue(mode: DisplaySourceMode): n
       return DISPLAY_MODE_STOKES_SPECTRAL_RGB;
     case 'stokesSpectralRgbLuminance':
       return DISPLAY_MODE_STOKES_SPECTRAL_RGB_LUMINANCE;
+    case 'muellerMatrix':
+      return DISPLAY_MODE_MUELLER_MATRIX;
   }
 }
 

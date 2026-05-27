@@ -6,8 +6,10 @@ import {
   getDisplaySelectionValueLabel,
   getSelectionAlpha,
   isGroupedRgbStokesSelection,
+  isGroupedRgbMuellerMatrixSelection,
   isChannelSelection,
   isMonoSelection,
+  isMuellerMatrixSelection,
   isSpectralRgbSelection,
   isStokesSelection,
   type DisplaySelection,
@@ -181,6 +183,20 @@ function readProbeDisplayValues(
       readProbeChannel(sample, `${label}.G`),
       readProbeChannel(sample, `${label}.B`)
     ];
+  }
+
+  if (isMuellerMatrixSelection(selection)) {
+    if (isGroupedRgbMuellerMatrixSelection(selection)) {
+      const label = getDisplaySelectionOptionLabel(selection);
+      return [
+        readProbeChannel(sample, `${label}.R`),
+        readProbeChannel(sample, `${label}.G`),
+        readProbeChannel(sample, `${label}.B`)
+      ];
+    }
+
+    const value = readProbeChannel(sample, getDisplaySelectionOptionLabel(selection));
+    return [value, value, value];
   }
 
   if (selection.kind === 'channelMono') {

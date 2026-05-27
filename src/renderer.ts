@@ -1,4 +1,5 @@
 import { GlImageRenderer } from './rendering/gl-image-renderer';
+import { resolveDisplayImageSize } from './display-size';
 import { OverlayRenderer } from './rendering/overlay-renderer';
 import { ProbeOverlayRenderer } from './rendering/probe-overlay-renderer';
 import { RulerOverlayRenderer } from './rendering/ruler-overlay-renderer';
@@ -97,12 +98,13 @@ export class WebGlExrRenderer implements Disposable {
     }
 
     this.imageRenderer.setDisplaySelectionBindings(sessionId, layerIndex, width, height, binding);
+    const displaySize = resolveDisplayImageSize(width, height, selection);
     this.overlayRenderer.setDisplaySelectionContext(width, height, layer, selection, visualizationMode, {
       maskInvalidStokesVectors,
       spectralRgbGroupingEnabled
     });
     this.probeOverlayRenderer.setImagePresent(true);
-    this.rulerOverlayRenderer.setImageSize(width, height);
+    this.rulerOverlayRenderer.setImageSize(displaySize.width, displaySize.height);
   }
 
   setColormapTexture(entryCount: number, rgba8: Uint8Array): void {

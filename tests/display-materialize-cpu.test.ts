@@ -12,9 +12,12 @@ import {
   createChannelRgbSelection,
   createLayer,
   createLayerFromChannels,
+  createMuellerMatrixSelection,
+  createRgbMuellerMatrixSelection,
   createSpectralRgbSelection,
   createStokesSelection
 } from './helpers/state-fixtures';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 
 describe('display CPU materialization', () => {
   it('builds RGBA display texture from selected channels', () => {
@@ -46,6 +49,38 @@ describe('display CPU materialization', () => {
     const texture = buildSelectedDisplayTexture(layer, 2, 2, createChannelMonoSelection('Y'));
     expect(Array.from(texture.slice(0, 4))).toEqual([0.25, 0.25, 0.25, 1]);
     expect(Array.from(texture.slice(12, 16))).toEqual([1, 1, 1, 1]);
+  });
+
+  it('builds Mueller matrix display textures as a 4x4 source-sized grid', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, [index, index + 100]])
+    ), 'mueller');
+
+    const texture = buildSelectedDisplayTexture(layer, 2, 1, createMuellerMatrixSelection());
+
+    expect(texture.length).toBe(8 * 4 * 4);
+    expect(Array.from(texture.slice(0, 8))).toEqual([0, 0, 0, 1, 100, 100, 100, 1]);
+    expect(Array.from(texture.slice(2 * 4, 4 * 4))).toEqual([1, 1, 1, 1, 101, 101, 101, 1]);
+    const m33Start = ((3 * 8) + 6) * 4;
+    expect(Array.from(texture.slice(m33Start, m33Start + 8))).toEqual([15, 15, 15, 1, 115, 115, 115, 1]);
+  });
+
+  it('builds RGB Mueller matrix display textures as a 4x4 source-sized grid', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.flatMap((element, index) => [
+        [`${element}.R`, [index, index + 100]],
+        [`${element}.G`, [index + 20, index + 120]],
+        [`${element}.B`, [index + 40, index + 140]]
+      ])
+    ), 'mueller-rgb');
+
+    const texture = buildSelectedDisplayTexture(layer, 2, 1, createRgbMuellerMatrixSelection());
+
+    expect(texture.length).toBe(8 * 4 * 4);
+    expect(Array.from(texture.slice(0, 8))).toEqual([0, 20, 40, 1, 100, 120, 140, 1]);
+    expect(Array.from(texture.slice(2 * 4, 4 * 4))).toEqual([1, 21, 41, 1, 101, 121, 141, 1]);
+    const m33Start = ((3 * 8) + 6) * 4;
+    expect(Array.from(texture.slice(m33Start, m33Start + 8))).toEqual([15, 35, 55, 1, 115, 135, 155, 1]);
   });
 
   it('builds scalar Stokes AoLP display textures with values duplicated across RGB', () => {

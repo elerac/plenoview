@@ -10,6 +10,7 @@ import {
   computeRawSpectralStokesRgbDisplayValueForComponent,
   computeSpectralStokesRgbMonoValues
 } from '../stokes/spectral-stokes-rgb';
+import { readMuellerMatrixDisplayValue, readRgbMuellerMatrixDisplayValue } from '../mueller';
 import { readSpectralRgbSampleAtIndex } from '../spectral-color';
 import type { StatsChannelSummary } from '../types';
 import type { DisplaySelectionEvaluator } from '../display/evaluator';
@@ -82,6 +83,41 @@ export function createDisplaySelectionStatsAccumulators(
             { clamp: !evaluator.signed }
           ).b
         )
+      ];
+    case 'muellerMatrix':
+      if (evaluator.rgb) {
+        return [
+          createStatsAccumulator('R', (pixelIndex) => readRgbMuellerMatrixDisplayValue(
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight,
+            'r'
+          )),
+          createStatsAccumulator('G', (pixelIndex) => readRgbMuellerMatrixDisplayValue(
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight,
+            'g'
+          )),
+          createStatsAccumulator('B', (pixelIndex) => readRgbMuellerMatrixDisplayValue(
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight,
+            'b'
+          ))
+        ];
+      }
+
+      return [
+        createStatsAccumulator('Mono', (pixelIndex) => readMuellerMatrixDisplayValue(
+          evaluator.channels,
+          pixelIndex,
+          evaluator.sourceWidth,
+          evaluator.sourceHeight
+        ))
       ];
     case 'stokesDirect':
       return [

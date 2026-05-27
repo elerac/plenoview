@@ -1,4 +1,9 @@
-import { discardMaterializedChannel, getChannelDenseArray } from '../../channel-storage';
+import {
+  discardMaterializedChannel,
+  getChannelDenseArray,
+  getChannelReadView,
+  readChannelValue
+} from '../../channel-storage';
 import {
   DISPLAY_SOURCE_SLOT_COUNT,
   type DisplaySourceBinding
@@ -16,6 +21,16 @@ import {
   readSignedSpectralRgbSampleAtIndex,
   resolveSpectralRgbChannels
 } from '../../spectral-color';
+import {
+  detectMuellerMatrixChannels,
+  detectRgbMuellerMatrixChannels,
+  MUELLER_MATRIX_ELEMENTS,
+  parseMuellerMatrixSourceName,
+  resolveMuellerMatrixDisplaySize,
+  resolveRgbMuellerMatrixChannelArrays,
+  type ResolvedRgbMuellerMatrixChannels,
+  type MuellerMatrixElement
+} from '../../mueller';
 import type { ResidentChannelUpload } from '../../display-cache';
 import type { DecodedLayer } from '../../types';
 import type { GlImageRendererState, LayerSourceTextures } from './types';
@@ -89,6 +104,20 @@ export function ensureLayerChannelsResident(
       continue;
     }
 
+    const muellerMatrixSource = parseMuellerMatrixSourceName(channelName);
+    if (muellerMatrixSource !== null) {
+      uploads.push(uploadMuellerMatrixSourceTexture(
+        state,
+        layerTextures,
+        width,
+        height,
+        layer,
+        channelName,
+        muellerMatrixSource
+      ));
+      continue;
+    }
+
     if (layer.channelStorage.channelIndexByName[channelName] === undefined) {
       continue;
     }
@@ -137,6 +166,110 @@ export function ensureLayerChannelsResident(
   }
 
   return uploads;
+}
+
+function uploadMuellerMatrixSourceTexture(
+  state: GlImageRendererState,
+  layerTextures: LayerSourceTextures,
+  width: number,
+  height: number,
+  layer: DecodedLayer,
+  sourceName: string,
+  source: NonNullable<ReturnType<typeof parseMuellerMatrixSourceName>>
+): ResidentChannelUpload {
+  const displaySize = resolveMuellerMatrixDisplaySize(width, height);
+  const pixels = buildMuellerMatrixPixels(layer, width, height, source);
+  let texture: WebGLTexture | null = null;
+  try {
+    texture = state.gl.createTexture();
+    if (!texture) {
+      throw new Error('Failed to create Mueller matrix source texture.');
+    }
+
+    state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
+    configureSourceTexture(state.gl);
+    state.gl.texImage2D(
+      state.gl.TEXTURE_2D,
+      0,
+      state.gl.RGBA32F,
+      displaySize.width,
+      displaySize.height,
+      0,
+      state.gl.RGBA,
+      state.gl.FLOAT,
+      pixels
+    );
+    layerTextures.textureByChannel.set(sourceName, texture);
+    return {
+      channelName: sourceName,
+      textureBytes: predictRgba32fTextureBytes(displaySize.width, displaySize.height),
+      materializedBytes: 0
+    };
+  } catch (error) {
+    if (texture) {
+      state.gl.deleteTexture(texture);
+    }
+    throw error;
+  }
+}
+
+function buildMuellerMatrixPixels(
+  layer: DecodedLayer,
+  width: number,
+  height: number,
+  source: NonNullable<ReturnType<typeof parseMuellerMatrixSourceName>>
+): Float32Array {
+  const displaySize = resolveMuellerMatrixDisplaySize(width, height);
+  const out = new Float32Array(displaySize.width * displaySize.height * 4);
+  const scalarChannels = source.rgb ? null : detectMuellerMatrixChannels(layer.channelNames, source.suffix);
+  const rgbChannels = source.rgb
+    ? resolveRgbMuellerMatrixChannelArrays(layer, detectRgbMuellerMatrixChannels(layer.channelNames))
+    : null;
+  if ((!scalarChannels && !rgbChannels) || width <= 0 || height <= 0) {
+    return out;
+  }
+
+  const channelViews = {} as Record<MuellerMatrixElement, ReturnType<typeof getChannelReadView>>;
+  if (scalarChannels) {
+    for (const element of MUELLER_MATRIX_ELEMENTS) {
+      channelViews[element] = getChannelReadView(layer, scalarChannels.elements[element]);
+    }
+  }
+
+  for (let y = 0; y < displaySize.height; y += 1) {
+    const matrixRow = Math.floor(y / height);
+    const sourceY = y - matrixRow * height;
+    for (let x = 0; x < displaySize.width; x += 1) {
+      const matrixColumn = Math.floor(x / width);
+      const sourceX = x - matrixColumn * width;
+      const element = `M${matrixRow}${matrixColumn}` as MuellerMatrixElement;
+      const sourceIndex = sourceY * width + sourceX;
+      const outIndex = (y * displaySize.width + x) * 4;
+      if (rgbChannels) {
+        writeRgbMuellerMatrixPixel(out, outIndex, rgbChannels, element, sourceIndex);
+      } else {
+        const value = readChannelValue(channelViews[element], sourceIndex);
+        out[outIndex + 0] = value;
+        out[outIndex + 1] = value;
+        out[outIndex + 2] = value;
+      }
+      out[outIndex + 3] = 1;
+    }
+  }
+
+  return out;
+}
+
+function writeRgbMuellerMatrixPixel(
+  output: Float32Array,
+  outputIndex: number,
+  channels: ResolvedRgbMuellerMatrixChannels,
+  element: MuellerMatrixElement,
+  sourceIndex: number
+): void {
+  output[outputIndex + 0] = readChannelValue(channels.r.elements[element], sourceIndex);
+  output[outputIndex + 1] = readChannelValue(channels.g.elements[element], sourceIndex);
+  output[outputIndex + 2] = readChannelValue(channels.b.elements[element], sourceIndex);
 }
 
 function uploadSpectralStokesRgbSourceTexture(
@@ -264,7 +397,9 @@ export function setDisplaySelectionBindings(
   height: number,
   binding: DisplaySourceBinding
 ): void {
-  state.imageSize = { width, height };
+  state.imageSize = binding.mode === 'muellerMatrix'
+    ? resolveMuellerMatrixDisplaySize(width, height)
+    : { width, height };
   state.activeBinding = binding;
 
   const layerTextures = state.layerTexturesBySession.get(sessionId)?.get(layerIndex) ?? null;

@@ -8,8 +8,11 @@ import {
 import {
   createChannelMonoSelection,
   createChannelRgbSelection,
+  createMuellerMatrixSelection,
+  createRgbMuellerMatrixSelection,
   createLayerFromChannels
 } from './helpers/state-fixtures';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 
 describe('display image stats', () => {
   it('computes display luminance ranges directly from decoded source channels', () => {
@@ -51,6 +54,59 @@ describe('display image stats', () => {
         createExpectedStatsChannel('G', -2, 3.2, 8, 5, 0, 0, 0),
         createExpectedStatsChannel('B', null, null, null, 0, 5, 0, 0),
         createExpectedStatsChannel('A', 0.5, 0.75, 1, 2, 1, 1, 1)
+      ]
+    });
+  });
+
+  it('computes Mueller matrix stats over the 4x display grid', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, [index + 1]])
+    ));
+
+    expect(computeDisplaySelectionLuminanceRange(
+      layer,
+      1,
+      1,
+      createMuellerMatrixSelection()
+    )).toEqual({ min: 1, max: 16 });
+
+    expect(computeDisplaySelectionImageStats(
+      layer,
+      1,
+      1,
+      createMuellerMatrixSelection()
+    )).toEqual({
+      width: 4,
+      height: 4,
+      pixelCount: 16,
+      channels: [
+        createExpectedStatsChannel('Mono', 1, 8.5, 16, 16, 0, 0, 0)
+      ]
+    });
+  });
+
+  it('computes RGB Mueller matrix stats over the 4x display grid', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.flatMap((element, index) => [
+        [`${element}.R`, [index + 1]],
+        [`${element}.G`, [index + 21]],
+        [`${element}.B`, [index + 41]]
+      ])
+    ));
+
+    expect(computeDisplaySelectionImageStats(
+      layer,
+      1,
+      1,
+      createRgbMuellerMatrixSelection()
+    )).toEqual({
+      width: 4,
+      height: 4,
+      pixelCount: 16,
+      channels: [
+        createExpectedStatsChannel('R', 1, 8.5, 16, 16, 0, 0, 0),
+        createExpectedStatsChannel('G', 21, 28.5, 36, 16, 0, 0, 0),
+        createExpectedStatsChannel('B', 41, 48.5, 56, 16, 0, 0, 0)
       ]
     });
   });

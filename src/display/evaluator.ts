@@ -44,6 +44,17 @@ import {
   parseSpectralRgbSourceName,
   shouldReadSpectralRgbSeriesSigned
 } from '../spectral';
+import {
+  detectMuellerMatrixChannels,
+  detectRgbMuellerMatrixChannels,
+  parseMuellerMatrixSourceName,
+  readMuellerMatrixDisplayValue,
+  readRgbMuellerMatrixDisplayValue,
+  resolveMuellerMatrixChannelArrays,
+  resolveRgbMuellerMatrixChannelArrays,
+  type ResolvedMuellerMatrixChannels,
+  type ResolvedRgbMuellerMatrixChannels
+} from '../mueller';
 
 export interface DisplayPixelValues {
   r: number;
@@ -54,7 +65,10 @@ export interface DisplayPixelValues {
 
 type ResolvedStokesComputationOptions = Required<Pick<StokesComputationOptions, 'maskInvalidStokesVectors'>>;
 
-export interface DisplayEvaluationOptions extends StokesComputationOptions, DisplaySourceBindingConfig {}
+export interface DisplayEvaluationOptions extends StokesComputationOptions, DisplaySourceBindingConfig {
+  sourceWidth?: number;
+  sourceHeight?: number;
+}
 
 export type DisplaySelectionEvaluator =
   | {
@@ -80,6 +94,22 @@ export type DisplaySelectionEvaluator =
       binding: DisplaySourceBinding;
       channels: ResolvedSpectralRgbChannel[];
       signed: boolean;
+    }
+  | {
+      kind: 'muellerMatrix';
+      binding: DisplaySourceBinding;
+      rgb: false;
+      channels: ResolvedMuellerMatrixChannels;
+      sourceWidth: number;
+      sourceHeight: number;
+    }
+  | {
+      kind: 'muellerMatrix';
+      binding: DisplaySourceBinding;
+      rgb: true;
+      channels: ResolvedRgbMuellerMatrixChannels;
+      sourceWidth: number;
+      sourceHeight: number;
     }
   | {
       kind: 'stokesDirect';
@@ -164,6 +194,8 @@ export function createDisplaySelectionEvaluator(
       };
     case 'spectralRgb':
       return createSpectralRgbEvaluator(layer, binding);
+    case 'muellerMatrix':
+      return createMuellerMatrixEvaluator(layer, binding, stokesOptions);
     case 'stokesDirect':
       return createStokesDirectEvaluator(layer, binding, resolvedStokesOptions);
     case 'stokesRgb':
@@ -207,6 +239,23 @@ export function readDisplaySelectionPixelValuesAtIndex(
     }
     case 'spectralRgb':
       return writeSpectralRgbDisplayPixel(out, evaluator.channels, evaluator.signed, pixelIndex);
+    case 'muellerMatrix':
+      return evaluator.rgb
+        ? writeRgbMuellerMatrixDisplayPixel(
+            out,
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight,
+            true
+          )
+        : writeMuellerMatrixDisplayPixel(
+            out,
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight
+          );
     case 'stokesDirect':
       return writeStokesDisplayPixel(
         out,
@@ -279,6 +328,23 @@ export function readDisplaySelectionOverlayPixelValuesAtIndex(
     }
     case 'spectralRgb':
       return writeSpectralRgbDisplayPixel(out, evaluator.channels, evaluator.signed, pixelIndex);
+    case 'muellerMatrix':
+      return evaluator.rgb
+        ? writeRgbMuellerMatrixDisplayPixel(
+            out,
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight,
+            false
+          )
+        : writeRawMuellerMatrixDisplayPixel(
+            out,
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight
+          );
     case 'stokesDirect':
       return writeRawStokesDisplayPixel(
         out,
@@ -351,6 +417,23 @@ export function readDisplaySelectionSnapshotPixelValuesAtIndex(
     }
     case 'spectralRgb':
       return writeSpectralRgbDisplayPixel(out, evaluator.channels, evaluator.signed, pixelIndex);
+    case 'muellerMatrix':
+      return evaluator.rgb
+        ? writeRgbMuellerMatrixDisplayPixel(
+            out,
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight,
+            true
+          )
+        : writeMuellerMatrixDisplayPixel(
+            out,
+            evaluator.channels,
+            pixelIndex,
+            evaluator.sourceWidth,
+            evaluator.sourceHeight
+          );
     case 'stokesDirect':
       return writeStokesSnapshotDisplayPixel(
         out,
@@ -446,6 +529,48 @@ function createSpectralRgbEvaluator(
   };
 }
 
+function createMuellerMatrixEvaluator(
+  layer: DecodedLayer,
+  binding: DisplaySourceBinding,
+  options: DisplayEvaluationOptions
+): DisplaySelectionEvaluator {
+  const source = parseMuellerMatrixSourceName(binding.slots[0]);
+  const sourceWidth = normalizeSourceDimension(options.sourceWidth);
+  const sourceHeight = normalizeSourceDimension(options.sourceHeight);
+  if (!source || sourceWidth <= 0 || sourceHeight <= 0) {
+    return {
+      kind: 'empty',
+      binding: createEmptyDisplaySourceBinding()
+    };
+  }
+
+  if (source.rgb) {
+    return {
+      kind: 'muellerMatrix',
+      binding,
+      rgb: true,
+      channels: resolveRgbMuellerMatrixChannelArrays(
+        layer,
+        detectRgbMuellerMatrixChannels(layer.channelNames)
+      ),
+      sourceWidth,
+      sourceHeight
+    };
+  }
+
+  return {
+    kind: 'muellerMatrix',
+    binding,
+    rgb: false,
+    channels: resolveMuellerMatrixChannelArrays(
+      layer,
+      detectMuellerMatrixChannels(layer.channelNames, source.suffix)
+    ),
+    sourceWidth,
+    sourceHeight
+  };
+}
+
 function createRgbStokesEvaluator(
   layer: DecodedLayer,
   binding: DisplaySourceBinding,
@@ -502,6 +627,10 @@ function resolveStokesComputationOptions(
   };
 }
 
+function normalizeSourceDimension(value: number | undefined): number {
+  return Number.isFinite(value) && value !== undefined && value > 0 ? Math.floor(value) : 0;
+}
+
 function setDisplayPixelValues(
   output: DisplayPixelValues,
   r: number,
@@ -524,6 +653,49 @@ function writeSpectralRgbDisplayPixel(
 ): DisplayPixelValues {
   const rgb = readSpectralRgbSampleAtIndex(channels, pixelIndex, undefined, { clamp: !signed });
   return setDisplayPixelValues(output, rgb.r, rgb.g, rgb.b, 1);
+}
+
+function writeMuellerMatrixDisplayPixel(
+  output: DisplayPixelValues,
+  channels: ResolvedMuellerMatrixChannels,
+  pixelIndex: number,
+  sourceWidth: number,
+  sourceHeight: number
+): DisplayPixelValues {
+  const value = readMuellerMatrixDisplayValue(channels, pixelIndex, sourceWidth, sourceHeight);
+  const displayValue = sanitizeDisplayValue(value);
+  return setDisplayPixelValues(output, displayValue, displayValue, displayValue, 1);
+}
+
+function writeRawMuellerMatrixDisplayPixel(
+  output: DisplayPixelValues,
+  channels: ResolvedMuellerMatrixChannels,
+  pixelIndex: number,
+  sourceWidth: number,
+  sourceHeight: number
+): DisplayPixelValues {
+  const value = readMuellerMatrixDisplayValue(channels, pixelIndex, sourceWidth, sourceHeight);
+  return setDisplayPixelValues(output, value, value, value, 1);
+}
+
+function writeRgbMuellerMatrixDisplayPixel(
+  output: DisplayPixelValues,
+  channels: ResolvedRgbMuellerMatrixChannels,
+  pixelIndex: number,
+  sourceWidth: number,
+  sourceHeight: number,
+  sanitize: boolean
+): DisplayPixelValues {
+  const r = readRgbMuellerMatrixDisplayValue(channels, pixelIndex, sourceWidth, sourceHeight, 'r');
+  const g = readRgbMuellerMatrixDisplayValue(channels, pixelIndex, sourceWidth, sourceHeight, 'g');
+  const b = readRgbMuellerMatrixDisplayValue(channels, pixelIndex, sourceWidth, sourceHeight, 'b');
+  return setDisplayPixelValues(
+    output,
+    sanitize ? sanitizeDisplayValue(r) : r,
+    sanitize ? sanitizeDisplayValue(g) : g,
+    sanitize ? sanitizeDisplayValue(b) : b,
+    1
+  );
 }
 
 function writeStokesDisplayPixel(

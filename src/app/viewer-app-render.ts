@@ -7,6 +7,7 @@ import {
 } from '../display/revision-keys';
 import { sameDisplayLuminanceRange } from '../colormap-range';
 import { sameDisplaySelection } from '../display-model';
+import { resolveDisplayImageSize } from '../display-size';
 import { resolveDisplaySelectionForLayer } from '../display-selection';
 import {
   createEmptyRoiInteractionState,
@@ -328,8 +329,15 @@ function createProbeReadoutSelector(): (
 
   return (state, activeSession, activeLayer) => {
     const sessionId = activeSession?.id ?? null;
-    const width = activeSession?.decoded.width ?? 0;
-    const height = activeSession?.decoded.height ?? 0;
+    const displaySize = activeSession
+      ? resolveDisplayImageSize(
+          activeSession.decoded.width,
+          activeSession.decoded.height,
+          state.sessionState.displaySelection
+        )
+      : { width: 0, height: 0 };
+    const width = displaySize.width;
+    const height = displaySize.height;
     const nextStokesDegreeModulation = state.sessionState.stokesDegreeModulation;
     const usesColormap = state.sessionState.visualizationMode === 'colormap';
     const activeDisplayLuminanceRange = selectActiveDisplayLuminanceRange(state);
@@ -418,8 +426,15 @@ function createSpectralPlotReadoutSelector(): (
 
   return (state, activeSession, activeLayer) => {
     const sessionId = activeSession?.id ?? null;
-    const width = activeSession?.decoded.width ?? 0;
-    const height = activeSession?.decoded.height ?? 0;
+    const displaySize = activeSession
+      ? resolveDisplayImageSize(
+          activeSession.decoded.width,
+          activeSession.decoded.height,
+          state.sessionState.displaySelection
+        )
+      : { width: 0, height: 0 };
+    const width = displaySize.width;
+    const height = displaySize.height;
     if (
       sessionId === previousSessionId &&
       activeLayer === previousLayer &&

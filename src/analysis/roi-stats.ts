@@ -1,4 +1,5 @@
 import type { DisplaySelection } from '../display-model';
+import { resolveDisplayImageSize } from '../display-size';
 import { resolveDisplaySelectionEvaluator, type DisplayEvaluationOptions } from '../display/evaluator';
 import { clampImageRoiToBounds, getImageRoiHeight, getImageRoiPixelCount, getImageRoiWidth } from '../roi';
 import type { DecodedLayer, ImageRoi, RoiStats, VisualizationMode } from '../types';
@@ -17,17 +18,22 @@ export function computeDisplaySelectionRoiStats(
   visualizationMode: VisualizationMode = 'rgb',
   stokesOptions: DisplayEvaluationOptions = {}
 ): RoiStats | null {
-  const clampedRoi = clampImageRoiToBounds(roi, width, height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const clampedRoi = clampImageRoiToBounds(roi, displaySize.width, displaySize.height);
   if (!clampedRoi) {
     return null;
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...stokesOptions,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const accumulators = createDisplaySelectionStatsAccumulators(evaluator, selection);
   const pixelCount = getImageRoiPixelCount(clampedRoi);
 
   for (let iy = clampedRoi.y0; iy <= clampedRoi.y1; iy += 1) {
-    const rowOffset = iy * width;
+    const rowOffset = iy * displaySize.width;
     for (let ix = clampedRoi.x0; ix <= clampedRoi.x1; ix += 1) {
       const pixelIndex = rowOffset + ix;
       for (const accumulator of accumulators) {

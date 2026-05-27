@@ -13,6 +13,7 @@ import {
 } from './export-actions';
 import type { ExportImagePixels } from '../../export/export-pixels';
 import { mergeRenderState } from '../../view-state';
+import { resolveDisplayImageSize } from '../../display-size';
 import { selectActiveSession } from '../viewer-app-selectors';
 import { ViewerAppCore } from '../viewer-app-core';
 import type { DisplayController } from '../../controllers/display-controller';
@@ -267,10 +268,11 @@ export function createViewerUi({
           panoramaHfovDeg: renderState.panoramaHfovDeg
         },
         imageSize: activeSession
-          ? {
-              width: activeSession.decoded.width,
-              height: activeSession.decoded.height
-            }
+          ? resolveDisplayImageSize(
+              activeSession.decoded.width,
+              activeSession.decoded.height,
+              renderState.displaySelection
+            )
           : null
       };
     },
@@ -295,13 +297,13 @@ export function createViewerUi({
         return null;
       }
 
-      const topLeft = imageToScreen(0, 0, renderState, viewport);
-      const bottomRight = imageToScreen(
+      const displaySize = resolveDisplayImageSize(
         activeSession.decoded.width,
         activeSession.decoded.height,
-        renderState,
-        viewport
+        renderState.displaySelection
       );
+      const topLeft = imageToScreen(0, 0, renderState, viewport);
+      const bottomRight = imageToScreen(displaySize.width, displaySize.height, renderState, viewport);
       return intersectViewportRect({
         x: Math.min(topLeft.x, bottomRight.x),
         y: Math.min(topLeft.y, bottomRight.y),

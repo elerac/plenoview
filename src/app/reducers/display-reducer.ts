@@ -8,6 +8,7 @@ import {
   cloneDisplaySelection,
   sameDisplaySelection
 } from '../../display-model';
+import { resolveDisplayImageSize } from '../../display-size';
 import { getSuccessValue } from '../../async-resource';
 import { normalizeDisplayGamma } from '../../color';
 import { computeFitView } from '../../interaction/image-geometry';
@@ -272,9 +273,14 @@ export function displayReducer(
         return state;
       }
 
+      const displaySize = resolveDisplayImageSize(
+        activeSession.decoded.width,
+        activeSession.decoded.height,
+        state.sessionState.displaySelection
+      );
       return patchSessionState(
         state,
-        computeFitView(intent.viewport, activeSession.decoded.width, activeSession.decoded.height, intent.fitInsets),
+        computeFitView(intent.viewport, displaySize.width, displaySize.height, intent.fitInsets),
         {
           syncInteractionView: true,
           clearHover: true

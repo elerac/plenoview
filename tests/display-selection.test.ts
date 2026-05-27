@@ -12,9 +12,12 @@ import {
 import {
   createChannelMonoSelection,
   createChannelRgbSelection,
+  createMuellerMatrixSelection,
+  createRgbMuellerMatrixSelection,
   createSpectralRgbSelection,
   createStokesSelection
 } from './helpers/state-fixtures';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 
 describe('display selection', () => {
   it('extracts RGB groups from channel namespaces', () => {
@@ -249,6 +252,24 @@ describe('display selection', () => {
     );
   });
 
+  it('uses a complete Mueller matrix as the default before falling back to M00', () => {
+    const muellerNames = [...MUELLER_MATRIX_ELEMENTS];
+    const rgbMuellerNames = MUELLER_MATRIX_ELEMENTS.flatMap((element) => [
+      `${element}.R`,
+      `${element}.G`,
+      `${element}.B`
+    ]);
+    expect(pickDefaultDisplaySelection(muellerNames)).toEqual(createMuellerMatrixSelection());
+    expect(pickDefaultDisplaySelection(rgbMuellerNames)).toEqual(createRgbMuellerMatrixSelection());
+    expect(pickDefaultDisplaySelection(['R', 'G', 'B', ...rgbMuellerNames])).toEqual(
+      createChannelRgbSelection('R', 'G', 'B')
+    );
+    expect(pickDefaultDisplaySelection(muellerNames.map((element) => `${element}.Y`))).toEqual(
+      createMuellerMatrixSelection('Y')
+    );
+    expect(pickDefaultDisplaySelection(muellerNames.slice(0, -1))).toEqual(createChannelMonoSelection('M00'));
+  });
+
   it('falls back to wavelength channels when spectral RGB grouping is disabled', () => {
     expect(pickDefaultDisplaySelection(['400nm', '500nm', '600nm', '700nm'], {
       spectralRgbGroupingEnabled: false
@@ -289,6 +310,16 @@ describe('display selection', () => {
     );
     expect(resolveDisplaySelectionForLayer(['hoge.450nm', 'hoge.550nm'], createSpectralRgbSelection('missing'))).toEqual(
       createSpectralRgbSelection('hoge')
+    );
+    expect(resolveDisplaySelectionForLayer([...MUELLER_MATRIX_ELEMENTS], createMuellerMatrixSelection())).toEqual(
+      createMuellerMatrixSelection()
+    );
+    expect(resolveDisplaySelectionForLayer(
+      MUELLER_MATRIX_ELEMENTS.flatMap((element) => [`${element}.R`, `${element}.G`, `${element}.B`]),
+      createRgbMuellerMatrixSelection()
+    )).toEqual(createRgbMuellerMatrixSelection());
+    expect(resolveDisplaySelectionForLayer([...MUELLER_MATRIX_ELEMENTS].slice(0, -1), createMuellerMatrixSelection())).toEqual(
+      createChannelMonoSelection('M00')
     );
   });
 });

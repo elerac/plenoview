@@ -45,6 +45,8 @@ export function serializeDisplaySelectionLuminanceKey(
       return `channelMono:${selection.channel}`;
     case 'spectralRgb':
       return serializeDisplaySelectionRevisionKey(selection, visualizationMode, state);
+    case 'muellerMatrix':
+      return serializeDisplaySelectionRevisionKey(selection, visualizationMode, state);
     case 'stokesScalar':
     case 'stokesAngle':
       return serializeDisplaySelectionRevisionKey(selection, visualizationMode, state);

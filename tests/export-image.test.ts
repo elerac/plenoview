@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unzlibSync } from 'fflate';
 import { DEFAULT_DISPLAY_GAMMA, linearToDisplayGammaByte } from '../src/color';
+import { buildSelectedDisplayTexture } from '../src/display/materialize-cpu';
 import {
   buildColormapExportPixels,
   buildExportImagePixels
@@ -14,7 +15,9 @@ import {
   parsePngCompressionLevel,
   renderPixelsToCanvas
 } from '../src/export-image';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 import { createDefaultStokesDegreeModulation } from '../src/stokes';
+import { createLayerFromChannels, createMuellerMatrixSelection } from './helpers/state-fixtures';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -135,6 +138,36 @@ describe('export image pixels', () => {
     });
 
     expect(Array.from(pixels.data)).toEqual([255, 128, 128, 255]);
+  });
+
+  it('exports Mueller matrix selections at their 4x grid dimensions', () => {
+    const selection = createMuellerMatrixSelection();
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, [index / 15]])
+    ), 'mueller');
+    const displayTexture = buildSelectedDisplayTexture(layer, 1, 1, selection);
+
+    const pixels = buildExportImagePixels({
+      displayTexture,
+      width: 4,
+      height: 4,
+      state: {
+        exposureEv: 0,
+        displayGamma: DEFAULT_DISPLAY_GAMMA,
+        visualizationMode: 'rgb',
+        colormapRange: null,
+        displaySelection: selection,
+        stokesDegreeModulation: createDefaultStokesDegreeModulation(),
+        stokesAolpDegreeModulationMode: 'value'
+      },
+      colormapLut: null
+    });
+
+    expect(displayTexture.length).toBe(4 * 4 * 4);
+    expect(pixels.width).toBe(4);
+    expect(pixels.height).toBe(4);
+    expect(Array.from(pixels.data.slice(0, 4))).toEqual([0, 0, 0, 255]);
+    expect(Array.from(pixels.data.slice((15 * 4), (16 * 4)))).toEqual([255, 255, 255, 255]);
   });
 
   it('encodes valid compressed PNG bytes from the rgba buffer', async () => {

@@ -18,6 +18,7 @@ import {
   type StokesAolpDegreeModulationMode,
   type StokesDegreeModulationState
 } from './display-model';
+import { resolveDisplayImageSize } from './display-size';
 import {
   readDisplaySelectionPixelValuesAtIndex,
   readDisplaySelectionSnapshotPixelValuesAtIndex,
@@ -155,13 +156,14 @@ export function buildDisplaySelectionThumbnailPixels(
   preview: ThumbnailPreviewOptions | null = null,
   options: OpenedImageThumbnailOptions = {}
 ): OpenedImageThumbnailPixels {
+  const effectiveSelection = cloneDisplaySelection(selection);
+  const displaySize = resolveDisplayImageSize(width, height, effectiveSelection);
   const { width: thumbnailWidth, height: thumbnailHeight } = resolveThumbnailDimensions(
-    width,
-    height,
+    displaySize.width,
+    displaySize.height,
     maxEdge
   );
   const thumbnailData = new Uint8ClampedArray(thumbnailWidth * thumbnailHeight * 4);
-  const effectiveSelection = cloneDisplaySelection(selection);
   const scalarThumbnail = isMonoSelection(effectiveSelection);
   const useColormapPreview = Boolean(
     preview?.visualizationMode === 'colormap' &&
@@ -178,17 +180,21 @@ export function buildDisplaySelectionThumbnailPixels(
     layer,
     effectiveSelection,
     useColormapPreview ? 'colormap' : 'rgb',
-    stokesOptions
+    {
+      ...stokesOptions,
+      sourceWidth: width,
+      sourceHeight: height
+    }
   );
   const sample = createThumbnailSample();
   const stats = !useColormapPreview && scalarThumbnail
-    ? computeThumbnailStats(evaluator, width, height, sample)
+    ? computeThumbnailStats(evaluator, displaySize.width, displaySize.height, sample)
     : null;
   const sampledAutoExposure = !scalarThumbnail && !useColormapPreview && options.autoExposureEnabled
     ? computeSampledThumbnailAutoExposure(
         evaluator,
-        width,
-        height,
+        displaySize.width,
+        displaySize.height,
         options.autoExposurePercentile ?? AUTO_EXPOSURE_PERCENTILE
       )
     : null;
@@ -208,14 +214,14 @@ export function buildDisplaySelectionThumbnailPixels(
       const outIndex = (y * thumbnailWidth + x) * 4;
 
       const sourceX = Math.min(
-        width - 1,
-        Math.max(0, Math.floor(((x + 0.5) / thumbnailWidth) * width))
+        displaySize.width - 1,
+        Math.max(0, Math.floor(((x + 0.5) / thumbnailWidth) * displaySize.width))
       );
       const sourceY = Math.min(
-        height - 1,
-        Math.max(0, Math.floor(((y + 0.5) / thumbnailHeight) * height))
+        displaySize.height - 1,
+        Math.max(0, Math.floor(((y + 0.5) / thumbnailHeight) * displaySize.height))
       );
-      const sourceIndex = sourceY * width + sourceX;
+      const sourceIndex = sourceY * displaySize.width + sourceX;
 
       if (colormapPreview?.colormapRange && colormapPreview.colormapLut) {
         readDisplaySelectionSnapshotPixelValuesAtIndex(evaluator, sourceIndex, sample);

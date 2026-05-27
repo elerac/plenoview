@@ -7,6 +7,7 @@ import {
   sameDisplaySelection,
   type DisplaySelection
 } from '../display-model';
+import { resolveDisplayImageSize } from '../display-size';
 import { clampImageRoiToBounds } from '../roi';
 import {
   buildSessionDisplayName,
@@ -55,18 +56,12 @@ export interface BuildSwitchedSessionStateOptions {
 }
 
 export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSession {
-  const fitView = computeFitView(args.viewport, args.decoded.width, args.decoded.height, args.fitInsets);
   const displayName = buildSessionDisplayName(
     args.filename,
     args.existingSessions.map((session) => session.filename)
   );
-  const defaultSessionState = buildViewerStateForLayer(
-    {
-      ...createClearedViewerState(args.defaultColormapId),
-      zoom: fitView.zoom,
-      panX: fitView.panX,
-      panY: fitView.panY
-    },
+  const defaultBaseState = buildViewerStateForLayer(
+    createClearedViewerState(args.defaultColormapId),
     args.decoded,
     0,
     {
@@ -74,6 +69,18 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
       spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
     }
   );
+  const defaultDisplaySize = resolveDisplayImageSize(
+    args.decoded.width,
+    args.decoded.height,
+    defaultBaseState.displaySelection
+  );
+  const fitView = computeFitView(args.viewport, defaultDisplaySize.width, defaultDisplaySize.height, args.fitInsets);
+  const defaultSessionState = {
+    ...defaultBaseState,
+    zoom: fitView.zoom,
+    panX: fitView.panX,
+    panY: fitView.panY
+  };
   const baseSession: OpenedImageSession = {
     id: args.sessionId,
     filename: args.filename,
@@ -152,11 +159,18 @@ export function buildReloadedSessionState(
   stokesParameterVisibility?: StokesParameterVisibilitySettings,
   spectralRgbGroupingEnabled?: boolean
 ): ViewerSessionState {
+  const resolvedState = buildViewerStateForLayer(
+    currentState,
+    decoded,
+    currentState.activeLayer,
+    { stokesParameterVisibility, spectralRgbGroupingEnabled }
+  );
+  const displaySize = resolveDisplayImageSize(decoded.width, decoded.height, resolvedState.displaySelection);
   const lockedPixel = currentState.lockedPixel
-    ? clampPixelToImageBounds(currentState.lockedPixel, decoded.width, decoded.height)
+    ? clampPixelToImageBounds(currentState.lockedPixel, displaySize.width, displaySize.height)
     : null;
   const roi = currentState.roi
-    ? clampImageRoiToBounds(currentState.roi, decoded.width, decoded.height)
+    ? clampImageRoiToBounds(currentState.roi, displaySize.width, displaySize.height)
     : null;
   const nextImageCamera = currentState.viewerMode === 'image'
     ? {
@@ -165,7 +179,9 @@ export function buildReloadedSessionState(
           currentState.panX,
           currentState.panY,
           previousImage,
-          decoded
+          decoded,
+          currentState.displaySelection,
+          resolvedState.displaySelection
         )
       }
     : {
@@ -178,6 +194,7 @@ export function buildReloadedSessionState(
     {
       ...currentState,
       ...nextImageCamera,
+      displaySelection: cloneDisplaySelection(resolvedState.displaySelection),
       lockedPixel,
       roi
     },
@@ -193,13 +210,36 @@ export function buildSwitchedSessionState(
   previousImage: DecodedExrImage | null,
   options: BuildSwitchedSessionStateOptions = {}
 ): ViewerSessionState {
+  const resolvedState = buildViewerStateForLayer(
+    {
+      ...cloneViewerSessionState(nextSession.state),
+      displaySelection: cloneDisplaySelection(currentState.displaySelection)
+    },
+    nextSession.decoded,
+    nextSession.state.activeLayer,
+    {
+      stokesParameterVisibility: options.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
+    }
+  );
+  const displaySize = resolveDisplayImageSize(
+    nextSession.decoded.width,
+    nextSession.decoded.height,
+    resolvedState.displaySelection
+  );
   const lockedPixel = currentState.lockedPixel
-    ? clampPixelToImageBounds(currentState.lockedPixel, nextSession.decoded.width, nextSession.decoded.height)
+    ? clampPixelToImageBounds(currentState.lockedPixel, displaySize.width, displaySize.height)
     : null;
   const roi = currentState.roi
-    ? clampImageRoiToBounds(currentState.roi, nextSession.decoded.width, nextSession.decoded.height)
+    ? clampImageRoiToBounds(currentState.roi, displaySize.width, displaySize.height)
     : null;
-  const nextImageCamera = buildSwitchedImageCamera(nextSession, currentState, previousImage, options);
+  const nextImageCamera = buildSwitchedImageCamera(
+    nextSession,
+    currentState,
+    previousImage,
+    resolvedState.displaySelection,
+    options
+  );
   const nextPanoramaCamera = currentState.viewerMode === 'panorama'
     ? {
         panoramaYawDeg: currentState.panoramaYawDeg,
@@ -222,14 +262,14 @@ export function buildSwitchedSessionState(
       channelThumbnailExposureEv: currentState.channelThumbnailExposureEv,
       displayGamma: currentState.displayGamma,
       channelThumbnailDisplayGamma: currentState.channelThumbnailDisplayGamma,
-      displaySelection: cloneDisplaySelection(currentState.displaySelection),
+      displaySelection: cloneDisplaySelection(resolvedState.displaySelection),
       stokesDegreeModulation: { ...currentState.stokesDegreeModulation },
       stokesAolpDegreeModulationMode: currentState.stokesAolpDegreeModulationMode,
       lockedPixel,
       roi
     },
     nextSession.decoded,
-    nextSession.state.activeLayer,
+    resolvedState.activeLayer,
     {
       stokesParameterVisibility: options.stokesParameterVisibility,
       spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
@@ -254,6 +294,7 @@ function buildSwitchedImageCamera(
   nextSession: OpenedImageSession,
   currentState: ViewerSessionState,
   previousImage: DecodedExrImage | null,
+  nextDisplaySelection: DisplaySelection | null,
   options: BuildSwitchedSessionStateOptions
 ): Pick<ViewerSessionState, 'zoom' | 'panX' | 'panY'> {
   if (currentState.viewerMode !== 'image') {
@@ -265,10 +306,15 @@ function buildSwitchedImageCamera(
   }
 
   if (options.autoFitViewport) {
-    return computeFitView(
-      options.autoFitViewport,
+    const displaySize = resolveDisplayImageSize(
       nextSession.decoded.width,
       nextSession.decoded.height,
+      nextDisplaySelection
+    );
+    return computeFitView(
+      options.autoFitViewport,
+      displaySize.width,
+      displaySize.height,
       options.autoFitInsets
     );
   }
@@ -279,7 +325,9 @@ function buildSwitchedImageCamera(
       currentState.panX,
       currentState.panY,
       previousImage,
-      nextSession.decoded
+      nextSession.decoded,
+      currentState.displaySelection,
+      nextDisplaySelection
     )
   };
 }
@@ -296,14 +344,10 @@ export function buildResetSessionState(
     return createClearedViewerState(defaultColormapId);
   }
 
-  const fitView = computeFitView(viewport, activeSession.decoded.width, activeSession.decoded.height, fitInsets);
-  return buildViewerStateForLayer(
+  const resetBaseState = buildViewerStateForLayer(
     {
       ...createClearedViewerState(defaultColormapId),
-      viewerMode: currentState.viewerMode,
-      zoom: fitView.zoom,
-      panX: fitView.panX,
-      panY: fitView.panY
+      viewerMode: currentState.viewerMode
     },
     activeSession.decoded,
     0,
@@ -312,22 +356,38 @@ export function buildResetSessionState(
       spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled
     }
   );
+  const displaySize = resolveDisplayImageSize(
+    activeSession.decoded.width,
+    activeSession.decoded.height,
+    resetBaseState.displaySelection
+  );
+  const fitView = computeFitView(viewport, displaySize.width, displaySize.height, fitInsets);
+  return {
+    ...resetBaseState,
+    zoom: fitView.zoom,
+    panX: fitView.panX,
+    panY: fitView.panY
+  };
 }
 
 function remapPanToImageCenterAnchor(
   panX: number,
   panY: number,
   previousImage: DecodedExrImage | null,
-  nextImage: DecodedExrImage
+  nextImage: DecodedExrImage,
+  previousSelection: DisplaySelection | null,
+  nextSelection: DisplaySelection | null
 ): { panX: number; panY: number } {
   if (!previousImage) {
     return { panX, panY };
   }
 
-  const previousCenterX = previousImage.width * 0.5;
-  const previousCenterY = previousImage.height * 0.5;
-  const nextCenterX = nextImage.width * 0.5;
-  const nextCenterY = nextImage.height * 0.5;
+  const previousSize = resolveDisplayImageSize(previousImage.width, previousImage.height, previousSelection);
+  const nextSize = resolveDisplayImageSize(nextImage.width, nextImage.height, nextSelection);
+  const previousCenterX = previousSize.width * 0.5;
+  const previousCenterY = previousSize.height * 0.5;
+  const nextCenterX = nextSize.width * 0.5;
+  const nextCenterY = nextSize.height * 0.5;
 
   return {
     panX: nextCenterX + (panX - previousCenterX),

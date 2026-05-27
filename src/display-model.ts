@@ -43,6 +43,12 @@ export type SpectralRgbSelection = {
   seriesKey: string;
 };
 
+export type MuellerMatrixSelection = {
+  kind: 'muellerMatrix';
+  suffix?: string;
+  rgb?: boolean;
+};
+
 export type StokesScalarSelection = {
   kind: 'stokesScalar';
   parameter: StokesScalarParameter;
@@ -57,7 +63,7 @@ export type StokesAngleSelection = {
 
 export type ChannelSelection = ChannelRgbSelection | ChannelMonoSelection;
 export type StokesSelection = StokesScalarSelection | StokesAngleSelection;
-export type DisplaySelection = ChannelSelection | StokesSelection | SpectralRgbSelection;
+export type DisplaySelection = ChannelSelection | StokesSelection | SpectralRgbSelection | MuellerMatrixSelection;
 
 const STOKES_PARAMETER_LABELS: Record<StokesParameter, string> = {
   aolp: 'AoLP',
@@ -94,6 +100,10 @@ export function cloneDisplaySelection(selection: DisplaySelection | null): Displ
     return { ...selection };
   }
 
+  if (selection.kind === 'muellerMatrix') {
+    return { ...selection };
+  }
+
   return {
     ...selection,
     source: cloneStokesSource(selection.source)
@@ -125,6 +135,10 @@ export function sameDisplaySelection(
       const next = b as SpectralRgbSelection;
       return a.seriesKey === next.seriesKey;
     }
+    case 'muellerMatrix': {
+      const next = b as MuellerMatrixSelection;
+      return (a.suffix ?? null) === (next.suffix ?? null) && Boolean(a.rgb) === Boolean(next.rgb);
+    }
     case 'stokesScalar':
     case 'stokesAngle': {
       const next = b as StokesSelection;
@@ -145,6 +159,8 @@ export function serializeDisplaySelectionKey(selection: DisplaySelection | null)
       return `channelMono:${selection.channel}:${selection.alpha ?? ''}`;
     case 'spectralRgb':
       return `spectralRgb:${selection.seriesKey}`;
+    case 'muellerMatrix':
+      return selection.rgb ? 'muellerMatrixRgb:' : `muellerMatrix:${selection.suffix ?? ''}`;
     case 'stokesScalar':
     case 'stokesAngle':
       return `${selection.kind}:${selection.parameter}:${serializeStokesSource(selection.source)}`;
@@ -161,6 +177,16 @@ export function isStokesSelection(selection: DisplaySelection | null): selection
 
 export function isSpectralRgbSelection(selection: DisplaySelection | null): selection is SpectralRgbSelection {
   return Boolean(selection && selection.kind === 'spectralRgb');
+}
+
+export function isMuellerMatrixSelection(selection: DisplaySelection | null): selection is MuellerMatrixSelection {
+  return Boolean(selection && selection.kind === 'muellerMatrix');
+}
+
+export function isGroupedRgbMuellerMatrixSelection(
+  selection: DisplaySelection | null
+): selection is MuellerMatrixSelection & { rgb: true } {
+  return Boolean(isMuellerMatrixSelection(selection) && selection.rgb);
 }
 
 export function isStokesAngleSelection(selection: DisplaySelection | null): selection is StokesAngleSelection {
@@ -184,7 +210,7 @@ export function isMonoSelection(selection: DisplaySelection | null): boolean {
   return selection.kind === 'channelMono' || (
     isStokesSelection(selection) &&
     selection.source.kind === 'rgbComponent'
-  );
+  ) || (isMuellerMatrixSelection(selection) && !selection.rgb);
 }
 
 export function selectionUsesImageAlpha(selection: DisplaySelection | null): boolean {
@@ -273,6 +299,8 @@ export function getDisplaySelectionOptionLabel(selection: DisplaySelection): str
       return selection.alpha ? `${selection.channel},${selection.alpha}` : selection.channel;
     case 'spectralRgb':
       return formatSpectralRgbSelectionLabel(selection);
+    case 'muellerMatrix':
+      return formatMuellerMatrixSelectionLabel(selection);
     case 'stokesScalar':
     case 'stokesAngle':
       return formatStokesSelectionLabel(selection);
@@ -335,6 +363,14 @@ function formatChannelRgbSelectionLabel(selection: ChannelRgbSelection): string 
 
 function formatSpectralRgbSelectionLabel(selection: SpectralRgbSelection): string {
   return selection.seriesKey ? `${selection.seriesKey} Spectral RGB` : 'Spectral RGB';
+}
+
+function formatMuellerMatrixSelectionLabel(selection: MuellerMatrixSelection): string {
+  if (selection.rgb) {
+    return 'Mueller Matrix.RGB';
+  }
+
+  return selection.suffix ? `Mueller Matrix.${selection.suffix}` : 'Mueller Matrix';
 }
 
 function formatStokesSelectionLabel(selection: StokesSelection): string {

@@ -18,6 +18,14 @@ import {
   pickDefaultSpectralRgbSelection
 } from './spectral';
 import {
+  buildMuellerMatrixSelection,
+  buildRgbMuellerMatrixSelection,
+  detectMuellerMatrixChannelSets,
+  detectRgbMuellerMatrixChannels,
+  getMuellerMatrixRgbComponentChannels,
+  isMuellerMatrixDisplayAvailable
+} from './mueller';
+import {
   buildRgbGroupLabel,
   type ChannelMonoSelection,
   type ChannelRgbSelection,
@@ -25,6 +33,8 @@ import {
   type DisplaySelection,
   isAlphaChannel,
   isChannelSelection,
+  isGroupedRgbMuellerMatrixSelection,
+  isMuellerMatrixSelection,
   isSpectralRgbSelection,
   isStokesSelection,
   parseRgbChannelName,
@@ -65,8 +75,18 @@ export function pickDefaultDisplaySelection(
 ): DisplaySelection | null {
   const names = [...channelNames];
   const rgbGroups = extractRgbChannelGroups(names);
+  const nonMuellerRgbGroups = rgbGroups.filter((group) => !isMuellerMatrixElementName(group.key));
+  if (nonMuellerRgbGroups.length > 0) {
+    return buildChannelRgbSelection(nonMuellerRgbGroups[0]!);
+  }
+
+  const rgbMuellerChannels = detectRgbMuellerMatrixChannels(names);
+  if (rgbMuellerChannels) {
+    return buildRgbMuellerMatrixSelection();
+  }
+
   if (rgbGroups.length > 0) {
-    return buildChannelRgbSelection(rgbGroups[0]);
+    return buildChannelRgbSelection(rgbGroups[0]!);
   }
 
   if (config.spectralRgbGroupingEnabled !== false) {
@@ -79,6 +99,11 @@ export function pickDefaultDisplaySelection(
   const grayscaleChannel = pickGrayscaleDisplayChannel(names);
   if (grayscaleChannel) {
     return buildChannelMonoSelection(channelNames, grayscaleChannel);
+  }
+
+  const muellerChannels = detectMuellerMatrixChannelSets(names);
+  if (muellerChannels.length > 0) {
+    return buildMuellerMatrixSelection(muellerChannels[0]?.suffix ?? null);
   }
 
   const fallbackChannel = names.find((channelName) => !isAlphaChannel(channelName)) ?? names[0] ?? null;
@@ -112,6 +137,12 @@ export function resolveDisplaySelectionForLayer(
 
   if (isSpectralRgbSelection(currentSelection)) {
     return config.spectralRgbGroupingEnabled !== false && isSpectralRgbDisplayAvailable(channelNames, currentSelection)
+      ? currentSelection
+      : pickDefaultDisplaySelection(channelNames, config);
+  }
+
+  if (isMuellerMatrixSelection(currentSelection)) {
+    return isMuellerMatrixDisplayAvailable(channelNames, currentSelection)
       ? currentSelection
       : pickDefaultDisplaySelection(channelNames, config);
   }
@@ -295,6 +326,16 @@ export function findMergedSelectionForSplitDisplay(
     return spectralStokesSelection;
   }
 
+  if (
+    isMuellerMatrixSelection(selected) &&
+    !selected.rgb &&
+    isMuellerMatrixRgbComponentSuffix(selected.suffix)
+  ) {
+    return detectRgbMuellerMatrixChannels(channelNames)
+      ? buildRgbMuellerMatrixSelection()
+      : null;
+  }
+
   if (!isStokesSelection(selected) || selected.source.kind !== 'rgbComponent') {
     return null;
   }
@@ -325,6 +366,13 @@ export function findSplitSelectionForMergedDisplay(
   const spectralStokesSelection = findSplitSelectionForMergedSpectralStokes(channelNames, selected);
   if (spectralStokesSelection) {
     return spectralStokesSelection;
+  }
+
+  if (isGroupedRgbMuellerMatrixSelection(selected)) {
+    const channels = detectRgbMuellerMatrixChannels(channelNames);
+    return channels
+      ? buildMuellerMatrixSelection(getMuellerMatrixRgbComponentChannels(channels, 'R').suffix ?? null)
+      : null;
   }
 
   if (!isStokesSelection(selected) || selected.source.kind !== 'rgbLuminance') {
@@ -553,4 +601,12 @@ function pickGrayscaleDisplayChannel(channelNames: string[]): string | null {
 
   const nonAlphaChannels = channelNames.filter((channelName) => !isAlphaChannel(channelName));
   return nonAlphaChannels.length === 1 ? nonAlphaChannels[0] ?? null : null;
+}
+
+function isMuellerMatrixElementName(value: string): boolean {
+  return /^M[0-3][0-3]$/.test(value);
+}
+
+function isMuellerMatrixRgbComponentSuffix(value: string | undefined): value is 'R' | 'G' | 'B' {
+  return value === 'R' || value === 'G' || value === 'B';
 }

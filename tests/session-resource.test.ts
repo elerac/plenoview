@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildLoadedSession, buildReloadedSession, buildReloadedSessionState } from '../src/app/session-resource';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 import { createInitialState } from '../src/viewer-store';
-import { createImage, createLayerFromChannels } from './helpers/state-fixtures';
+import { createImage, createLayerFromChannels, createMuellerMatrixSelection } from './helpers/state-fixtures';
 import type { DecodedExrImage, OpenedImageSession } from '../src/types';
 
 describe('session resource ROI handling', () => {
@@ -55,6 +56,23 @@ describe('session resource ROI handling', () => {
     );
 
     expect(nextState.roi).toBeNull();
+  });
+
+  it('clamps Mueller display coordinates after a reload falls back to source-sized display', () => {
+    const nextState = buildReloadedSessionState(
+      {
+        ...createInitialState(),
+        displaySelection: createMuellerMatrixSelection(),
+        lockedPixel: { ix: 3, iy: 3 },
+        roi: { x0: 0, y0: 0, x1: 3, y1: 3 }
+      },
+      createMuellerImage(1, 1),
+      createSizedImage(1, 1)
+    );
+
+    expect(nextState.displaySelection).toMatchObject({ kind: 'channelRgb' });
+    expect(nextState.lockedPixel).toBeNull();
+    expect(nextState.roi).toEqual({ x0: 0, y0: 0, x1: 0, y1: 0 });
   });
 });
 
@@ -181,6 +199,22 @@ function createSizedImage(width: number, height: number): DecodedExrImage {
         G: new Float32Array(pixelCount).fill(1),
         B: new Float32Array(pixelCount).fill(1)
       })
+    ]
+  };
+}
+
+function createMuellerImage(width: number, height: number): DecodedExrImage {
+  const pixelCount = width * height;
+  return {
+    width,
+    height,
+    layers: [
+      createLayerFromChannels(Object.fromEntries(
+        MUELLER_MATRIX_ELEMENTS.map((element, index) => [
+          element,
+          new Float32Array(pixelCount).fill(index + 1)
+        ])
+      ))
     ]
   };
 }

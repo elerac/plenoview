@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildDisplaySourceBinding } from '../src/display/bindings';
+import { buildMuellerMatrixSourceName, buildRgbMuellerMatrixSourceName, MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 import {
   createChannelMonoSelection,
   createChannelRgbSelection,
+  createMuellerMatrixSelection,
+  createRgbMuellerMatrixSelection,
   createSpectralRgbSelection,
   createLayerFromChannels,
   createStokesSelection
@@ -36,6 +39,19 @@ describe('display bindings', () => {
       'S2.Y': [3],
       'S3.Y': [4]
     });
+    const muellerLayer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, [index + 1]])
+    ));
+    const suffixedMuellerLayer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [`${element}.Y`, [index + 1]])
+    ));
+    const rgbMuellerLayer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.flatMap((element, index) => [
+        [`${element}.R`, [index + 1]],
+        [`${element}.G`, [index + 2]],
+        [`${element}.B`, [index + 3]]
+      ])
+    ));
     const spectralLayer = createLayerFromChannels({
       '400nm': [1],
       '500nm': [1],
@@ -59,6 +75,13 @@ describe('display bindings', () => {
       suffixedStokesLayer,
       createStokesSelection('dop', 'stokesScalar', null, 'Y')
     );
+    const muellerBinding = buildDisplaySourceBinding(muellerLayer, createMuellerMatrixSelection());
+    const suffixedMuellerBinding = buildDisplaySourceBinding(
+      suffixedMuellerLayer,
+      createMuellerMatrixSelection('Y')
+    );
+    const rgbMuellerBinding = buildDisplaySourceBinding(rgbMuellerLayer, createRgbMuellerMatrixSelection());
+    const splitRgbMuellerBinding = buildDisplaySourceBinding(rgbMuellerLayer, createMuellerMatrixSelection('G'));
     const stokesColormapBinding = buildDisplaySourceBinding(
       stokesLayer,
       createStokesSelection('dop', 'stokesRgb'),
@@ -97,6 +120,22 @@ describe('display bindings', () => {
     expect(suffixedStokesBinding.slots.slice(0, 4)).toEqual(['S0.Y', 'S1.Y', 'S2.Y', 'S3.Y']);
     expect(suffixedStokesBinding.usesImageAlpha).toBe(false);
     expect(suffixedStokesBinding.stokesParameter).toBe('dop');
+    expect(muellerBinding.mode).toBe('muellerMatrix');
+    expect(muellerBinding.slots[0]).toBe(buildMuellerMatrixSourceName());
+    expect(muellerBinding.usesImageAlpha).toBe(false);
+    expect(muellerBinding.stokesParameter).toBeNull();
+    expect(suffixedMuellerBinding.mode).toBe('muellerMatrix');
+    expect(suffixedMuellerBinding.slots[0]).toBe(buildMuellerMatrixSourceName('Y'));
+    expect(suffixedMuellerBinding.usesImageAlpha).toBe(false);
+    expect(suffixedMuellerBinding.stokesParameter).toBeNull();
+    expect(rgbMuellerBinding.mode).toBe('muellerMatrix');
+    expect(rgbMuellerBinding.slots[0]).toBe(buildRgbMuellerMatrixSourceName());
+    expect(rgbMuellerBinding.usesImageAlpha).toBe(false);
+    expect(rgbMuellerBinding.stokesParameter).toBeNull();
+    expect(splitRgbMuellerBinding.mode).toBe('muellerMatrix');
+    expect(splitRgbMuellerBinding.slots[0]).toBe(buildMuellerMatrixSourceName('G'));
+    expect(splitRgbMuellerBinding.usesImageAlpha).toBe(false);
+    expect(splitRgbMuellerBinding.stokesParameter).toBeNull();
     expect(stokesColormapBinding.mode).toBe('stokesRgbLuminance');
     expect(stokesColormapBinding.slots).toEqual(stokesBinding.slots);
     expect(spectralBinding.mode).toBe('spectralRgb');

@@ -39,6 +39,7 @@ const int DISPLAY_MODE_STOKES_RGB_LUMINANCE = 5;
 const int DISPLAY_MODE_SPECTRAL_RGB = 6;
 const int DISPLAY_MODE_STOKES_SPECTRAL_RGB = 7;
 const int DISPLAY_MODE_STOKES_SPECTRAL_RGB_LUMINANCE = 8;
+const int DISPLAY_MODE_MUELLER_MATRIX = 9;
 const int ALPHA_OUTPUT_OPAQUE = 0;
 const int ALPHA_OUTPUT_STRAIGHT = 1;
 const int ALPHA_OUTPUT_PREMULTIPLIED = 2;
@@ -582,6 +583,16 @@ DisplaySample readDisplaySample(ivec2 pixel) {
       1.0,
       vec4(0.0),
       hasInvalidValue(spectralRgb)
+    );
+  }
+
+  if (uDisplayMode == DISPLAY_MODE_MUELLER_MATRIX) {
+    vec4 mueller = texelFetch(uSourceTextures[0], pixel, 0);
+    return DisplaySample(
+      sanitizeDisplayColor(mueller.rgb),
+      sanitizeAlphaValue(mueller.a),
+      vec4(0.0),
+      hasInvalidValue(mueller.rgb) || !isFiniteValue(mueller.a)
     );
   }
 

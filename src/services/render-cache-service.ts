@@ -30,6 +30,7 @@ import {
   isSpectralStokesRgbSourceName,
   pickDefaultSpectralRgbSelection
 } from '../spectral';
+import { isMuellerMatrixSourceName } from '../mueller';
 import {
   buildDisplayAutoExposureRevisionKey,
   buildDisplayImageStatsRevisionKey,
@@ -1985,6 +1986,10 @@ function predictRetainedChannelBytes(
     ? predictChannelTextureBytes(width, height)
     : 0;
   return channelNames.reduce((total, channelName) => {
+    if (isMuellerMatrixSourceName(channelName)) {
+      return total + perChannelTextureBytes * 64;
+    }
+
     if (isDerivedDisplaySourceName(channelName)) {
       return total + perChannelTextureBytes * 4;
     }
@@ -1994,7 +1999,9 @@ function predictRetainedChannelBytes(
 }
 
 function isDerivedDisplaySourceName(channelName: string): boolean {
-  return isSpectralRgbSourceName(channelName) || isSpectralStokesRgbSourceName(channelName);
+  return isSpectralRgbSourceName(channelName) ||
+    isSpectralStokesRgbSourceName(channelName) ||
+    isMuellerMatrixSourceName(channelName);
 }
 
 function resolveSpectralRgbHotSourceNames(

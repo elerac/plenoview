@@ -9,7 +9,14 @@ import {
   selectVisibleChannelViewItems
 } from '../src/channel-view-items';
 import { createDefaultStokesParameterVisibilitySettings } from '../src/stokes';
-import { createChannelMonoSelection, createSpectralRgbSelection, createStokesSelection } from './helpers/state-fixtures';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
+import {
+  createChannelMonoSelection,
+  createMuellerMatrixSelection,
+  createRgbMuellerMatrixSelection,
+  createSpectralRgbSelection,
+  createStokesSelection
+} from './helpers/state-fixtures';
 
 describe('channel view items', () => {
   it('keeps merged and split channel ordering stable from one shared descriptor list', () => {
@@ -73,6 +80,53 @@ describe('channel view items', () => {
     expect(stokesItem?.meta).toBe('32f x 3');
     expect(findSelectedChannelViewItem(items, createStokesSelection('aolp', 'stokesScalar', null, 'Y'))?.value)
       .toBe('stokesScalar:aolp:Y');
+  });
+
+  it('builds Mueller matrix descriptors for complete bare and suffixed sets', () => {
+    const items = buildChannelViewItems([
+      ...MUELLER_MATRIX_ELEMENTS,
+      ...MUELLER_MATRIX_ELEMENTS.map((element) => `${element}.Y`)
+    ]);
+    const visible = selectVisibleChannelViewItems(items, false);
+    const bare = visible.find((item) => item.value === 'muellerMatrix:');
+    const suffixed = visible.find((item) => item.value === 'muellerMatrix:Y');
+
+    expect(bare?.label).toBe('Mueller Matrix');
+    expect(bare?.meta).toBe('32f x 16');
+    expect(suffixed?.label).toBe('Mueller Matrix.Y');
+    expect(suffixed?.meta).toBe('32f x 16');
+    expect(findSelectedChannelViewItem(items, createMuellerMatrixSelection())?.value).toBe('muellerMatrix:');
+    expect(findSelectedChannelViewItem(items, createMuellerMatrixSelection('Y'))?.value).toBe('muellerMatrix:Y');
+  });
+
+  it('builds grouped and split RGB Mueller matrix descriptors', () => {
+    const channelNames = MUELLER_MATRIX_ELEMENTS.flatMap((element) => [
+      `${element}.R`,
+      `${element}.G`,
+      `${element}.B`
+    ]);
+    const items = buildChannelViewItems(channelNames);
+    const merged = selectVisibleChannelViewItems(items, false);
+    const split = selectVisibleChannelViewItems(items, true);
+
+    expect(merged.some((item) => (
+      item.value === 'muellerMatrixRgb:' &&
+      item.label === 'Mueller Matrix.RGB' &&
+      item.meta === '32f x 48'
+    ))).toBe(true);
+    expect(split.map((item) => item.value)).toEqual(expect.arrayContaining([
+      'muellerMatrix:R',
+      'muellerMatrix:G',
+      'muellerMatrix:B'
+    ]));
+    expect(findSelectedChannelViewItem(items, createRgbMuellerMatrixSelection())?.value).toBe('muellerMatrixRgb:');
+    expect(findSelectedChannelViewItem(items, createMuellerMatrixSelection('G'))?.value).toBe('muellerMatrix:G');
+    expect(buildChannelViewStacks(channelNames, items).some((stack) => (
+      stack.parentValue === 'muellerMatrixRgb:' &&
+      stack.childValues.includes('muellerMatrix:R') &&
+      stack.childValues.includes('muellerMatrix:G') &&
+      stack.childValues.includes('muellerMatrix:B')
+    ))).toBe(true);
   });
 
   it('finds the selected descriptor by display selection', () => {

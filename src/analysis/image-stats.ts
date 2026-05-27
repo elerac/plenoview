@@ -1,5 +1,6 @@
 import { computeRec709Luminance } from '../color';
 import type { DisplaySelection } from '../display-model';
+import { resolveDisplayImageSize } from '../display-size';
 import {
   createDisplayPixelValues,
   readDisplaySelectionPixelValuesAtIndex,
@@ -26,8 +27,13 @@ export function computeDisplaySelectionLuminanceRange(
   visualizationMode: VisualizationMode = 'rgb',
   stokesOptions: DisplayEvaluationOptions = {}
 ): DisplayLuminanceRange | null {
-  const pixelCount = width * height;
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = displaySize.width * displaySize.height;
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...stokesOptions,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const values = createDisplayPixelValues();
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -65,8 +71,13 @@ export async function computeDisplaySelectionLuminanceRangeAsync(
   options: CooperativeComputeOptions & DisplayEvaluationOptions = {}
 ): Promise<DisplayLuminanceRange | null> {
   throwIfCooperativeComputeAborted(options);
-  const pixelCount = width * height;
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, options);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = displaySize.width * displaySize.height;
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...options,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const values = createDisplayPixelValues();
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -106,12 +117,17 @@ export function computeDisplaySelectionImageStats(
   visualizationMode: VisualizationMode = 'rgb',
   stokesOptions: DisplayEvaluationOptions = {}
 ): ImageStats | null {
-  const pixelCount = Math.max(0, width * height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = Math.max(0, displaySize.width * displaySize.height);
   if (pixelCount === 0) {
     return null;
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...stokesOptions,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const accumulators = createDisplaySelectionStatsAccumulators(evaluator, selection);
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
@@ -121,8 +137,8 @@ export function computeDisplaySelectionImageStats(
   }
 
   return {
-    width,
-    height,
+    width: displaySize.width,
+    height: displaySize.height,
     pixelCount,
     channels: accumulators.map(toStatsChannelSummary)
   };
@@ -137,12 +153,17 @@ export async function computeDisplaySelectionImageStatsAsync(
   options: CooperativeComputeOptions & DisplayEvaluationOptions = {}
 ): Promise<ImageStats | null> {
   throwIfCooperativeComputeAborted(options);
-  const pixelCount = Math.max(0, width * height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = Math.max(0, displaySize.width * displaySize.height);
   if (pixelCount === 0) {
     return null;
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, options);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...options,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const accumulators = createDisplaySelectionStatsAccumulators(evaluator, selection);
 
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
@@ -157,8 +178,8 @@ export async function computeDisplaySelectionImageStatsAsync(
   }
 
   return {
-    width,
-    height,
+    width: displaySize.width,
+    height: displaySize.height,
     pixelCount,
     channels: accumulators.map(toStatsChannelSummary)
   };

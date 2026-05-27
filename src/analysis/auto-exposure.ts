@@ -1,4 +1,5 @@
 import type { DisplaySelection } from '../display-model';
+import { resolveDisplayImageSize } from '../display-size';
 import type { DecodedLayer, VisualizationMode } from '../types';
 import {
   createDisplayPixelValues,
@@ -96,12 +97,17 @@ export function computeDisplaySelectionAutoExposure(
   percentile = AUTO_EXPOSURE_PERCENTILE,
   stokesOptions: DisplayEvaluationOptions = {}
 ): AutoExposureResult {
-  const pixelCount = Math.max(0, width * height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = Math.max(0, displaySize.width * displaySize.height);
   if (pixelCount === 0) {
     return createAutoExposureResult(1, percentile);
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...stokesOptions,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const values = createDisplayPixelValues();
   const scalars = new Float32Array(pixelCount);
   let scalarCount = 0;
@@ -134,23 +140,28 @@ export function computeDisplaySelectionAutoExposurePreview(
   percentile = AUTO_EXPOSURE_PERCENTILE,
   stokesOptions: DisplayEvaluationOptions = {}
 ): AutoExposureResult {
-  const sampleWidth = resolveAutoExposurePreviewSampleSize(width);
-  const sampleHeight = resolveAutoExposurePreviewSampleSize(height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const sampleWidth = resolveAutoExposurePreviewSampleSize(displaySize.width);
+  const sampleHeight = resolveAutoExposurePreviewSampleSize(displaySize.height);
   const sampleCount = sampleWidth * sampleHeight;
   if (sampleCount === 0) {
     return createAutoExposureResult(1, percentile);
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...stokesOptions,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const values = createDisplayPixelValues();
   const scalars = new Float32Array(sampleCount);
   let scalarCount = 0;
 
   for (let sampleY = 0; sampleY < sampleHeight; sampleY += 1) {
-    const sourceY = resolveAutoExposurePreviewSourceCoordinate(sampleY, sampleHeight, height);
-    const sourceRowOffset = sourceY * width;
+    const sourceY = resolveAutoExposurePreviewSourceCoordinate(sampleY, sampleHeight, displaySize.height);
+    const sourceRowOffset = sourceY * displaySize.width;
     for (let sampleX = 0; sampleX < sampleWidth; sampleX += 1) {
-      const sourceX = resolveAutoExposurePreviewSourceCoordinate(sampleX, sampleWidth, width);
+      const sourceX = resolveAutoExposurePreviewSourceCoordinate(sampleX, sampleWidth, displaySize.width);
       const scalar = readAutoExposureScalar(evaluator, sourceRowOffset + sourceX, values);
       if (!Number.isFinite(scalar) || scalar <= 0) {
         continue;
@@ -180,12 +191,17 @@ export async function computeDisplaySelectionAutoExposureAsync(
   options: CooperativeComputeOptions & DisplayEvaluationOptions = {}
 ): Promise<AutoExposureResult> {
   throwIfCooperativeComputeAborted(options);
-  const pixelCount = Math.max(0, width * height);
+  const displaySize = resolveDisplayImageSize(width, height, selection);
+  const pixelCount = Math.max(0, displaySize.width * displaySize.height);
   if (pixelCount === 0) {
     return createAutoExposureResult(1, percentile);
   }
 
-  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, options);
+  const evaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+    ...options,
+    sourceWidth: width,
+    sourceHeight: height
+  });
   const values = createDisplayPixelValues();
   const scalars = new Float32Array(pixelCount);
   let scalarCount = 0;

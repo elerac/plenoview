@@ -10,10 +10,12 @@ import type { DecodedExrImage, DecodedLayer, DisplayLuminanceRange, ImageStats, 
 import { buildViewerStateForLayer, createInitialState } from '../src/viewer-store';
 import {
   createChannelMonoSelection,
+  createMuellerMatrixSelection,
   createSpectralRgbSelection,
   createLayerFromChannels,
   createStokesSelection
 } from './helpers/state-fixtures';
+import { buildMuellerMatrixSourceName, MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 
 const MB = 1024 * 1024;
 
@@ -93,10 +95,16 @@ function createRendererMock() {
         channelNames: string[]
       ) => channelNames.map((channelName) => ({
         channelName,
-        textureBytes: channelName.startsWith('__spectral')
-          ? width * height * 4 * Float32Array.BYTES_PER_ELEMENT
-          : width * height * Float32Array.BYTES_PER_ELEMENT,
-        materializedBytes: !channelName.startsWith('__spectral') && layer.channelStorage.kind === 'interleaved-f32'
+        textureBytes: channelName.startsWith('__muellerMatrix:')
+          ? width * height * 64 * Float32Array.BYTES_PER_ELEMENT
+          : channelName.startsWith('__spectral')
+            ? width * height * 4 * Float32Array.BYTES_PER_ELEMENT
+            : width * height * Float32Array.BYTES_PER_ELEMENT,
+        materializedBytes: (
+          !channelName.startsWith('__muellerMatrix:') &&
+          !channelName.startsWith('__spectral') &&
+          layer.channelStorage.kind === 'interleaved-f32'
+        )
           ? width * height * Float32Array.BYTES_PER_ELEMENT
           : 0
       }))
@@ -280,6 +288,42 @@ describe('render cache service', () => {
       '__spectralStokesRgb:S2',
       '__spectralStokesRgb:S3'
     ]);
+  });
+
+  it('uploads and accounts for synthetic Mueller matrix source textures', () => {
+    const decoded = createDecodedImage(2, 1, Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, index + 1])
+    ));
+    const session = createSession('session-1', decoded);
+    const state = {
+      ...session.state,
+      displaySelection: createMuellerMatrixSelection()
+    };
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+    const service = new RenderCacheService({
+      ui,
+      renderer
+    });
+
+    const result = service.prepareActiveSession(session, state);
+
+    expect(result.textureDirty).toBe(true);
+    expect(renderer.ensureLayerChannelsResident).toHaveBeenCalledWith(
+      session.id,
+      0,
+      2,
+      1,
+      decoded.layers[0],
+      [buildMuellerMatrixSourceName()]
+    );
+    expect(getEntries(service).get(session.id)?.residentLayers.get(0)?.residentChannels.get(
+      buildMuellerMatrixSourceName()
+    )).toMatchObject({
+      textureBytes: 512,
+      materializedBytes: 0
+    });
+    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(640, 256 * MB);
   });
 
   it('keeps active paired spectral RGB resident when switching to split channels over budget', () => {

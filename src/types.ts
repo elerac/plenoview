@@ -32,6 +32,7 @@ export type {
   ChannelRgbSelection,
   ChannelSelection,
   DisplaySelection,
+  MuellerMatrixSelection,
   RgbSuffix,
   StokesAngleParameter,
   StokesAngleSelection,

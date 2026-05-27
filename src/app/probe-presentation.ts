@@ -1,4 +1,5 @@
 import { samplePixelValuesForDisplay } from '../sampling/probe';
+import { resolveDisplayImageSize } from '../display-size';
 import {
   buildProbeColorPreview,
   resolveActiveProbePixel,
@@ -28,10 +29,11 @@ export interface BuildProbePresentationArgs {
 export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeReadoutModel {
   const mode = resolveProbeMode(args.sessionState.lockedPixel);
   const imageSize = args.activeSession
-    ? {
-        width: args.activeSession.decoded.width,
-        height: args.activeSession.decoded.height
-      }
+    ? resolveDisplayImageSize(
+        args.activeSession.decoded.width,
+        args.activeSession.decoded.height,
+        args.sessionState.displaySelection
+      )
     : null;
 
   if (!args.activeSession || !args.activeLayer) {

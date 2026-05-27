@@ -4,6 +4,7 @@ import {
   type DisplayEvaluationOptions,
   type DisplaySelectionEvaluator
 } from '../display/evaluator';
+import { resolveDisplayImageSize } from '../display-size';
 import type { Disposable } from '../lifecycle';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../types';
 import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
@@ -62,8 +63,12 @@ export class OverlayRenderer implements Disposable {
       return;
     }
 
-    this.imageSize = { width, height };
-    this.displayEvaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, stokesOptions);
+    this.imageSize = resolveDisplayImageSize(width, height, selection);
+    this.displayEvaluator = resolveDisplaySelectionEvaluator(layer, selection, visualizationMode, {
+      ...stokesOptions,
+      sourceWidth: width,
+      sourceHeight: height
+    });
   }
 
   clearImage(): void {

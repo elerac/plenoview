@@ -5,9 +5,12 @@ import {
   samplePixelValuesForDisplay
 } from '../src/sampling/probe';
 import type { ImagePixel } from '../src/types';
+import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 import {
   createLayer,
   createLayerFromChannels,
+  createMuellerMatrixSelection,
+  createRgbMuellerMatrixSelection,
   createStokesSelection
 } from './helpers/state-fixtures';
 
@@ -142,5 +145,71 @@ describe('display probe sampling', () => {
       b: 0,
       a: 1
     });
+  });
+
+  it('maps Mueller display probe pixels back to source pixels and matrix elements', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.map((element, index) => [element, [index, index + 100]])
+    ), 'mueller');
+
+    expect(readDisplaySelectionPixelValues(
+      layer,
+      2,
+      1,
+      { ix: 6, iy: 3 },
+      createMuellerMatrixSelection()
+    )).toEqual({
+      r: 15,
+      g: 15,
+      b: 15,
+      a: 1
+    });
+
+    const sample = samplePixelValuesForDisplay(
+      layer,
+      2,
+      1,
+      { ix: 7, iy: 3 },
+      createMuellerMatrixSelection()
+    );
+    expect(sample?.x).toBe(7);
+    expect(sample?.y).toBe(3);
+    expect(sample?.values['Mueller Matrix']).toBe(115);
+  });
+
+  it('maps RGB Mueller display probe pixels back to source pixels and matrix elements', () => {
+    const layer = createLayerFromChannels(Object.fromEntries(
+      MUELLER_MATRIX_ELEMENTS.flatMap((element, index) => [
+        [`${element}.R`, [index, index + 100]],
+        [`${element}.G`, [index + 20, index + 120]],
+        [`${element}.B`, [index + 40, index + 140]]
+      ])
+    ), 'mueller-rgb');
+
+    expect(readDisplaySelectionPixelValues(
+      layer,
+      2,
+      1,
+      { ix: 6, iy: 3 },
+      createRgbMuellerMatrixSelection()
+    )).toEqual({
+      r: 15,
+      g: 35,
+      b: 55,
+      a: 1
+    });
+
+    const sample = samplePixelValuesForDisplay(
+      layer,
+      2,
+      1,
+      { ix: 7, iy: 3 },
+      createRgbMuellerMatrixSelection()
+    );
+    expect(sample?.x).toBe(7);
+    expect(sample?.y).toBe(3);
+    expect(sample?.values['Mueller Matrix.RGB.R']).toBe(115);
+    expect(sample?.values['Mueller Matrix.RGB.G']).toBe(135);
+    expect(sample?.values['Mueller Matrix.RGB.B']).toBe(155);
   });
 });
