@@ -131,7 +131,7 @@ export interface ViewerDisplayRangeRequest extends ViewerResourceTarget {
 export interface ViewerAutoExposureRequest extends ViewerResourceTarget {
   requestKey: string;
   percentile: number;
-  source: 'rgbMax';
+  source: 'rgbAbsMax';
 }
 
 export interface ViewerImageStatsRequest extends ViewerResourceTarget {

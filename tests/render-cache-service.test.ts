@@ -732,7 +732,7 @@ describe('render cache service', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       },
       pending: true
     });
@@ -742,7 +742,7 @@ describe('render cache service', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       },
       pending: true
     });
@@ -761,7 +761,7 @@ describe('render cache service', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
     expect(service.requestAutoExposure(session, session.state)).toEqual({
@@ -769,7 +769,7 @@ describe('render cache service', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       },
       pending: false
     });
@@ -780,7 +780,7 @@ describe('render cache service', () => {
         scalar: 4,
         exposureEv: -2,
         percentile: 50,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       },
       pending: true
     });
@@ -799,7 +799,7 @@ describe('render cache service', () => {
         scalar: 4,
         exposureEv: -2,
         percentile: 50,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
   });
@@ -835,7 +835,7 @@ describe('render cache service', () => {
         scalar: 511,
         exposureEv: -Math.log2(511),
         percentile: 100,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       },
       pending: true
     });
@@ -855,7 +855,7 @@ describe('render cache service', () => {
         scalar: 610,
         exposureEv: -Math.log2(610),
         percentile: 100,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
   });

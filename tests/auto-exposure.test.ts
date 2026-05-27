@@ -11,9 +11,9 @@ import {
 } from './helpers/state-fixtures';
 
 describe('display auto exposure', () => {
-  it('computes auto exposure from the lower-rank 99.5th percentile rgb max scalar', () => {
+  it('computes auto exposure from the lower-rank 99.5th percentile rgb absolute max scalar', () => {
     const layer = createLayerFromChannels({
-      R: [1, 2, 4, 8, 1000],
+      R: [-1, -2, -4, -8, -1000],
       G: [0, 0, 0, 0, 0],
       B: [0, 0, 0, 0, 0]
     }, 'beauty');
@@ -28,7 +28,7 @@ describe('display auto exposure', () => {
     expect(autoExposure.scalar).toBe(8);
     expect(autoExposure.exposureEv).toBe(-3);
     expect(autoExposure.percentile).toBe(99.5);
-    expect(autoExposure.source).toBe('rgbMax');
+    expect(autoExposure.source).toBe('rgbAbsMax');
   });
 
   it('computes preview auto exposure from a bounded low-resolution sample grid', () => {
@@ -62,7 +62,7 @@ describe('display auto exposure', () => {
     expect(exact.scalar).toBe(100);
   });
 
-  it('filters invalid and non-positive scalars in preview auto exposure', () => {
+  it('filters invalid and zero scalars in preview auto exposure', () => {
     const layer = createLayerFromChannels({
       R: [Number.NaN, -1, 0, 4],
       G: [0, 0, 0, 0],
@@ -73,7 +73,9 @@ describe('display auto exposure', () => {
       layer,
       4,
       1,
-      createChannelRgbSelection('R', 'G', 'B')
+      createChannelRgbSelection('R', 'G', 'B'),
+      'rgb',
+      100
     );
 
     expect(preview.scalar).toBe(4);
@@ -101,11 +103,11 @@ describe('display auto exposure', () => {
     expect(preview.percentile).toBe(50);
   });
 
-  it('falls back to neutral preview auto exposure when no positive scalars are available', () => {
+  it('falls back to neutral preview auto exposure when no non-zero magnitudes are available', () => {
     const layer = createLayerFromChannels({
-      R: [0, -1],
-      G: [0, -2],
-      B: [0, -3]
+      R: [0, 0],
+      G: [0, 0],
+      B: [0, 0]
     }, 'beauty');
 
     const preview = computeDisplaySelectionAutoExposurePreview(
@@ -133,27 +135,29 @@ describe('display auto exposure', () => {
     expect(preview).toEqual(exact);
   });
 
-  it('computes auto exposure for mono selections while ignoring invalid and non-positive scalars', () => {
+  it('computes auto exposure for mono selections from absolute magnitudes', () => {
     const layer = createLayerFromChannels({
-      Y: [Number.NaN, -1, 0, 0.25, 2]
+      Y: [Number.NaN, -4, 0, 0.25, 2]
     }, 'gray');
 
     const autoExposure = computeDisplaySelectionAutoExposure(
       layer,
       5,
       1,
-      createChannelMonoSelection('Y')
+      createChannelMonoSelection('Y'),
+      'rgb',
+      100
     );
 
-    expect(autoExposure.scalar).toBe(0.25);
-    expect(autoExposure.exposureEv).toBe(2);
+    expect(autoExposure.scalar).toBe(4);
+    expect(autoExposure.exposureEv).toBe(-2);
   });
 
-  it('falls back to neutral auto exposure when no positive scalars are available', () => {
+  it('falls back to neutral auto exposure when no non-zero magnitudes are available', () => {
     const layer = createLayerFromChannels({
-      R: [0, -1],
-      G: [0, -2],
-      B: [0, -3]
+      R: [0, 0],
+      G: [0, 0],
+      B: [0, 0]
     }, 'beauty');
 
     const autoExposure = computeDisplaySelectionAutoExposure(
@@ -195,7 +199,7 @@ describe('display auto exposure', () => {
 
   it('clamps computed auto exposure to the existing exposure range', () => {
     const bright = createLayerFromChannels({
-      R: [4096],
+      R: [-4096],
       G: [0],
       B: [0]
     }, 'bright');

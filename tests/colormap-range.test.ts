@@ -21,7 +21,7 @@ describe('colormap range', () => {
     const imageRange = { min: 0.2, max: 0.4 };
     const channelSelection: DisplaySelection = createChannelRgbSelection('R', 'G', 'B');
 
-    expect(resolveColormapAutoRange(channelSelection, imageRange, false)).toEqual(imageRange);
+    expect(resolveColormapAutoRange(channelSelection, imageRange, false)).toEqual({ min: -0.4, max: 0.4 });
     expect(resolveColormapAutoRange(channelSelection, imageRange, true)).toEqual({ min: -0.4, max: 0.4 });
     expect(resolveColormapAutoRange(createStokesSelection('aolp'), imageRange, false)).toEqual({
       min: 0,

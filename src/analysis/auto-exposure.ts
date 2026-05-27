@@ -21,7 +21,7 @@ export const AUTO_EXPOSURE_PERCENTILE = 99.5;
 export const AUTO_EXPOSURE_PERCENTILE_MIN = 1;
 export const AUTO_EXPOSURE_PERCENTILE_MAX = 100;
 export const AUTO_EXPOSURE_PERCENTILE_STEP = 0.1;
-export const AUTO_EXPOSURE_SOURCE = 'rgbMax' as const;
+export const AUTO_EXPOSURE_SOURCE = 'rgbAbsMax' as const;
 export const AUTO_EXPOSURE_MIN_EV = -10;
 export const AUTO_EXPOSURE_MAX_EV = 10;
 export const AUTO_EXPOSURE_PREVIEW_MAX_EDGE = 256;
@@ -243,7 +243,7 @@ function readAutoExposureScalar(
   values: DisplayPixelValues
 ): number {
   readDisplaySelectionPixelValuesAtIndex(evaluator, pixelIndex, values);
-  return Math.max(values.r, values.g, values.b);
+  return Math.max(Math.abs(values.r), Math.abs(values.g), Math.abs(values.b));
 }
 
 function resolveAutoExposurePercentileIndex(count: number, percentile: number): number {

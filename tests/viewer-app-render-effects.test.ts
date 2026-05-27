@@ -86,7 +86,7 @@ function createRenderCacheMock() {
         scalar: 4,
         exposureEv: -2,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       },
       pending: true
     }))

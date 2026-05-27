@@ -38,8 +38,8 @@ Browser-based OpenEXR viewer for graphics/computer-vision workflows, with tev-li
   - Exposure controls are hidden in `Colormap` mode because exposure does not affect that display path.
   - `Palette` selects the active LUT without rebuilding the EXR display texture.
   - `vmin`/`vmax` can be adjusted with one dual-handle slider or numeric inputs.
-  - `Auto Range` has two modes: highlighted always-auto mode follows each image/layer/channel, while one-time/manual mode preserves the current min/max across targets.
-  - `Zero Center` keeps the range symmetric around zero (`min=-v`, `max=v`), and in auto mode uses `v=max(abs(min), abs(max))`.
+  - `Auto Range` has two modes: highlighted always-auto mode follows each image/layer/channel, while one-time/manual mode preserves the current min/max across targets. Dynamic auto ranges use `v=max(abs(min), abs(max))` and map to `[-v, v]`.
+  - `Zero Center` keeps manual ranges symmetric around zero (`min=-v`, `max=v`) and also applies to fixed Stokes colormap defaults.
   - Angle Stokes colormaps expose a paired degree modulation toggle: AoLP can be modulated by DoLP, CoP by DoCP, and ToP by DoP. AoLP also lets the modulation target be `V` (HSV value) or `S` (HSV saturation), defaulting to `V`. CoP and ToP modulation default to on; AoLP defaults to off.
   - Leaves raw numeric probe values unchanged.
 - Nearest-neighbor rendering at all zoom levels (no interpolation).

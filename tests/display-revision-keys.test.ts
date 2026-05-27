@@ -88,11 +88,11 @@ describe('display revision keys', () => {
     })).toBe('4:spectralRgb:hoge:spectralRgbGrouping:true');
   });
 
-  it('builds auto-exposure revision keys with rgb max percentile context', () => {
+  it('builds auto-exposure revision keys with rgb absolute max percentile context', () => {
     expect(buildDisplayAutoExposureRevisionKey({
       activeLayer: 0,
       displaySelection: createChannelRgbSelection('R', 'G', 'B')
-    })).toBe('0:channelRgb:R:G:B::autoExposure:rgbMax:p99.5');
+    })).toBe('0:channelRgb:R:G:B::autoExposure:rgbAbsMax:p99.5');
   });
 
   it('includes Stokes invalid-vector masking in Stokes revision keys only', () => {

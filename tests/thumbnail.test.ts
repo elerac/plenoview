@@ -79,7 +79,7 @@ describe('thumbnail rendering', () => {
     expect(readPixel(thumbnail.data, thumbnail.width, 35, 10)).toEqual([255, 255, 255, 255]);
   });
 
-  it('applies current exposure without implicit rgb max scaling before display gamma encoding', () => {
+  it('applies current exposure without implicit rgb absolute max scaling before display gamma encoding', () => {
     const layer = createLayerFromChannels({
       R: [0.25],
       G: [0.5],
@@ -132,6 +132,31 @@ describe('thumbnail rendering', () => {
       255
     ]);
     expect(readPixel(autoThumbnail.data, autoThumbnail.width, 28, 4)).toEqual([255, 0, 0, 255]);
+  });
+
+  it('applies sampled auto exposure to thumbnails from absolute rgb magnitudes', () => {
+    const layer = createLayerFromChannels({
+      R: [-1, -2, -4, -8, -1000],
+      G: [0, 0.25, 0.5, 1, 1],
+      B: [0, 0, 0, 0, 0]
+    }, 'beauty');
+    const state = createThumbnailState({
+      displaySelection: createChannelRgbSelection('R', 'G', 'B')
+    });
+
+    const manualThumbnail = buildOpenedImageThumbnailPixels(layer, 5, 1, state);
+    const autoThumbnail = buildOpenedImageThumbnailPixels(layer, 5, 1, state, {
+      autoExposureEnabled: true,
+      autoExposurePercentile: 99.5
+    });
+
+    expect(readPixel(manualThumbnail.data, manualThumbnail.width, 28, 4)).toEqual([0, 255, 0, 255]);
+    expect(readPixel(autoThumbnail.data, autoThumbnail.width, 28, 4)).toEqual([
+      0,
+      linearToDisplayGammaByte(0.125),
+      0,
+      255
+    ]);
   });
 
   it('preserves source alpha in rgb thumbnails', () => {

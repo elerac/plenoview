@@ -149,7 +149,7 @@ describe('viewer app core', () => {
         scalar: 4,
         exposureEv: -2,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
 
@@ -168,7 +168,7 @@ describe('viewer app core', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
 
@@ -213,7 +213,7 @@ describe('viewer app core', () => {
         scalar: 4,
         exposureEv: -2,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
 
@@ -236,7 +236,7 @@ describe('viewer app core', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
 
@@ -271,7 +271,7 @@ describe('viewer app core', () => {
         scalar: 4,
         exposureEv: -2,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
 
@@ -291,7 +291,7 @@ describe('viewer app core', () => {
         scalar: 8,
         exposureEv: -3,
         percentile: 99.5,
-        source: 'rgbMax'
+        source: 'rgbAbsMax'
       }
     });
 

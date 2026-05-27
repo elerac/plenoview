@@ -341,7 +341,7 @@ function computeSampledThumbnailAutoExposure(
   const scalars: number[] = [];
   for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += sampleStep) {
     readDisplaySelectionPixelValuesAtIndex(evaluator, pixelIndex, sample);
-    const scalar = Math.max(sample.r, sample.g, sample.b);
+    const scalar = Math.max(Math.abs(sample.r), Math.abs(sample.g), Math.abs(sample.b));
     if (Number.isFinite(scalar) && scalar > 0) {
       scalars.push(scalar);
     }

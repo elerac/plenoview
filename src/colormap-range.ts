@@ -49,11 +49,13 @@ export function resolveColormapAutoRange(
   zeroCentered: boolean
 ): DisplayLuminanceRange | null {
   const stokesDefault = getStokesDisplayColormapDefault(selection);
-  const sourceRange = stokesDefault?.range ?? imageRange;
+  if (stokesDefault?.range) {
+    return zeroCentered
+      ? buildZeroCenteredColormapRange(stokesDefault.range)
+      : cloneDisplayLuminanceRange(stokesDefault.range);
+  }
 
-  return zeroCentered
-    ? buildZeroCenteredColormapRange(sourceRange)
-    : cloneDisplayLuminanceRange(sourceRange);
+  return buildZeroCenteredColormapRange(imageRange);
 }
 
 export function shouldPreserveStokesColormapState(
