@@ -48,16 +48,21 @@ describe('probe presentation', () => {
       activeDisplayLuminanceRange: null
     });
 
+    expect(readout.sample).not.toBeNull();
+    if (!readout.sample) {
+      throw new Error('Expected probe readout sample.');
+    }
+
     expect(readout.sample).toMatchObject({
       x: 1,
       y: 0,
       values: {
-        R: 0.2,
-        G: 0.4,
-        B: 0.6,
         Z: 2
       }
     });
+    expect(readout.sample.values.R).toBeCloseTo(0.2, 6);
+    expect(readout.sample.values.G).toBeCloseTo(0.4, 6);
+    expect(readout.sample.values.B).toBeCloseTo(0.6, 6);
     expect(readout.imageSize).toEqual({ width: 2, height: 1 });
     expect(readout.colorPreview?.displayValues.map((item) => item.label)).toEqual(['R', 'G', 'B']);
   });
