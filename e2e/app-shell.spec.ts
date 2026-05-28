@@ -11,10 +11,17 @@ import {
 } from './helpers/exr-fixtures';
 import {
   clickChannelStackToggle,
+  expectColormapAutoRange,
+  expectColormapDisplayMode,
+  expectColormapZeroCentered,
+  expectRgbDisplayMode,
   getChannelThumbnailTile,
   getSelectedChannelThumbnailTile,
   readProbeCoords,
+  resetColormapAutoRange,
   resolveViewerPoint,
+  selectColormapPalette,
+  selectPaletteNone,
   setExposureValue
 } from './helpers/viewer';
 
@@ -401,14 +408,8 @@ test('opens the gallery demo image and keeps core display controls stable', asyn
   const rightStack = page.locator('#right-stack');
   const viewer = page.locator('#viewer-container');
   const displayHeading = page.locator('#display-control-heading');
-  const noneButton = page.locator('#visualization-none-button');
-  const colormapButton = page.locator('#colormap-toggle-button');
-  const exposureControl = page.locator('#exposure-control');
   const exposureValue = page.locator('#exposure-value');
-  const colormapRangeControl = page.locator('#colormap-range-control');
   const colormapSelect = page.locator('#colormap-select');
-  const colormapAutoRangeButton = page.getByRole('button', { name: 'Auto Range' });
-  const colormapZeroCenterButton = page.getByRole('button', { name: 'Zero Center' });
   const colormapRangeSlider = page.locator('#colormap-range-slider');
   const colormapVminInput = page.locator('#colormap-vmin-input');
   const colormapVmaxInput = page.locator('#colormap-vmax-input');
@@ -475,34 +476,28 @@ test('opens the gallery demo image and keeps core display controls stable', asyn
   await expectMainPanelTopsAligned(viewer, imagePanel, rightStack);
 
   await expect(displayHeading).toBeVisible();
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(exposureControl).toBeVisible();
-  await expect(colormapRangeControl).toBeHidden();
+  await expectRgbDisplayMode(page);
   await setExposureValue(exposureValue, '1.3');
   await expect(exposureValue).toHaveValue('1.3');
   await setExposureValue(exposureValue, '-0.7');
   await expect(exposureValue).toHaveValue('-0.7');
 
-  await colormapButton.click();
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(exposureControl).toBeHidden();
-  await expect(colormapRangeControl).toBeVisible();
+  await selectColormapPalette(page, expectedColormapLabels[0]);
+  await expectColormapDisplayMode(page, expectedColormapLabels[0]);
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['Mono:']);
-  await expect(colormapAutoRangeButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'false');
+  await expectColormapAutoRange(page, true);
+  await expectColormapZeroCentered(page, false);
   const rdBuId = String(expectedColormapLabels.indexOf('RdBu'));
   expect(rdBuId).not.toBe('-1');
-  await expect(colormapSelect.locator('option')).toHaveText(expectedColormapLabels);
+  await expect(colormapSelect.locator('option')).toHaveText(['None', ...expectedColormapLabels]);
   await expect(colormapSelect).toHaveValue('0');
-  await colormapSelect.selectOption({ label: 'RdBu' });
+  await selectColormapPalette(page, 'RdBu');
   await expect(colormapSelect).toHaveValue(rdBuId);
   await expect(colormapRangeSlider).toBeVisible();
   await expect(colormapVminInput).toBeEnabled();
   await expect(colormapVmaxInput).toBeEnabled();
   await expect(colormapVmaxSlider).toBeEnabled();
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect(colormapRangeSlider).toHaveClass(/zero-centered/);
 
   const autoMin = Number(await colormapVminInput.inputValue());
@@ -532,28 +527,25 @@ test('opens the gallery demo image and keeps core display controls stable', asyn
   const manualMax = 1e-16;
   await colormapVmaxInput.fill(String(manualMax));
   await colormapVmaxInput.dispatchEvent('change');
-  await expect(colormapAutoRangeButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapAutoRange(page, false);
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-manualMax, 12);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(manualMax, 12);
 
   await reloadOpenedFileButton.click();
   await expect(openedImages.locator('option:checked')).toContainText('cbox_rgb.exr');
-  await expect(colormapAutoRangeButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapAutoRange(page, false);
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-manualMax, 12);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(manualMax, 12);
 
-  await colormapAutoRangeButton.click();
-  await expect(colormapAutoRangeButton).toHaveAttribute('aria-pressed', 'true');
+  await resetColormapAutoRange(page);
+  await expectColormapAutoRange(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-zeroCenteredAutoMax, 5);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(zeroCenteredAutoMax, 5);
 
-  await noneButton.click();
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(exposureControl).toBeVisible();
-  await expect(colormapRangeControl).toBeHidden();
+  await selectPaletteNone(page);
+  await expectRgbDisplayMode(page);
 
   await closeOpenedFileButton.click();
   await expect(openedImages.locator('option')).toHaveCount(0, { timeout: 30000 });

@@ -11,7 +11,17 @@ import {
   getPendingIdleCallbackCount,
   installIdleCallbackController
 } from './helpers/idle-callbacks';
-import { clickChannelStackToggle, getChannelStackToggle, readImagePixel } from './helpers/viewer';
+import {
+  clickChannelStackToggle,
+  expectColormapAutoRange,
+  expectColormapDisplayMode,
+  expectColormapZeroCentered,
+  expectRgbDisplayMode,
+  getChannelStackToggle,
+  readImagePixel,
+  selectColormapPalette,
+  selectPaletteNone
+} from './helpers/viewer';
 
 function exactText(text: string): RegExp {
   return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
@@ -27,6 +37,16 @@ function selectedChannelTile(page: Page): Locator {
 
 async function selectChannelTile(page: Page, label: string): Promise<void> {
   await channelTileByLabel(page, label).click();
+}
+
+async function expectThumbnailImageAfterIdleFlush(page: Page, tile: Locator): Promise<void> {
+  const image = tile.locator('.channel-thumbnail-image');
+  await expect
+    .poll(async () => {
+      await flushAllIdleCallbacks(page);
+      return await image.count();
+    }, { timeout: 30000 })
+    .toBe(1);
 }
 
 test('loads scalar Stokes channels and applies derived-channel defaults', async ({ page }) => {
@@ -57,8 +77,7 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   const colormapSelect = page.locator('#colormap-select');
   const colormapVminInput = page.locator('#colormap-vmin-input');
   const colormapVmaxInput = page.locator('#colormap-vmax-input');
-  const colormapAutoRangeButton = page.getByRole('button', { name: 'Auto Range' });
-  const colormapZeroCenterButton = page.getByRole('button', { name: 'Zero Center' });
+  const colormapZeroCenterButton = page.locator('#colormap-zero-center-button');
   const stokesDegreeModulationButton = page.locator('#stokes-degree-modulation-button');
   const stokesAolpModeControl = page.locator('#stokes-aolp-modulation-mode-control');
   const stokesAolpValueButton = page.locator('#stokes-aolp-modulation-value-button');
@@ -80,8 +99,8 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await selectChannelTile(page, 'Stokes AoLP');
   await expect(colormapRangeControl).toBeVisible();
   await expect(colormapSelect).toHaveValue(hsvId);
-  await expect(colormapAutoRangeButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'false');
+  await expectColormapAutoRange(page, false);
+  await expectColormapZeroCentered(page, false);
   await expect(stokesDegreeModulationButton).toBeVisible();
   await expect(stokesDegreeModulationButton).toHaveText('DoLP Modulation');
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'false');
@@ -116,15 +135,15 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(0, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(1, 8);
 
-  await colormapSelect.selectOption({ label: 'coolwarm' });
+  await selectColormapPalette(page, 'coolwarm');
   await expect(colormapSelect).toHaveValue(coolwarmId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await colormapVminInput.fill('0.2');
   await colormapVminInput.dispatchEvent('change');
   await colormapVmaxInput.fill('0.8');
   await colormapVmaxInput.dispatchEvent('change');
   await colormapVmaxInput.blur();
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-0.8, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(0.8, 8);
 
@@ -132,7 +151,7 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await expect(stokesDegreeModulationButton).toBeHidden();
   await expect(stokesAolpModeControl).toBeHidden();
   await expect(colormapSelect).toHaveValue(coolwarmId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-0.8, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(0.8, 8);
 
@@ -142,7 +161,7 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await expect(stokesDegreeModulationButton).toHaveText('DoCP Modulation');
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'true');
   await expect(stokesAolpModeControl).toBeHidden();
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await stokesDegreeModulationButton.click();
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-Math.PI / 4, 6);
@@ -161,21 +180,21 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await expect(stokesDegreeModulationButton).toBeHidden();
   await expect(stokesAolpModeControl).toBeHidden();
   await expect(colormapSelect).toHaveValue(rdBuId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-1, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(1, 8);
 
   await colormapZeroCenterButton.click();
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'false');
-  await colormapSelect.selectOption({ label: 'coolwarm' });
+  await expectColormapZeroCentered(page, false);
+  await selectColormapPalette(page, 'coolwarm');
   await expect(colormapSelect).toHaveValue(coolwarmId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await colormapVminInput.fill('-0.4');
   await colormapVminInput.dispatchEvent('change');
   await colormapVmaxInput.fill('0.6');
   await colormapVmaxInput.dispatchEvent('change');
   await colormapVmaxInput.blur();
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-0.6, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(0.6, 8);
 
@@ -183,7 +202,7 @@ test('loads scalar Stokes channels and applies derived-channel defaults', async 
   await expect(stokesDegreeModulationButton).toBeHidden();
   await expect(stokesAolpModeControl).toBeHidden();
   await expect(colormapSelect).toHaveValue(coolwarmId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-0.6, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(0.6, 8);
 });
@@ -256,11 +275,6 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
   const colormapSelect = page.locator('#colormap-select');
   const colormapVminInput = page.locator('#colormap-vmin-input');
   const colormapVmaxInput = page.locator('#colormap-vmax-input');
-  const noneButton = page.locator('#visualization-none-button');
-  const colormapButton = page.locator('#colormap-toggle-button');
-  const exposureControl = page.locator('#exposure-control');
-  const colormapAutoRangeButton = page.getByRole('button', { name: 'Auto Range' });
-  const colormapZeroCenterButton = page.getByRole('button', { name: 'Zero Center' });
   const stokesDegreeModulationButton = page.locator('#stokes-degree-modulation-button');
   const probeColorValues = page.locator('#probe-color-values');
   const viewer = page.locator('#viewer-container');
@@ -279,31 +293,27 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
   await selectChannelTile(page, 'AoLP.RGB');
   await expect(colormapRangeControl).toBeVisible();
   await expect(colormapSelect).toHaveValue(hsvId);
-  await expect(colormapAutoRangeButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'false');
+  await expectColormapAutoRange(page, false);
+  await expectColormapZeroCentered(page, false);
   await expect(stokesDegreeModulationButton).toBeVisible();
   await expect(stokesDegreeModulationButton).toHaveText('DoLP Modulation');
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(0, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(Math.PI, 6);
 
-  await noneButton.click();
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(exposureControl).toBeVisible();
-  await expect(colormapRangeControl).toBeHidden();
+  await selectPaletteNone(page);
+  await expectRgbDisplayMode(page);
   await viewer.hover();
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['R:', 'G:', 'B:']);
 
-  await colormapButton.click();
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapRangeControl).toBeVisible();
+  await selectColormapPalette(page, 'HSV');
+  await expectColormapDisplayMode(page, 'HSV');
   await expect(probeColorValues.locator('.probe-color-channel')).toHaveText(['Mono:']);
 
   await selectChannelTile(page, 'S2/S0.RGB');
   await expect(stokesDegreeModulationButton).toBeHidden();
   await expect(colormapSelect).toHaveValue(previousColormapId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-1, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(1, 8);
 
@@ -354,7 +364,7 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
   await expect(stokesDegreeModulationButton).toBeVisible();
   await expect(stokesDegreeModulationButton).toHaveText('DoCP Modulation');
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-Math.PI / 4, 6);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(Math.PI / 4, 6);
 
@@ -371,7 +381,7 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
   await selectChannelTile(page, 'S3/S0.B');
   await expect(stokesDegreeModulationButton).toBeHidden();
   await expect(colormapSelect).toHaveValue(previousColormapId);
-  await expect(colormapZeroCenterButton).toHaveAttribute('aria-pressed', 'true');
+  await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-1, 8);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(1, 8);
 
@@ -384,15 +394,12 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
   await expect(channelTileByLabel(page, 'S0.R')).toHaveCount(0);
   await selectChannelTile(page, 'RGB');
   await expect(selectedChannelTile(page)).toHaveText('RGB');
+  await selectPaletteNone(page);
+  await expectRgbDisplayMode(page);
   await expect(stokesDegreeModulationButton).toBeHidden();
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(exposureControl).toBeVisible();
-  await expect(colormapRangeControl).toBeHidden();
 
-  await colormapButton.click();
-  await colormapSelect.selectOption({ label: 'RdBu' });
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'true');
+  await selectColormapPalette(page, 'RdBu');
+  await expectColormapDisplayMode(page, 'RdBu');
   await expect(colormapSelect).toHaveValue(previousColormapId);
 
   await selectChannelTile(page, 'ToP.RGB');
@@ -401,10 +408,7 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(Math.PI / 4, 6);
 
   await selectChannelTile(page, 'RGB');
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'false');
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(exposureControl).toBeHidden();
-  await expect(colormapRangeControl).toBeVisible();
+  await expectColormapDisplayMode(page, 'RdBu');
   await expect(colormapSelect).toHaveValue(previousColormapId);
 });
 
@@ -425,8 +429,7 @@ test('renders default-colormapped Stokes thumbnails in the bottom panel', async 
     hasText: /^Stokes AoLP$/
   });
   await expect.poll(async () => await getPendingIdleCallbackCount(page)).not.toBe(0);
-  await flushAllIdleCallbacks(page);
-  await expect(scalarAolpTile.locator('.channel-thumbnail-image')).toHaveCount(1);
+  await expectThumbnailImageAfterIdleFlush(page, scalarAolpTile);
 
   const scalarPixel = await readImagePixel(scalarAolpTile.locator('.channel-thumbnail-image'), 96, 96);
   expect(new Set(scalarPixel.slice(0, 3)).size).toBeGreaterThan(1);
@@ -441,8 +444,7 @@ test('renders default-colormapped Stokes thumbnails in the bottom panel', async 
     hasText: /^AoLP\.RGB$/
   });
   await expect.poll(async () => await getPendingIdleCallbackCount(page)).not.toBe(0);
-  await flushAllIdleCallbacks(page);
-  await expect(groupedAolpTile.locator('.channel-thumbnail-image')).toHaveCount(1);
+  await expectThumbnailImageAfterIdleFlush(page, groupedAolpTile);
 
   const groupedPixel = await readImagePixel(groupedAolpTile.locator('.channel-thumbnail-image'), 96, 96);
   expect(new Set(groupedPixel.slice(0, 3)).size).toBeGreaterThan(1);
@@ -453,7 +455,6 @@ test('keeps RGB Stokes stack controls coherent when opening another matching ima
 
   const openedImages = page.locator('#opened-images-select');
   const colormapRangeControl = page.locator('#colormap-range-control');
-  const colormapSelect = page.locator('#colormap-select');
 
   await page.setInputFiles('#file-input', {
     name: 'stokes_rgb_first.exr',
@@ -465,7 +466,7 @@ test('keeps RGB Stokes stack controls coherent when opening another matching ima
   await selectChannelTile(page, 'AoLP.RGB');
   await clickChannelStackToggle(page, 'stokesRgb:aolp:group');
   await expect(selectedChannelTile(page)).toHaveText('AoLP.R');
-  await colormapSelect.selectOption({ label: 'RdBu' });
+  await selectColormapPalette(page, 'RdBu');
   await expect(colormapRangeControl).toBeVisible();
   await expect(selectedChannelTile(page)).toHaveText('AoLP.R');
   await page.waitForTimeout(120);

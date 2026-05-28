@@ -1,8 +1,53 @@
-import { type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export interface ProbeCoords {
   x: number;
   y: number;
+}
+
+export async function selectPaletteNone(page: Page): Promise<void> {
+  await page.locator('#colormap-select').selectOption({ label: 'None' });
+}
+
+export async function selectColormapPalette(page: Page, label: string): Promise<void> {
+  await page.locator('#colormap-select').selectOption({ label });
+}
+
+export async function expectRgbDisplayMode(page: Page): Promise<void> {
+  await expect(page.locator('#colormap-select').locator('option:checked')).toHaveText('None');
+  await expect(page.locator('#exposure-control')).toBeVisible();
+  await expect(page.locator('#colormap-range-control')).toBeHidden();
+}
+
+export async function expectColormapDisplayMode(page: Page, label?: string): Promise<void> {
+  const checkedOption = page.locator('#colormap-select').locator('option:checked');
+  if (label) {
+    await expect(checkedOption).toHaveText(label);
+  } else {
+    await expect(checkedOption).not.toHaveText('None');
+  }
+  await expect(page.locator('#exposure-control')).toBeHidden();
+  await expect(page.locator('#colormap-range-control')).toBeVisible();
+}
+
+export async function expectColormapAutoRange(page: Page, enabled: boolean): Promise<void> {
+  await expect(page.locator('#colormap-range-reset-label')).toHaveAttribute(
+    'data-range-mode',
+    enabled ? 'alwaysAuto' : 'manual'
+  );
+}
+
+export async function resetColormapAutoRange(page: Page): Promise<void> {
+  await page.locator('#colormap-range-reset-label').dblclick();
+}
+
+export async function expectColormapZeroCentered(page: Page, enabled: boolean): Promise<void> {
+  const checkbox = page.locator('#colormap-zero-center-button');
+  if (enabled) {
+    await expect(checkbox).toBeChecked();
+  } else {
+    await expect(checkbox).not.toBeChecked();
+  }
 }
 
 export async function readProbeCoords(probeCoords: Locator): Promise<ProbeCoords | null> {

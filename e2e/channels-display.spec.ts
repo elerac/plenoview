@@ -15,10 +15,14 @@ import {
 import {
   clickChannelStackToggle,
   dragBy,
+  expectColormapDisplayMode,
+  expectRgbDisplayMode,
   getChannelStackToggle,
   getChannelThumbnailTile,
   getSelectedChannelThumbnailTile,
   resolveViewerPoint,
+  selectColormapPalette,
+  selectPaletteNone,
   setExposureValue
 } from './helpers/viewer';
 
@@ -75,10 +79,7 @@ test('auto exposure updates in None mode and pauses while Colormap is active', a
 
   const openedImages = page.locator('#opened-images-select');
   const autoExposureButton = page.locator('#app-auto-exposure-button');
-  const exposureControl = page.locator('#exposure-control');
   const exposureValue = page.locator('#exposure-value');
-  const noneButton = page.locator('#visualization-none-button');
-  const colormapButton = page.locator('#colormap-toggle-button');
 
   await page.setInputFiles('#file-input', {
     name: 'auto_exposure.exr',
@@ -88,17 +89,15 @@ test('auto exposure updates in None mode and pauses while Colormap is active', a
   await expect(openedImages.locator('option:checked')).toContainText('auto_exposure.exr', { timeout: 30000 });
   await expect(exposureValue).toHaveValue('0.0');
 
-  await colormapButton.click();
-  await expect(colormapButton).toHaveAttribute('aria-pressed', 'true', { timeout: 30000 });
-  await expect(exposureControl).toBeHidden();
+  await selectColormapPalette(page, 'Viridis');
+  await expectColormapDisplayMode(page, 'Viridis');
 
   await autoExposureButton.click();
   await expect(autoExposureButton).toHaveAttribute('aria-pressed', 'true');
   await expect(exposureValue).toHaveValue('0.0');
 
-  await noneButton.click();
-  await expect(noneButton).toHaveAttribute('aria-pressed', 'true');
-  await expect(exposureControl).toBeVisible();
+  await selectPaletteNone(page);
+  await expectRgbDisplayMode(page);
   await expect(exposureValue).toHaveValue('-3.0', { timeout: 30000 });
 });
 
