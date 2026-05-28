@@ -10,7 +10,7 @@ import { RenderCacheService } from '../../services/render-cache-service';
 import { ThumbnailService } from '../../services/thumbnail-service';
 import { DisplayController } from '../../controllers/display-controller';
 import { SessionController } from '../../controllers/session-controller';
-import { ViewerUi } from '../../ui/viewer-ui';
+import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 import { ViewerAppCore } from '../viewer-app-core';
 
 export interface BootstrapServices {
@@ -26,7 +26,7 @@ export interface BootstrapServices {
 
 interface CreateBootstrapServicesArgs {
   core: ViewerAppCore;
-  ui: ViewerUi;
+  ui: ViewerRuntimeUi;
   loadQueue: LoadQueueService;
   isDisposed: () => boolean;
 }

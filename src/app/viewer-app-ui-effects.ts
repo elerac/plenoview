@@ -1,8 +1,8 @@
-import { ViewerUi } from '../ui/viewer-ui';
+import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
 import { ViewerUiInvalidationFlags } from './viewer-app-ui';
 import type { ViewerUiTransition } from './viewer-app-types';
 
-export function applyUiEffects(ui: ViewerUi, transition: ViewerUiTransition): void {
+export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransition): void {
   const { snapshot, invalidation } = transition;
 
   if (invalidation & ViewerUiInvalidationFlags.Error) {

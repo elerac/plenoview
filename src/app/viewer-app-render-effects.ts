@@ -1,7 +1,7 @@
 import { WebGlExrRenderer } from '../renderer';
 import { RenderCacheService } from '../services/render-cache-service';
 import { buildDisplayLuminanceRevisionKey } from '../display/revision-keys';
-import { ViewerUi } from '../ui/viewer-ui';
+import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
 import { ViewerAppCore } from './viewer-app-core';
 import { ViewerRenderInvalidationFlags } from './viewer-app-render';
 import { selectActiveDisplayLuminanceRange } from './viewer-app-selectors';
@@ -10,7 +10,7 @@ import type { ViewerPaneRenderInfo } from '../viewer-pane-layout';
 
 export function applyRenderEffects(
   core: ViewerAppCore,
-  ui: ViewerUi,
+  ui: ViewerRuntimeUi,
   renderer: WebGlExrRenderer,
   renderCache: RenderCacheService,
   transition: ViewerRenderTransition

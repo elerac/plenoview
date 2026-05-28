@@ -8,11 +8,11 @@ import {
 import { applyUiEffects } from '../viewer-app-ui-effects';
 import { ViewerAppCore } from '../viewer-app-core';
 import type { BootstrapServices } from './create-services';
-import type { ViewerUi } from '../../ui/viewer-ui';
+import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 
 interface RegisterBootstrapEffectsArgs {
   core: ViewerAppCore;
-  ui: ViewerUi;
+  ui: ViewerRuntimeUi;
   services: BootstrapServices;
   isDisposed: () => boolean;
 }

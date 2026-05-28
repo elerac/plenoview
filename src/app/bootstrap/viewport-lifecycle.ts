@@ -16,18 +16,18 @@ import { selectActiveSession } from '../viewer-app-selectors';
 import { ViewerAppCore } from '../viewer-app-core';
 import type { ViewerInteractionCoordinator } from '../../interaction-coordinator';
 import type { ViewerViewState, ViewportInfo } from '../../types';
-import type { ViewerUi } from '../../ui/viewer-ui';
+import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 import type { WebGlExrRenderer } from '../../renderer';
 
 interface CreateViewerInteractionArgs {
   core: ViewerAppCore;
-  ui: ViewerUi;
+  ui: ViewerRuntimeUi;
   interactionCoordinator: ViewerInteractionCoordinator;
 }
 
 interface InitializeViewportLifecycleArgs {
   core: ViewerAppCore;
-  ui: ViewerUi;
+  ui: ViewerRuntimeUi;
   renderer: WebGlExrRenderer;
   interactionCoordinator: ViewerInteractionCoordinator;
   isDisposed: () => boolean;
@@ -225,7 +225,7 @@ export function initializeViewportLifecycle({
   return resizeObserver;
 }
 
-function resolveActivePaneClientRect(ui: ViewerUi, containerRect: ViewportClientRect): ViewportClientRect {
+function resolveActivePaneClientRect(ui: ViewerRuntimeUi, containerRect: ViewportClientRect): ViewportClientRect {
   const activePane = ui.getActiveViewerPane();
   return {
     left: containerRect.left + activePane.rect.x,

@@ -150,6 +150,11 @@ npm run test:e2e
 
 ## Controls
 
+- HTML embed: include `public/embed/openexr-viewer.js` from the deployed viewer and use
+  `<openexr-viewer src="https://example.com/image.exr"></openexr-viewer>` for a minimal iframe viewer.
+  The embed supports pan, zoom, hover probe, and an `Open full viewer` button. Remote `src` files must be
+  CORS-readable by the viewer origin. Local files can be loaded programmatically with
+  `document.querySelector('openexr-viewer').loadFile(file)`.
 - `Open Files` list: switch active image session by filename, filter rows, rename rows inline, or drag rows to reorder/assign to a split pane.
 - `Alt/Option+Up/Down`: reorder the active `Open Files` row.
 - `Gallery > cbox_rgb.exr` / `multipart.0001.exr` / `brown_photostudio_02_1k.exr`: open a gallery sample and append it as a new session. Remote samples require network access.

@@ -3,6 +3,17 @@ import { ViewerInteraction } from '../interaction/viewer-interaction';
 import { LoadQueueService } from '../services/load-queue';
 import { readStoredImageLoadWorkers } from '../image-load-workers';
 import { setMaxDecodeWorkers } from '../exr-worker-client';
+import { EmbedViewerUi } from '../embed/embed-viewer-ui';
+import {
+  applyEmbedViewerStateSnapshot,
+  createEmbedViewerStateSnapshot,
+  type EmbedViewerStateSnapshot
+} from '../embed/embed-state';
+import { buildFullViewerUrl } from '../embed/embed-params';
+import {
+  createLocalFileHandoffId,
+  startLocalFileHandoffSender
+} from '../embed/local-file-handoff';
 import { ViewerAppCore } from './viewer-app-core';
 import { createViewerUi } from './bootstrap/create-ui';
 import {
@@ -16,12 +27,23 @@ import {
 } from './bootstrap/export-actions';
 import { registerBootstrapEffects } from './bootstrap/register-effects';
 import { createViewerInteraction, initializeViewportLifecycle } from './bootstrap/viewport-lifecycle';
+import { selectActiveSession } from './viewer-app-selectors';
+import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
+
+export interface BootstrapAppOptions {
+  mode?: 'full' | 'embed';
+}
 
 export interface AppHandle {
+  loadUrl(url: string, options?: { name?: string; state?: EmbedViewerStateSnapshot | null }): Promise<void>;
+  loadGallery(galleryId: string, options?: { state?: EmbedViewerStateSnapshot | null }): Promise<void>;
+  loadFile(file: File, options?: { state?: EmbedViewerStateSnapshot | null }): Promise<void>;
+  applyState(state: EmbedViewerStateSnapshot | null | undefined): void;
+  openFullViewer(): void;
   dispose(): void;
 }
 
-export async function bootstrapApp(): Promise<AppHandle> {
+export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<AppHandle> {
   const core = new ViewerAppCore();
 
   let services: BootstrapServices | null = null;
@@ -29,6 +51,7 @@ export async function bootstrapApp(): Promise<AppHandle> {
   let resizeObserver: ResizeObserver | null = null;
   const unsubscribers: Array<() => void> = [];
   let disposed = false;
+  let app: AppHandle;
   const isDisposed = () => disposed;
   const onBeforeUnload = () => {
     app.dispose();
@@ -63,48 +86,56 @@ export async function bootstrapApp(): Promise<AppHandle> {
     },
     isDisposed
   });
-  const ui = createViewerUi({
-    core,
-    getSessionController: () => {
-      if (!services) {
-        throw createAbortError('Viewer application has not finished initializing.');
-      }
-      return services.sessionController;
+  const getServices = (): BootstrapServices => {
+    if (!services) {
+      throw createAbortError('Viewer application has not finished initializing.');
+    }
+    return services;
+  };
+  const ui: ViewerRuntimeUi = options.mode === 'embed'
+    ? new EmbedViewerUi({
+        onOpenFull: () => {
+          app.openFullViewer();
+        }
+      })
+    : createViewerUi({
+        core,
+        getSessionController: () => getServices().sessionController,
+        getDisplayController: () => getServices().displayController,
+        getChannelThumbnailService: () => getServices().channelThumbnailService,
+        getRenderCache: () => getServices().renderCache,
+        getRenderer: () => getServices().renderer,
+        getInteraction: () => interaction,
+        resolveColormapExportPixels,
+        resolveImageExportPixels,
+        onImageLoadWorkersChange: (workerCount) => {
+          loadQueue.setMaxWorkers(workerCount);
+          setMaxDecodeWorkers(workerCount);
+        },
+        isDisposed
+      });
+  app = {
+    loadUrl: async (url, loadOptions = {}) => {
+      await getServices().sessionController.enqueueUrl(url, {
+        filename: loadOptions.name,
+        displayName: loadOptions.name
+      });
+      applyEmbedViewerStateSnapshot(core, loadOptions.state);
     },
-    getDisplayController: () => {
-      if (!services) {
-        throw createAbortError('Viewer application has not finished initializing.');
-      }
-      return services.displayController;
+    loadGallery: async (galleryId, loadOptions = {}) => {
+      await getServices().sessionController.enqueueGalleryImage(galleryId);
+      applyEmbedViewerStateSnapshot(core, loadOptions.state);
     },
-    getChannelThumbnailService: () => {
-      if (!services) {
-        throw createAbortError('Viewer application has not finished initializing.');
-      }
-      return services.channelThumbnailService;
+    loadFile: async (file, loadOptions = {}) => {
+      await getServices().sessionController.enqueueFiles([file]);
+      applyEmbedViewerStateSnapshot(core, loadOptions.state);
     },
-    getRenderCache: () => {
-      if (!services) {
-        throw createAbortError('Viewer application has not finished initializing.');
-      }
-      return services.renderCache;
+    applyState: (state) => {
+      applyEmbedViewerStateSnapshot(core, state);
     },
-    getRenderer: () => {
-      if (!services) {
-        throw createAbortError('Viewer application has not finished initializing.');
-      }
-      return services.renderer;
+    openFullViewer: () => {
+      openFullViewer(core);
     },
-    getInteraction: () => interaction,
-    resolveColormapExportPixels,
-    resolveImageExportPixels,
-    onImageLoadWorkersChange: (workerCount) => {
-      loadQueue.setMaxWorkers(workerCount);
-      setMaxDecodeWorkers(workerCount);
-    },
-    isDisposed
-  });
-  const app: AppHandle = {
     dispose: () => {
       if (disposed) {
         return;
@@ -165,4 +196,53 @@ export async function bootstrapApp(): Promise<AppHandle> {
   }
 
   return app;
+}
+
+function openFullViewer(core: ViewerAppCore): void {
+  const activeSession = selectActiveSession(core.getState());
+  if (!activeSession) {
+    return;
+  }
+
+  const state = createEmbedViewerStateSnapshot(core.getState());
+  const source = activeSession.source;
+  if (source.kind === 'url') {
+    window.open(buildFullViewerUrl({
+      baseUrl: import.meta.env.BASE_URL,
+      src: source.url,
+      name: activeSession.displayName,
+      state
+    }), '_blank');
+    return;
+  }
+
+  const handoffId = createLocalFileHandoffId();
+  const fullWindow = window.open(buildFullViewerUrl({
+    baseUrl: import.meta.env.BASE_URL,
+    handoffId,
+    name: activeSession.displayName,
+    state
+  }), '_blank');
+  if (!fullWindow) {
+    core.dispatch({
+      type: 'errorSet',
+      message: 'Popup blocked. Allow popups to open the full viewer.'
+    });
+    return;
+  }
+
+  startLocalFileHandoffSender({
+    targetWindow: fullWindow,
+    handoffId,
+    file: source.file,
+    name: activeSession.displayName,
+    state,
+    targetOrigin: window.location.origin,
+    onTimeout: () => {
+      core.dispatch({
+        type: 'errorSet',
+        message: 'Timed out while opening the local file in the full viewer.'
+      });
+    }
+  });
 }

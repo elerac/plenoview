@@ -192,6 +192,25 @@ export class SessionController implements Disposable {
     });
   }
 
+  enqueueUrl(url: string, options: { filename?: string; displayName?: string } = {}): Promise<void> {
+    if (this.disposed) {
+      return Promise.resolve();
+    }
+
+    this.cancelBackgroundLoads('Foreground load superseded background work.');
+    return this.enqueueLoadTask(async (signal) => {
+      this.throwIfStopped(signal);
+      await this.loadUrlImage(url, {
+        signal,
+        filename: options.filename ?? inferFilenameFromUrl(url),
+        displayName: options.displayName
+      });
+    }, {
+      priority: 'foreground',
+      category: LOAD_CATEGORY_GALLERY
+    });
+  }
+
   reloadSession(sessionId: string): Promise<void> {
     if (this.disposed) {
       return Promise.resolve();
@@ -677,24 +696,10 @@ export class SessionController implements Disposable {
       return;
     }
 
-    const galleryImageUrl = getGalleryImageUrl(galleryImage);
-
     try {
-      const response = await fetch(galleryImageUrl, { signal });
-      if (!response.ok) {
-        throw new Error(`Failed to load ${galleryImageUrl} (${response.status})`);
-      }
-
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      this.throwIfStopped(signal);
-      const decoded = await this.decodeBytes(bytes, {
+      await this.loadUrlImage(getGalleryImageUrl(galleryImage), {
         signal,
         filename: galleryImage.filename
-      });
-      this.throwIfStopped(signal);
-      this.applyDecodedImage(decoded, galleryImage.filename, bytes.byteLength, {
-        kind: 'url',
-        url: galleryImageUrl
       });
     } catch (error) {
       if (!isAbortError(error) && !this.disposed) {
@@ -704,6 +709,32 @@ export class SessionController implements Disposable {
         });
       }
     }
+  }
+
+  private async loadUrlImage(
+    url: string,
+    options: { signal: AbortSignal; filename: string; displayName?: string }
+  ): Promise<void> {
+    this.throwIfStopped(options.signal);
+
+    const response = await fetch(url, { signal: options.signal });
+    if (!response.ok) {
+      throw new Error(`Failed to load ${url} (${response.status})`);
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    this.throwIfStopped(options.signal);
+    const decoded = await this.decodeBytes(bytes, {
+      signal: options.signal,
+      filename: options.filename
+    });
+    this.throwIfStopped(options.signal);
+    this.applyDecodedImage(decoded, options.filename, bytes.byteLength, {
+      kind: 'url',
+      url
+    }, {
+      displayName: options.displayName
+    });
   }
 
   private async decodeFile(
@@ -810,6 +841,18 @@ export class SessionController implements Disposable {
 
 function getGalleryImageUrl(galleryImage: (typeof GALLERY_IMAGES)[number]): string {
   return 'url' in galleryImage ? galleryImage.url : `${import.meta.env.BASE_URL}${galleryImage.filename}`;
+}
+
+function inferFilenameFromUrl(url: string): string {
+  try {
+    const base = typeof window === 'undefined' ? 'http://localhost/' : window.location.href;
+    const parsed = new URL(url, base);
+    const pathname = parsed.pathname.split('/').filter(Boolean).pop()?.trim();
+    return pathname || 'image.exr';
+  } catch {
+    const pathname = url.split(/[?#]/, 1)[0]?.split('/').filter(Boolean).pop()?.trim();
+    return pathname || 'image.exr';
+  }
 }
 
 async function decodeExrFromSessionSource(

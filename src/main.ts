@@ -1,3 +1,22 @@
 import { bootstrapApp } from './app/bootstrap';
+import { parseViewerBootstrapParams } from './embed/embed-params';
+import {
+  initializeFullViewerHandoffReceiver,
+  registerEmbedMessageBridge,
+  runInitialBootstrapLoad
+} from './embed/embed-runtime';
 
-void bootstrapApp();
+const params = parseViewerBootstrapParams(window.location);
+void bootstrapApp({ mode: params.uiMode }).then((app) => {
+  const cleanupHandoffReceiver = initializeFullViewerHandoffReceiver(params.handoffId, app, params.state);
+  const cleanupEmbedBridge = params.uiMode === 'embed'
+    ? registerEmbedMessageBridge(app)
+    : () => {};
+  const originalDispose = app.dispose;
+  app.dispose = () => {
+    cleanupEmbedBridge();
+    cleanupHandoffReceiver();
+    originalDispose();
+  };
+  runInitialBootstrapLoad(params, app);
+});

@@ -177,6 +177,48 @@ describe('session controller shim', () => {
     }
   });
 
+  it('loads an arbitrary URL as a URL-backed session', async () => {
+    const url = 'https://example.com/renders/beauty.exr?download=1';
+    const encodedBytes = new Uint8Array([1, 3, 5, 7]);
+    const decodeBytes = vi.fn<(
+      bytes: Uint8Array,
+      options?: DecodeBytesOptions
+    ) => Promise<DecodedExrImage>>(async () => createDecodedImage(8, 4));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(encodedBytes));
+    const originalFetch = globalThis.fetch;
+    Object.defineProperty(globalThis, 'fetch', {
+      configurable: true,
+      writable: true,
+      value: fetchMock
+    });
+
+    try {
+      const { controller } = createController({ decodeBytes });
+
+      await controller.enqueueUrl(url, { displayName: 'Beauty pass' });
+
+      expect(fetchMock).toHaveBeenCalledWith(url, { signal: expect.any(AbortSignal) });
+      expect(decodeBytes.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+        filename: 'beauty.exr',
+        signal: expect.any(AbortSignal)
+      }));
+      expect(controller.getActiveSession()).toMatchObject({
+        filename: 'beauty.exr',
+        displayName: 'Beauty pass',
+        source: {
+          kind: 'url',
+          url
+        }
+      });
+    } finally {
+      Object.defineProperty(globalThis, 'fetch', {
+        configurable: true,
+        writable: true,
+        value: originalFetch
+      });
+    }
+  });
+
   it('activates the first decoded image while the rest of a multi-file open continues loading', async () => {
     const firstDecode = createDeferred<DecodedExrImage>();
     const secondDecode = createDeferred<DecodedExrImage>();
