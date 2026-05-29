@@ -152,9 +152,15 @@ npm run test:e2e
 
 - HTML embed: include `public/embed/openexr-viewer.js` from the deployed viewer and use
   `<openexr-viewer src="https://example.com/image.exr"></openexr-viewer>` for a minimal iframe viewer.
-  The embed supports pan, zoom, hover probe, and an `Open full viewer` button. Remote `src` files must be
-  CORS-readable by the viewer origin. Local files can be loaded programmatically with
-  `document.querySelector('openexr-viewer').loadFile(file)`.
+  Raw iframe URLs are also supported with `?ui=embed&src=https://example.com/image.exr`.
+  The embed supports pan, zoom, hover probe, and an `Open full viewer` button. Remote `src` files loaded by the
+  viewer must be CORS-readable by the viewer origin.
+- JS embed API: create iframe-backed viewers with `OpenExrViewer.create('#viewer', { src: './public/cbox_rgb.exr' })`.
+  By default, relative and `blob:` sources are fetched by the embedding page and handed to the iframe as a `File`,
+  while absolute remote URLs are passed through to the viewer. Use `sourceOrigin: 'parent'` to force parent-page
+  fetches or `sourceOrigin: 'viewer'` to force viewer-side URL loading. Pass `viewerUrl`, or set the `viewer-url`
+  attribute, to point the iframe at a custom viewer deployment. Direct `file://` relative EXR loading is not
+  browser-portable; use a local HTTP server or `loadFile(file)` from a file input for local files.
 - `Open Files` list: switch active image session by filename, filter rows, rename rows inline, or drag rows to reorder/assign to a split pane.
 - `Alt/Option+Up/Down`: reorder the active `Open Files` row.
 - `Gallery > cbox_rgb.exr` / `multipart.0001.exr` / `brown_photostudio_02_1k.exr`: open a gallery sample and append it as a new session. Remote samples require network access.
