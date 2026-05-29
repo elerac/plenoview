@@ -7,6 +7,7 @@ interface E2EStateSnapshot {
   errorMessage: string | null;
   isLoading: boolean;
   pendingOpenedImageCount: number;
+  selectionTransitionPending: boolean;
   sessionCount: number;
   thumbnailPendingCount: number;
 }
@@ -90,7 +91,8 @@ export function installE2EHooks(core: ViewerAppCore): () => void {
       const state = await waitFor((snapshotState) => (
         snapshotState.appReady &&
         !snapshotState.isLoading &&
-        snapshotState.pendingOpenedImageCount === 0
+        snapshotState.pendingOpenedImageCount === 0 &&
+        !snapshotState.selectionTransitionPending
       ), timeoutMs);
       await waitForFrames(2);
       return state;
@@ -134,6 +136,7 @@ function createSnapshot(state: ViewerAppState, appReady: boolean): E2EStateSnaps
     errorMessage: state.errorMessage,
     isLoading: state.isLoading,
     pendingOpenedImageCount: state.pendingOpenedImages.length,
+    selectionTransitionPending: state.pendingSelectionTransitionRequestId !== null,
     sessionCount: state.sessions.length,
     thumbnailPendingCount: countPendingThumbnails(state)
   };

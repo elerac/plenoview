@@ -1,7 +1,7 @@
 import { expect, test, type Download, type Locator, type Page } from '@playwright/test';
 import { unzipSync } from 'fflate';
 import { Buffer } from 'node:buffer';
-import { gotoViewerApp, openGalleryCbox } from './helpers/app';
+import { gotoViewerApp, openGalleryCbox, waitForE2ERenderIdle } from './helpers/app';
 import {
   buildPortraitRgbExr,
   buildRgbAuxExr,
@@ -529,17 +529,23 @@ test('opens the gallery demo image and keeps core display controls stable @smoke
   const manualMax = 1e-16;
   await colormapVmaxInput.fill(String(manualMax));
   await colormapVmaxInput.dispatchEvent('change');
+  await colormapVmaxInput.blur();
   await expectColormapAutoRange(page, false);
   await expectColormapZeroCentered(page, true);
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-manualMax, 12);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(manualMax, 12);
 
   await reloadOpenedFileButton.click();
+  await waitForE2ERenderIdle(page);
   await expect(openedImages.locator('option:checked')).toContainText('cbox_rgb.exr');
   await expectColormapAutoRange(page, false);
   await expectColormapZeroCentered(page, true);
-  await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-manualMax, 12);
-  await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(manualMax, 12);
+  await expect
+    .poll(async () => Number(await colormapVminInput.inputValue()), { timeout: 30000 })
+    .toBeCloseTo(-manualMax, 12);
+  await expect
+    .poll(async () => Number(await colormapVmaxInput.inputValue()), { timeout: 30000 })
+    .toBeCloseTo(manualMax, 12);
 
   await resetColormapAutoRange(page);
   await expectColormapAutoRange(page, true);

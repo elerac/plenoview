@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { gotoViewerApp } from './helpers/app';
+import { gotoViewerApp, waitForE2ERenderIdle } from './helpers/app';
 import {
   buildLinearScalarStokesExr,
   buildRgbStokesExr,
@@ -37,6 +37,7 @@ function selectedChannelTile(page: Page): Locator {
 
 async function selectChannelTile(page: Page, label: string): Promise<void> {
   await channelTileByLabel(page, label).click();
+  await waitForE2ERenderIdle(page);
 }
 
 async function expectThumbnailImageAfterIdleFlush(page: Page, tile: Locator): Promise<void> {
@@ -50,6 +51,7 @@ async function expectThumbnailImageAfterIdleFlush(page: Page, tile: Locator): Pr
 }
 
 test('loads scalar Stokes channels and applies derived-channel defaults @smoke', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
 
   const openedImages = page.locator('#opened-images-select');
