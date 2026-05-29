@@ -104,7 +104,8 @@ describe('opened image option labels', () => {
       reservations: [{
         id: 'pending-1',
         filename: 'sphere_owl.exr',
-        displayName: 'sphere_owl.exr',
+        displayName: 'Hero Sphere',
+        displayNameIsCustom: true,
         fileSizeBytes: 3,
         source: {
           kind: 'url',
@@ -114,7 +115,8 @@ describe('opened image option labels', () => {
     });
 
     expect(buildOpenedImageOptions(core.getState())[0]).toMatchObject({
-      label: 'sphere_owl.exr',
+      label: 'Hero Sphere',
+      displayNameIsCustom: true,
       thumbnailDataUrl: null,
       thumbnailLoading: true,
       selectable: false
@@ -238,6 +240,10 @@ describe('opened image option labels', () => {
       'hoge/image.exr',
       'fuga/image.exr'
     ]);
+    expect(buildOpenedImageOptions(core.getState())[0]).toMatchObject({
+      label: 'Hero Plate.exr',
+      displayNameIsCustom: true
+    });
   });
 
   it('uses custom display names for export defaults and batch labels without changing source paths', () => {

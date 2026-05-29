@@ -237,6 +237,7 @@ export interface PendingOpenedImageReservation {
   id: string;
   filename: string;
   displayName: string;
+  displayNameIsCustom?: boolean;
   fileSizeBytes: number | null;
   source: SessionSource;
 }

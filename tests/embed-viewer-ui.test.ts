@@ -31,6 +31,8 @@ describe('EmbedViewerUi', () => {
       activeRegionId: null,
       regions: []
     });
+    expect(document.querySelector('.embed-source-label')?.classList.contains('hidden')).toBe(true);
+    expect(document.querySelector('.embed-source-label')?.textContent).toBe('');
     expect(ui.viewerContainer.style.getPropertyValue('--viewer-checker-offset-x')).toBe('-10px');
     expect(ui.viewerContainer.style.getPropertyValue('--viewer-checker-offset-y')).toBe('-20px');
 
@@ -61,6 +63,26 @@ describe('EmbedViewerUi', () => {
         selectable: true
       }
     ], 'session-1');
+    expect(document.querySelector('.embed-source-label')?.classList.contains('hidden')).toBe(true);
+    expect(document.querySelector('.embed-source-label')?.textContent).toBe('');
+
+    ui.setOpenedImageOptions([
+      {
+        id: 'session-1',
+        label: 'Beauty pass',
+        displayNameIsCustom: true,
+        sizeBytes: 12,
+        sourceDetail: 'Local file',
+        metadata: null,
+        thumbnailDataUrl: null,
+        thumbnailAspectRatio: null,
+        thumbnailLoading: false,
+        selectable: true
+      }
+    ], 'session-1');
+    expect(document.querySelector('.embed-source-label')?.classList.contains('hidden')).toBe(false);
+    expect(document.querySelector('.embed-source-label')?.textContent).toBe('Beauty pass');
+
     const button = document.querySelector<HTMLButtonElement>('.embed-open-full-button');
     expect(button?.disabled).toBe(false);
     button?.click();

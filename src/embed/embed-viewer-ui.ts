@@ -96,8 +96,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     const toolbar = document.createElement('div');
     toolbar.className = 'embed-toolbar';
     this.sourceLabel = document.createElement('div');
-    this.sourceLabel.className = 'embed-source-label';
-    this.sourceLabel.textContent = 'OpenEXR';
+    this.sourceLabel.className = 'embed-source-label hidden';
     this.openFullButton = document.createElement('button');
     this.openFullButton.className = 'embed-open-full-button';
     this.openFullButton.type = 'button';
@@ -256,7 +255,9 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
   setOpenedImageOptions(items: ViewerOpenedImageOption[], activeId: string | null): void {
     const active = items.find((item) => item.id === activeId) ?? items[0] ?? null;
     this.openFullButton.disabled = !active;
-    this.sourceLabel.textContent = active?.label ?? 'OpenEXR';
+    const showSourceLabel = Boolean(active?.displayNameIsCustom && active.label.trim());
+    this.sourceLabel.classList.toggle('hidden', !showSourceLabel);
+    this.sourceLabel.textContent = showSourceLabel ? active?.label ?? '' : '';
   }
 
   setExportTarget(_target: ExportImageTarget | null): void {}

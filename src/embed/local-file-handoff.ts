@@ -54,7 +54,9 @@ export function isEmbedLoadFileMessage(value: unknown): value is EmbedLoadFileMe
     return false;
   }
   const record = value as Record<string, unknown>;
-  return record.type === EMBED_LOAD_FILE_MESSAGE && isFileLike(record.file);
+  return record.type === EMBED_LOAD_FILE_MESSAGE &&
+    isFileLike(record.file) &&
+    isOptionalString(record.name);
 }
 
 export function isLocalFileHandoffReadyMessage(value: unknown): value is LocalFileHandoffReadyMessage {
@@ -72,7 +74,8 @@ export function isLocalFileHandoffFileMessage(value: unknown): value is LocalFil
   const record = value as Record<string, unknown>;
   return record.type === LOCAL_HANDOFF_FILE_MESSAGE &&
     typeof record.id === 'string' &&
-    isFileLike(record.file);
+    isFileLike(record.file) &&
+    isOptionalString(record.name);
 }
 
 export function postEmbedReady(target: Window = window.parent): void {
@@ -230,4 +233,8 @@ function runStoreRequest<T = unknown>(
 
 function isFileLike(value: unknown): value is File {
   return typeof File !== 'undefined' && value instanceof File;
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === 'string';
 }

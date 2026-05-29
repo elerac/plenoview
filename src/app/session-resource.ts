@@ -16,7 +16,8 @@ import { resolveDisplayImageSize } from '../display-size';
 import { clampImageRoiToBounds } from '../roi';
 import {
   buildSessionDisplayName,
-  cloneViewerSessionState
+  cloneViewerSessionState,
+  normalizeSessionDisplayName
 } from '../session-state';
 import {
   DEFAULT_STOKES_AOLP_DEGREE_MODULATION_MODE,
@@ -61,10 +62,11 @@ export interface BuildSwitchedSessionStateOptions {
 }
 
 export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSession {
-  const displayName = buildSessionDisplayName(
+  const generatedDisplayName = buildSessionDisplayName(
     args.filename,
     args.existingSessions.map((session) => session.filename)
   );
+  const customDisplayName = normalizeSessionDisplayName(args.displayName);
   const defaultBaseState = buildViewerStateForLayer(
     createClearedViewerState(args.defaultColormapId),
     args.decoded,
@@ -89,7 +91,8 @@ export function buildLoadedSession(args: BuildLoadedSessionArgs): OpenedImageSes
   const baseSession: OpenedImageSession = {
     id: args.sessionId,
     filename: args.filename,
-    displayName: args.displayName ?? displayName,
+    displayName: customDisplayName ?? generatedDisplayName,
+    ...(customDisplayName ? { displayNameIsCustom: true } : {}),
     fileSizeBytes: args.fileSizeBytes,
     source: args.source,
     decoded: args.decoded,

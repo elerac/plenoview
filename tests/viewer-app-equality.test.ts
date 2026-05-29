@@ -27,6 +27,7 @@ describe('viewer app equality helpers', () => {
       ...base[0],
       metadata: [{ key: 'compression', label: 'Compression', value: 'ZIP' }]
     }])).toBe(false);
+    expect(sameOpenedImageOptions(base, [{ ...base[0], displayNameIsCustom: true }])).toBe(false);
     expect(sameOpenedImageOptions(base, [{ ...base[0], thumbnailLoading: true }])).toBe(false);
   });
 

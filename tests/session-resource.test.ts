@@ -99,6 +99,37 @@ describe('session resource display names', () => {
       source: { kind: 'url', url: '/image.exr' }
     });
   });
+
+  it('normalizes explicit display names when loading and falls back for blank names', () => {
+    const sharedArgs = {
+      sessionId: 'session-1',
+      decoded: createSizedImage(2, 2),
+      filename: 'image.exr',
+      fileSizeBytes: 16,
+      source: { kind: 'url' as const, url: '/image.exr' },
+      existingSessions: [],
+      defaultColormapId: '0',
+      viewport: { width: 200, height: 100 },
+      currentSessionState: createInitialState(),
+      hasActiveSession: false,
+      previousImage: null,
+      autoFitImageOnSelect: false
+    };
+
+    expect(buildLoadedSession({
+      ...sharedArgs,
+      displayName: '  Hero Plate.exr  '
+    })).toMatchObject({
+      displayName: 'Hero Plate.exr',
+      displayNameIsCustom: true
+    });
+    const blankDisplayNameSession = buildLoadedSession({
+      ...sharedArgs,
+      displayName: '   '
+    });
+    expect(blankDisplayNameSession.displayName).toBe('image.exr');
+    expect(blankDisplayNameSession.displayNameIsCustom).toBeUndefined();
+  });
 });
 
 describe('session resource auto-fit handling', () => {

@@ -71,6 +71,7 @@ export function buildOpenedImageOptions(state: ViewerAppState): ViewerOpenedImag
   return entries.map((entry, index) => ({
     id: entry.id,
     label: labels[index] ?? entry.displayName,
+    ...(entry.displayNameIsCustom ? { displayNameIsCustom: true } : {}),
     sizeBytes: entry.fileSizeBytes,
     sourceDetail: entry.sourceDetail,
     metadata: entry.metadata,
@@ -109,7 +110,7 @@ function buildLoadedOpenedImageEntry(
   return {
     id: session.id,
     displayName: session.displayName,
-    displayNameIsCustom: session.displayNameIsCustom,
+    ...(session.displayNameIsCustom ? { displayNameIsCustom: true } : {}),
     fileSizeBytes: session.fileSizeBytes,
     sourceDetail: getSessionSourceDetail(session),
     metadata: layer?.metadata ?? null,
@@ -126,6 +127,7 @@ function buildPendingOpenedImageEntry(
   return {
     id: reservation.id,
     displayName: reservation.displayName,
+    ...(reservation.displayNameIsCustom ? { displayNameIsCustom: true } : {}),
     fileSizeBytes: reservation.fileSizeBytes,
     sourceDetail: getOpenedImageSourceDetail(reservation.source, reservation.filename),
     metadata: null,

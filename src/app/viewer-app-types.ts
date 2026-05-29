@@ -103,6 +103,7 @@ export interface ViewerStateReadoutModel {
 export interface ViewerOpenedImageOption {
   id: string;
   label: string;
+  displayNameIsCustom?: boolean;
   sizeBytes: number | null;
   sourceDetail: string;
   metadata: ExrMetadataEntry[] | null;

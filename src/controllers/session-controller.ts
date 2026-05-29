@@ -11,7 +11,7 @@ import { buildLoadedSession, buildReloadedSession } from '../app/session-resourc
 import { selectActiveSession } from '../app/viewer-app-selectors';
 import { LoadQueueService, type LoadQueueOptions, type LoadQueuePriority } from '../services/load-queue';
 import type { DecodeBytesOptions } from '../exr-decode-context';
-import { buildSessionDisplayName } from '../session-state';
+import { buildSessionDisplayName, normalizeSessionDisplayName } from '../session-state';
 import {
   DEFAULT_FOLDER_LOAD_LIMITS,
   createFolderLoadAdmission,
@@ -93,6 +93,10 @@ export interface FolderLoadOptions {
   overrideLimits?: boolean;
 }
 
+export interface FileLoadOptions {
+  displayName?: string;
+}
+
 export interface SessionControllerDependencies {
   core: ViewerAppCore;
   loadQueue: LoadQueueService;
@@ -124,7 +128,7 @@ export class SessionController implements Disposable {
     this.getFitInsets = dependencies.getFitInsets;
   }
 
-  enqueueFiles(files: File[]): Promise<void> {
+  enqueueFiles(files: File[], options: FileLoadOptions = {}): Promise<void> {
     if (this.disposed || files.length === 0) {
       return Promise.resolve();
     }
@@ -132,7 +136,8 @@ export class SessionController implements Disposable {
     this.cancelBackgroundLoads('Foreground load superseded background work.');
     const reservedLoads = this.reservePendingFileLoads(files, {
       priority: 'foreground',
-      category: LOAD_CATEGORY_OPEN_FILES
+      category: LOAD_CATEGORY_OPEN_FILES,
+      displayName: files.length === 1 ? options.displayName : undefined
     });
 
     return this.enqueueOrderedFileLoadGroup(reservedLoads, {
@@ -177,7 +182,7 @@ export class SessionController implements Disposable {
     });
   }
 
-  enqueueGalleryImage(galleryId: string): Promise<void> {
+  enqueueGalleryImage(galleryId: string, options: { displayName?: string } = {}): Promise<void> {
     if (this.disposed) {
       return Promise.resolve();
     }
@@ -185,7 +190,9 @@ export class SessionController implements Disposable {
     this.cancelBackgroundLoads('Foreground load superseded background work.');
     return this.enqueueLoadTask(async (signal) => {
       this.throwIfStopped(signal);
-      await this.loadGalleryImage(galleryId, signal);
+      await this.loadGalleryImage(galleryId, signal, {
+        displayName: options.displayName
+      });
     }, {
       priority: 'foreground',
       category: LOAD_CATEGORY_GALLERY
@@ -502,7 +509,7 @@ export class SessionController implements Disposable {
         }, {
           activate: !group.activatedLoadedFile,
           sessionId: load.reservation.id,
-          displayName: load.reservation.displayName
+          displayName: load.reservation.displayNameIsCustom ? load.reservation.displayName : undefined
         });
         group.activatedLoadedFile = true;
         this.clearPendingOpenedImageReservations([load.reservation.id]);
@@ -577,12 +584,13 @@ export class SessionController implements Disposable {
 
   private reservePendingFileLoads(
     files: File[],
-    options: { priority: LoadQueuePriority; category: string }
+    options: { priority: LoadQueuePriority; category: string; displayName?: string }
   ): ReservedFileLoad[] {
     if (files.length === 0) {
       return [];
     }
 
+    const customDisplayName = files.length === 1 ? normalizeSessionDisplayName(options.displayName) : null;
     const currentState = this.core.getState();
     const existingFilenames = [
       ...currentState.sessions.map((session) => session.filename),
@@ -593,7 +601,8 @@ export class SessionController implements Disposable {
       const reservation: PendingOpenedImageReservation = {
         id: this.core.issueSessionId(),
         filename,
-        displayName: buildSessionDisplayName(filename, existingFilenames),
+        displayName: customDisplayName ?? buildSessionDisplayName(filename, existingFilenames),
+        ...(customDisplayName ? { displayNameIsCustom: true } : {}),
         fileSizeBytes: file.size,
         source: {
           kind: 'file',
@@ -687,7 +696,11 @@ export class SessionController implements Disposable {
     });
   }
 
-  private async loadGalleryImage(galleryId: string, signal: AbortSignal): Promise<void> {
+  private async loadGalleryImage(
+    galleryId: string,
+    signal: AbortSignal,
+    options: { displayName?: string } = {}
+  ): Promise<void> {
     this.throwIfStopped(signal);
 
     const galleryImage = GALLERY_IMAGES.find((item) => item.id === galleryId);
@@ -699,7 +712,8 @@ export class SessionController implements Disposable {
     try {
       await this.loadUrlImage(getGalleryImageUrl(galleryImage), {
         signal,
-        filename: galleryImage.filename
+        filename: galleryImage.filename,
+        displayName: options.displayName
       });
     } catch (error) {
       if (!isAbortError(error) && !this.disposed) {

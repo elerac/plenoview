@@ -18,6 +18,7 @@ export function registerEmbedMessageBridge(app: AppHandle): () => void {
       return;
     }
     void app.loadFile(event.data.file, {
+      name: event.data.name,
       state: null
     });
   };
@@ -47,6 +48,7 @@ export function initializeFullViewerHandoffReceiver(
     }
     handled = true;
     void app.loadFile(stored.file, {
+      name: stored.name,
       state: stored.state ?? fallbackState
     });
   }).catch(() => undefined);
@@ -70,6 +72,7 @@ export function initializeFullViewerHandoffReceiver(
       event.data.name
     ).catch(() => undefined);
     void app.loadFile(event.data.file, {
+      name: event.data.name,
       state: event.data.state ?? fallbackState
     });
   };
@@ -96,7 +99,10 @@ export function runInitialBootstrapLoad(params: ViewerBootstrapParams, app: AppH
     return;
   }
   if (params.gallery) {
-    void app.loadGallery(params.gallery, { state });
+    void app.loadGallery(params.gallery, {
+      name: params.name ?? undefined,
+      state
+    });
     return;
   }
   app.applyState(state);

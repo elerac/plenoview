@@ -36,8 +36,8 @@ export interface BootstrapAppOptions {
 
 export interface AppHandle {
   loadUrl(url: string, options?: { name?: string; state?: EmbedViewerStateSnapshot | null }): Promise<void>;
-  loadGallery(galleryId: string, options?: { state?: EmbedViewerStateSnapshot | null }): Promise<void>;
-  loadFile(file: File, options?: { state?: EmbedViewerStateSnapshot | null }): Promise<void>;
+  loadGallery(galleryId: string, options?: { name?: string; state?: EmbedViewerStateSnapshot | null }): Promise<void>;
+  loadFile(file: File, options?: { name?: string; state?: EmbedViewerStateSnapshot | null }): Promise<void>;
   applyState(state: EmbedViewerStateSnapshot | null | undefined): void;
   openFullViewer(): void;
   dispose(): void;
@@ -116,17 +116,20 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
   const app: AppHandle = {
     loadUrl: async (url, loadOptions = {}) => {
       await getServices().sessionController.enqueueUrl(url, {
-        filename: loadOptions.name,
         displayName: loadOptions.name
       });
       applyEmbedViewerStateSnapshot(core, loadOptions.state);
     },
     loadGallery: async (galleryId, loadOptions = {}) => {
-      await getServices().sessionController.enqueueGalleryImage(galleryId);
+      await getServices().sessionController.enqueueGalleryImage(galleryId, {
+        displayName: loadOptions.name
+      });
       applyEmbedViewerStateSnapshot(core, loadOptions.state);
     },
     loadFile: async (file, loadOptions = {}) => {
-      await getServices().sessionController.enqueueFiles([file]);
+      await getServices().sessionController.enqueueFiles([file], {
+        displayName: loadOptions.name
+      });
       applyEmbedViewerStateSnapshot(core, loadOptions.state);
     },
     applyState: (state) => {
@@ -205,11 +208,12 @@ function openFullViewer(core: ViewerAppCore): void {
 
   const state = createEmbedViewerStateSnapshot(core.getState());
   const source = activeSession.source;
+  const explicitName = activeSession.displayNameIsCustom ? activeSession.displayName : undefined;
   if (source.kind === 'url') {
     window.open(buildFullViewerUrl({
       baseUrl: import.meta.env.BASE_URL,
       src: source.url,
-      name: activeSession.displayName,
+      name: explicitName,
       state
     }), '_blank');
     return;
@@ -219,7 +223,7 @@ function openFullViewer(core: ViewerAppCore): void {
   const fullWindow = window.open(buildFullViewerUrl({
     baseUrl: import.meta.env.BASE_URL,
     handoffId,
-    name: activeSession.displayName,
+    name: explicitName,
     state
   }), '_blank');
   if (!fullWindow) {
@@ -234,7 +238,7 @@ function openFullViewer(core: ViewerAppCore): void {
     targetWindow: fullWindow,
     handoffId,
     file: source.file,
-    name: activeSession.displayName,
+    name: explicitName,
     state,
     targetOrigin: window.location.origin,
     onTimeout: () => {

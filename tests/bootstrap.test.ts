@@ -535,6 +535,85 @@ afterEach(() => {
 });
 
 describe('bootstrap app lifecycle', () => {
+  it('omits inferred session names when opening the full viewer', async () => {
+    class ResizeObserverMock {
+      constructor(callback: ResizeObserverCallback) {
+        mocks.setResizeObserverCallback(callback);
+      }
+
+      observe(): void {}
+      disconnect(): void {}
+    }
+
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    const mutableCoreState = mocks.coreState as unknown as {
+      activeSessionId: string | null;
+      sessions: unknown[];
+    };
+    mutableCoreState.activeSessionId = 'session-1';
+    mutableCoreState.sessions = [{
+      id: 'session-1',
+      filename: 'image.exr',
+      displayName: 'image.exr',
+      fileSizeBytes: 4,
+      source: { kind: 'url', url: 'https://example.com/image.exr' },
+      decoded: { width: 1, height: 1, layers: [] },
+      state: mocks.coreState.sessionState
+    }];
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp();
+
+    app.openFullViewer();
+
+    const url = new URL(openSpy.mock.calls[0]?.[0] as string);
+    expect(url.searchParams.get('src')).toBe('https://example.com/image.exr');
+    expect(url.searchParams.get('name')).toBeNull();
+
+    app.dispose();
+  });
+
+  it('includes explicit session names when opening the full viewer', async () => {
+    class ResizeObserverMock {
+      constructor(callback: ResizeObserverCallback) {
+        mocks.setResizeObserverCallback(callback);
+      }
+
+      observe(): void {}
+      disconnect(): void {}
+    }
+
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    const mutableCoreState = mocks.coreState as unknown as {
+      activeSessionId: string | null;
+      sessions: unknown[];
+    };
+    mutableCoreState.activeSessionId = 'session-1';
+    mutableCoreState.sessions = [{
+      id: 'session-1',
+      filename: 'image.exr',
+      displayName: 'Hero Plate',
+      displayNameIsCustom: true,
+      fileSizeBytes: 4,
+      source: { kind: 'url', url: 'https://example.com/image.exr' },
+      decoded: { width: 1, height: 1, layers: [] },
+      state: mocks.coreState.sessionState
+    }];
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp();
+
+    app.openFullViewer();
+
+    const url = new URL(openSpy.mock.calls[0]?.[0] as string);
+    expect(url.searchParams.get('src')).toBe('https://example.com/image.exr');
+    expect(url.searchParams.get('name')).toBe('Hero Plate');
+
+    app.dispose();
+  });
+
   it('returns an app handle whose unload path disposes every owned subsystem', async () => {
     const resizeDisconnect = vi.fn();
     class ResizeObserverMock {

@@ -20,6 +20,11 @@ export function buildSessionDisplayName(filename: string, existingFilenames: str
   return `${filename} (${duplicateCount + 1})`;
 }
 
+export function normalizeSessionDisplayName(displayName: string | null | undefined): string | null {
+  const trimmed = displayName?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export function pickNextSessionIndexAfterRemoval(removedIndex: number, remainingCount: number): number {
   if (removedIndex < 0 || remainingCount <= 0) {
     return -1;

@@ -119,8 +119,26 @@ describe('session controller shim', () => {
     const session = controller.getActiveSession();
     expect(decodeBytes).toHaveBeenCalledTimes(1);
     expect(session?.filename).toBe('beauty.exr');
+    expect(session?.displayName).toBe('beauty.exr');
+    expect(session?.displayNameIsCustom).toBeUndefined();
     expect(core.getState().sessionState.activeColormapId).toBeNull();
     expect(core.getState().sessionState.displaySelection).toEqual(createChannelRgbSelection('R', 'G', 'B'));
+  });
+
+  it('applies explicit file display names without replacing source filenames', async () => {
+    const { controller, core } = createController();
+
+    await controller.enqueueFiles([createFile('beauty.exr')], { displayName: '  Hero Plate  ' });
+
+    expect(controller.getActiveSession()).toMatchObject({
+      filename: 'beauty.exr',
+      displayName: 'Hero Plate',
+      displayNameIsCustom: true
+    });
+    expect(buildOpenedImageOptions(core.getState())[0]).toMatchObject({
+      label: 'Hero Plate',
+      displayNameIsCustom: true
+    });
   });
 
   it.each([
@@ -205,6 +223,7 @@ describe('session controller shim', () => {
       expect(controller.getActiveSession()).toMatchObject({
         filename: 'beauty.exr',
         displayName: 'Beauty pass',
+        displayNameIsCustom: true,
         source: {
           kind: 'url',
           url

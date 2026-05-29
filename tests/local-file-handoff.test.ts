@@ -21,7 +21,17 @@ describe('local file handoff messages', () => {
     })).toBe(true);
     expect(isEmbedLoadFileMessage({
       type: EMBED_LOAD_FILE_MESSAGE,
+      file,
+      name: 'Beauty pass'
+    })).toBe(true);
+    expect(isEmbedLoadFileMessage({
+      type: EMBED_LOAD_FILE_MESSAGE,
       file: {}
+    })).toBe(false);
+    expect(isEmbedLoadFileMessage({
+      type: EMBED_LOAD_FILE_MESSAGE,
+      file,
+      name: {}
     })).toBe(false);
   });
 
@@ -36,6 +46,7 @@ describe('local file handoff messages', () => {
       type: LOCAL_HANDOFF_FILE_MESSAGE,
       id: 'abc',
       file,
+      name: 'Beauty pass',
       state: {
         viewerMode: 'image'
       }
@@ -44,6 +55,12 @@ describe('local file handoff messages', () => {
       type: LOCAL_HANDOFF_FILE_MESSAGE,
       id: 'abc',
       file: 'not a file'
+    })).toBe(false);
+    expect(isLocalFileHandoffFileMessage({
+      type: LOCAL_HANDOFF_FILE_MESSAGE,
+      id: 'abc',
+      file,
+      name: {}
     })).toBe(false);
   });
 
