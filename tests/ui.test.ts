@@ -7641,7 +7641,7 @@ describe('opened files actions', () => {
     expect(document.querySelector('#opened-files-list .opened-file-label')?.hasAttribute('title')).toBe(false);
   });
 
-  it('shows opened-file filename and size quickly when hovering the whole row', () => {
+  it('shows opened-file filename and size quickly when hovering the thumbnail slot', () => {
     vi.useFakeTimers();
     installUiFixture();
 
@@ -7657,7 +7657,11 @@ describe('opened files actions', () => {
     }], 'session-1');
 
     const row = mockOpenedFilesListGeometry()[0] as HTMLDivElement;
-    row.dispatchEvent(new Event('pointerenter'));
+    const thumbnailSlot = row.querySelector('.file-row-icon') as HTMLElement;
+    thumbnailSlot.dispatchEvent(new MouseEvent('pointerover', {
+      bubbles: true,
+      relatedTarget: document.body
+    }));
     vi.advanceTimersByTime(74);
 
     expect(document.querySelector('.opened-file-info-tooltip')).toBeNull();
@@ -7681,8 +7685,88 @@ describe('opened files actions', () => {
     ]);
     expect(row.getAttribute('aria-describedby')).toBe('opened-file-info-tooltip');
 
-    row.dispatchEvent(new Event('pointerleave'));
+    thumbnailSlot.dispatchEvent(new MouseEvent('pointerout', {
+      bubbles: true,
+      relatedTarget: document.body
+    }));
 
+    expect(document.querySelector('.opened-file-info-tooltip')).toBeNull();
+    expect(row.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('does not show opened-file info when hovering the filename label', () => {
+    vi.useFakeTimers();
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([{
+      id: 'session-1',
+      label: 'beauty.exr',
+      sizeBytes: 3 * 1024 * 1024,
+      metadata: [
+        { key: 'compression', label: 'Compression', value: 'PIZ' }
+      ]
+    }], 'session-1');
+
+    const row = mockOpenedFilesListGeometry()[0] as HTMLDivElement;
+    const label = row.querySelector('.opened-file-label') as HTMLSpanElement;
+    label.dispatchEvent(new MouseEvent('pointerover', {
+      bubbles: true,
+      relatedTarget: document.body
+    }));
+    vi.advanceTimersByTime(75);
+
+    expect(document.querySelector('.opened-file-info-tooltip')).toBeNull();
+    expect(row.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('hides opened-file info when moving from the thumbnail slot to the filename label', () => {
+    vi.useFakeTimers();
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([{
+      id: 'session-1',
+      label: 'beauty.exr',
+      sizeBytes: 3 * 1024 * 1024,
+      thumbnailDataUrl: 'data:image/png;base64,AAAA'
+    }], 'session-1');
+
+    const row = mockOpenedFilesListGeometry()[0] as HTMLDivElement;
+    const thumbnail = row.querySelector('.opened-file-thumbnail') as HTMLImageElement;
+    const label = row.querySelector('.opened-file-label') as HTMLSpanElement;
+    thumbnail.dispatchEvent(new MouseEvent('pointerover', {
+      bubbles: true,
+      relatedTarget: document.body
+    }));
+    vi.advanceTimersByTime(75);
+    expect(document.querySelector('.opened-file-info-tooltip')).not.toBeNull();
+
+    thumbnail.dispatchEvent(new MouseEvent('pointerout', {
+      bubbles: true,
+      relatedTarget: label
+    }));
+    vi.advanceTimersByTime(75);
+
+    expect(document.querySelector('.opened-file-info-tooltip')).toBeNull();
+    expect(row.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('does not reopen opened-file info from filename click focus', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([{
+      id: 'session-1',
+      label: 'beauty.exr',
+      sizeBytes: 3 * 1024 * 1024
+    }], 'session-1');
+
+    const row = mockOpenedFilesListGeometry()[0] as HTMLDivElement;
+    const label = row.querySelector('.opened-file-label') as HTMLSpanElement;
+    label.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+
+    expect(document.activeElement).toBe(row);
     expect(document.querySelector('.opened-file-info-tooltip')).toBeNull();
     expect(row.hasAttribute('aria-describedby')).toBe(false);
   });
@@ -7709,7 +7793,7 @@ describe('opened files actions', () => {
 
     expect(document.querySelector('.opened-file-info-tooltip')?.textContent).toBe('preview.exr1.0 MB');
 
-    row.dispatchEvent(new MouseEvent('pointerout', {
+    thumbnail.dispatchEvent(new MouseEvent('pointerout', {
       bubbles: true,
       relatedTarget: document.body
     }));
@@ -7732,7 +7816,11 @@ describe('opened files actions', () => {
     }], 'session-1');
 
     const row = mockOpenedFilesListGeometry()[0] as HTMLDivElement;
-    row.dispatchEvent(new Event('pointerenter'));
+    const thumbnailSlot = row.querySelector('.file-row-icon') as HTMLElement;
+    thumbnailSlot.dispatchEvent(new MouseEvent('pointerover', {
+      bubbles: true,
+      relatedTarget: document.body
+    }));
     vi.advanceTimersByTime(75);
     expect(document.querySelector('.opened-file-info-tooltip')).not.toBeNull();
 
@@ -7756,7 +7844,11 @@ describe('opened files actions', () => {
     }], null);
 
     const row = mockOpenedFilesListGeometry()[0] as HTMLDivElement;
-    row.dispatchEvent(new Event('pointerenter'));
+    const thumbnailSlot = row.querySelector('.opened-file-thumbnail-loading') as HTMLElement;
+    thumbnailSlot.dispatchEvent(new MouseEvent('pointerover', {
+      bubbles: true,
+      relatedTarget: document.body
+    }));
     vi.advanceTimersByTime(75);
 
     const tooltip = document.querySelector('.opened-file-info-tooltip') as HTMLElement;

@@ -434,8 +434,10 @@ test('opens the gallery demo image and keeps core display controls stable', asyn
   await expect(reloadOpenedFileButton).toBeVisible();
   await expect(closeOpenedFileButton).toBeVisible();
   await expect(openedFileRow.locator('.opened-file-label')).not.toHaveAttribute('title');
-  await openedFileRow.hover();
   const openedFileTooltip = page.locator('#opened-file-info-tooltip');
+  await openedFileRow.locator('.opened-file-label').hover();
+  await expect(openedFileTooltip).toHaveCount(0);
+  await openedFileRow.locator('.opened-file-thumbnail').hover();
   await expect(openedFileTooltip).toBeVisible();
   await expect(openedFileTooltip).toContainText('cbox_rgb.exr');
   await expect(openedFileTooltip).toContainText('compression');
