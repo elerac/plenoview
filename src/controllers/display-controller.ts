@@ -228,6 +228,11 @@ export class DisplayController implements Disposable {
           requestId: colormapRequestId,
           colormapId
         });
+        this.core.dispatch({
+          type: 'displaySelectionSet',
+          displaySelection: cloneDisplaySelection(latestSelection),
+          restoreState
+        });
         const lut = await loadColormapLut(latestState.colormapRegistry, colormapId, colormapGuard.signal);
         this.throwIfStopped();
         colormapGuard.throwIfStale();
@@ -241,11 +246,6 @@ export class DisplayController implements Disposable {
           requestId: colormapRequestId,
           colormapId,
           lut
-        });
-        this.core.dispatch({
-          type: 'displaySelectionSet',
-          displaySelection: cloneDisplaySelection(latestSelection),
-          restoreState
         });
       }
 

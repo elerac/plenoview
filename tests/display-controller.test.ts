@@ -783,6 +783,57 @@ describe('display controller shim', () => {
     expect(colormapMocks.loadColormapLut.mock.calls.map(([, id]) => id)).toEqual(['2']);
   });
 
+  it('commits split normalized Stokes selection before its colormap LUT resolves', async () => {
+    const decoded = createDecodedImage([
+      'R', 'G', 'B',
+      'S0.R', 'S0.G', 'S0.B',
+      'S1.R', 'S1.G', 'S1.B',
+      'S2.R', 'S2.G', 'S2.B',
+      'S3.R', 'S3.G', 'S3.B'
+    ]);
+    const deferred = createDeferred<(typeof luts)['4']>();
+    colormapMocks.loadColormapLut.mockImplementation((_registry: unknown, id: string) => {
+      if (id === '0') {
+        return Promise.resolve(luts['0']);
+      }
+      if (id === '4') {
+        return deferred.promise;
+      }
+      return Promise.resolve(luts[id as keyof typeof luts]);
+    });
+    const { controller, core } = createController(createSession(decoded));
+
+    await controller.initialize();
+    colormapMocks.loadColormapLut.mockClear();
+    const queuedWindow = stubWindow({ queueAnimationFrames: true });
+
+    const pendingSelection = controller.applyDisplaySelection(createStokesSelection('s3_over_s0', 'stokesRgb', 'B'));
+    expect(core.getState().pendingSelectionTransitionRequestId).not.toBeNull();
+
+    queuedWindow.flushAnimationFrames();
+    await Promise.resolve();
+
+    expect(core.getState().sessionState).toMatchObject({
+      visualizationMode: 'colormap',
+      activeColormapId: '4',
+      colormapRange: { min: -1, max: 1 },
+      colormapRangeMode: 'oneTime',
+      colormapZeroCentered: true,
+      displaySelection: createStokesSelection('s3_over_s0', 'stokesRgb', 'B')
+    });
+    expect(core.getState().colormapLutResource).toMatchObject({
+      status: 'pending',
+      key: '4'
+    });
+    expect(core.getState().pendingSelectionTransitionRequestId).not.toBeNull();
+
+    deferred.resolve(luts['4']);
+    await pendingSelection;
+
+    expect(core.getState().pendingSelectionTransitionRequestId).toBeNull();
+    expect(getLoadedColormapLut(core)).toEqual(luts['4']);
+  });
+
   it('silently drops stale Stokes selection transitions after the active layer changes', async () => {
     const decoded: DecodedExrImage = {
       width: 2,

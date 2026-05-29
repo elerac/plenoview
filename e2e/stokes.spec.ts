@@ -379,6 +379,7 @@ test('loads RGB Stokes channels and applies grouped and split derived defaults',
 
   await clickChannelStackToggle(page, 'stokesRgb:s3_over_s0:group');
   await selectChannelTile(page, 'S3/S0.B');
+  await expect(selectedChannelTile(page)).toHaveText('S3/S0.B');
   await expect(stokesDegreeModulationButton).toBeHidden();
   await expect(colormapSelect).toHaveValue(previousColormapId);
   await expectColormapZeroCentered(page, true);
