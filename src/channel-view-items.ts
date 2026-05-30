@@ -1,9 +1,5 @@
 import { cloneDisplaySelection, sameDisplaySelection, serializeDisplaySelectionKey, type DisplaySelection } from './display-model';
 import {
-  findMergedSelectionForSplitDisplay,
-  findSplitSelectionForMergedDisplay
-} from './display-selection';
-import {
   recognizeLayerChannels,
   type RecognizedChannelCandidate
 } from './channel-recognition';
@@ -19,6 +15,9 @@ export interface ChannelViewItem {
   swatches: string[];
   selection: DisplaySelection;
   selectionKey: string;
+  recognitionKey: string;
+  mergedParentKey: string | null;
+  splitChildKeys: string[];
   mergedOrder: number | null;
   splitOrder: number | null;
 }
@@ -59,8 +58,14 @@ export function buildChannelViewItems(
   channelNames: string[],
   config: ChannelViewItemsConfig = {}
 ): ChannelViewItem[] {
-  const mergedItems = buildDisplayItems(channelNames, false, config);
-  const splitItems = buildDisplayItems(channelNames, true, config);
+  const recognition = recognizeLayerChannels(channelNames, {
+    stokesParameterVisibility: config.stokesParameterVisibility,
+    spectralRgbGroupingEnabled: config.spectralRgbGroupingEnabled,
+    channelRecognitionSettings: config.channelRecognitionSettings,
+    channelRecognitionNameRules: config.channelRecognitionNameRules
+  });
+  const mergedItems = buildDisplayItems(recognition.candidates, false);
+  const splitItems = buildDisplayItems(recognition.candidates, true);
   const itemsByValue = new Map<string, ChannelViewItem>();
   const buildCollisionKey = (item: Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>): string =>
     `${item.value}::${item.selectionKey}`;
@@ -69,6 +74,7 @@ export function buildChannelViewItems(
     const existing = itemsByValue.get(item.value) ?? itemsByValue.get(buildCollisionKey(item));
     if (existing) {
       existing.mergedOrder = index;
+      mergeChannelViewItemRelationships(existing, item);
       return;
     }
 
@@ -93,6 +99,7 @@ export function buildChannelViewItems(
       }
 
       existing.splitOrder = index;
+      mergeChannelViewItemRelationships(existing, item);
       return;
     }
 
@@ -122,30 +129,32 @@ export function hasSplitChannelViewItems(items: readonly Pick<ChannelViewItem, '
 }
 
 export function buildChannelViewStacks(
-  channelNames: string[],
+  _channelNames: string[],
   items: readonly ChannelViewItem[],
-  config: ChannelViewItemsConfig = {}
+  _config: ChannelViewItemsConfig = {}
 ): ChannelViewStackInfo[] {
   const splitItems = selectVisibleChannelViewItems(items, true);
+  const splitItemsByRecognitionKey = new Map<string, ChannelViewItem[]>();
+  for (const item of splitItems) {
+    const existing = splitItemsByRecognitionKey.get(item.recognitionKey) ?? [];
+    existing.push(item);
+    splitItemsByRecognitionKey.set(item.recognitionKey, existing);
+  }
+
   const stacks: ChannelViewStackInfo[] = [];
 
   for (const parent of selectVisibleChannelViewItems(items, false)) {
-    const firstSplitSelection = findSplitSelectionForMergedDisplay(channelNames, parent.selection, config);
-    if (!firstSplitSelection) {
+    if (parent.splitChildKeys.length === 0) {
       continue;
     }
 
-    const childItems = splitItems
-      .filter((child) => {
-        const mergedSelection = findMergedSelectionForSplitDisplay(channelNames, child.selection, config);
-        return sameDisplaySelection(mergedSelection, parent.selection);
-      })
+    const childItems = parent.splitChildKeys
+      .flatMap((childKey) => splitItemsByRecognitionKey.get(childKey) ?? [])
+      .filter((child) => child.mergedParentKey === parent.recognitionKey)
+      .filter((child, index, children) => children.findIndex((candidate) => candidate.value === child.value) === index)
       .sort((a, b) => compareNullableOrder(a.splitOrder, b.splitOrder));
 
-    if (
-      childItems.length < 2 ||
-      !childItems.some((child) => sameDisplaySelection(child.selection, firstSplitSelection))
-    ) {
+    if (childItems.length < 2) {
       continue;
     }
 
@@ -242,18 +251,10 @@ export function getChannelViewSwatches(mapping: DisplayChannelMapping): string[]
 }
 
 function buildDisplayItems(
-  channelNames: string[],
-  includeSplitRgbChannels: boolean,
-  config: ChannelViewItemsConfig
+  candidates: readonly RecognizedChannelCandidate[],
+  includeSplitRgbChannels: boolean
 ): Omit<ChannelViewItem, 'mergedOrder' | 'splitOrder'>[] {
-  const recognition = recognizeLayerChannels(channelNames, {
-    stokesParameterVisibility: config.stokesParameterVisibility,
-    spectralRgbGroupingEnabled: config.spectralRgbGroupingEnabled,
-    channelRecognitionSettings: config.channelRecognitionSettings,
-    channelRecognitionNameRules: config.channelRecognitionNameRules
-  });
-
-  return recognition.candidates
+  return candidates
     .filter((candidate) => includeSplitRgbChannels ? candidate.availability.split : candidate.availability.merged)
     .filter((candidate) => includeSplitRgbChannels || !candidate.metadata.hiddenInMergedChannelView)
     .sort((a, b) => a.sourceOrder - b.sourceOrder)
@@ -265,9 +266,26 @@ function buildDisplayItems(
         meta: formatChannelViewMeta(candidate.mapping, channelCount),
         swatches: getChannelViewSwatches(candidate.mapping),
         selection: cloneDisplaySelection(candidate.selection) ?? candidate.selection,
-        selectionKey: serializeDisplaySelectionKey(candidate.selection)
+        selectionKey: serializeDisplaySelectionKey(candidate.selection),
+        recognitionKey: candidate.key,
+        mergedParentKey: candidate.mergedParentKey,
+        splitChildKeys: [...candidate.splitChildren]
       };
     });
+}
+
+function mergeChannelViewItemRelationships(
+  target: Pick<ChannelViewItem, 'mergedParentKey' | 'splitChildKeys'>,
+  source: Pick<ChannelViewItem, 'mergedParentKey' | 'splitChildKeys'>
+): void {
+  if (!target.mergedParentKey && source.mergedParentKey) {
+    target.mergedParentKey = source.mergedParentKey;
+  }
+  for (const splitChildKey of source.splitChildKeys) {
+    if (!target.splitChildKeys.includes(splitChildKey)) {
+      target.splitChildKeys.push(splitChildKey);
+    }
+  }
 }
 
 function getChannelViewCandidateChannelCount(candidate: RecognizedChannelCandidate): number | undefined {

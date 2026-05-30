@@ -95,12 +95,15 @@ export function sameChannelThumbnailItems(a: ViewerChannelThumbnailItem[], b: Vi
     return Boolean(other)
       && item.value === other.value
       && item.selectionKey === other.selectionKey
+      && item.recognitionKey === other.recognitionKey
+      && item.mergedParentKey === other.mergedParentKey
       && sameDisplaySelection(item.selection, other.selection)
       && item.label === other.label
       && item.meta === other.meta
       && item.thumbnailDataUrl === other.thumbnailDataUrl
       && item.mergedOrder === other.mergedOrder
       && item.splitOrder === other.splitOrder
+      && sameStringArray(item.splitChildKeys, other.splitChildKeys)
       && sameStringArray(item.swatches, other.swatches);
   });
 }

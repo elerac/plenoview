@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { __debugGetMaterializedChannelCount } from '../src/channel-storage';
+import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
 import { DEFAULT_DISPLAY_GAMMA, computeRec709Luminance, linearToDisplayGammaByte } from '../src/color';
 import {
   mapValueToColormapRgbBytes,
@@ -115,6 +116,47 @@ describe('thumbnail rendering', () => {
       linearToDisplayGammaByte(4),
       255
     ]);
+  });
+
+  it('skips selection re-resolution for already-resolved channel thumbnails', () => {
+    const layer = createLayerFromChannels({
+      R: [1],
+      G: [0],
+      B: [0]
+    }, 'beauty');
+    const state = createThumbnailState();
+    const disabledRgbRecognition = {
+      ...createDefaultChannelRecognitionSettings(),
+      'component.rgb': false
+    };
+    const selection = createChannelRgbSelection('R', 'G', 'B');
+
+    const reResolved = buildDisplaySelectionThumbnailPixels(
+      layer,
+      1,
+      1,
+      state,
+      selection,
+      40,
+      null,
+      { channelRecognitionSettings: disabledRgbRecognition }
+    );
+    const alreadyResolved = buildDisplaySelectionThumbnailPixels(
+      layer,
+      1,
+      1,
+      state,
+      selection,
+      40,
+      null,
+      {
+        channelRecognitionSettings: disabledRgbRecognition,
+        selectionAlreadyResolved: true
+      }
+    );
+
+    expect(readPixel(reResolved.data, reResolved.width, 20, 20)).toEqual([255, 255, 255, 255]);
+    expect(readPixel(alreadyResolved.data, alreadyResolved.width, 20, 20)).toEqual([255, 0, 0, 255]);
   });
 
   it('renders normal-map thumbnails without exposure, gamma, auto-exposure, or colormap preview', () => {

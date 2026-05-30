@@ -7,6 +7,7 @@ import {
   findSelectedComponentChannelGroup,
   pickDefaultRecognizedCandidate,
   recognizeLayerChannels,
+  type ChannelRecognitionResult,
   resolveAlphaChannelForChannel,
   type ComponentGroupCandidate,
   type NormalMapCandidate,
@@ -52,7 +53,7 @@ export function pickDefaultDisplaySelection(
   channelNames: string[],
   config: DisplaySelectionAvailabilityConfig = {}
 ): DisplaySelection | null {
-  return pickDefaultRecognizedCandidate(recognizeLayerChannels(channelNames, config))?.selection ?? null;
+  return pickDefaultSelectionFromRecognition(recognizeLayerChannels(channelNames, config));
 }
 
 export function resolveDisplaySelectionForLayer(
@@ -60,22 +61,21 @@ export function resolveDisplaySelectionForLayer(
   currentSelection: DisplaySelection | null,
   config: DisplaySelectionAvailabilityConfig = {}
 ): DisplaySelection | null {
+  const recognition = recognizeLayerChannels(channelNames, config);
   if (!currentSelection) {
-    return pickDefaultDisplaySelection(channelNames, config);
+    return pickDefaultSelectionFromRecognition(recognition);
   }
 
   if (currentSelection.kind === 'channelMono' || currentSelection.kind === 'channelRgb') {
-    const normalized = normalizeChannelSelection(channelNames, currentSelection, config);
-    const recognition = recognizeLayerChannels(channelNames, config);
+    const normalized = normalizeChannelSelection(channelNames, currentSelection, config, recognition);
     return normalized && findRecognizedCandidateForSelection(recognition, normalized)
       ? normalized
-      : pickDefaultDisplaySelection(channelNames, config);
+      : pickDefaultSelectionFromRecognition(recognition);
   }
 
-  const recognition = recognizeLayerChannels(channelNames, config);
   return findRecognizedCandidateForSelection(recognition, currentSelection)
     ? currentSelection
-    : pickDefaultDisplaySelection(channelNames, config);
+    : pickDefaultSelectionFromRecognition(recognition);
 }
 
 export { extractRgbChannelGroups, resolveAlphaChannelForChannel };
@@ -184,14 +184,14 @@ export function findSplitSelectionForMergedDisplay(
 function normalizeChannelSelection(
   channelNames: string[],
   selection: ChannelSelection,
-  config: DisplaySelectionAvailabilityConfig = {}
+  config: DisplaySelectionAvailabilityConfig = {},
+  recognition = recognizeLayerChannels(channelNames, config)
 ): ChannelSelection | null {
   if (selection.kind === 'channelMono') {
     if (!channelNames.includes(selection.channel)) {
       return null;
     }
 
-    const recognition = recognizeLayerChannels(channelNames, config);
     const recognized = recognition.candidates.find((candidate) => (
       candidate.kind === 'singleChannel' &&
       candidate.selection.kind === 'channelMono' &&
@@ -211,7 +211,6 @@ function normalizeChannelSelection(
     selection.g,
     selection.b
   );
-  const recognition = recognizeLayerChannels(channelNames, config);
   const recognized = recognition.candidates.find((candidate) => (
     (candidate.kind === 'componentGroup' || candidate.kind === 'normalMap') &&
     candidate.selection.kind === 'channelRgb' &&
@@ -225,6 +224,10 @@ function normalizeChannelSelection(
   }
 
   return group ? buildChannelRgbSelection(group) : null;
+}
+
+function pickDefaultSelectionFromRecognition(recognition: ChannelRecognitionResult): DisplaySelection | null {
+  return pickDefaultRecognizedCandidate(recognition)?.selection ?? null;
 }
 
 function isChannelDisplayCandidate(

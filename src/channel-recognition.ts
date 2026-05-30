@@ -223,6 +223,11 @@ interface ResolvedChannelRecognitionConfig {
 
 type ComponentLikeChannelGroup = Pick<ComponentChannelGroup | NormalMapChannelGroup, 'kind' | 'optionKey' | 'r' | 'g' | 'b' | 'a'>;
 
+interface AlphaChannelLookup {
+  channelSet: ReadonlySet<string>;
+  alphaByBase: ReadonlyMap<string, string>;
+}
+
 const RGB_COMPONENT_SOURCE_ORDER_BASE = 0;
 const NORMAL_MAP_SOURCE_ORDER_BASE = 100_000;
 const COMPONENT_SOURCE_ORDER_BASE = 200_000;
@@ -276,11 +281,13 @@ export function recognizeLayerChannels(
   const resolved = resolveChannelRecognitionConfig(config);
   const { settings, nameRules } = resolved;
   const includeAlphaCompanions = settings['fallback.alphaCompanions'];
+  const alphaLookup = buildAlphaChannelLookup(names, nameRules);
   const normalMapGroups = extractEnabledNormalMapChannelGroups(
     names,
     settings,
     includeAlphaCompanions,
-    nameRules
+    nameRules,
+    alphaLookup
   );
   const componentGroups = excludeNormalMapComponentDuplicates(
     extractEnabledComponentChannelGroups(names, settings, nameRules),
@@ -293,14 +300,16 @@ export function recognizeLayerChannels(
     groupedDisplays,
     spectralRecognition.parentKeyByChannel,
     includeAlphaCompanions,
-    nameRules
+    nameRules,
+    alphaLookup
   );
   const mergedSingleCandidates = buildMergedSingleChannelCandidates(
     names,
     groupedDisplays,
     spectralRecognition.parentKeyByChannel,
     includeAlphaCompanions,
-    nameRules
+    nameRules,
+    alphaLookup
   );
 
   return {
@@ -355,7 +364,8 @@ function extractEnabledNormalMapChannelGroups(
   channelNames: string[],
   settings: ChannelRecognitionSettings,
   includeAlphaCompanions: boolean,
-  nameRules: CompiledChannelRecognitionNameRules
+  nameRules: CompiledChannelRecognitionNameRules,
+  alphaLookup: AlphaChannelLookup
 ): NormalMapChannelGroup[] {
   if (!isRecognitionSettingEnabled(settings, 'normal.map')) {
     return [];
@@ -383,7 +393,7 @@ function extractEnabledNormalMapChannelGroups(
     }
 
     const alpha = includeAlphaCompanions
-      ? findAlphaChannelForBase(channelNames, base, nameRules) ?? undefined
+      ? findAlphaChannelForBase(channelNames, base, nameRules, alphaLookup) ?? undefined
       : undefined;
     groups.push({
       kind: 'normalMap',
@@ -452,34 +462,38 @@ export function resolveAlphaChannelForChannel(
   config: Pick<ChannelRecognitionConfig, 'channelRecognitionNameRules'> = {}
 ): string | null {
   const nameRules = compileChannelRecognitionNameRules(config.channelRecognitionNameRules);
-  return resolveAlphaChannelForChannelWithRules(channelNames, channelName, nameRules);
+  return resolveAlphaChannelForChannelWithRules(
+    channelNames,
+    channelName,
+    nameRules,
+    buildAlphaChannelLookup(channelNames, nameRules)
+  );
 }
 
 function resolveAlphaChannelForChannelWithRules(
   channelNames: readonly string[],
   channelName: string,
-  nameRules: CompiledChannelRecognitionNameRules
+  nameRules: CompiledChannelRecognitionNameRules,
+  alphaLookup = buildAlphaChannelLookup(channelNames, nameRules)
 ): string | null {
-  const channels = new Set(channelNames);
-
   if (isAlphaChannelWithRules(channelName, nameRules)) {
     return null;
   }
 
   const parsed = parseComponentChannelNameWithRules(channelName, 'rgb', nameRules);
   if (parsed?.base) {
-    const alphaChannel = findAlphaChannelForBase(channelNames, parsed.base, nameRules);
-    return alphaChannel && channels.has(alphaChannel) ? alphaChannel : null;
+    const alphaChannel = findAlphaChannelForBase(channelNames, parsed.base, nameRules, alphaLookup);
+    return alphaChannel && alphaLookup.channelSet.has(alphaChannel) ? alphaChannel : null;
   }
 
   if (channelName.includes('.')) {
     const dotIndex = channelName.lastIndexOf('.');
-    const alphaChannel = findAlphaChannelForBase(channelNames, channelName.slice(0, dotIndex), nameRules);
-    return alphaChannel && channels.has(alphaChannel) ? alphaChannel : null;
+    const alphaChannel = findAlphaChannelForBase(channelNames, channelName.slice(0, dotIndex), nameRules, alphaLookup);
+    return alphaChannel && alphaLookup.channelSet.has(alphaChannel) ? alphaChannel : null;
   }
 
-  const alphaChannel = findAlphaChannelForBase(channelNames, '', nameRules);
-  return alphaChannel && channels.has(alphaChannel) ? alphaChannel : null;
+  const alphaChannel = findAlphaChannelForBase(channelNames, '', nameRules, alphaLookup);
+  return alphaChannel && alphaLookup.channelSet.has(alphaChannel) ? alphaChannel : null;
 }
 
 export function pickDefaultRecognizedCandidate(
@@ -645,7 +659,8 @@ function buildMergedSingleChannelCandidates(
   componentGroups: readonly ComponentLikeChannelGroup[],
   spectralParentKeyByChannel: ReadonlyMap<string, string>,
   includeAlphaCompanions: boolean,
-  nameRules: CompiledChannelRecognitionNameRules
+  nameRules: CompiledChannelRecognitionNameRules,
+  alphaLookup: AlphaChannelLookup
 ): SingleChannelCandidate[] {
   const groupedComponentChannels = new Set<string>();
   const consumedAlphaChannels = new Set<string>();
@@ -669,7 +684,7 @@ function buildMergedSingleChannelCandidates(
         continue;
       }
 
-      const alphaChannel = resolveAlphaChannelForChannelWithRules(channelNames, channelName, nameRules);
+      const alphaChannel = resolveAlphaChannelForChannelWithRules(channelNames, channelName, nameRules, alphaLookup);
       if (alphaChannel) {
         consumedAlphaChannels.add(alphaChannel);
       }
@@ -687,7 +702,9 @@ function buildMergedSingleChannelCandidates(
     const selection: ChannelMonoSelection = {
       kind: 'channelMono',
       channel: channelName,
-      alpha: includeAlphaCompanions ? resolveAlphaChannelForChannelWithRules(channelNames, channelName, nameRules) : null
+      alpha: includeAlphaCompanions
+        ? resolveAlphaChannelForChannelWithRules(channelNames, channelName, nameRules, alphaLookup)
+        : null
     };
     if (selection.alpha) {
       consumedAlphaChannels.add(selection.alpha);
@@ -722,7 +739,8 @@ function buildSplitSingleChannelCandidates(
   componentGroups: readonly ComponentLikeChannelGroup[],
   spectralParentKeyByChannel: ReadonlyMap<string, string>,
   includeAlphaCompanions: boolean,
-  nameRules: CompiledChannelRecognitionNameRules
+  nameRules: CompiledChannelRecognitionNameRules,
+  alphaLookup: AlphaChannelLookup
 ): SingleChannelCandidate[] {
   const candidates: SingleChannelCandidate[] = [];
   const singleChannelOptions = new Set<string>();
@@ -769,7 +787,12 @@ function buildSplitSingleChannelCandidates(
       return;
     }
 
-    const alphaParentKey = includeAlphaCompanions && resolveAlphaChannelForChannelWithRules(channelNames, channelName, nameRules)
+    const alphaParentKey = includeAlphaCompanions && resolveAlphaChannelForChannelWithRules(
+      channelNames,
+      channelName,
+      nameRules,
+      alphaLookup
+    )
       ? `channel:${channelName}`
       : null;
     const mergedParentKey = parentKeyByGroupedChannel.get(channelName)
@@ -1369,15 +1392,28 @@ function isAlphaChannelWithRules(
   return parseAlphaChannelNameWithRules(channelName, nameRules) !== null;
 }
 
+function buildAlphaChannelLookup(
+  channelNames: readonly string[],
+  nameRules: CompiledChannelRecognitionNameRules
+): AlphaChannelLookup {
+  const channelSet = new Set(channelNames);
+  const alphaByBase = new Map<string, string>();
+  for (const channelName of channelNames) {
+    const parsed = parseAlphaChannelNameWithRules(channelName, nameRules);
+    if (parsed && !alphaByBase.has(parsed.base)) {
+      alphaByBase.set(parsed.base, channelName);
+    }
+  }
+  return { channelSet, alphaByBase };
+}
+
 function findAlphaChannelForBase(
   channelNames: readonly string[],
   base: string,
-  nameRules: CompiledChannelRecognitionNameRules
+  nameRules: CompiledChannelRecognitionNameRules,
+  alphaLookup = buildAlphaChannelLookup(channelNames, nameRules)
 ): string | null {
-  return channelNames.find((candidate) => {
-    const parsed = parseAlphaChannelNameWithRules(candidate, nameRules);
-    return parsed?.base === base;
-  }) ?? null;
+  return alphaLookup.alphaByBase.get(base) ?? null;
 }
 
 function isMuellerMatrixElementName(value: string): boolean {

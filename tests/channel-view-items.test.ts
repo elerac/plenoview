@@ -210,6 +210,22 @@ describe('channel view items', () => {
     });
   });
 
+  it('keeps alpha companion parent and split child relationships when their raw keys collide', () => {
+    const items = buildChannelViewItems(['Y', 'A', 'mask']);
+    const mergedY = selectVisibleChannelViewItems(items, false)
+      .find((item) => item.selection.kind === 'channelMono' && item.selection.channel === 'Y');
+    const splitY = selectVisibleChannelViewItems(items, true)
+      .find((item) => item.selection.kind === 'channelMono' && item.selection.channel === 'Y');
+
+    expect(mergedY?.selection).toEqual(createChannelMonoSelection('Y', 'A'));
+    expect(splitY?.selection).toEqual(createChannelMonoSelection('Y'));
+    expect(splitY?.value).not.toBe(mergedY?.value);
+    expect(mergedY?.recognitionKey).toBe('channel:Y');
+    expect(splitY?.recognitionKey).toBe('channel:Y');
+    expect(mergedY?.splitChildKeys).toEqual(['channel:Y']);
+    expect(splitY?.mergedParentKey).toBe('channel:Y');
+  });
+
   it('builds merged and split stokes descriptors from the same item set', () => {
     const items = buildChannelViewItems([
       'S0.R', 'S0.G', 'S0.B',

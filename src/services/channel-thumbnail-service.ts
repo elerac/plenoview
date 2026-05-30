@@ -429,7 +429,13 @@ async function createChannelViewThumbnailDataUrlWithPreview({
     stateSnapshot,
     selection,
     preview,
-    { maskInvalidStokesVectors, spectralRgbGroupingEnabled, channelRecognitionSettings, channelRecognitionNameRules }
+    {
+      maskInvalidStokesVectors,
+      spectralRgbGroupingEnabled,
+      channelRecognitionSettings,
+      channelRecognitionNameRules,
+      selectionAlreadyResolved: true
+    }
   );
 }
 

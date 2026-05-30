@@ -1,4 +1,5 @@
 import { sameDisplayLuminanceRange } from '../colormap-range';
+import { buildChannelViewItems, type ChannelViewItem } from '../channel-view-items';
 import { hasDepthChannelCandidate } from '../depth';
 import { sameDisplaySelection } from '../display-model';
 import type { OpenedImageSession } from '../types';
@@ -474,9 +475,62 @@ function createStokesControlSelector(): (state: ViewerAppState) => ViewerUiSnaps
 }
 
 function createChannelThumbnailItemsSelector(): (state: ViewerAppState) => ViewerUiSnapshot['channelThumbnailItems'] {
+  let previousDescriptorSessionId: string | null = null;
+  let previousDescriptorActiveLayer: number | null = null;
+  let previousDescriptorChannelNames: string[] = [];
+  let previousStokesParameterVisibility: ViewerAppState['stokesParameterVisibility'] | null = null;
+  let previousSpectralRgbGroupingEnabled: boolean | null = null;
+  let previousChannelRecognitionSettings: ViewerAppState['channelRecognitionSettings'] | null = null;
+  let previousChannelRecognitionNameRules: ViewerAppState['channelRecognitionNameRules'] | null = null;
+  let previousChannelViewItems: ChannelViewItem[] = [];
   let previousResult: ViewerUiSnapshot['channelThumbnailItems'] = [];
+
+  const selectMemoizedChannelViewItems = (state: ViewerAppState): readonly ChannelViewItem[] => {
+    const activeSession = selectActiveSession(state);
+    const layer = activeSession?.decoded.layers[state.sessionState.activeLayer] ?? null;
+    if (!activeSession || !layer) {
+      previousDescriptorSessionId = activeSession?.id ?? null;
+      previousDescriptorActiveLayer = state.sessionState.activeLayer;
+      previousDescriptorChannelNames = [];
+      previousChannelViewItems = [];
+      return previousChannelViewItems;
+    }
+
+    const sameDescriptorInputs = (
+      previousDescriptorSessionId === activeSession.id &&
+      previousDescriptorActiveLayer === state.sessionState.activeLayer &&
+      sameStringArray(previousDescriptorChannelNames, layer.channelNames) &&
+      previousStokesParameterVisibility !== null &&
+      sameStokesParameterVisibilitySettings(previousStokesParameterVisibility, state.stokesParameterVisibility) &&
+      previousSpectralRgbGroupingEnabled === state.spectralRgbGroupingEnabled &&
+      previousChannelRecognitionSettings !== null &&
+      sameChannelRecognitionSettings(previousChannelRecognitionSettings, state.channelRecognitionSettings) &&
+      previousChannelRecognitionNameRules !== null &&
+      sameChannelRecognitionNameRules(previousChannelRecognitionNameRules, state.channelRecognitionNameRules)
+    );
+    if (sameDescriptorInputs) {
+      return previousChannelViewItems;
+    }
+
+    previousDescriptorSessionId = activeSession.id;
+    previousDescriptorActiveLayer = state.sessionState.activeLayer;
+    previousDescriptorChannelNames = [...layer.channelNames];
+    previousStokesParameterVisibility = state.stokesParameterVisibility;
+    previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
+    previousChannelRecognitionSettings = state.channelRecognitionSettings;
+    previousChannelRecognitionNameRules = state.channelRecognitionNameRules;
+    previousChannelViewItems = buildChannelViewItems(layer.channelNames, {
+      stokesParameterVisibility: state.stokesParameterVisibility,
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+      channelRecognitionSettings: state.channelRecognitionSettings,
+      channelRecognitionNameRules: state.channelRecognitionNameRules
+    });
+    return previousChannelViewItems;
+  };
+
   return (state) => {
-    const nextResult = buildChannelThumbnailItems(state);
+    const channelViewItems = selectMemoizedChannelViewItems(state);
+    const nextResult = buildChannelThumbnailItems(state, channelViewItems);
     if (sameChannelThumbnailItems(previousResult, nextResult)) {
       return previousResult;
     }

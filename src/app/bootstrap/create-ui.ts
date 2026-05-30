@@ -437,7 +437,8 @@ function promoteActiveChannelThumbnail(
     stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
     spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
-    channelRecognitionSettings: state.channelRecognitionSettings
+    channelRecognitionSettings: state.channelRecognitionSettings,
+    channelRecognitionNameRules: state.channelRecognitionNameRules
   });
 
   getChannelThumbnailService().promoteRequest(requestKey);

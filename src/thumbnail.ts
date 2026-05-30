@@ -56,6 +56,7 @@ export interface OpenedImageThumbnailOptions {
   spectralRgbGroupingEnabled?: boolean;
   channelRecognitionSettings?: ChannelRecognitionSettings;
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
+  selectionAlreadyResolved?: boolean;
 }
 
 export interface ThumbnailPreviewOptions {
@@ -166,7 +167,7 @@ export function buildDisplaySelectionThumbnailPixels(
   preview: ThumbnailPreviewOptions | null = null,
   options: OpenedImageThumbnailOptions = {}
 ): OpenedImageThumbnailPixels {
-  const effectiveSelection = selection && (
+  const effectiveSelection = selection && !options.selectionAlreadyResolved && (
     options.channelRecognitionSettings ||
     options.channelRecognitionNameRules ||
     options.spectralRgbGroupingEnabled !== undefined

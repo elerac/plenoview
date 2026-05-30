@@ -370,5 +370,8 @@ function cloneThumbnailOptions(options: OpenedImageThumbnailOptions): OpenedImag
   if (options.channelRecognitionNameRules) {
     cloned.channelRecognitionNameRules = cloneChannelRecognitionNameRules(options.channelRecognitionNameRules);
   }
+  if (options.selectionAlreadyResolved !== undefined) {
+    cloned.selectionAlreadyResolved = options.selectionAlreadyResolved === true;
+  }
   return cloned;
 }

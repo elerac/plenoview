@@ -1,4 +1,4 @@
-import { buildChannelViewItems } from '../channel-view-items';
+import { buildChannelViewItems, type ChannelViewItem } from '../channel-view-items';
 import { getSuccessValue, idleResource } from '../async-resource';
 import { cloneDisplaySelection, sameDisplaySelection } from '../display-model';
 import { resolveDisplayImageSize } from '../display-size';
@@ -235,7 +235,10 @@ export function buildLayerOptions(session: OpenedImageSession | null): ViewerLay
   }));
 }
 
-export function buildChannelThumbnailItems(state: ViewerAppState): ViewerChannelThumbnailItem[] {
+export function buildChannelThumbnailItems(
+  state: ViewerAppState,
+  channelViewItems?: readonly ChannelViewItem[]
+): ViewerChannelThumbnailItem[] {
   const session = selectActiveSession(state);
   if (!session) {
     return [];
@@ -246,12 +249,14 @@ export function buildChannelThumbnailItems(state: ViewerAppState): ViewerChannel
     return [];
   }
 
-  return buildChannelViewItems(layer.channelNames, {
+  const items = channelViewItems ?? buildChannelViewItems(layer.channelNames, {
     stokesParameterVisibility: state.stokesParameterVisibility,
     spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
     channelRecognitionSettings: state.channelRecognitionSettings,
     channelRecognitionNameRules: state.channelRecognitionNameRules
-  }).map((item) => {
+  });
+
+  return items.map((item) => {
     const requestKey = serializeChannelThumbnailRequestKey({
       sessionId: session.id,
       activeLayer: state.sessionState.activeLayer,
