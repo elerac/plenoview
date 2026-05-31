@@ -45,13 +45,7 @@ export interface Elements {
   channelRecognitionEditNameRulesButton: HTMLButtonElement;
   channelRecognitionNameRuleEditor: HTMLElement;
   channelRecognitionRulesList: HTMLElement;
-  channelRecognitionPreviewSourceNote: HTMLElement;
-  channelRecognitionPreviewStatus: HTMLElement;
-  channelRecognitionPreviewSampleField: HTMLElement;
-  channelRecognitionPreviewSampleTextarea: HTMLTextAreaElement;
   channelRecognitionRuleErrorSummary: HTMLElement;
-  channelRecognitionPreviewWarnings: HTMLElement;
-  channelRecognitionPreviewResults: HTMLElement;
   channelRecognitionApplyRulesButton: HTMLButtonElement;
   channelRecognitionCancelRulesButton: HTMLButtonElement;
   channelRecognitionResetRulesButton: HTMLButtonElement;
@@ -602,16 +596,7 @@ export function resolveElements(): Elements {
     ),
     channelRecognitionNameRuleEditor: requireElement('channel-recognition-name-rule-editor', HTMLElement),
     channelRecognitionRulesList: requireElement('channel-recognition-rules-list', HTMLElement),
-    channelRecognitionPreviewSourceNote: requireElement('channel-recognition-preview-source-note', HTMLElement),
-    channelRecognitionPreviewStatus: requireElement('channel-recognition-preview-status', HTMLElement),
-    channelRecognitionPreviewSampleField: requireElement('channel-recognition-preview-sample-field', HTMLElement),
-    channelRecognitionPreviewSampleTextarea: requireElement(
-      'channel-recognition-preview-sample-textarea',
-      HTMLTextAreaElement
-    ),
     channelRecognitionRuleErrorSummary: requireElement('channel-recognition-rule-error-summary', HTMLElement),
-    channelRecognitionPreviewWarnings: requireElement('channel-recognition-preview-warnings', HTMLElement),
-    channelRecognitionPreviewResults: requireElement('channel-recognition-preview-results', HTMLElement),
     channelRecognitionApplyRulesButton: requireElement('channel-recognition-apply-rules-button', HTMLButtonElement),
     channelRecognitionCancelRulesButton: requireElement('channel-recognition-cancel-rules-button', HTMLButtonElement),
     channelRecognitionResetRulesButton: requireElement('channel-recognition-reset-rules-button', HTMLButtonElement),

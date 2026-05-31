@@ -3056,7 +3056,7 @@ describe('view menu', () => {
     expect(checkbox.checked).toBe(true);
   });
 
-  it('edits Channel Recognition name rules as a validated draft with preview', () => {
+  it('edits Channel Recognition name rules as a validated draft', () => {
     installUiFixture();
 
     const onChannelRecognitionNameRulesChange = vi.fn();
@@ -3065,8 +3065,6 @@ describe('view menu', () => {
     const editButton = document.getElementById('channel-recognition-edit-name-rules-button') as HTMLButtonElement;
     const editor = document.getElementById('channel-recognition-name-rule-editor') as HTMLElement;
     const patternInput = document.getElementById('channel-recognition-rule-component-rgb-pattern') as HTMLInputElement;
-    const sampleTextarea = document.getElementById('channel-recognition-preview-sample-textarea') as HTMLTextAreaElement;
-    const previewResults = document.getElementById('channel-recognition-preview-results') as HTMLElement;
     const applyButton = document.getElementById('channel-recognition-apply-rules-button') as HTMLButtonElement;
     const resetRowButton = editor.querySelector<HTMLButtonElement>('[aria-label="Reset RGB component groups name rule"]')!;
 
@@ -3077,6 +3075,8 @@ describe('view menu', () => {
     expect(patternInput.value).toBe(defaults['component.rgb'].pattern);
     expect(document.getElementById('channel-recognition-rule-component-rgb-case')).toBeNull();
     expect(editor.textContent).not.toContain('Ignore case');
+    expect(editor.querySelector('aside')).toBeNull();
+    expect(editor.textContent).not.toContain('Preview');
 
     patternInput.value = '(?<r>R';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3089,16 +3089,8 @@ describe('view menu', () => {
 
     patternInput.value = '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
-    sampleTextarea.value = [
-      'beauty_red',
-      'beauty_green',
-      'beauty_blue',
-      'beauty_alpha'
-    ].join('\n');
-    sampleTextarea.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(patternInput.getAttribute('aria-invalid')).toBe('false');
-    expect(previewResults.textContent).toContain('beauty_red');
 
     resetRowButton.click();
 

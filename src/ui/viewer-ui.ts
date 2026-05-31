@@ -168,7 +168,6 @@ import {
   type ChannelRecognitionNameRuleId,
   type ChannelRecognitionNameRules
 } from '../channel-recognition-name-rules';
-import { recognizeLayerChannels, type RecognizedChannelCandidate } from '../channel-recognition';
 import type { AppFullscreenHost, DesktopCommandId, ExportSaveResult } from '../platform';
 
 const AUTO_FIT_IMAGE_ON_SELECT_STORAGE_KEY = 'openexr-viewer:auto-fit-image-on-select:v1';
@@ -1259,7 +1258,6 @@ export class ViewerUi implements Disposable {
       checkbox.checked = this.channelRecognitionSettings[descriptor.id] !== false;
       checkbox.disabled = !descriptor.mutable;
     }
-    this.renderChannelRecognitionRulePreview();
   }
 
   setChannelRecognitionNameRules(rules: ChannelRecognitionNameRules): void {
@@ -1273,7 +1271,6 @@ export class ViewerUi implements Disposable {
       : null;
     this.renderChannelRecognitionCustomizationSummary();
     this.renderChannelRecognitionRuleRows(true);
-    this.renderChannelRecognitionRulePreview();
     this.renderChannelViewControls();
   }
 
@@ -1592,7 +1589,6 @@ export class ViewerUi implements Disposable {
     this.currentChannelSelection = null;
     this.channelStackScopeKey = 'default';
     this.channelThumbnailStrip.clearForNoImage();
-    this.renderChannelRecognitionRulePreview();
     this.globalKeyboardController.normalizeVerticalNavigationTarget();
   }
 
@@ -1620,7 +1616,6 @@ export class ViewerUi implements Disposable {
     this.expandChannelStackForSelection(selected);
     this.currentChannelSelection = cloneDisplaySelection(selected);
     this.renderChannelViewControls();
-    this.renderChannelRecognitionRulePreview();
   }
 
   private handleChannelViewValueChange(value: string): void {
@@ -3086,9 +3081,6 @@ export class ViewerUi implements Disposable {
     this.disposables.addEventListener(this.elements.channelRecognitionResetRulesButton, 'click', () => {
       this.resetChannelRecognitionRuleDraft();
     });
-    this.disposables.addEventListener(this.elements.channelRecognitionPreviewSampleTextarea, 'input', () => {
-      this.renderChannelRecognitionRulePreview();
-    });
 
     this.disposables.addEventListener(this.elements.spectrumLatticeMotionSelect, 'change', () => {
       this.setSpectrumLatticeMotionPreference(
@@ -3539,14 +3531,12 @@ export class ViewerUi implements Disposable {
         pattern: input.value
       };
       this.renderChannelRecognitionRuleRowValidation(descriptor.id);
-      this.renderChannelRecognitionRulePreview();
     });
     this.disposables.addEventListener(resetButton, 'click', () => {
       const draft = this.ensureChannelRecognitionRuleDraft();
       const defaults = createDefaultChannelRecognitionNameRules();
       draft[descriptor.id] = { ...defaults[descriptor.id] };
       this.renderChannelRecognitionRuleRows(true);
-      this.renderChannelRecognitionRulePreview();
     });
 
     return row;
@@ -3570,11 +3560,7 @@ export class ViewerUi implements Disposable {
     this.setChannelRecognitionRuleEditorControlsEnabled(open);
     if (open) {
       this.channelRecognitionNameRuleDraft = cloneChannelRecognitionNameRules(this.channelRecognitionNameRules);
-      if (!this.hasActiveChannelImage && this.elements.channelRecognitionPreviewSampleTextarea.value.trim() === '') {
-        this.elements.channelRecognitionPreviewSampleTextarea.value = DEFAULT_CHANNEL_RECOGNITION_PREVIEW_SAMPLE;
-      }
       this.renderChannelRecognitionRuleRows(true);
-      this.renderChannelRecognitionRulePreview();
       return;
     }
 
@@ -3611,7 +3597,6 @@ export class ViewerUi implements Disposable {
     this.channelRecognitionNameRuleDraft = cloneChannelRecognitionNameRules(draft);
     this.channelRecognitionNameRules = cloneChannelRecognitionNameRules(draft);
     this.renderChannelRecognitionCustomizationSummary();
-    this.renderChannelRecognitionRulePreview();
     this.renderChannelViewControls();
     this.callbacks.onChannelRecognitionNameRulesChange(this.channelRecognitionNameRules);
   }
@@ -3620,127 +3605,12 @@ export class ViewerUi implements Disposable {
     this.channelRecognitionNameRuleDraft = cloneChannelRecognitionNameRules(this.channelRecognitionNameRules);
     this.clearChannelRecognitionRuleSummary();
     this.renderChannelRecognitionRuleRows(true);
-    this.renderChannelRecognitionRulePreview();
   }
 
   private resetChannelRecognitionRuleDraft(): void {
     this.channelRecognitionNameRuleDraft = createDefaultChannelRecognitionNameRules();
     this.clearChannelRecognitionRuleSummary();
     this.renderChannelRecognitionRuleRows(true);
-    this.renderChannelRecognitionRulePreview();
-  }
-
-  private renderChannelRecognitionRulePreview(): void {
-    if (!this.isChannelRecognitionRuleEditorOpen()) {
-      return;
-    }
-
-    const rules = this.getChannelRecognitionRuleDraft();
-    const validation = validateChannelRecognitionNameRules(rules);
-    for (const descriptor of CHANNEL_RECOGNITION_NAME_RULE_DESCRIPTORS) {
-      this.renderChannelRecognitionRuleRowValidation(descriptor.id);
-    }
-
-    if (!validation.valid) {
-      this.renderChannelRecognitionRuleSummary(validation.issues.map((issue) => issue.message));
-      this.elements.channelRecognitionPreviewStatus.textContent = `${validation.issues.length} rule error${validation.issues.length === 1 ? '' : 's'}`;
-      this.elements.channelRecognitionPreviewWarnings.replaceChildren();
-      this.elements.channelRecognitionPreviewResults.textContent = 'Preview paused until the rule errors are fixed.';
-      return;
-    }
-
-    this.clearChannelRecognitionRuleSummary();
-    const channelNames = this.resolveChannelRecognitionPreviewChannelNames();
-    const usingSample = !this.hasActiveChannelImage;
-    this.elements.channelRecognitionPreviewSampleField.classList.toggle('hidden', !usingSample);
-    this.elements.channelRecognitionPreviewSourceNote.textContent = usingSample
-      ? 'Using sample names because no image is active.'
-      : `Using ${channelNames.length} channel${channelNames.length === 1 ? '' : 's'} from the active layer.`;
-
-    if (channelNames.length === 0) {
-      this.elements.channelRecognitionPreviewStatus.textContent = 'No channels';
-      this.elements.channelRecognitionPreviewWarnings.replaceChildren();
-      this.elements.channelRecognitionPreviewResults.textContent = 'Enter channel names to preview recognition.';
-      return;
-    }
-
-    const result = recognizeLayerChannels(channelNames, {
-      channelRecognitionSettings: this.channelRecognitionSettings,
-      channelRecognitionNameRules: rules
-    });
-    const previewCandidates = result.candidates.filter((candidate) => candidate.ruleId !== 'fallback.singleChannel');
-    const warnings = buildChannelRecognitionPreviewWarnings(previewCandidates);
-    this.elements.channelRecognitionPreviewStatus.textContent =
-      `${previewCandidates.length} display${previewCandidates.length === 1 ? '' : 's'} recognized`;
-    this.renderChannelRecognitionPreviewWarnings(warnings);
-    this.renderChannelRecognitionPreviewResults(channelNames, previewCandidates);
-  }
-
-  private resolveChannelRecognitionPreviewChannelNames(): string[] {
-    if (this.hasActiveChannelImage) {
-      return [...this.rgbGroupChannelNames];
-    }
-
-    return this.elements.channelRecognitionPreviewSampleTextarea.value
-      .split(/\r?\n/)
-      .map((name) => name.trim())
-      .filter((name) => name.length > 0);
-  }
-
-  private renderChannelRecognitionPreviewWarnings(warnings: string[]): void {
-    if (warnings.length === 0) {
-      this.elements.channelRecognitionPreviewWarnings.replaceChildren();
-      return;
-    }
-
-    const list = document.createElement('ul');
-    for (const warning of warnings) {
-      const item = document.createElement('li');
-      item.textContent = warning;
-      list.append(item);
-    }
-    this.elements.channelRecognitionPreviewWarnings.replaceChildren(list);
-  }
-
-  private renderChannelRecognitionPreviewResults(
-    channelNames: string[],
-    candidates: RecognizedChannelCandidate[]
-  ): void {
-    const usedChannels = new Set(candidates.flatMap((candidate) => candidate.channels));
-    const unmatched = channelNames.filter((channelName) => !usedChannels.has(channelName));
-    const fragment = document.createDocumentFragment();
-
-    if (candidates.length > 0) {
-      const list = document.createElement('div');
-      list.className = 'channel-recognition-preview-display-list';
-      for (const candidate of candidates.slice(0, CHANNEL_RECOGNITION_PREVIEW_DISPLAY_LIMIT)) {
-        const item = document.createElement('article');
-        item.className = 'channel-recognition-preview-display';
-        const title = document.createElement('div');
-        title.className = 'channel-recognition-preview-display-title';
-        title.textContent = candidate.label;
-        const meta = document.createElement('div');
-        meta.className = 'channel-recognition-preview-display-meta';
-        meta.textContent = `${formatChannelRecognitionRuleId(candidate.ruleId)} · ${formatChannelRecognitionPreviewChannelList(candidate.channels)}`;
-        item.append(title, meta);
-        list.append(item);
-      }
-      if (candidates.length > CHANNEL_RECOGNITION_PREVIEW_DISPLAY_LIMIT) {
-        const overflow = document.createElement('div');
-        overflow.className = 'channel-recognition-preview-overflow';
-        overflow.textContent = `${candidates.length - CHANNEL_RECOGNITION_PREVIEW_DISPLAY_LIMIT} more`;
-        list.append(overflow);
-      }
-      fragment.append(list);
-    }
-
-    const unmatchedBlock = document.createElement('div');
-    unmatchedBlock.className = 'channel-recognition-preview-unmatched';
-    unmatchedBlock.textContent = unmatched.length === 0
-      ? 'All channels participate in recognized displays.'
-      : `Unmatched: ${formatChannelRecognitionPreviewChannelList(unmatched)}`;
-    fragment.append(unmatchedBlock);
-    this.elements.channelRecognitionPreviewResults.replaceChildren(fragment);
   }
 
   private renderChannelRecognitionRuleSummary(messages: string[]): void {
@@ -3773,26 +3643,6 @@ export class ViewerUi implements Disposable {
   }
 }
 
-const CHANNEL_RECOGNITION_PREVIEW_DISPLAY_LIMIT = 8;
-const CHANNEL_RECOGNITION_PREVIEW_CHANNEL_LIMIT = 12;
-const DEFAULT_CHANNEL_RECOGNITION_PREVIEW_SAMPLE = [
-  'beauty.R',
-  'beauty.G',
-  'beauty.B',
-  'beauty.A',
-  'depth.Z',
-  'S0.450nm',
-  'S1.450nm',
-  'S2.450nm',
-  'S0.550nm',
-  'S1.550nm',
-  'S2.550nm',
-  'M00',
-  'M01',
-  'M10',
-  'M11'
-].join('\n');
-
 function sameChannelRecognitionNameRulesForId(
   id: ChannelRecognitionNameRuleId,
   rules: ChannelRecognitionNameRules,
@@ -3811,44 +3661,6 @@ function getChannelRecognitionRuleHintId(id: ChannelRecognitionNameRuleId): stri
 
 function getChannelRecognitionRuleErrorId(id: ChannelRecognitionNameRuleId): string {
   return `channel-recognition-rule-${id.replaceAll('.', '-')}-error`;
-}
-
-function formatChannelRecognitionRuleId(ruleId: string): string {
-  const descriptor = CHANNEL_RECOGNITION_NAME_RULE_DESCRIPTORS.find((item) => item.id === ruleId);
-  return descriptor?.label ?? ruleId;
-}
-
-function formatChannelRecognitionPreviewChannelList(channelNames: readonly string[]): string {
-  const visible = channelNames.slice(0, CHANNEL_RECOGNITION_PREVIEW_CHANNEL_LIMIT);
-  const suffix = channelNames.length > visible.length
-    ? `, +${channelNames.length - visible.length} more`
-    : '';
-  return `${visible.join(', ')}${suffix}`;
-}
-
-function buildChannelRecognitionPreviewWarnings(candidates: RecognizedChannelCandidate[]): string[] {
-  const warnings: string[] = [];
-  const candidatesByChannel = new Map<string, RecognizedChannelCandidate[]>();
-  for (const candidate of candidates) {
-    for (const channelName of candidate.channels) {
-      const list = candidatesByChannel.get(channelName) ?? [];
-      list.push(candidate);
-      candidatesByChannel.set(channelName, list);
-    }
-  }
-
-  for (const [channelName, matches] of candidatesByChannel) {
-    const families = new Set(matches.map((candidate) => candidate.ruleId));
-    if (families.size <= 1) {
-      continue;
-    }
-
-    warnings.push(
-      `${channelName} matches ${[...families].map(formatChannelRecognitionRuleId).join(' and ')}.`
-    );
-  }
-
-  return warnings.slice(0, 6);
 }
 
 function toFiles(files: FileList | null | undefined): File[] {
