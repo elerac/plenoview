@@ -45,6 +45,7 @@ export function createViewerInteraction({
       return mergeRenderState(state.sessionState, state.interactionState, {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
         spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+        channelRecognitionSettings: state.channelRecognitionSettings,
         channelRecognitionNameRules: state.channelRecognitionNameRules,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
@@ -59,7 +60,8 @@ export function createViewerInteraction({
       });
     },
     getImageSize: () => {
-      const activeSession = selectActiveSession(core.getState());
+      const appState = core.getState();
+      const activeSession = selectActiveSession(appState);
       if (!activeSession) {
         return null;
       }
@@ -67,7 +69,7 @@ export function createViewerInteraction({
       return resolveDisplayImageSize(
         activeSession.decoded.width,
         activeSession.decoded.height,
-        core.getState().sessionState.displaySelection
+        appState.sessionState.displaySelection
       );
     },
     resolveDepthProbePixel: (point, state, viewport) => {
@@ -75,7 +77,8 @@ export function createViewerInteraction({
         return null;
       }
 
-      const activeSession = selectActiveSession(core.getState());
+      const appState = core.getState();
+      const activeSession = selectActiveSession(appState);
       const activeLayer = activeSession?.decoded.layers[state.activeLayer] ?? null;
       if (!activeSession || !activeLayer) {
         return null;
@@ -84,7 +87,11 @@ export function createViewerInteraction({
       const depthChannel = resolveDepthChannelForLayer(
         activeLayer.channelNames,
         state.depthChannel,
-        { allowArbitraryZSuffix: true }
+        {
+          allowArbitraryZSuffix: true,
+          channelRecognitionSettings: appState.channelRecognitionSettings,
+          channelRecognitionNameRules: appState.channelRecognitionNameRules
+        }
       );
       return depthProbeProjectionCache.pick(point, {
         layer: activeLayer,
@@ -163,6 +170,7 @@ export function initializeViewportLifecycle({
       renderer.render(mergeRenderState(state.sessionState, interactionCoordinator.getState(), {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
         spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+        channelRecognitionSettings: state.channelRecognitionSettings,
         channelRecognitionNameRules: state.channelRecognitionNameRules,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       }));

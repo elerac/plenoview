@@ -2,6 +2,16 @@ import {
   getChannelReadView,
   readChannelValue
 } from './channel-storage';
+import {
+  normalizeChannelRecognitionSettings,
+  type ChannelRecognitionSettings
+} from './channel-recognition-settings';
+import {
+  compileChannelRecognitionNameRules,
+  parseDepthMapChannelNameWithRules,
+  type ChannelRecognitionNameRules,
+  type CompiledChannelRecognitionNameRules
+} from './channel-recognition-name-rules';
 import type {
   DecodedLayer,
   DisplayLuminanceRange,
@@ -30,6 +40,14 @@ export interface DepthChannelOption {
 
 export interface ResolveDepthChannelOptions {
   allowArbitraryZSuffix?: boolean;
+  channelRecognitionSettings?: ChannelRecognitionSettings;
+  channelRecognitionNameRules?: ChannelRecognitionNameRules;
+}
+
+export interface DepthChannelOptionsConfig {
+  allowArbitraryZSuffix?: boolean;
+  channelRecognitionSettings?: ChannelRecognitionSettings;
+  channelRecognitionNameRules?: ChannelRecognitionNameRules;
 }
 
 export interface DepthPointSampling {
@@ -157,9 +175,20 @@ export function resolveDepthFocalLengthPx(
   return normalizeDepthFocalLengthPx(focalLengthPx) ?? Math.max(1, width, height);
 }
 
-export function getDepthChannelOptions(channelNames: readonly string[]): DepthChannelOption[] {
+export function getDepthChannelOptions(
+  channelNames: readonly string[],
+  config: DepthChannelOptionsConfig = { allowArbitraryZSuffix: true }
+): DepthChannelOption[] {
+  if (!isDepthMapRecognitionEnabled(config.channelRecognitionSettings)) {
+    return [];
+  }
+
+  const nameRules = compileChannelRecognitionNameRules(config.channelRecognitionNameRules);
   return channelNames
-    .filter((channelName) => isExactDepthChannel(channelName) || isZSuffixChannel(channelName))
+    .filter((channelName) => (
+      isRecognizedDepthChannel(channelName, nameRules) ||
+      (config.allowArbitraryZSuffix !== false && isZSuffixChannel(channelName))
+    ))
     .map((channelName) => ({
       value: channelName,
       label: channelName
@@ -171,24 +200,40 @@ export function resolveDepthChannelForLayer(
   current: string | null | undefined,
   options: ResolveDepthChannelOptions = {}
 ): string | null {
+  if (!isDepthMapRecognitionEnabled(options.channelRecognitionSettings)) {
+    return null;
+  }
+
   const available = new Set(channelNames);
-  if (current && available.has(current)) {
+  const nameRules = compileChannelRecognitionNameRules(options.channelRecognitionNameRules);
+  const recognizedChannels = channelNames.filter((channelName) => isRecognizedDepthChannel(channelName, nameRules));
+  const recognizedChannelSet = new Set(recognizedChannels);
+  if (
+    current &&
+    available.has(current) &&
+    (recognizedChannelSet.has(current) || (options.allowArbitraryZSuffix && isZSuffixChannel(current)))
+  ) {
     return current;
   }
 
-  const exactZ = channelNames.find((channelName) => channelName === 'Z');
+  const exactZ = recognizedChannels.find((channelName) => channelName === 'Z');
   if (exactZ) {
     return exactZ;
   }
 
-  const exactDepthZ = channelNames.find((channelName) => channelName === 'depth.Z');
+  const exactDepthZ = recognizedChannels.find((channelName) => channelName === 'depth.Z');
   if (exactDepthZ) {
     return exactDepthZ;
   }
 
-  const depthLikeZ = channelNames.find(isDepthLikeZSuffixChannel);
+  const depthLikeZ = recognizedChannels.find(isDepthLikeZSuffixChannel);
   if (depthLikeZ) {
     return depthLikeZ;
+  }
+
+  const customDepth = recognizedChannels[0];
+  if (customDepth) {
+    return customDepth;
   }
 
   if (options.allowArbitraryZSuffix) {
@@ -669,12 +714,14 @@ export function computePositiveFiniteDepthRange(
   return count > 0 ? { min, max } : null;
 }
 
-export function hasDepthChannelCandidate(channelNames: readonly string[]): boolean {
-  return resolveDepthChannelForLayer(channelNames, null, { allowArbitraryZSuffix: true }) !== null;
-}
-
-function isExactDepthChannel(channelName: string): boolean {
-  return channelName === 'Z' || channelName === 'depth.Z';
+export function hasDepthChannelCandidate(
+  channelNames: readonly string[],
+  config: ResolveDepthChannelOptions = {}
+): boolean {
+  return resolveDepthChannelForLayer(channelNames, null, {
+    ...config,
+    allowArbitraryZSuffix: config.allowArbitraryZSuffix ?? true
+  }) !== null;
 }
 
 function isZSuffixChannel(channelName: string): boolean {
@@ -688,6 +735,17 @@ function isDepthLikeZSuffixChannel(channelName: string): boolean {
 
   const prefix = channelName.slice(0, -2).toLowerCase();
   return prefix.includes('depth');
+}
+
+function isRecognizedDepthChannel(
+  channelName: string,
+  nameRules: CompiledChannelRecognitionNameRules
+): boolean {
+  return parseDepthMapChannelNameWithRules(channelName, nameRules) !== null;
+}
+
+function isDepthMapRecognitionEnabled(settings: ChannelRecognitionSettings | undefined): boolean {
+  return normalizeChannelRecognitionSettings(settings)['depth.map'] !== false;
 }
 
 function clampFinite(value: number, min: number, max: number, fallback: number): number {

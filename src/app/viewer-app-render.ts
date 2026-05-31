@@ -34,6 +34,11 @@ import {
   createDefaultChannelRecognitionNameRules,
   sameChannelRecognitionNameRules
 } from '../channel-recognition-name-rules';
+import {
+  createDefaultChannelRecognitionSettings,
+  sameChannelRecognitionSettings,
+  type ChannelRecognitionSettings
+} from '../channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from '../channel-recognition-name-rules';
 import type { DisplayLuminanceRange, OpenedImageSession, ViewerRenderState } from '../types';
 import { buildProbeReadoutModel } from './probe-presentation';
@@ -227,6 +232,7 @@ function createRenderStateSelector(): (state: ViewerAppState) => ViewerRenderSna
     const nextResult = mergeRenderState(state.sessionState, state.interactionState, {
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+      channelRecognitionSettings: state.channelRecognitionSettings,
       channelRecognitionNameRules: state.channelRecognitionNameRules,
       invalidValueWarningEnabled: state.invalidValueWarningEnabled
     });
@@ -264,6 +270,7 @@ function selectPaneRenderSources(
           session.state,
           state.maskInvalidStokesVectors,
           state.spectralRgbGroupingEnabled,
+          state.channelRecognitionSettings,
           state.channelRecognitionNameRules,
           state.invalidValueWarningEnabled
         );
@@ -282,7 +289,11 @@ function selectPaneRenderSources(
       depthChannel: resolveDepthChannelForLayer(
         layer.channelNames,
         renderState.depthChannel,
-        { allowArbitraryZSuffix: renderState.viewerMode === 'depth' }
+        {
+          allowArbitraryZSuffix: renderState.viewerMode === 'depth',
+          channelRecognitionSettings: state.channelRecognitionSettings,
+          channelRecognitionNameRules: state.channelRecognitionNameRules
+        }
       )
     };
 
@@ -306,6 +317,7 @@ function createStoredPaneRenderState(
   sessionState: ViewerAppState['sessionState'],
   maskInvalidStokesVectors: boolean,
   spectralRgbGroupingEnabled: boolean,
+  channelRecognitionSettings: ChannelRecognitionSettings,
   channelRecognitionNameRules: ChannelRecognitionNameRules,
   invalidValueWarningEnabled: boolean
 ): ViewerRenderState {
@@ -313,6 +325,7 @@ function createStoredPaneRenderState(
     ...sessionState,
     maskInvalidStokesVectors,
     spectralRgbGroupingEnabled,
+    channelRecognitionSettings,
     channelRecognitionNameRules,
     invalidValueWarningEnabled,
     hoveredPixel: null,
@@ -347,6 +360,7 @@ function createProbeReadoutSelector(): (
   let previousStokesAolpDegreeModulationMode: ViewerAppState['sessionState']['stokesAolpDegreeModulationMode'] = 'value';
   let previousMaskInvalidStokesVectors = true;
   let previousSpectralRgbGroupingEnabled = true;
+  let previousChannelRecognitionSettings = stateLikeRecognitionSettings();
   let previousChannelRecognitionNameRules = stateLikeNameRules();
   let previousResult = buildProbeReadoutModel({
     activeSession: null,
@@ -389,6 +403,7 @@ function createProbeReadoutSelector(): (
       state.sessionState.visualizationMode === previousVisualizationMode &&
       state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
       state.spectralRgbGroupingEnabled === previousSpectralRgbGroupingEnabled &&
+      sameChannelRecognitionSettings(state.channelRecognitionSettings, previousChannelRecognitionSettings) &&
       sameChannelRecognitionNameRules(state.channelRecognitionNameRules, previousChannelRecognitionNameRules) &&
       (
         !usesColormap || (
@@ -427,6 +442,7 @@ function createProbeReadoutSelector(): (
     previousStokesAolpDegreeModulationMode = state.sessionState.stokesAolpDegreeModulationMode;
     previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
     previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
+    previousChannelRecognitionSettings = state.channelRecognitionSettings;
     previousChannelRecognitionNameRules = state.channelRecognitionNameRules;
     previousResult = buildProbeReadoutModel({
       activeSession,
@@ -437,6 +453,7 @@ function createProbeReadoutSelector(): (
       activeDisplayLuminanceRange,
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+      channelRecognitionSettings: state.channelRecognitionSettings,
       channelRecognitionNameRules: state.channelRecognitionNameRules
     });
     return previousResult;
@@ -790,6 +807,7 @@ function buildViewerStateReadout(
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
     spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+    channelRecognitionSettings: state.channelRecognitionSettings,
     channelRecognitionNameRules: state.channelRecognitionNameRules,
     invalidValueWarningEnabled: state.invalidValueWarningEnabled
   });
@@ -812,11 +830,18 @@ function buildViewerStateReadout(
         ? resolveDepthChannelForLayer(
             activeSession.decoded.layers[renderState.activeLayer]?.channelNames ?? [],
             renderState.depthChannel,
-            { allowArbitraryZSuffix: renderState.viewerMode === 'depth' }
+            {
+              allowArbitraryZSuffix: renderState.viewerMode === 'depth',
+              channelRecognitionSettings: state.channelRecognitionSettings,
+              channelRecognitionNameRules: state.channelRecognitionNameRules
+            }
           )
         : null,
       channelOptions: activeSession
-        ? getDepthChannelOptions(activeSession.decoded.layers[renderState.activeLayer]?.channelNames ?? [])
+        ? getDepthChannelOptions(activeSession.decoded.layers[renderState.activeLayer]?.channelNames ?? [], {
+            channelRecognitionSettings: state.channelRecognitionSettings,
+            channelRecognitionNameRules: state.channelRecognitionNameRules
+          })
         : [],
       focalLengthPx: renderState.depthFocalLengthPx,
       resolvedFocalLengthPx: activeSession
@@ -905,6 +930,10 @@ function samePaneResourceInputs(
     source.renderState.depthChannel === other.renderState.depthChannel &&
     source.renderState.maskInvalidStokesVectors === other.renderState.maskInvalidStokesVectors &&
     source.renderState.spectralRgbGroupingEnabled === other.renderState.spectralRgbGroupingEnabled &&
+    sameOptionalChannelRecognitionSettings(
+      source.renderState.channelRecognitionSettings,
+      other.renderState.channelRecognitionSettings
+    ) &&
     sameOptionalChannelRecognitionNameRules(
       source.renderState.channelRecognitionNameRules,
       other.renderState.channelRecognitionNameRules
@@ -948,6 +977,10 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
     previous.colormapExposureEv === next.colormapExposureEv &&
     previous.colormapGamma === next.colormapGamma &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
+    sameOptionalChannelRecognitionSettings(
+      previous.channelRecognitionSettings,
+      next.channelRecognitionSettings
+    ) &&
     sameOptionalChannelRecognitionNameRules(
       previous.channelRecognitionNameRules,
       next.channelRecognitionNameRules
@@ -989,6 +1022,10 @@ function samePaneValueOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
     previous.viewerMode === next.viewerMode &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
+    sameOptionalChannelRecognitionSettings(
+      previous.channelRecognitionSettings,
+      next.channelRecognitionSettings
+    ) &&
     sameOptionalChannelRecognitionNameRules(
       previous.channelRecognitionNameRules,
       next.channelRecognitionNameRules
@@ -1004,6 +1041,10 @@ function samePaneProbeOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
   return (
     previous.viewerMode === next.viewerMode &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
+    sameOptionalChannelRecognitionSettings(
+      previous.channelRecognitionSettings,
+      next.channelRecognitionSettings
+    ) &&
     sameOptionalChannelRecognitionNameRules(
       previous.channelRecognitionNameRules,
       next.channelRecognitionNameRules
@@ -1041,6 +1082,7 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.stokesAolpDegreeModulationMode === b.stokesAolpDegreeModulationMode &&
     a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
     a.spectralRgbGroupingEnabled === b.spectralRgbGroupingEnabled &&
+    sameOptionalChannelRecognitionSettings(a.channelRecognitionSettings, b.channelRecognitionSettings) &&
     sameOptionalChannelRecognitionNameRules(a.channelRecognitionNameRules, b.channelRecognitionNameRules) &&
     a.invalidValueWarningEnabled === b.invalidValueWarningEnabled &&
     a.activeLayer === b.activeLayer &&
@@ -1095,6 +1137,17 @@ function stateLikeSessionState(): ViewerAppState['sessionState'] {
 
 function stateLikeNameRules(): ChannelRecognitionNameRules {
   return createDefaultChannelRecognitionNameRules();
+}
+
+function stateLikeRecognitionSettings(): ChannelRecognitionSettings {
+  return createDefaultChannelRecognitionSettings();
+}
+
+function sameOptionalChannelRecognitionSettings(
+  a: ChannelRecognitionSettings | undefined,
+  b: ChannelRecognitionSettings | undefined
+): boolean {
+  return sameChannelRecognitionSettings(a ?? stateLikeRecognitionSettings(), b ?? stateLikeRecognitionSettings());
 }
 
 function sameOptionalChannelRecognitionNameRules(

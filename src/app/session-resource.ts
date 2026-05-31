@@ -241,7 +241,11 @@ export function buildReloadedSessionState(
       ? resolveDepthChannelForLayer(
           nextLayer.channelNames,
           currentState.depthChannel,
-          { allowArbitraryZSuffix: true }
+          {
+            allowArbitraryZSuffix: true,
+            channelRecognitionSettings,
+            channelRecognitionNameRules
+          }
         )
       : null;
     if (!nextState.depthChannel) {
@@ -348,7 +352,11 @@ export function buildSwitchedSessionState(
       ? resolveDepthChannelForLayer(
           nextLayer.channelNames,
           currentState.depthChannel,
-          { allowArbitraryZSuffix: true }
+          {
+            allowArbitraryZSuffix: true,
+            channelRecognitionSettings: options.channelRecognitionSettings,
+            channelRecognitionNameRules: options.channelRecognitionNameRules
+          }
         )
       : null;
     if (!nextState.depthChannel) {

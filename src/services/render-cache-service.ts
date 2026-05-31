@@ -315,7 +315,7 @@ export class RenderCacheService implements Disposable {
     session: OpenedImageSession,
     state: ViewerSessionState & Partial<Pick<
       ViewerRenderState,
-      'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled' | 'channelRecognitionNameRules'
+      'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled' | 'channelRecognitionSettings' | 'channelRecognitionNameRules'
     >>
   ): PrepareActiveSessionResult {
     if (this.disposed) {
@@ -348,7 +348,11 @@ export class RenderCacheService implements Disposable {
       channelRecognitionNameRules: state.channelRecognitionNameRules
     });
     const depthChannel = state.viewerMode === 'depth'
-      ? resolveDepthChannelForLayer(layer.channelNames, state.depthChannel, { allowArbitraryZSuffix: true })
+      ? resolveDepthChannelForLayer(layer.channelNames, state.depthChannel, {
+          allowArbitraryZSuffix: true,
+          channelRecognitionSettings: state.channelRecognitionSettings,
+          channelRecognitionNameRules: state.channelRecognitionNameRules
+        })
       : null;
     const requiredChannelNames = getDisplaySourceBindingChannelNames(binding).filter((channelName) => {
       return isDerivedDisplaySourceName(channelName) ||

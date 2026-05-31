@@ -3,6 +3,8 @@ import {
   clampDepthYaw,
   computePositiveFiniteDepthRange,
   DepthProbeProjectionCache,
+  getDepthChannelOptions,
+  hasDepthChannelCandidate,
   isDepthSampledPixel,
   pickDepthPixelAtScreenPoint,
   projectDepthPixelToScreen,
@@ -11,6 +13,8 @@ import {
   resolveDepthFocalLengthPx,
   resolveDepthPointSampling
 } from '../src/depth';
+import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
+import { createDefaultChannelRecognitionNameRules } from '../src/channel-recognition-name-rules';
 import { createLayerFromChannels } from './helpers/state-fixtures';
 
 describe('depth utilities', () => {
@@ -39,6 +43,38 @@ describe('depth utilities', () => {
     expect(resolveDepthChannelForLayer(['beauty.R', 'beauty.Z'], null, {
       allowArbitraryZSuffix: true
     })).toBe('beauty.Z');
+  });
+
+  it('gates depth detection through channel recognition settings', () => {
+    const channelRecognitionSettings = {
+      ...createDefaultChannelRecognitionSettings(),
+      'depth.map': false
+    };
+
+    expect(resolveDepthChannelForLayer(['Z', 'depth.Z'], null, {
+      allowArbitraryZSuffix: true,
+      channelRecognitionSettings
+    })).toBeNull();
+    expect(getDepthChannelOptions(['Z', 'depth.Z'], { channelRecognitionSettings })).toEqual([]);
+    expect(hasDepthChannelCandidate(['Z'], { channelRecognitionSettings })).toBe(false);
+  });
+
+  it('uses custom depth name rules before arbitrary .Z fallback', () => {
+    const channelRecognitionNameRules = createDefaultChannelRecognitionNameRules();
+    channelRecognitionNameRules['depth.map'] = {
+      pattern: '^(?<depth>worldDepth)$'
+    };
+
+    expect(resolveDepthChannelForLayer(['Z', 'worldDepth', 'beauty.Z'], null, {
+      channelRecognitionNameRules
+    })).toBe('worldDepth');
+    expect(resolveDepthChannelForLayer(['Z', 'beauty.Z'], null, {
+      channelRecognitionNameRules,
+      allowArbitraryZSuffix: true
+    })).toBe('beauty.Z');
+    expect(getDepthChannelOptions(['worldDepth', 'beauty.Z'], {
+      channelRecognitionNameRules
+    }).map((option) => option.value)).toEqual(['worldDepth', 'beauty.Z']);
   });
 
   it('projects pixel centers with auto and manual focal length', () => {

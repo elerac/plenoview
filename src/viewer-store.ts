@@ -155,7 +155,10 @@ export function buildViewerStateForLayer(
     depthYawDeg: clampDepthYaw(currentState.depthYawDeg),
     depthPitchDeg: clampDepthPitch(currentState.depthPitchDeg),
     depthZoom: clampDepthZoom(currentState.depthZoom),
-    depthChannel: resolveDepthChannelForLayer(layer.channelNames, currentState.depthChannel)
+    depthChannel: resolveDepthChannelForLayer(layer.channelNames, currentState.depthChannel, {
+      channelRecognitionSettings: config.channelRecognitionSettings,
+      channelRecognitionNameRules: config.channelRecognitionNameRules
+    })
   };
 }
 

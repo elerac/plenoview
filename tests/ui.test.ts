@@ -3647,6 +3647,7 @@ describe('view menu', () => {
     const rgbRecognition = getRecognitionCheckbox('component.rgb');
     const xyzRecognition = getRecognitionCheckbox('component.xyz');
     const normalMapRecognition = getRecognitionCheckbox('normal.map');
+    const depthMapRecognition = getRecognitionCheckbox('depth.map');
     const uvRecognition = getRecognitionCheckbox('component.uv');
     const spectralGroupingCheckbox = getRecognitionCheckbox('spectral.series');
     const scalarStokesRecognition = getRecognitionCheckbox('stokes.scalar');
@@ -3700,6 +3701,7 @@ describe('view menu', () => {
       rgbRecognition,
       xyzRecognition,
       normalMapRecognition,
+      depthMapRecognition,
       uvRecognition,
       spectralGroupingCheckbox,
       scalarStokesRecognition,

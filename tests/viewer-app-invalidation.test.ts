@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pendingResource, successResource } from '../src/async-resource';
 import { createInitialViewerAppState } from '../src/app/viewer-app-core';
 import { buildChannelViewItems } from '../src/channel-view-items';
+import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
 import {
   serializeChannelThumbnailContextKey,
   serializeChannelThumbnailRequestKey
@@ -449,6 +450,29 @@ describe('viewer app lanes', () => {
     expect(hasUiFlag(uiFlags, ViewerUiInvalidationFlags.RgbGroupOptions)).toBe(true);
     expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.ResourcePrepare)).toBe(true);
     expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
+  });
+
+  it('marks depth mode availability when depth recognition settings change', () => {
+    const session = createSession('session-1', createDecodedImage(['R', 'G', 'B', 'Z']));
+    const previous = {
+      ...createInitialViewerAppState(),
+      sessions: [session],
+      activeSessionId: session.id,
+      sessionState: session.state,
+      interactionState: createInteractionState(session.state)
+    };
+    const next = {
+      ...previous,
+      channelRecognitionSettings: {
+        ...createDefaultChannelRecognitionSettings(),
+        'depth.map': false
+      }
+    };
+    const selectUiSnapshot = createViewerUiSnapshotSelector();
+
+    expect(selectUiSnapshot(previous).depthModeAvailable).toBe(true);
+    expect(selectUiSnapshot(next).depthModeAvailable).toBe(false);
+    expect(hasUiFlag(createUiFlags(previous, next), ViewerUiInvalidationFlags.DepthModeAvailability)).toBe(true);
   });
 
   it('keeps channel thumbnails on the committed exposure while live exposure changes', () => {

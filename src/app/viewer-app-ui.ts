@@ -115,7 +115,11 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       depthModeAvailable: Boolean(
         activeSession &&
         hasDepthChannelCandidate(
-          activeSession.decoded.layers[state.sessionState.activeLayer]?.channelNames ?? []
+          activeSession.decoded.layers[state.sessionState.activeLayer]?.channelNames ?? [],
+          {
+            channelRecognitionSettings: state.channelRecognitionSettings,
+            channelRecognitionNameRules: state.channelRecognitionNameRules
+          }
         )
       ),
       visualizationMode: state.sessionState.visualizationMode,
@@ -254,11 +258,15 @@ export function computeViewerUiInvalidation(
   }
 
   if (!sameChannelRecognitionSettings(previous.channelRecognitionSettings, next.channelRecognitionSettings)) {
-    flags |= ViewerUiInvalidationFlags.ChannelRecognitionSettings | ViewerUiInvalidationFlags.RgbGroupOptions;
+    flags |= ViewerUiInvalidationFlags.ChannelRecognitionSettings |
+      ViewerUiInvalidationFlags.RgbGroupOptions |
+      ViewerUiInvalidationFlags.DepthModeAvailability;
   }
 
   if (!sameChannelRecognitionNameRules(previous.channelRecognitionNameRules, next.channelRecognitionNameRules)) {
-    flags |= ViewerUiInvalidationFlags.ChannelRecognitionNameRules | ViewerUiInvalidationFlags.RgbGroupOptions;
+    flags |= ViewerUiInvalidationFlags.ChannelRecognitionNameRules |
+      ViewerUiInvalidationFlags.RgbGroupOptions |
+      ViewerUiInvalidationFlags.DepthModeAvailability;
   }
 
   if (previous.maskInvalidStokesVectors !== next.maskInvalidStokesVectors) {

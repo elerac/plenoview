@@ -201,7 +201,11 @@ export class ProbeOverlayRenderer implements Disposable {
     const depthChannel = resolveDepthChannelForLayer(
       this.sourceLayer.channelNames,
       this.depthChannelName ?? state.depthChannel,
-      { allowArbitraryZSuffix: true }
+      {
+        allowArbitraryZSuffix: true,
+        channelRecognitionSettings: state.channelRecognitionSettings,
+        channelRecognitionNameRules: state.channelRecognitionNameRules
+      }
     );
     if (!depthChannel) {
       return;

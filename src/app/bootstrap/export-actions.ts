@@ -304,6 +304,7 @@ export function createImageExportPixelsResolver({
     const renderState = mergeRenderState(state.sessionState, state.interactionState, {
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+      channelRecognitionSettings: state.channelRecognitionSettings,
       channelRecognitionNameRules: state.channelRecognitionNameRules,
       invalidValueWarningEnabled: state.invalidValueWarningEnabled
     });
@@ -390,6 +391,7 @@ export async function handleExportImage(
         renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
           maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors,
           spectralRgbGroupingEnabled: stateSnapshot.spectralRgbGroupingEnabled,
+          channelRecognitionSettings: stateSnapshot.channelRecognitionSettings,
           channelRecognitionNameRules: stateSnapshot.channelRecognitionNameRules,
           invalidValueWarningEnabled: stateSnapshot.invalidValueWarningEnabled
         })
@@ -558,6 +560,7 @@ export async function handleExportScreenshotRegions(
           renderState: mergeRenderState(stateSnapshot.sessionState, stateSnapshot.interactionState, {
             maskInvalidStokesVectors: stateSnapshot.maskInvalidStokesVectors,
             spectralRgbGroupingEnabled: stateSnapshot.spectralRgbGroupingEnabled,
+            channelRecognitionSettings: stateSnapshot.channelRecognitionSettings,
             channelRecognitionNameRules: stateSnapshot.channelRecognitionNameRules,
             invalidValueWarningEnabled: stateSnapshot.invalidValueWarningEnabled
           }),
@@ -986,6 +989,7 @@ async function resolveBatchEntryExportResult({
       ...mergeRenderState(exportState.state, createInteractionState(exportState.state), {
         maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
         spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled,
+        channelRecognitionSettings: appState.channelRecognitionSettings,
         channelRecognitionNameRules: appState.channelRecognitionNameRules,
         invalidValueWarningEnabled: appState.invalidValueWarningEnabled
       }),
@@ -995,6 +999,7 @@ async function resolveBatchEntryExportResult({
     : mergeRenderState(exportState.state, createInteractionState(exportState.state), {
       maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled,
+      channelRecognitionSettings: appState.channelRecognitionSettings,
       channelRecognitionNameRules: appState.channelRecognitionNameRules,
       invalidValueWarningEnabled: appState.invalidValueWarningEnabled
     });
@@ -1383,6 +1388,7 @@ function restoreActiveRendererBinding(
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
     spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+    channelRecognitionSettings: state.channelRecognitionSettings,
     channelRecognitionNameRules: state.channelRecognitionNameRules,
     invalidValueWarningEnabled: state.invalidValueWarningEnabled
   });

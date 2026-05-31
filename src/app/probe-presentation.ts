@@ -10,6 +10,7 @@ import {
   resolveProbeMode
 } from '../probe';
 import type { ColormapLut } from '../colormaps';
+import type { ChannelRecognitionSettings } from '../channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from '../channel-recognition-name-rules';
 import type { ProbeReadoutModel } from './viewer-app-types';
 import type {
@@ -29,6 +30,7 @@ export interface BuildProbePresentationArgs {
   activeDisplayLuminanceRange: DisplayLuminanceRange | null;
   maskInvalidStokesVectors?: boolean;
   spectralRgbGroupingEnabled?: boolean;
+  channelRecognitionSettings?: ChannelRecognitionSettings;
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
 }
 
@@ -73,7 +75,11 @@ export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeR
     const depthChannel = resolveDepthChannelForLayer(
       args.activeLayer.channelNames,
       args.sessionState.depthChannel,
-      { allowArbitraryZSuffix: true }
+      {
+        allowArbitraryZSuffix: true,
+        channelRecognitionSettings: args.channelRecognitionSettings,
+        channelRecognitionNameRules: args.channelRecognitionNameRules
+      }
     );
     if (!isValidDepthProbePixel(targetPixel, {
       layer: args.activeLayer,

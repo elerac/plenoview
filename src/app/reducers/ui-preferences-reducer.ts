@@ -14,6 +14,7 @@ import {
   sameChannelRecognitionNameRules,
   type ChannelRecognitionNameRules
 } from '../../channel-recognition-name-rules';
+import { resolveDepthChannelForLayer } from '../../depth';
 import { sameDisplaySelection } from '../../display-model';
 import { resolveDisplaySelectionForLayer } from '../../display-selection';
 import {
@@ -132,23 +133,8 @@ function reduceChannelRecognitionNameRulesSet(
     return nextState;
   }
 
-  const displaySelection = resolveDisplaySelectionForLayer(
-    layer.channelNames,
-    nextState.sessionState.displaySelection,
-    {
-      stokesParameterVisibility: nextState.stokesParameterVisibility,
-      spectralRgbGroupingEnabled: nextState.spectralRgbGroupingEnabled,
-      channelRecognitionSettings: nextState.channelRecognitionSettings,
-      channelRecognitionNameRules: nextRules
-    }
-  );
-  if (sameDisplaySelection(displaySelection, nextState.sessionState.displaySelection)) {
-    return nextState;
-  }
-
-  return patchSessionState(nextState, { displaySelection }, {
-    clearHover: true,
-    resetDisplayRangeContext: true
+  return applyRecognitionDependentSessionState(nextState, layer.channelNames, {
+    channelRecognitionNameRules: nextRules
   });
 }
 
@@ -175,23 +161,8 @@ function reduceChannelRecognitionSettingsSet(
     return nextState;
   }
 
-  const displaySelection = resolveDisplaySelectionForLayer(
-    layer.channelNames,
-    nextState.sessionState.displaySelection,
-    {
-      stokesParameterVisibility: nextState.stokesParameterVisibility,
-      spectralRgbGroupingEnabled: nextState.spectralRgbGroupingEnabled,
-      channelRecognitionSettings: nextSettings,
-      channelRecognitionNameRules: nextState.channelRecognitionNameRules
-    }
-  );
-  if (sameDisplaySelection(displaySelection, nextState.sessionState.displaySelection)) {
-    return nextState;
-  }
-
-  return patchSessionState(nextState, { displaySelection }, {
-    clearHover: true,
-    resetDisplayRangeContext: true
+  return applyRecognitionDependentSessionState(nextState, layer.channelNames, {
+    channelRecognitionSettings: nextSettings
   });
 }
 
@@ -222,22 +193,63 @@ function reduceSpectralRgbGroupingSet(state: ViewerAppState, enabled: boolean): 
     return nextState;
   }
 
+  return applyRecognitionDependentSessionState(nextState, layer.channelNames, {
+    spectralRgbGroupingEnabled: enabled,
+    channelRecognitionSettings
+  });
+}
+
+function applyRecognitionDependentSessionState(
+  state: ViewerAppState,
+  channelNames: string[],
+  overrides: {
+    spectralRgbGroupingEnabled?: boolean;
+    channelRecognitionSettings?: ChannelRecognitionSettings;
+    channelRecognitionNameRules?: ChannelRecognitionNameRules;
+  } = {}
+): ViewerAppState {
+  const spectralRgbGroupingEnabled = overrides.spectralRgbGroupingEnabled ?? state.spectralRgbGroupingEnabled;
+  const channelRecognitionSettings = overrides.channelRecognitionSettings ?? state.channelRecognitionSettings;
+  const channelRecognitionNameRules = overrides.channelRecognitionNameRules ?? state.channelRecognitionNameRules;
   const displaySelection = resolveDisplaySelectionForLayer(
-    layer.channelNames,
-    nextState.sessionState.displaySelection,
+    channelNames,
+    state.sessionState.displaySelection,
     {
-      stokesParameterVisibility: nextState.stokesParameterVisibility,
-      spectralRgbGroupingEnabled: enabled,
+      stokesParameterVisibility: state.stokesParameterVisibility,
+      spectralRgbGroupingEnabled,
       channelRecognitionSettings,
-      channelRecognitionNameRules: nextState.channelRecognitionNameRules
+      channelRecognitionNameRules
     }
   );
-  if (sameDisplaySelection(displaySelection, nextState.sessionState.displaySelection)) {
-    return nextState;
+  const patch: Partial<ViewerAppState['sessionState']> = {};
+  if (!sameDisplaySelection(displaySelection, state.sessionState.displaySelection)) {
+    patch.displaySelection = displaySelection;
   }
 
-  return patchSessionState(nextState, { displaySelection }, {
+  if (state.sessionState.viewerMode === 'depth') {
+    const depthChannel = resolveDepthChannelForLayer(
+      channelNames,
+      state.sessionState.depthChannel,
+      {
+        allowArbitraryZSuffix: true,
+        channelRecognitionSettings,
+        channelRecognitionNameRules
+      }
+    );
+    if (depthChannel !== state.sessionState.depthChannel) {
+      patch.depthChannel = depthChannel;
+    }
+    if (!depthChannel) {
+      patch.viewerMode = 'image';
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return state;
+  }
+
+  return patchSessionState(state, patch, {
     clearHover: true,
-    resetDisplayRangeContext: true
+    resetDisplayRangeContext: patch.displaySelection !== undefined
   });
 }

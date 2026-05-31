@@ -3,6 +3,7 @@ import {
   cloneChannelRecognitionNameRules,
   compileChannelRecognitionNameRules,
   createDefaultChannelRecognitionNameRules,
+  parseDepthMapChannelNameWithRules,
   parseComponentChannelNameWithRules,
   parseMuellerMatrixChannelNameWithRules,
   parseNormalMapChannelNameWithRules,
@@ -35,6 +36,10 @@ describe('channel recognition name rules', () => {
       component: 'y'
     });
     expect(parseNormalMapChannelNameWithRules('surface.X', compiled)).toBeNull();
+    expect(parseDepthMapChannelNameWithRules('Z', compiled)).toEqual({ channelName: 'Z' });
+    expect(parseDepthMapChannelNameWithRules('depth.Z', compiled)).toEqual({ channelName: 'depth.Z' });
+    expect(parseDepthMapChannelNameWithRules('cameraDepth.Z', compiled)).toEqual({ channelName: 'cameraDepth.Z' });
+    expect(parseDepthMapChannelNameWithRules('beauty.Z', compiled)).toBeNull();
     expect(parseComponentChannelNameWithRules('flow.U', 'uv', compiled)).toEqual({ base: 'flow', slot: 'u' });
     expect(parseSpectralChannelNameWithRules('FUGA500nm', compiled)).toMatchObject({
       wavelength: 500,
@@ -115,6 +120,17 @@ describe('channel recognition name rules', () => {
     });
   });
 
+  it('recognizes custom depth-map aliases after applying custom regexes', () => {
+    const rules = createDefaultChannelRecognitionNameRules();
+    rules['depth.map'] = {
+      pattern: '^(?<depth>worldDepth)$'
+    };
+    const compiled = compileChannelRecognitionNameRules(rules);
+
+    expect(parseDepthMapChannelNameWithRules('worldDepth', compiled)).toEqual({ channelName: 'worldDepth' });
+    expect(parseDepthMapChannelNameWithRules('Z', compiled)).toBeNull();
+  });
+
   it('validates regex syntax and required named captures without losing input', () => {
     expect(validateChannelRecognitionNameRule('spectral.series', {
       pattern: '^(?<series>.+)$'
@@ -134,6 +150,14 @@ describe('channel recognition name rules', () => {
       {
         id: 'normal.map',
         message: 'Add a named capture for (?<z>...).'
+      }
+    ]);
+    expect(validateChannelRecognitionNameRule('depth.map', {
+      pattern: '^(?<base>.+)$'
+    })).toEqual([
+      {
+        id: 'depth.map',
+        message: 'Add a named capture for (?<z>...) or (?<depth>...).'
       }
     ]);
 
@@ -169,6 +193,11 @@ describe('channel recognition name rules', () => {
     expect(readStoredChannelRecognitionNameRules()).toEqual(createDefaultChannelRecognitionNameRules());
 
     saveStoredChannelRecognitionNameRules(rules);
+    expect(readStoredChannelRecognitionNameRules()).toEqual(rules);
+
+    const legacyRules = { ...rules } as Record<string, unknown>;
+    delete legacyRules['depth.map'];
+    store.set(CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY, JSON.stringify(legacyRules));
     expect(readStoredChannelRecognitionNameRules()).toEqual(rules);
 
     store.set(CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY, JSON.stringify({

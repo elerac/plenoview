@@ -3,6 +3,7 @@ export type ChannelRecognitionNameRuleId =
   | 'component.xyz'
   | 'component.uv'
   | 'normal.map'
+  | 'depth.map'
   | 'spectral.series'
   | 'stokes.scalar'
   | 'stokes.rgb'
@@ -61,6 +62,10 @@ export interface ParsedAlphaChannelName {
 export interface ParsedNormalMapChannelName {
   base: string;
   component: NormalMapNameRuleComponent;
+}
+
+export interface ParsedDepthMapChannelName {
+  channelName: string;
 }
 
 export interface ParsedSpectralChannelName {
@@ -125,6 +130,12 @@ export const CHANNEL_RECOGNITION_NAME_RULE_DESCRIPTORS: readonly ChannelRecognit
     requiredCaptures: ['x', 'y', 'z']
   },
   {
+    id: 'depth.map',
+    label: 'Depth maps',
+    hint: 'Use z or depth named captures. Default matches Z and depth-like .Z channels.',
+    requiredCaptures: ['z|depth']
+  },
+  {
     id: 'spectral.series',
     label: 'Spectral RGB series',
     hint: 'Use wavelength and optional series captures. Wavelength values may use decimal commas or points.',
@@ -182,6 +193,9 @@ const DEFAULT_CHANNEL_RECOGNITION_NAME_RULES: ChannelRecognitionNameRules = {
   },
   'normal.map': {
     pattern: '^(?<base>N|normal|.+_normal)\\.(?:(?<x>X)|(?<y>Y)|(?<z>Z))$'
+  },
+  'depth.map': {
+    pattern: '^(?:(?<z>Z)|(?<depth>.*[dD][eE][pP][tT][hH].*\\.Z))$'
   },
   'spectral.series': {
     pattern: '^(?![sS]4\\.)(?![sS][0-3]\\.\\d+\\.\\d+(?:[eE][-+]?\\d+)?[nN][mM]$)(?![tT]\\.\\d+\\.\\d+(?:[eE][-+]?\\d+)?[nN][mM]$)(?:(?<series>[sS][0-3]|[tT]|(?!(?:[sS][0-4]|[tT])\\.)[A-Za-z_][A-Za-z0-9_.-]*?)\\.|[A-Za-z_][A-Za-z0-9_-]*?(?=\\d))?(?<wavelength>\\d+(?:[.,]\\d+)?(?:[eE][-+]?\\d+)?)[nN][mM]$'
@@ -413,6 +427,18 @@ export function parseNormalMapChannelNameWithRules(
   return component
     ? { base: match.groups.base ?? '', component }
     : null;
+}
+
+export function parseDepthMapChannelNameWithRules(
+  channelName: string,
+  compiled = compileChannelRecognitionNameRules()
+): ParsedDepthMapChannelName | null {
+  const match = execNamedRule(compiled.rules['depth.map'], channelName);
+  if (!match || (!hasCapture(match.groups, 'z') && !hasCapture(match.groups, 'depth'))) {
+    return null;
+  }
+
+  return { channelName };
 }
 
 export function parseSpectralChannelNameWithRules(

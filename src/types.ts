@@ -4,6 +4,7 @@ import type {
   StokesDegreeModulationState
 } from './display-model';
 import type { ChannelStorage, FiniteValueRange } from './channel-storage';
+import type { ChannelRecognitionSettings } from './channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from './channel-recognition-name-rules';
 
 export type VisualizationMode = 'rgb' | 'colormap';
@@ -191,6 +192,7 @@ export interface ViewerInteractionState {
 export interface ViewerRenderState extends ViewerSessionState {
   maskInvalidStokesVectors?: boolean;
   spectralRgbGroupingEnabled?: boolean;
+  channelRecognitionSettings?: ChannelRecognitionSettings;
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
   invalidValueWarningEnabled?: boolean;
   invalidValueWarningPhase?: number;

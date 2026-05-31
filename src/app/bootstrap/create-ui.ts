@@ -296,6 +296,7 @@ export function createViewerUi({
       const renderState = mergeRenderState(state.sessionState, state.interactionState, {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
         spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+        channelRecognitionSettings: state.channelRecognitionSettings,
         channelRecognitionNameRules: state.channelRecognitionNameRules,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });
@@ -332,6 +333,7 @@ export function createViewerUi({
       const renderState = mergeRenderState(state.sessionState, state.interactionState, {
         maskInvalidStokesVectors: state.maskInvalidStokesVectors,
         spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+        channelRecognitionSettings: state.channelRecognitionSettings,
         channelRecognitionNameRules: state.channelRecognitionNameRules,
         invalidValueWarningEnabled: state.invalidValueWarningEnabled
       });

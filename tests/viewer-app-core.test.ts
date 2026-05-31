@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AUTO_EXPOSURE_PERCENTILE } from '../src/auto-exposure';
 import { getSuccessValue } from '../src/async-resource';
+import { createDefaultChannelRecognitionNameRules } from '../src/channel-recognition-name-rules';
 import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
 import { DEFAULT_DISPLAY_GAMMA } from '../src/color';
 import { DEFAULT_DEPTH_ZOOM } from '../src/depth';
@@ -109,6 +110,38 @@ describe('viewer app core', () => {
 
     expect(core.getState().channelRecognitionSettings['component.rgb']).toBe(false);
     expect(core.getState().sessionState.displaySelection).toEqual(createChannelMonoSelection('Y'));
+  });
+
+  it('uses depth recognition settings and name rules to maintain depth mode', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({
+      type: 'sessionLoaded',
+      session: createSession('session-1', createDecodedImage(['R', 'G', 'B', 'Z', 'worldDepth']))
+    });
+    core.dispatch({ type: 'viewerModeSet', viewerMode: 'depth' });
+
+    expect(core.getState().sessionState.viewerMode).toBe('depth');
+    expect(core.getState().sessionState.depthChannel).toBe('Z');
+
+    const customRules = createDefaultChannelRecognitionNameRules();
+    customRules['depth.map'] = {
+      pattern: '^(?<depth>worldDepth)$'
+    };
+    core.dispatch({ type: 'channelRecognitionNameRulesSet', rules: customRules });
+
+    expect(core.getState().sessionState.viewerMode).toBe('depth');
+    expect(core.getState().sessionState.depthChannel).toBe('worldDepth');
+
+    core.dispatch({
+      type: 'channelRecognitionSettingsSet',
+      settings: {
+        ...createDefaultChannelRecognitionSettings(),
+        'depth.map': false
+      }
+    });
+
+    expect(core.getState().sessionState.viewerMode).toBe('image');
+    expect(core.getState().sessionState.depthChannel).toBeNull();
   });
 
   it('splits, activates, and resets viewer panes without changing view state', () => {

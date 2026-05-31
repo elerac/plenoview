@@ -154,7 +154,11 @@ export function displayReducer(
         nextSessionState.depthChannel = resolveDepthChannelForLayer(
           nextLayer.channelNames,
           state.sessionState.depthChannel,
-          { allowArbitraryZSuffix: true }
+          {
+            allowArbitraryZSuffix: true,
+            channelRecognitionSettings: state.channelRecognitionSettings,
+            channelRecognitionNameRules: state.channelRecognitionNameRules
+          }
         );
         if (!nextSessionState.depthChannel) {
           nextSessionState.viewerMode = 'image';
@@ -374,9 +378,15 @@ export function displayReducer(
 
       const patch: Partial<ViewerAppState['sessionState']> = {};
       if (intent.patch.depthChannel !== undefined) {
-        patch.depthChannel = activeLayer.channelNames.includes(intent.patch.depthChannel ?? '')
-          ? intent.patch.depthChannel ?? null
-          : resolveDepthChannelForLayer(activeLayer.channelNames, null, { allowArbitraryZSuffix: true });
+        patch.depthChannel = resolveDepthChannelForLayer(
+          activeLayer.channelNames,
+          intent.patch.depthChannel,
+          {
+            allowArbitraryZSuffix: true,
+            channelRecognitionSettings: state.channelRecognitionSettings,
+            channelRecognitionNameRules: state.channelRecognitionNameRules
+          }
+        );
       }
       if (intent.patch.depthFocalLengthPx !== undefined) {
         patch.depthFocalLengthPx = normalizeDepthFocalLengthPx(intent.patch.depthFocalLengthPx);
@@ -466,7 +476,11 @@ function resolveDepthModeActivationPatch(state: ViewerAppState): Partial<ViewerA
     depthChannel: resolveDepthChannelForLayer(
       activeLayer.channelNames,
       state.sessionState.depthChannel,
-      { allowArbitraryZSuffix: true }
+      {
+        allowArbitraryZSuffix: true,
+        channelRecognitionSettings: state.channelRecognitionSettings,
+        channelRecognitionNameRules: state.channelRecognitionNameRules
+      }
     )
   };
 }
