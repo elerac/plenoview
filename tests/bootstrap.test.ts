@@ -92,6 +92,7 @@ const mocks = vi.hoisted(() => {
   const interactionSetViewerKeyboardZoomInput = vi.fn();
   const interactionCoordinatorDispose = vi.fn();
   const sessionDispose = vi.fn();
+  const sessionResetActiveSessionViewState = vi.fn();
   const displayDispose = vi.fn();
   const thumbnailDispose = vi.fn();
   const renderCacheDispose = vi.fn();
@@ -194,6 +195,7 @@ const mocks = vi.hoisted(() => {
     interactionCoordinatorGetState,
     interactionCoordinatorEnqueueViewPatch,
     viewerRect,
+    sessionResetActiveSessionViewState,
     getUiCallbacks: () => uiCallbacks,
     setUiCallbacks: (callbacks: Record<string, unknown> | null) => {
       uiCallbacks = callbacks;
@@ -403,6 +405,7 @@ vi.mock('../src/controllers/session-controller', () => ({
     readonly getActiveSession = vi.fn(() => null);
     readonly getActiveSessionId = vi.fn(() => null);
     readonly getSessions = vi.fn(() => []);
+    readonly resetActiveSessionViewState = mocks.sessionResetActiveSessionViewState;
   }
 }));
 
@@ -970,6 +973,20 @@ describe('bootstrap app lifecycle', () => {
     callbacks.onResetView();
 
     expect(mocks.displayResetActiveSessionDisplayState).toHaveBeenCalledTimes(1);
+
+    app.dispose();
+  });
+
+  it('routes viewer state reset callbacks through the session controller', async () => {
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp();
+    const callbacks = mocks.getUiCallbacks() as {
+      onViewerStateReset: () => void;
+    };
+
+    callbacks.onViewerStateReset();
+
+    expect(mocks.sessionResetActiveSessionViewState).toHaveBeenCalledTimes(1);
 
     app.dispose();
   });

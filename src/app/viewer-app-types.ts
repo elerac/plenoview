@@ -289,6 +289,7 @@ export type ViewerIntent =
   | { type: 'sessionClosed'; sessionId: string }
   | { type: 'allSessionsClosed' }
   | { type: 'activeSessionReset'; viewport: ViewportInfo; fitInsets?: ViewportInsets }
+  | { type: 'activeSessionViewReset'; viewport: ViewportInfo; fitInsets?: ViewportInsets }
   | { type: 'activeSessionDisplayReset' }
   | { type: 'activeSessionFitToViewport'; viewport: ViewportInfo; fitInsets?: ViewportInsets }
   | { type: 'thumbnailRequested'; sessionId: string; token: number }

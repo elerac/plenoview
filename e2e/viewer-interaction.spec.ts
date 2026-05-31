@@ -1,7 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
-import { gotoViewerApp, openGalleryCbox } from './helpers/app';
+import { gotoViewerApp, openGalleryCbox, waitForE2ERenderIdle } from './helpers/app';
 import { buildScalarChannelExr, buildSpectralExr } from './helpers/exr-fixtures';
 import { dragViewerRoi, readProbeCoords } from './helpers/viewer';
+
+async function commitViewerStateInput(page: Page, selector: string, value: string): Promise<void> {
+  const input = page.locator(selector);
+  await input.fill(value);
+  await input.press('Enter');
+}
+
+async function readImageViewInputs(page: Page): Promise<{ zoom: string; panX: string; panY: string }> {
+  return {
+    zoom: await page.locator('#viewer-state-zoom-input').inputValue(),
+    panX: await page.locator('#viewer-state-pan-x-input').inputValue(),
+    panY: await page.locator('#viewer-state-pan-y-input').inputValue()
+  };
+}
 
 test('pans image view with global w/a/s/d keys while keeping the probe in sync', async ({ page }) => {
   await gotoViewerApp(page);
@@ -33,6 +47,46 @@ test('pans image view with global w/a/s/d keys while keeping the probe in sync',
 
   await page.keyboard.press('a');
   await expect.poll(async () => await readProbeCoords(probeCoords)).toEqual(initialCoords);
+});
+
+test('resets all right-panel View state by double-clicking the View heading', async ({ page }) => {
+  await gotoViewerApp(page);
+  await openGalleryCbox(page);
+
+  const viewHeading = page.locator('#viewer-state-heading');
+  await expect(page.locator('#viewer-state-image-fields')).toBeVisible();
+  const initialImageView = await readImageViewInputs(page);
+
+  await commitViewerStateInput(page, '#viewer-state-zoom-input', '3');
+  await commitViewerStateInput(page, '#viewer-state-pan-x-input', '10');
+  await commitViewerStateInput(page, '#viewer-state-pan-y-input', '12');
+  await expect.poll(async () => await readImageViewInputs(page)).toEqual({
+    zoom: '3',
+    panX: '10',
+    panY: '12'
+  });
+
+  await page.locator('#view-menu-button').click();
+  await page.locator('#panorama-viewer-menu-item').click();
+  await expect(page.locator('#viewer-state-panorama-fields')).toBeVisible();
+  await commitViewerStateInput(page, '#viewer-state-yaw-input', '15');
+  await commitViewerStateInput(page, '#viewer-state-pitch-input', '5');
+  await commitViewerStateInput(page, '#viewer-state-hfov-input', '80');
+  await expect(page.locator('#viewer-state-yaw-input')).toHaveValue('15');
+  await expect(page.locator('#viewer-state-pitch-input')).toHaveValue('5');
+  await expect(page.locator('#viewer-state-hfov-input')).toHaveValue('80');
+
+  await viewHeading.dblclick();
+  await waitForE2ERenderIdle(page);
+
+  await expect(page.locator('#viewer-state-yaw-input')).toHaveValue('0');
+  await expect(page.locator('#viewer-state-pitch-input')).toHaveValue('0');
+  await expect(page.locator('#viewer-state-hfov-input')).toHaveValue('100');
+
+  await page.locator('#view-menu-button').click();
+  await page.locator('#image-viewer-menu-item').click();
+  await expect(page.locator('#viewer-state-image-fields')).toBeVisible();
+  await expect.poll(async () => await readImageViewInputs(page)).toEqual(initialImageView);
 });
 
 test('leaves editable text input alone when typing image-viewer wasd keys', async ({ page }) => {

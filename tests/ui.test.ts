@@ -1117,6 +1117,28 @@ describe('top bar and display controls', () => {
     expect(displayHeading.getAttribute('aria-disabled')).toBe('false');
   });
 
+  it('dispatches view state reset from a View heading double-click', () => {
+    installUiFixture();
+
+    const onViewerStateReset = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onViewerStateReset }));
+    const viewHeading = document.getElementById('viewer-state-heading') as HTMLHeadingElement;
+
+    expect(viewHeading.title).toBe('Double-click to reset view');
+
+    viewHeading.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(onViewerStateReset).toHaveBeenCalledTimes(1);
+
+    ui.setLoading(true);
+    expect(viewHeading.getAttribute('aria-disabled')).toBe('true');
+
+    viewHeading.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(onViewerStateReset).toHaveBeenCalledTimes(1);
+
+    ui.setLoading(false);
+    expect(viewHeading.getAttribute('aria-disabled')).toBe('false');
+  });
+
   it('dispatches palette changes from the inspector palette select', () => {
     installUiFixture();
 
@@ -11351,7 +11373,8 @@ function createUiCallbacksBase() {
     onInvalidValueWarningChange: () => {},
     onClearRoi: () => {},
     onResetSettings: () => {},
-    onResetView: () => {}
+    onResetView: () => {},
+    onViewerStateReset: () => {}
   };
 }
 

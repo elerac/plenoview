@@ -215,6 +215,7 @@ export interface Elements {
   roiValidCount: HTMLElement;
   roiStats: HTMLElement;
   clearRoiButton: HTMLButtonElement;
+  viewerStateHeading: HTMLHeadingElement;
   viewerStateToggle: HTMLButtonElement;
   viewerStateContent: HTMLDivElement;
   viewerStateEmptyState: HTMLElement;
@@ -772,6 +773,7 @@ export function resolveElements(): Elements {
     roiValidCount: requireElement('roi-valid-count', HTMLElement),
     roiStats: requireElement('roi-stats', HTMLElement),
     clearRoiButton: requireElement('clear-roi-button', HTMLButtonElement),
+    viewerStateHeading: requireElement('viewer-state-heading', HTMLHeadingElement),
     viewerStateToggle: requireElement('viewer-state-toggle', HTMLButtonElement),
     viewerStateContent: requireElement('viewer-state-content', HTMLDivElement),
     viewerStateEmptyState: requireElement('viewer-state-empty-state', HTMLElement),

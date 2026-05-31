@@ -16,11 +16,13 @@ import { resolveDisplayImageSize } from '../../display-size';
 import { getSuccessValue } from '../../async-resource';
 import { DEFAULT_DISPLAY_GAMMA, normalizeDisplayGamma } from '../../color';
 import {
+  DEFAULT_DEPTH_ZOOM,
   normalizeDepthFocalLengthPx,
   normalizeDepthPointSize,
   resolveDepthChannelForLayer
 } from '../../depth';
 import { computeFitView } from '../../interaction/image-geometry';
+import { DEFAULT_PANORAMA_HFOV_DEG } from '../../interaction/panorama-geometry';
 import { cloneImageRoi } from '../../roi';
 import { samePixel } from '../../view-state';
 import { buildViewerStateForLayer } from '../../viewer-store';
@@ -414,6 +416,34 @@ export function displayReducer(
       return patchSessionState(
         state,
         computeFitView(intent.viewport, displaySize.width, displaySize.height, intent.fitInsets),
+        {
+          syncInteractionView: true,
+          clearHover: true
+        }
+      );
+    }
+    case 'activeSessionViewReset': {
+      const activeSession = selectActiveSession(state);
+      if (!activeSession) {
+        return state;
+      }
+
+      const displaySize = resolveDisplayImageSize(
+        activeSession.decoded.width,
+        activeSession.decoded.height,
+        state.sessionState.displaySelection
+      );
+      return patchSessionState(
+        state,
+        {
+          ...computeFitView(intent.viewport, displaySize.width, displaySize.height, intent.fitInsets),
+          panoramaYawDeg: 0,
+          panoramaPitchDeg: 0,
+          panoramaHfovDeg: DEFAULT_PANORAMA_HFOV_DEG,
+          depthYawDeg: 0,
+          depthPitchDeg: 0,
+          depthZoom: DEFAULT_DEPTH_ZOOM
+        },
         {
           syncInteractionView: true,
           clearHover: true

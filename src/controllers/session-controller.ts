@@ -544,6 +544,18 @@ export class SessionController implements Disposable {
     });
   }
 
+  resetActiveSessionViewState(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.core.dispatch({
+      type: 'activeSessionViewReset',
+      viewport: this.getViewport(),
+      fitInsets: this.getFitInsets()
+    });
+  }
+
   fitActiveSessionToViewport(): void {
     if (this.disposed) {
       return;

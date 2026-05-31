@@ -3,7 +3,9 @@ import { AUTO_EXPOSURE_PERCENTILE } from '../src/auto-exposure';
 import { getSuccessValue } from '../src/async-resource';
 import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
 import { DEFAULT_DISPLAY_GAMMA } from '../src/color';
+import { DEFAULT_DEPTH_ZOOM } from '../src/depth';
 import { ViewerAppCore } from '../src/app/viewer-app-core';
+import { DEFAULT_PANORAMA_HFOV_DEG } from '../src/interaction/panorama-geometry';
 import { createInteractionState } from '../src/view-state';
 import { collectViewerPaneLeaves } from '../src/viewer-pane-layout';
 import { buildViewerStateForLayer, createInitialState } from '../src/viewer-store';
@@ -977,6 +979,99 @@ describe('viewer app core', () => {
     expect(core.getState().sessionState.zoom).toBe(28);
     expect(core.getState().sessionState.panX).toBeCloseTo(4 / 7);
     expect(core.getState().sessionState.panY).toBeCloseTo(1 / 14);
+  });
+
+  it('resets only view state to fitted and default camera values', () => {
+    const core = new ViewerAppCore();
+    const session = createSession('session-1', createDecodedImage());
+    core.dispatch({ type: 'sessionLoaded', session });
+    core.dispatch({ type: 'exposureSet', exposureEv: 2 });
+    core.dispatch({ type: 'displaySelectionSet', displaySelection: createChannelMonoSelection('R') });
+    core.dispatch({ type: 'viewerModeSet', viewerMode: 'panorama' });
+    core.dispatch({ type: 'roiSet', roi: { x0: 0, y0: 0, x1: 1, y1: 0 } });
+    core.dispatch({ type: 'lockedPixelToggled', pixel: { ix: 1, iy: 0 } });
+    core.dispatch({
+      type: 'viewStateCommitted',
+      view: {
+        zoom: 3,
+        panX: 20,
+        panY: 30,
+        panoramaYawDeg: 15,
+        panoramaPitchDeg: 5,
+        panoramaHfovDeg: 80,
+        depthYawDeg: 12,
+        depthPitchDeg: -8,
+        depthZoom: 3
+      }
+    });
+    core.dispatch({
+      type: 'interactionStatePublished',
+      interactionState: {
+        view: {
+          ...core.getState().interactionState.view,
+          zoom: 4,
+          panX: 40,
+          panY: 50
+        },
+        hoveredPixel: { ix: 1, iy: 0 },
+        draftRoi: null,
+        roiInteraction: core.getState().interactionState.roiInteraction
+      }
+    });
+
+    core.dispatch({
+      type: 'activeSessionViewReset',
+      viewport: { width: 80, height: 80 },
+      fitInsets: rulerFitInsets
+    });
+
+    expect(core.getState().sessionState).toMatchObject({
+      viewerMode: 'panorama',
+      zoom: 28,
+      panoramaYawDeg: 0,
+      panoramaPitchDeg: 0,
+      panoramaHfovDeg: DEFAULT_PANORAMA_HFOV_DEG,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: DEFAULT_DEPTH_ZOOM,
+      exposureEv: 2,
+      displaySelection: createChannelMonoSelection('R'),
+      lockedPixel: { ix: 1, iy: 0 },
+      roi: { x0: 0, y0: 0, x1: 1, y1: 0 }
+    });
+    expect(core.getState().sessionState.panX).toBeCloseTo(4 / 7);
+    expect(core.getState().sessionState.panY).toBeCloseTo(1 / 14);
+    expect(core.getState().interactionState.view).toMatchObject({
+      zoom: 28,
+      panoramaYawDeg: 0,
+      panoramaPitchDeg: 0,
+      panoramaHfovDeg: DEFAULT_PANORAMA_HFOV_DEG,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: DEFAULT_DEPTH_ZOOM
+    });
+    expect(core.getState().interactionState.view.panX).toBeCloseTo(4 / 7);
+    expect(core.getState().interactionState.view.panY).toBeCloseTo(1 / 14);
+    expect(core.getState().interactionState.hoveredPixel).toBeNull();
+    expect(core.getState().sessions[0]?.state).toMatchObject({
+      zoom: 28,
+      panoramaHfovDeg: DEFAULT_PANORAMA_HFOV_DEG,
+      exposureEv: 2
+    });
+    expect(core.getState().sessions[0]?.state.panX).toBeCloseTo(4 / 7);
+    expect(core.getState().sessions[0]?.state.panY).toBeCloseTo(1 / 14);
+  });
+
+  it('ignores view state reset without an active image', () => {
+    const core = new ViewerAppCore();
+    const previous = core.getState();
+
+    core.dispatch({
+      type: 'activeSessionViewReset',
+      viewport: { width: 80, height: 80 }
+    });
+
+    expect(core.getState()).toBe(previous);
   });
 
   it('fits the active image to the viewport while preserving non-view session state', () => {

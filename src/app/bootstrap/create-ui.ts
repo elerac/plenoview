@@ -445,6 +445,9 @@ export function createViewerUi({
     },
     onResetView: () => {
       getDisplayController().resetActiveSessionDisplayState();
+    },
+    onViewerStateReset: () => {
+      getSessionController().resetActiveSessionViewState();
     }
   };
 

@@ -355,6 +355,7 @@ export interface UiCallbacks {
   onClearRoi: () => void;
   onResetSettings: () => void;
   onResetView: () => void;
+  onViewerStateReset: () => void;
 }
 
 export type ChannelThumbnailOptionItem = ChannelViewThumbnailItem;
@@ -876,6 +877,7 @@ export class ViewerUi implements Disposable {
       galleryItem.disabled = loading;
     }
     this.elements.displayControlHeading.setAttribute('aria-disabled', viewerBlocked ? 'true' : 'false');
+    this.elements.viewerStateHeading.setAttribute('aria-disabled', viewerBlocked ? 'true' : 'false');
     this.openedImagesPanel.setLoading(loading, viewerBlocked);
     this.channelThumbnailStrip.setLoading(viewerBlocked);
     this.colormapPanel.setLoading(viewerBlocked);
@@ -3041,6 +3043,7 @@ export class ViewerUi implements Disposable {
     });
 
     this.bindResetDisplayHeading(this.elements.displayControlHeading);
+    this.bindResetViewerStateHeading(this.elements.viewerStateHeading);
     for (const group of STOKES_COLORMAP_DEFAULT_GROUPS) {
       this.bindStokesDefaultSettingRow(group);
     }
@@ -3262,15 +3265,31 @@ export class ViewerUi implements Disposable {
   }
 
   private bindResetDisplayHeading(heading: HTMLHeadingElement): void {
+    this.bindResettableHeading(heading, 'Double-click to reset display', () => {
+      this.callbacks.onResetView();
+    });
+  }
+
+  private bindResetViewerStateHeading(heading: HTMLHeadingElement): void {
+    this.bindResettableHeading(heading, 'Double-click to reset view', () => {
+      this.callbacks.onViewerStateReset();
+    });
+  }
+
+  private bindResettableHeading(
+    heading: HTMLHeadingElement,
+    title: string,
+    reset: () => void
+  ): void {
     heading.classList.add('resettable-control-label');
-    heading.title = 'Double-click to reset display';
+    heading.title = title;
     heading.setAttribute('aria-disabled', 'false');
     this.disposables.addEventListener(heading, 'dblclick', () => {
       if (heading.getAttribute('aria-disabled') === 'true') {
         return;
       }
 
-      this.callbacks.onResetView();
+      reset();
     });
   }
 
