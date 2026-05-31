@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Embeddable OpenEXR Viewer Example</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fff;
+      color: #1f2933
+    }
+
+    body {
+      margin: 0;
+      padding: 16px
+    }
+
+    main {
+      display: grid;
+      gap: 10px;
+      max-width: 1040px
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600
+    }
+
+    p {
+      margin: 0;
+      color: #5f6b7a;
+      font-size: 14px;
+      line-height: 1.4
+    }
+
+    a {
+      color: #1f6feb
+    }
+
+    .v {
+      overflow: hidden;
+      border: 1px solid #d8dee6;
+      background: #fff
+    }
+  </style>
+  <script src="./public/embed/openexr-viewer.js"></script>
+  <!-- <script src="https://elerac.github.io/openexr_viewer/embed/openexr-viewer.js"></script> -->
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.css" />
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.js"></script>
+  <style>
+    #panorama {
+      width: 600px;
+      height: 400px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>Embeddable OpenEXR Viewer</h1>
+    <p>Cornell Box loaded as an EXR and opened directly in the viewer.
+      Source: <a href="https://elerac.github.io/openexr_viewer/cbox_rgb.exr">cbox_rgb.exr</a>
+    </p>
+    <div>
+      <openexr-viewer viewer-url="https://elerac.github.io/openexr_viewer/"
+        src="https://elerac.github.io/openexr_viewer/cbox_rgb.exr" name="Cornell Box" width="300" height="300">
+      </openexr-viewer>
+    </div>
+
+    <div id="panorama"></div>
+    <script>
+      pannellum.viewer('panorama', {
+        "type": "equirectangular",
+        // "panorama": "https://pannellum.org/images/alma.jpg"
+        "panorama": "./public/boar.jpg"
+      });
+    </script>
+
+    <div>
+      <openexr-viewer viewer-url="https://elerac.github.io/openexr_viewer/" src="./public/cbox_rgb.exr"
+        name="Cornell Box" width="300" height="300"></openexr-viewer>
+    </div>
+
+    <p>Cornell Box loaded through the Pannellum-style JavaScript API.</p>
+    <div id="openexr-js-viewer"></div>
+    <script>
+      OpenExrViewer.create('#openexr-js-viewer', {
+        src: './public/cbox_rgb.exr',
+        name: 'Cornell Box (JS API)',
+        width: 300,
+        height: 300,
+        viewerUrl: 'https://elerac.github.io/openexr_viewer/'
+      });
+    </script>
+
+    <p>JPEG image loaded and opened directly in the viewer.
+    <div>
+      <img src="https://www.w3schools.com/images/lamp.jpg" alt="Lamp" width="64" height="64">
+    </div>
+
+    <div>
+      <img src="./public/boar.jpg" alt="Lamp" width="64" height="64">
+    </div>
+
+    <p>Poly Haven HDRI loaded as an EXR and opened directly in Panorama viewer.
+      Source: <a href="https://polyhaven.com/a/brown_photostudio_02">brown_photostudio_02</a>
+    </p>
+    <div>
+      <openexr-viewer viewer-url="https://elerac.github.io/openexr_viewer/"
+        src="https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/brown_photostudio_02_1k.exr"
+        name="Poly Haven - brown_photostudio_02" view="panorama" width="100%" height="560"></openexr-viewer>
+    </div>
+
+    <iframe
+      src="https://elerac.github.io/openexr_viewer/?ui=embed&src=https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/brown_photostudio_02_1k.exr"
+      title="OpenEXR viewer" allow="clipboard-write">
+    </iframe>
+  </main>
+</body>
+
+</html>

@@ -98,13 +98,6 @@ export function runInitialBootstrapLoad(params: ViewerBootstrapParams, app: AppH
     });
     return;
   }
-  if (params.gallery) {
-    void app.loadGallery(params.gallery, {
-      name: params.name ?? undefined,
-      state
-    });
-    return;
-  }
   app.applyState(state);
 }
 

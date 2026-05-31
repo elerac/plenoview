@@ -20,12 +20,11 @@ function createAppHandle(): AppHandle {
 }
 
 describe('embed runtime', () => {
-  it('passes explicit names through initial URL and gallery loads', () => {
+  it('passes explicit names through initial URL loads', () => {
     const urlApp = createAppHandle();
     runInitialBootstrapLoad({
       uiMode: 'embed',
       src: 'https://example.com/beauty.exr',
-      gallery: null,
       name: 'Beauty pass',
       view: null,
       handoffId: null,
@@ -36,22 +35,7 @@ describe('embed runtime', () => {
       name: 'Beauty pass',
       state: null
     });
-
-    const galleryApp = createAppHandle();
-    runInitialBootstrapLoad({
-      uiMode: 'embed',
-      src: null,
-      gallery: 'cbox-rgb',
-      name: 'Gallery plate',
-      view: null,
-      handoffId: null,
-      state: null
-    }, galleryApp);
-
-    expect(galleryApp.loadGallery).toHaveBeenCalledWith('cbox-rgb', {
-      name: 'Gallery plate',
-      state: null
-    });
+    expect(urlApp.loadGallery).not.toHaveBeenCalled();
   });
 
   it('passes wrapper-provided local file names to app file loads', () => {

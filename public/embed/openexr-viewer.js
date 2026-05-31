@@ -6,12 +6,10 @@
   const SOURCE_ORIGIN_VIEWER = 'viewer';
   const observedAttributes = [
     'src',
-    'gallery',
     'view',
     'name',
     'width',
     'height',
-    'allowfullscreen',
     'viewer-url',
     'source-origin'
   ];
@@ -68,7 +66,6 @@
         : this.getSourceOrigin();
       this.updateAttributes({
         src: sourceUrl,
-        gallery: null,
         name: hasOwn(options, 'name') ? options.name : undefined,
         view: hasOwn(options, 'view') ? options.view : undefined,
         'source-origin': hasOwn(options, 'sourceOrigin') ? nextSourceOrigin : undefined
@@ -94,22 +91,6 @@
       });
     }
 
-    loadGallery(gallery, options = {}) {
-      const galleryId = normalizeNonEmpty(gallery);
-      if (!galleryId) {
-        return Promise.reject(new TypeError('openexr-viewer.loadGallery(gallery) expects a non-empty string.'));
-      }
-
-      this.sourceLoadId += 1;
-      this.updateAttributes({
-        src: null,
-        gallery: galleryId,
-        name: hasOwn(options, 'name') ? options.name : undefined,
-        view: hasOwn(options, 'view') ? options.view : undefined
-      });
-      return Promise.resolve();
-    }
-
     setView(view) {
       this.updateAttributes({
         view: normalizeNonEmpty(view)
@@ -132,9 +113,6 @@
       iframe.style.border = '0';
       iframe.style.display = 'block';
       iframe.style.background = '#05070a';
-      if (this.getAttribute('allowfullscreen') !== 'false') {
-        iframe.allowFullscreen = true;
-      }
 
       const style = document.createElement('style');
       style.textContent = `
@@ -155,7 +133,6 @@
     buildIframeUrl() {
       const url = new URL(this.viewerBaseUrl);
       const src = normalizeNonEmpty(this.getAttribute('src'));
-      const gallery = normalizeNonEmpty(this.getAttribute('gallery'));
       const view = normalizeNonEmpty(this.getAttribute('view'));
       const name = normalizeNonEmpty(this.getAttribute('name'));
       const srcUsesParentFetch = src && shouldParentFetchSource(src, this.getSourceOrigin());
@@ -163,9 +140,6 @@
       url.searchParams.set('ui', 'embed');
       if (src && !srcUsesParentFetch) {
         url.searchParams.set('src', src);
-      }
-      if (gallery && (!src || !srcUsesParentFetch)) {
-        url.searchParams.set('gallery', gallery);
       }
       if (view) {
         url.searchParams.set('view', view);
@@ -304,7 +278,6 @@
       element,
       loadUrl: (src, loadOptions = {}) => element.loadUrl(src, loadOptions),
       loadFile: (file, loadOptions = {}) => element.loadFile(file, loadOptions),
-      loadGallery: (gallery, loadOptions = {}) => element.loadGallery(gallery, loadOptions),
       setView: (view) => {
         element.setView(view);
         return controller;
@@ -326,13 +299,6 @@
       }).catch((error) => {
         logEmbedError(`Failed to load ${options.src}.`, error);
       });
-    } else if (options.gallery) {
-      void controller.loadGallery(options.gallery, {
-        name: options.name,
-        view: options.view
-      }).catch((error) => {
-        logEmbedError(`Failed to load gallery image ${options.gallery}.`, error);
-      });
     }
 
     return controller;
@@ -347,10 +313,6 @@
       'viewer-url': options.viewerUrl,
       'source-origin': options.sourceOrigin
     };
-
-    if (hasOwn(options, 'allowFullscreen')) {
-      attributes.allowfullscreen = options.allowFullscreen === false ? 'false' : 'true';
-    }
 
     for (const [key, value] of Object.entries(attributes)) {
       const normalized = normalizeNonEmpty(value);

@@ -17,7 +17,6 @@ interface OpenExrViewerElementForTest extends HTMLElement {
   viewerOrigin: string;
   viewerTargetOrigin: string;
   loadFile(file: File, options?: { name?: string }): Promise<void>;
-  loadGallery(gallery: string, options?: { name?: string; view?: string }): Promise<void>;
   loadUrl(src: string, options?: { name?: string; sourceOrigin?: string; view?: string }): Promise<void>;
   setView(view: string): void;
 }
@@ -25,7 +24,6 @@ interface OpenExrViewerElementForTest extends HTMLElement {
 interface OpenExrViewerControllerForTest {
   element: OpenExrViewerElementForTest;
   loadFile(file: File, options?: { name?: string }): Promise<void>;
-  loadGallery(gallery: string, options?: { name?: string; view?: string }): Promise<void>;
   loadUrl(src: string, options?: { name?: string; sourceOrigin?: string; view?: string }): Promise<void>;
   setView(view: string): OpenExrViewerControllerForTest;
   destroy(): void;
@@ -35,12 +33,10 @@ interface OpenExrViewerApiForTest {
   create(target: string | HTMLElement, options?: {
     src?: string;
     file?: File;
-    gallery?: string;
     name?: string;
     view?: string;
     width?: number | string;
     height?: number | string;
-    allowFullscreen?: boolean;
     viewerUrl?: string;
     sourceOrigin?: string;
   }): OpenExrViewerControllerForTest;
@@ -104,6 +100,7 @@ describe('embed wrapper public script', () => {
     expect(controller.element.style.width).toBe('300px');
     expect(controller.element.getAttribute('name')).toBe('Beauty pass');
     expect(iframe.style.height).toBe('240px');
+    expect(iframe.allowFullscreen).toBe(false);
     expect(iframeUrl.pathname).toBe('/app/');
     expect(iframeUrl.searchParams.get('ui')).toBe('embed');
     expect(iframeUrl.searchParams.get('src')).toBe('https://example.com/render.exr');
@@ -176,7 +173,7 @@ describe('embed wrapper public script', () => {
     expect(posted.name).toBe('Parent fetched');
   });
 
-  it('supports controller loadFile, loadGallery, setView, and destroy', async () => {
+  it('supports controller loadFile, loadUrl, setView, and destroy', async () => {
     document.body.innerHTML = '<div id="target"></div>';
     const controller = getOpenExrViewer().create('#target', {
       height: 200
@@ -193,17 +190,19 @@ describe('embed wrapper public script', () => {
     expect(posted.type).toBe(EMBED_LOAD_FILE_MESSAGE);
     expect(posted.file.name).toBe('local.exr');
     expect(posted.name).toBe('Local plate');
+    expect(controller).not.toHaveProperty('loadGallery');
 
-    await controller.loadGallery('cbox-rgb', {
-      name: 'Gallery plate',
+    await controller.loadUrl('https://example.com/next.exr', {
+      name: 'Next plate',
       view: 'image'
     });
-    const galleryUrl = new URL(getViewerIframe(controller.element).src);
-    expect(controller.element.getAttribute('src')).toBeNull();
-    expect(galleryUrl.pathname).toBe('/app/');
-    expect(galleryUrl.searchParams.get('gallery')).toBe('cbox-rgb');
-    expect(galleryUrl.searchParams.get('name')).toBe('Gallery plate');
-    expect(galleryUrl.searchParams.get('view')).toBe('image');
+    const url = new URL(getViewerIframe(controller.element).src);
+    expect(controller.element.getAttribute('src')).toBe('https://example.com/next.exr');
+    expect(url.pathname).toBe('/app/');
+    expect(url.searchParams.get('src')).toBe('https://example.com/next.exr');
+    expect(url.searchParams.get('gallery')).toBeNull();
+    expect(url.searchParams.get('name')).toBe('Next plate');
+    expect(url.searchParams.get('view')).toBe('image');
 
     controller.setView('panorama');
     const panoramaUrl = new URL(getViewerIframe(controller.element).src);

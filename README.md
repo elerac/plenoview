@@ -190,11 +190,9 @@ Common attributes:
 | Attribute | Description |
 | --- | --- |
 | `src` | EXR URL to load. |
-| `gallery` | Gallery ID: `cbox-rgb`, `beachball-multipart-0001`, or `brown-photostudio-02-1k`. |
 | `name` | Embedded source label and opened file name when applicable. |
 | `view` | Initial mode: `image`, `panorama`, or `depth`. |
 | `width` / `height` | CSS sizes; numeric values become pixels. Defaults: `100%` / `320px`. |
-| `allowfullscreen` | Defaults to enabled; set `allowfullscreen="false"` to disable it. |
 | `viewer-url` | Viewer deployment URL, needed if the wrapper script is served from another location. |
 | `source-origin` | Loading policy: `auto`, `parent`, or `viewer`. |
 
@@ -224,7 +222,6 @@ Controller methods:
 | --- | --- |
 | `loadUrl(src, options)` | Load an EXR URL; options include `name`, `view`, and `sourceOrigin`. |
 | `loadFile(file, options)` | Load a browser `File` from user-selected or dropped files. |
-| `loadGallery(gallery, options)` | Load a gallery image by ID. |
 | `setView(view)` | Switch to `image`, `panorama`, or `depth`. |
 | `destroy()` | Remove the embedded viewer. |
 

@@ -16,7 +16,7 @@ describe('embed params', () => {
     const encodedState = encodeEmbedViewerState(state);
 
     const parsed = parseViewerBootstrapParams({
-      search: `?ui=embed&src=${encodeURIComponent('https://example.com/a.exr')}&view=image&state=${encodedState}`,
+      search: `?ui=embed&src=${encodeURIComponent('https://example.com/a.exr')}&gallery=cbox-rgb&view=image&state=${encodedState}`,
       hash: '#handoff=local-1'
     });
 
@@ -27,6 +27,7 @@ describe('embed params', () => {
       handoffId: 'local-1',
       state
     });
+    expect('gallery' in parsed).toBe(false);
   });
 
   it('builds static-hosting friendly full viewer URLs', () => {

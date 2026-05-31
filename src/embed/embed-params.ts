@@ -8,7 +8,6 @@ import type { ViewerSessionState } from '../types';
 export interface ViewerBootstrapParams {
   uiMode: 'full' | 'embed';
   src: string | null;
-  gallery: string | null;
   name: string | null;
   view: ViewerSessionState['viewerMode'] | null;
   handoffId: string | null;
@@ -18,7 +17,6 @@ export interface ViewerBootstrapParams {
 export interface FullViewerUrlOptions {
   baseUrl: string;
   src?: string | null;
-  gallery?: string | null;
   name?: string | null;
   handoffId?: string | null;
   state?: EmbedViewerStateSnapshot | null;
@@ -29,7 +27,6 @@ export function parseViewerBootstrapParams(location: Pick<Location, 'search' | '
   return {
     uiMode: params.get('ui') === 'embed' || params.get('embed') === '1' ? 'embed' : 'full',
     src: normalizeNonEmpty(params.get('src')),
-    gallery: normalizeNonEmpty(params.get('gallery')),
     name: normalizeNonEmpty(params.get('name')),
     view: parseViewerMode(params.get('view')),
     handoffId: normalizeNonEmpty(params.get('handoff')),
@@ -40,7 +37,6 @@ export function parseViewerBootstrapParams(location: Pick<Location, 'search' | '
 export function buildFullViewerUrl({
   baseUrl,
   src,
-  gallery,
   name,
   handoffId,
   state
@@ -49,9 +45,6 @@ export function buildFullViewerUrl({
   const params = url.searchParams;
   if (src) {
     params.set('src', src);
-  }
-  if (gallery) {
-    params.set('gallery', gallery);
   }
   if (name) {
     params.set('name', name);
