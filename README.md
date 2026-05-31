@@ -165,19 +165,79 @@ npx playwright install
 npm run test:e2e
 ```
 
+## HTML and JS Embeds
+
+The embed wrapper registers `<openexr-viewer>` and `window.OpenExrViewer`.
+
+### HTML custom element
+
+Load the deployed wrapper script, then add the custom element:
+
+```html
+<script src="https://elerac.github.io/openexr_viewer/embed/openexr-viewer.js"></script>
+
+<openexr-viewer
+  src="https://elerac.github.io/openexr_viewer/cbox_rgb.exr"
+  name="Cornell Box"
+  width="640"
+  height="420">
+</openexr-viewer>
+```
+
+Common attributes:
+
+| Attribute | Description |
+| --- | --- |
+| `src` | EXR URL to load. |
+| `gallery` | Gallery ID: `cbox-rgb`, `beachball-multipart-0001`, or `brown-photostudio-02-1k`. |
+| `name` | Embedded source label and opened file name when applicable. |
+| `view` | Initial mode: `image`, `panorama`, or `depth`. |
+| `width` / `height` | CSS sizes; numeric values become pixels. Defaults: `100%` / `320px`. |
+| `allowfullscreen` | Defaults to enabled; set `allowfullscreen="false"` to disable it. |
+| `viewer-url` | Viewer deployment URL, needed if the wrapper script is served from another location. |
+| `source-origin` | Loading policy: `auto`, `parent`, or `viewer`. |
+
+The embed supports pan, zoom, hover probe, and an `Open full viewer` button.
+
+### JavaScript API
+
+Use `OpenExrViewer.create(target, options)` for dynamic sources:
+
+```html
+<div id="viewer"></div>
+<script src="https://elerac.github.io/openexr_viewer/embed/openexr-viewer.js"></script>
+<script>
+  const viewer = OpenExrViewer.create('#viewer', {
+    src: './public/cbox_rgb.exr',
+    name: 'Cornell Box',
+    width: 640,
+    height: 420,
+    viewerUrl: 'https://elerac.github.io/openexr_viewer/'
+  });
+</script>
+```
+
+Controller methods:
+
+| Method | Description |
+| --- | --- |
+| `loadUrl(src, options)` | Load an EXR URL; options include `name`, `view`, and `sourceOrigin`. |
+| `loadFile(file, options)` | Load a browser `File` from user-selected or dropped files. |
+| `loadGallery(gallery, options)` | Load a gallery image by ID. |
+| `setView(view)` | Switch to `image`, `panorama`, or `depth`. |
+| `destroy()` | Remove the embedded viewer. |
+
+### Source loading and CORS
+
+- In `auto` mode, relative and `blob:` URLs are fetched by the embedding page; absolute remote URLs load in the viewer.
+- Use `source-origin="parent"` / `sourceOrigin: 'parent'` or `source-origin="viewer"` / `sourceOrigin: 'viewer'` to force
+  either side.
+- Remote viewer-loaded files must be CORS-readable by the viewer origin, such as `https://elerac.github.io`.
+- Direct `file://` relative EXR loading is not browser-portable. Use a local HTTP server for URL-based examples, or
+  `loadFile(file)` for local files.
+
 ## Controls
 
-- HTML embed: include `public/embed/openexr-viewer.js` from the deployed viewer and use
-  `<openexr-viewer src="https://example.com/image.exr"></openexr-viewer>` for a minimal iframe viewer.
-  Raw iframe URLs are also supported with `?ui=embed&src=https://example.com/image.exr`.
-  The embed supports pan, zoom, hover probe, and an `Open full viewer` button. Remote `src` files loaded by the
-  viewer must be CORS-readable by the viewer origin.
-- JS embed API: create iframe-backed viewers with `OpenExrViewer.create('#viewer', { src: './public/cbox_rgb.exr' })`.
-  By default, relative and `blob:` sources are fetched by the embedding page and handed to the iframe as a `File`,
-  while absolute remote URLs are passed through to the viewer. Use `sourceOrigin: 'parent'` to force parent-page
-  fetches or `sourceOrigin: 'viewer'` to force viewer-side URL loading. Pass `viewerUrl`, or set the `viewer-url`
-  attribute, to point the iframe at a custom viewer deployment. Direct `file://` relative EXR loading is not
-  browser-portable; use a local HTTP server or `loadFile(file)` from a file input for local files.
 - `Open Files` list: switch active image session by filename, filter rows, rename rows inline, or drag rows to reorder/assign to a split pane.
 - `Alt/Option+Up/Down`: reorder the active `Open Files` row.
 - `Gallery > cbox_rgb.exr` / `multipart.0001.exr` / `brown_photostudio_02_1k.exr`: open a gallery sample and append it as a new session. Remote samples require network access.
