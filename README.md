@@ -120,6 +120,23 @@ npm run preview
 
 Output is generated in `dist/` and is static-hosting ready.
 
+## Desktop App
+
+Prerequisites:
+
+- Node.js 20+ and npm 10+
+- Rust stable (`rustc` and `cargo`)
+- Tauri platform prerequisites for your OS
+
+Build the desktop app locally:
+
+```bash
+npm install
+npm run desktop:build
+```
+
+On macOS, the local unsigned app and DMG are generated under `src-tauri/target/release/bundle/`. Generated desktop bundles and build outputs should stay uncommitted.
+
 ## GitHub Pages
 
 This project is prepared for GitHub Pages at:
