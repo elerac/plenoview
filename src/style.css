@@ -783,6 +783,10 @@ output {
   flex-wrap: wrap;
 }
 
+.channel-recognition-rule-reset[aria-disabled='true'] {
+  opacity: 0.55;
+}
+
 .channel-recognition-rule-hint,
 .channel-recognition-rule-error {
   grid-column: 2 / -1;

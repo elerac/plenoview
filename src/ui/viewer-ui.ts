@@ -3481,6 +3481,7 @@ export class ViewerUi implements Disposable {
     }
 
     const draft = this.getChannelRecognitionRuleDraft();
+    const defaults = createDefaultChannelRecognitionNameRules();
     for (const descriptor of CHANNEL_RECOGNITION_NAME_RULE_DESCRIPTORS) {
       const row = this.channelRecognitionRuleRows.get(descriptor.id);
       const rule = draft[descriptor.id];
@@ -3490,6 +3491,10 @@ export class ViewerUi implements Disposable {
       if (forcePatternValues || document.activeElement !== row.patternInput) {
         row.patternInput.value = rule.pattern;
       }
+      row.resetButton.setAttribute(
+        'aria-disabled',
+        sameChannelRecognitionNameRulesForId(descriptor.id, draft, defaults) ? 'true' : 'false'
+      );
       this.renderChannelRecognitionRuleRowValidation(descriptor.id);
     }
   }
@@ -3549,6 +3554,7 @@ export class ViewerUi implements Disposable {
         ...draft[descriptor.id],
         pattern: input.value
       };
+      this.renderChannelRecognitionRuleRowResetVisualState(descriptor.id);
       this.renderChannelRecognitionRuleRowValidation(descriptor.id);
     });
     this.disposables.addEventListener(resetButton, 'click', () => {
@@ -3559,6 +3565,22 @@ export class ViewerUi implements Disposable {
     });
 
     return row;
+  }
+
+  private renderChannelRecognitionRuleRowResetVisualState(id: ChannelRecognitionNameRuleId): void {
+    const row = this.channelRecognitionRuleRows.get(id);
+    if (!row) {
+      return;
+    }
+
+    row.resetButton.setAttribute(
+      'aria-disabled',
+      sameChannelRecognitionNameRulesForId(
+        id,
+        this.getChannelRecognitionRuleDraft(),
+        createDefaultChannelRecognitionNameRules()
+      ) ? 'true' : 'false'
+    );
   }
 
   private renderChannelRecognitionRuleRowValidation(id: ChannelRecognitionNameRuleId): void {

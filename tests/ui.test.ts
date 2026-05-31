@@ -3097,6 +3097,8 @@ describe('view menu', () => {
     expect(editor.classList.contains('hidden')).toBe(false);
     expect(patternInput.disabled).toBe(false);
     expect(patternInput.value).toBe(defaults['component.rgb'].pattern);
+    expect(resetRowButton.disabled).toBe(false);
+    expect(resetRowButton.getAttribute('aria-disabled')).toBe('true');
     expect(document.getElementById('channel-recognition-rule-component-rgb-case')).toBeNull();
     expect(editor.textContent).not.toContain('Ignore case');
     expect(editor.querySelector('aside')).toBeNull();
@@ -3108,6 +3110,7 @@ describe('view menu', () => {
 
     expect(onChannelRecognitionNameRulesChange).not.toHaveBeenCalled();
     expect(patternInput.value).toBe('(?<r>R');
+    expect(resetRowButton.getAttribute('aria-disabled')).toBe('false');
     expect(patternInput.getAttribute('aria-invalid')).toBe('true');
     expect(document.activeElement).toBe(patternInput);
 
@@ -3115,10 +3118,22 @@ describe('view menu', () => {
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(patternInput.getAttribute('aria-invalid')).toBe('false');
+    expect(resetRowButton.getAttribute('aria-disabled')).toBe('false');
 
     resetRowButton.click();
 
     expect(patternInput.value).toBe(defaults['component.rgb'].pattern);
+    expect(resetRowButton.disabled).toBe(false);
+    expect(resetRowButton.getAttribute('aria-disabled')).toBe('true');
+
+    patternInput.value = '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$';
+    patternInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(resetRowButton.getAttribute('aria-disabled')).toBe('false');
+
+    patternInput.value = defaults['component.rgb'].pattern;
+    patternInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(resetRowButton.disabled).toBe(false);
+    expect(resetRowButton.getAttribute('aria-disabled')).toBe('true');
 
     patternInput.value = '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
