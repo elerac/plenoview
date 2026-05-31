@@ -1182,7 +1182,7 @@ export class SessionController implements Disposable {
     this.throwIfStopped(signal);
     const decoded = await this.decodeBytes(file.bytes, {
       signal,
-      filename: entry.relativePath || file.filename || entry.filename
+      filename: entry.relativePath || entry.filename
     });
     this.throwIfStopped(signal);
     return decoded;
@@ -1332,7 +1332,7 @@ async function decodeExrFromSessionSource(
     }
     return decodeBytes(file.bytes, {
       signal,
-      filename: source.relativePath || source.filename || file.filename || filename
+      filename: source.relativePath || source.filename || filename
     });
   }
 

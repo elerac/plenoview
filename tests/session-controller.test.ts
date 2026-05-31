@@ -145,7 +145,7 @@ describe('session controller shim', () => {
       listExrFolder: vi.fn(async () => []),
       openRecentFile: vi.fn(async () => entry),
       readExrFile: vi.fn(async () => ({
-        ...entry,
+        grantId: entry.grantId,
         bytes: new Uint8Array([1, 2, 3])
       }))
     };
@@ -203,7 +203,7 @@ describe('session controller shim', () => {
       listExrFolder: vi.fn(async () => entries),
       openRecentFile: vi.fn(async () => entries[0]!),
       readExrFile: vi.fn(async (grantId) => ({
-        ...entries.find((entry) => entry.grantId === grantId)!,
+        grantId,
         bytes: new Uint8Array([1, 2, 3])
       }))
     };

@@ -1,4 +1,5 @@
 import type { Disposable } from '../lifecycle';
+import { isStaleDesktopPathError, normalizeDesktopError } from './desktop-errors';
 import type {
   AppFullscreenHost,
   DesktopCommandCallbacks,
@@ -75,27 +76,12 @@ function normalizeBytes(value: RawBytes): Uint8Array {
   return new Uint8Array(value);
 }
 
-function normalizeInvokeError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-  if (error && typeof error === 'object') {
-    const candidate = error as { message?: unknown; code?: unknown };
-    if (typeof candidate.message === 'string') {
-      const wrapped = new Error(candidate.message) as Error & { code?: unknown };
-      wrapped.code = candidate.code;
-      return wrapped;
-    }
-  }
-  return new Error(typeof error === 'string' ? error : 'Desktop command failed.');
-}
-
 async function invokeDesktop<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     const { invoke } = await importTauriCore();
     return await invoke<T>(command, args);
   } catch (error) {
-    throw normalizeInvokeError(error);
+    throw normalizeDesktopError(error);
   }
 }
 
@@ -104,9 +90,6 @@ const tauriPathFileProvider: PathFileProvider = {
     const bytes = await invokeDesktop<RawBytes>('read_exr_file', { grantId });
     return {
       grantId,
-      path: '',
-      filename: '',
-      fileSizeBytes: 0,
       bytes: normalizeBytes(bytes)
     };
   },
@@ -160,27 +143,39 @@ export const tauriHost: ViewerHost = {
   kind: 'tauri',
   pathFileProvider: tauriPathFileProvider,
   appFullscreen: tauriAppFullscreenHost,
-  openFiles({ fallback, onEntries }: HostOpenFileOptions): void {
+  openFiles({ fallback, onEntries, onError }: HostOpenFileOptions): void {
     void (async () => {
       try {
-        const entries = await invokeDesktop<DesktopFileEntryWire[]>('open_exr_files_dialog');
+        const { invoke } = await importTauriCore();
+        const entries = await invoke<DesktopFileEntryWire[]>('open_exr_files_dialog');
         if (entries.length > 0) {
           onEntries(entries.map(normalizeEntry));
         }
-      } catch {
-        fallback();
+      } catch (error) {
+        const desktopError = normalizeDesktopError(error);
+        if (isTauriApiUnavailable(desktopError)) {
+          fallback();
+          return;
+        }
+        onError?.(desktopError);
       }
     })();
   },
-  openFolder({ fallback, onEntries }: HostOpenFolderOptions): void {
+  openFolder({ fallback, onEntries, onError }: HostOpenFolderOptions): void {
     void (async () => {
       try {
-        const entries = await invokeDesktop<DesktopFileEntryWire[]>('open_exr_folder_dialog');
+        const { invoke } = await importTauriCore();
+        const entries = await invoke<DesktopFileEntryWire[]>('open_exr_folder_dialog');
         if (entries.length > 0) {
           onEntries(entries.map(normalizeEntry));
         }
-      } catch {
-        fallback();
+      } catch (error) {
+        const desktopError = normalizeDesktopError(error);
+        if (isTauriApiUnavailable(desktopError)) {
+          fallback();
+          return;
+        }
+        onError?.(desktopError);
       }
     })();
   },
@@ -239,11 +234,15 @@ export const tauriHost: ViewerHost = {
       if (event.payload.type === 'drop') {
         callbacks.onDragStateChange?.(false);
         if (event.payload.paths.length > 0) {
-          void tauriPathFileProvider.resolveExrPaths(event.payload.paths).then((entries) => {
-            if (entries.length > 0) {
-              callbacks.onEntries(entries);
-            }
-          });
+          void tauriPathFileProvider.resolveExrPaths(event.payload.paths)
+            .then((entries) => {
+              if (entries.length > 0) {
+                callbacks.onEntries(entries);
+              }
+            })
+            .catch((error) => {
+              callbacks.onError?.(normalizeDesktopError(error));
+            });
         }
       }
     });
@@ -265,8 +264,13 @@ export const tauriHost: ViewerHost = {
   async setupDesktopCommands(callbacks: DesktopCommandCallbacks): Promise<Disposable> {
     nativeMenuCallbacks = callbacks;
     await installNativeMenu(callbacks);
+    const onCommandStateChanged = () => {
+      refreshNativeMenu();
+    };
+    window.addEventListener('openexr-viewer:desktop-command-state-changed', onCommandStateChanged);
     return {
       dispose: () => {
+        window.removeEventListener('openexr-viewer:desktop-command-state-changed', onCommandStateChanged);
         if (nativeMenuCallbacks === callbacks) {
           nativeMenuCallbacks = null;
         }
@@ -282,33 +286,40 @@ export const tauriHost: ViewerHost = {
   },
   async clearRecentFiles(): Promise<void> {
     await invokeDesktop<DesktopRecentFileWire[]>('clear_recent_files');
-    refreshNativeMenu();
+    notifyRecentFilesChanged();
   },
   recordRecentFile(entry: DesktopFileEntry): void {
     void invokeDesktop<DesktopRecentFileWire[]>('record_recent_file', { grantId: entry.grantId })
       .then(() => {
-        window.dispatchEvent(new Event('openexr-viewer:desktop-recent-files-changed'));
-        refreshNativeMenu();
+        notifyRecentFilesChanged();
       })
       .catch(() => {});
   },
   recordPathLoadFailure(entry: DesktopFileEntry, error: unknown): void {
-    const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : null;
-    const message = error instanceof Error ? error.message : String(error);
-    if (code === 'notFound' || code === 'notFile' || /does not exist|not a file/i.test(message)) {
+    if (isStaleDesktopPathError(error)) {
       void invokeDesktop<DesktopRecentFileWire[]>('remove_recent_file', { path: entry.path })
         .then(() => {
-          window.dispatchEvent(new Event('openexr-viewer:desktop-recent-files-changed'));
-          refreshNativeMenu();
+          notifyRecentFilesChanged();
         })
         .catch(() => {});
     }
   }
 };
 
+function isTauriApiUnavailable(error: Error): boolean {
+  return /failed to resolve module specifier|cannot find package|cannot find module|__tauri/i.test(error.message);
+}
+
+function notifyRecentFilesChanged(): void {
+  window.dispatchEvent(new Event('openexr-viewer:desktop-recent-files-changed'));
+  refreshNativeMenu();
+}
+
 async function installNativeMenu(callbacks: DesktopCommandCallbacks): Promise<void> {
   const { Menu, Submenu, PredefinedMenuItem } = await import('@tauri-apps/api/menu');
   const recents = await tauriHost.refreshRecentFiles();
+  const commandState = callbacks.getCommandState?.() ?? {};
+  const isEnabled = (id: DesktopCommandId) => commandState[id] ?? true;
   const command = (id: DesktopCommandId) => () => {
     callbacks.onCommand(id);
   };
@@ -316,32 +327,33 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks): Promise<vo
     ? [{ text: 'No Recent Files', enabled: false }]
     : recents.map((recent) => ({
         text: recent.label,
+        enabled: true,
         action: () => {
-          void tauriPathFileProvider.openRecentFile(recent.path).then(callbacks.onOpenRecent);
+          void openRecentFromMenu(recent.path, callbacks);
         }
       }));
 
   const fileMenu = await Submenu.new({
     text: 'File',
     items: [
-      { text: 'Open...', accelerator: 'CmdOrCtrl+O', action: command('openFile') },
-      { text: 'Open Folder...', accelerator: 'CmdOrCtrl+Shift+O', action: command('openFolder') },
+      { text: 'Open...', accelerator: 'CmdOrCtrl+O', enabled: isEnabled('openFile'), action: command('openFile') },
+      { text: 'Open Folder...', accelerator: 'CmdOrCtrl+Shift+O', enabled: isEnabled('openFolder'), action: command('openFolder') },
       await Submenu.new({
         text: 'Open Recent',
         items: [
           ...openRecentItems,
           await PredefinedMenuItem.new({ item: 'Separator' }),
-          { text: 'Clear Recent', action: command('clearRecentFiles') }
+          { text: 'Clear Recent', enabled: recents.length > 0, action: command('clearRecentFiles') }
         ]
       }),
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Export...', accelerator: 'CmdOrCtrl+E', action: command('exportImage') },
-      { text: 'Export Screenshot...', accelerator: 'CmdOrCtrl+Shift+E', action: command('exportScreenshot') },
-      { text: 'Export Batch...', action: command('exportBatch') },
-      { text: 'Export Colormap...', action: command('exportColormap') },
+      { text: 'Export...', accelerator: 'CmdOrCtrl+E', enabled: isEnabled('exportImage'), action: command('exportImage') },
+      { text: 'Export Screenshot...', accelerator: 'CmdOrCtrl+Shift+E', enabled: isEnabled('exportScreenshot'), action: command('exportScreenshot') },
+      { text: 'Export Batch...', enabled: isEnabled('exportBatch'), action: command('exportBatch') },
+      { text: 'Export Colormap...', enabled: isEnabled('exportColormap'), action: command('exportColormap') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Reload All', accelerator: 'CmdOrCtrl+R', action: command('reloadAll') },
-      { text: 'Close All', accelerator: 'CmdOrCtrl+W', action: command('closeAll') }
+      { text: 'Reload All', accelerator: 'CmdOrCtrl+R', enabled: isEnabled('reloadAll'), action: command('reloadAll') },
+      { text: 'Close All', accelerator: 'CmdOrCtrl+W', enabled: isEnabled('closeAll'), action: command('closeAll') }
     ]
   });
   const editMenu = await Submenu.new({
@@ -355,33 +367,33 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks): Promise<vo
       await PredefinedMenuItem.new({ item: 'Paste' }),
       await PredefinedMenuItem.new({ item: 'SelectAll' }),
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Copy Image', accelerator: 'CmdOrCtrl+Shift+C', action: command('copyImage') }
+      { text: 'Copy Image', accelerator: 'CmdOrCtrl+Shift+C', enabled: isEnabled('copyImage'), action: command('copyImage') }
     ]
   });
   const viewMenu = await Submenu.new({
     text: 'View',
     items: [
-      { text: 'Image Viewer', action: command('viewerModeImage') },
-      { text: 'Panorama Viewer', action: command('viewerModePanorama') },
-      { text: 'Depth Map Viewer', action: command('viewerModeDepth') },
+      { text: 'Image Viewer', enabled: isEnabled('viewerModeImage'), action: command('viewerModeImage') },
+      { text: 'Panorama Viewer', enabled: isEnabled('viewerModePanorama'), action: command('viewerModePanorama') },
+      { text: 'Depth Map Viewer', enabled: isEnabled('viewerModeDepth'), action: command('viewerModeDepth') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Rulers', action: command('toggleRulers') },
+      { text: 'Rulers', enabled: isEnabled('toggleRulers'), action: command('toggleRulers') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Settings...', accelerator: 'CmdOrCtrl+,', action: command('settings') },
-      { text: 'Metadata...', action: command('metadata') }
+      { text: 'Settings...', accelerator: 'CmdOrCtrl+,', enabled: isEnabled('settings'), action: command('settings') },
+      { text: 'Metadata...', enabled: isEnabled('metadata'), action: command('metadata') }
     ]
   });
   const windowMenu = await Submenu.new({
     text: 'Window',
     items: [
-      { text: 'Normal Preview', action: command('windowPreviewNormal') },
-      { text: 'Full Screen Preview', action: command('windowPreviewFullscreen') },
+      { text: 'Normal Preview', enabled: isEnabled('windowPreviewNormal'), action: command('windowPreviewNormal') },
+      { text: 'Full Screen Preview', enabled: isEnabled('windowPreviewFullscreen'), action: command('windowPreviewFullscreen') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Single Pane', action: command('paneReset') },
-      { text: 'Split Vertically', accelerator: 'CmdOrCtrl+D', action: command('paneSplitVertical') },
-      { text: 'Split Horizontally', accelerator: 'CmdOrCtrl+Shift+D', action: command('paneSplitHorizontal') },
+      { text: 'Single Pane', enabled: isEnabled('paneReset'), action: command('paneReset') },
+      { text: 'Split Vertically', accelerator: 'CmdOrCtrl+D', enabled: isEnabled('paneSplitVertical'), action: command('paneSplitVertical') },
+      { text: 'Split Horizontally', accelerator: 'CmdOrCtrl+Shift+D', enabled: isEnabled('paneSplitHorizontal'), action: command('paneSplitHorizontal') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Toggle App Fullscreen', accelerator: 'F11', action: command('toggleAppFullscreen') },
+      { text: 'Toggle App Fullscreen', accelerator: 'F11', enabled: isEnabled('toggleAppFullscreen'), action: command('toggleAppFullscreen') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
       await PredefinedMenuItem.new({ item: 'Minimize' }),
       await PredefinedMenuItem.new({ item: 'Maximize' }),
@@ -393,6 +405,24 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks): Promise<vo
     items: [fileMenu, editMenu, viewMenu, windowMenu]
   });
   await menu.setAsAppMenu();
+}
+
+function openRecentFromMenu(path: string, callbacks: DesktopCommandCallbacks | RecentFileCallbacks): void {
+  void tauriPathFileProvider.openRecentFile(path)
+    .then((entry) => {
+      if ('onOpenRecent' in callbacks) {
+        callbacks.onOpenRecent(entry);
+        return;
+      }
+      callbacks.onOpenEntry(entry);
+    })
+    .catch((error) => {
+      const desktopError = normalizeDesktopError(error);
+      if (isStaleDesktopPathError(desktopError)) {
+        notifyRecentFilesChanged();
+      }
+      callbacks.onError?.(desktopError);
+    });
 }
 
 function refreshNativeMenu(): void {
@@ -457,14 +487,18 @@ function installRustRecentFilesMenu(callbacks: RecentFileCallbacks): Disposable 
         button.textContent = item.label;
         button.title = item.displayPath;
         button.addEventListener('click', () => {
-          void tauriPathFileProvider.openRecentFile(item.path).then(callbacks.onOpenEntry);
+          openRecentFromMenu(item.path, callbacks);
         });
         itemsContainer.append(button);
       }
+    }).catch((error) => {
+      callbacks.onError?.(normalizeDesktopError(error));
     });
   };
   const onClear = () => {
-    void tauriHost.clearRecentFiles().then(render);
+    void tauriHost.clearRecentFiles().then(render).catch((error) => {
+      callbacks.onError?.(normalizeDesktopError(error));
+    });
   };
 
   window.addEventListener('openexr-viewer:desktop-recent-files-changed', render);

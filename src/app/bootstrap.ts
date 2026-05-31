@@ -29,7 +29,7 @@ import { registerBootstrapEffects } from './bootstrap/register-effects';
 import { createViewerInteraction, initializeViewportLifecycle } from './bootstrap/viewport-lifecycle';
 import { installE2EHooks } from './e2e-hooks';
 import { selectActiveSession } from './viewer-app-selectors';
-import { createViewerHost } from '../platform';
+import { createViewerHost, normalizeDesktopError } from '../platform';
 import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
 
 export interface BootstrapAppOptions {
@@ -63,6 +63,10 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
   setMaxDecodeWorkers(initialImageLoadWorkers);
   const loadQueue = new LoadQueueService({ maxWorkers: initialImageLoadWorkers });
   const host = createViewerHost();
+  const reportDesktopError = (error: unknown, fallbackMessage: string): void => {
+    const message = normalizeDesktopError(error, fallbackMessage).message;
+    core.dispatch({ type: 'errorSet', message });
+  };
   const resolveColormapExportPixels = createColormapExportPixelsResolver({
     core,
     isDisposed
@@ -184,6 +188,9 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
       const recentMenu = host.installRecentFilesMenu({
         onOpenEntry: (entry) => {
           void getServices().sessionController.enqueuePathEntries([entry]);
+        },
+        onError: (error) => {
+          reportDesktopError(error, 'Failed to open recent file.');
         }
       });
       unsubscribers.push(() => recentMenu.dispose());
@@ -194,6 +201,9 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
         },
         onDragStateChange: (active) => {
           ui.showDropOverlay?.(active);
+        },
+        onError: (error) => {
+          reportDesktopError(error, 'Failed to open dropped file.');
         }
       }).then((events) => {
         if (disposed) {
@@ -216,7 +226,11 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
         },
         onOpenRecent: (entry) => {
           void getServices().sessionController.enqueuePathEntries([entry]);
-        }
+        },
+        onError: (error) => {
+          reportDesktopError(error, 'Failed to open recent file.');
+        },
+        getCommandState: () => ui.getDesktopCommandState?.() ?? {}
       }).then((commands) => {
         if (disposed) {
           commands.dispose();

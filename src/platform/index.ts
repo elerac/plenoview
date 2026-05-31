@@ -9,7 +9,9 @@ export function createViewerHost(): ViewerHost {
 export type {
   AppFullscreenHost,
   DesktopCommandCallbacks,
+  DesktopCommandError,
   DesktopCommandId,
+  DesktopErrorCode,
   DesktopFileBytes,
   DesktopFileEntry,
   DesktopRecentFile,
@@ -19,3 +21,8 @@ export type {
   PathFileProvider,
   ViewerHost
 } from './types';
+
+export {
+  isStaleDesktopPathError,
+  normalizeDesktopError
+} from './desktop-errors';

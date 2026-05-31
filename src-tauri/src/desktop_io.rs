@@ -318,7 +318,7 @@ pub fn get_recent_files(
     app: &AppHandle,
     state: &tauri::State<'_, DesktopState>,
 ) -> DesktopResult<Vec<DesktopRecentFile>> {
-    with_recents(app, state, |items| Ok(items.to_vec()))
+    with_recents_read(app, state, |items| Ok(items.to_vec()))
 }
 
 pub fn record_recent_file(
@@ -333,7 +333,7 @@ pub fn record_recent_file(
             .map_err(|_| DesktopError::io("Failed to read desktop file grants."))?;
         grants.get(&grant_id)?
     };
-    with_recents(app, state, |items| {
+    with_recents_mut(app, state, |items| {
         let item = DesktopRecentFile {
             path: path_to_string(&grant.entry.path),
             label: grant.entry.filename.clone(),
@@ -357,7 +357,7 @@ pub fn open_recent_file(
     path: String,
 ) -> DesktopResult<DesktopFileEntry> {
     let recent_path = normalize_input_path(&path)?;
-    let allowed = with_recents(app, state, |items| {
+    let allowed = with_recents_read(app, state, |items| {
         Ok(items
             .iter()
             .any(|item| same_path_string(&item.path, &recent_path)))
@@ -394,7 +394,7 @@ pub fn remove_recent_file(
     state: &tauri::State<'_, DesktopState>,
     path: String,
 ) -> DesktopResult<Vec<DesktopRecentFile>> {
-    with_recents(app, state, |items| {
+    with_recents_mut(app, state, |items| {
         items.retain(|item| item.path != path);
         Ok(items.to_vec())
     })
@@ -404,7 +404,7 @@ pub fn clear_recent_files(
     app: &AppHandle,
     state: &tauri::State<'_, DesktopState>,
 ) -> DesktopResult<Vec<DesktopRecentFile>> {
-    with_recents(app, state, |items| {
+    with_recents_mut(app, state, |items| {
         items.clear();
         Ok(Vec::new())
     })
@@ -692,7 +692,23 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> DesktopResult<()> {
     Ok(())
 }
 
-fn with_recents<T>(
+fn with_recents_read<T>(
+    app: &AppHandle,
+    state: &tauri::State<'_, DesktopState>,
+    read: impl FnOnce(&[DesktopRecentFile]) -> DesktopResult<T>,
+) -> DesktopResult<T> {
+    let mut store = state
+        .recents
+        .lock()
+        .map_err(|_| DesktopError::io("Failed to read desktop recent files."))?;
+    if !store.loaded {
+        store.items = load_recents(app)?;
+        store.loaded = true;
+    }
+    read(&store.items)
+}
+
+fn with_recents_mut<T>(
     app: &AppHandle,
     state: &tauri::State<'_, DesktopState>,
     update: impl FnOnce(&mut Vec<DesktopRecentFile>) -> DesktopResult<T>,
@@ -712,6 +728,10 @@ fn with_recents<T>(
 
 fn load_recents(app: &AppHandle) -> DesktopResult<Vec<DesktopRecentFile>> {
     let path = recent_files_path(app)?;
+    load_recents_from_path(&path)
+}
+
+fn load_recents_from_path(path: &Path) -> DesktopResult<Vec<DesktopRecentFile>> {
     if !path.exists() {
         return Ok(Vec::new());
     }
@@ -724,13 +744,17 @@ fn load_recents(app: &AppHandle) -> DesktopResult<Vec<DesktopRecentFile>> {
 
 fn save_recents(app: &AppHandle, items: &[DesktopRecentFile]) -> DesktopResult<()> {
     let path = recent_files_path(app)?;
+    save_recents_to_path(&path, items)
+}
+
+fn save_recents_to_path(path: &Path, items: &[DesktopRecentFile]) -> DesktopResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| DesktopError::from_io("Failed to create app data folder", error))?;
     }
     let bytes = serde_json::to_vec_pretty(items)
         .map_err(|error| DesktopError::io(format!("Failed to serialize recent files: {error}")))?;
-    write_atomic(&path, &bytes)
+    write_atomic(path, &bytes)
 }
 
 fn recent_files_path(app: &AppHandle) -> DesktopResult<PathBuf> {
@@ -858,6 +882,35 @@ mod tests {
         fs::write(&path, b"old").unwrap();
         write_atomic(&path, b"new").unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"new");
+    }
+
+    #[test]
+    fn invalid_recent_file_json_loads_as_empty_list() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(RECENT_FILES_FILENAME);
+        fs::write(&path, b"{not-json").unwrap();
+
+        assert_eq!(load_recents_from_path(&path).unwrap(), Vec::new());
+    }
+
+    #[test]
+    fn recent_file_storage_truncates_and_round_trips() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(RECENT_FILES_FILENAME);
+        let items = (0..RECENT_FILES_LIMIT + 2)
+            .map(|index| DesktopRecentFile {
+                path: format!("/tmp/{index}.exr"),
+                label: format!("{index}.exr"),
+                display_path: format!("/tmp/{index}.exr"),
+                opened_at: index as u64,
+            })
+            .collect::<Vec<_>>();
+
+        save_recents_to_path(&path, &items).unwrap();
+        let loaded = load_recents_from_path(&path).unwrap();
+
+        assert_eq!(loaded.len(), RECENT_FILES_LIMIT);
+        assert_eq!(loaded[0].label, "0.exr");
     }
 
     #[test]

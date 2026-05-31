@@ -9,7 +9,23 @@ export interface DesktopFileEntry {
   fileSizeBytes: number;
 }
 
-export interface DesktopFileBytes extends DesktopFileEntry {
+export type DesktopErrorCode =
+  | 'notFound'
+  | 'notFile'
+  | 'notExr'
+  | 'permissionDenied'
+  | 'tooLarge'
+  | 'folderLimit'
+  | 'invalidOutput'
+  | 'cancelled'
+  | 'io';
+
+export interface DesktopCommandError extends Error {
+  code?: DesktopErrorCode;
+}
+
+export interface DesktopFileBytes {
+  grantId: string;
   bytes: Uint8Array;
 }
 
@@ -44,20 +60,24 @@ export interface ExportSink {
 export interface HostOpenFileOptions {
   fallback: () => void;
   onEntries: (entries: DesktopFileEntry[]) => void;
+  onError?: (error: DesktopCommandError) => void;
 }
 
 export interface HostOpenFolderOptions {
   fallback: () => void;
   onEntries: (entries: DesktopFileEntry[]) => void;
+  onError?: (error: DesktopCommandError) => void;
 }
 
 export interface DesktopEventCallbacks {
   onEntries: (entries: DesktopFileEntry[]) => void;
   onDragStateChange?: (active: boolean) => void;
+  onError?: (error: DesktopCommandError) => void;
 }
 
 export interface RecentFileCallbacks {
   onOpenEntry: (entry: DesktopFileEntry) => void;
+  onError?: (error: DesktopCommandError) => void;
 }
 
 export interface DesktopRecentFile {
@@ -94,6 +114,8 @@ export type DesktopCommandId =
 export interface DesktopCommandCallbacks {
   onCommand: (commandId: DesktopCommandId) => void;
   onOpenRecent: (entry: DesktopFileEntry) => void;
+  onError?: (error: DesktopCommandError) => void;
+  getCommandState?: () => Partial<Record<DesktopCommandId, boolean>>;
 }
 
 export interface AppFullscreenHost {

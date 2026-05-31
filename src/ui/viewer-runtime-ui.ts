@@ -127,6 +127,7 @@ export interface ViewerRuntimeUi extends Disposable {
   ): void;
   clearImageBrowserPanels(): void;
   executeDesktopCommand?(commandId: DesktopCommandId): void;
+  getDesktopCommandState?(): Partial<Record<DesktopCommandId, boolean>>;
   showDropOverlay?(show: boolean): void;
 
   setProbeReadout(

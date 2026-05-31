@@ -1804,6 +1804,7 @@ export class ViewerUi implements Disposable {
 
     setMetadata(this.elements, metadata);
     this.metadataDialog.setAvailable((metadata?.length ?? 0) > 0);
+    this.notifyDesktopCommandStateChanged();
   }
 
   setRoiReadout(readout: { roi: ImageRoi | null; stats: RoiStats | null }): void {
@@ -1917,6 +1918,33 @@ export class ViewerUi implements Disposable {
       case 'clearRecentFiles':
         return;
     }
+  }
+
+  getDesktopCommandState(): Partial<Record<DesktopCommandId, boolean>> {
+    return {
+      openFile: !this.isLoading,
+      openFolder: !this.isLoading,
+      exportImage: !this.elements.exportImageButton.disabled,
+      exportScreenshot: !this.elements.exportScreenshotButton.disabled,
+      exportBatch: !this.elements.exportImageBatchButton.disabled,
+      exportColormap: !this.elements.exportColormapButton.disabled,
+      copyImage: !this.elements.viewerContextCopyImageButton.disabled,
+      reloadAll: !this.elements.reloadAllOpenedImagesButton.disabled,
+      closeAll: !this.elements.closeAllOpenedImagesButton.disabled,
+      settings: true,
+      metadata: !this.elements.appMetadataButton.disabled,
+      viewerModeImage: !this.elements.imageViewerMenuItem.disabled,
+      viewerModePanorama: !this.elements.panoramaViewerMenuItem.disabled,
+      viewerModeDepth: !this.elements.depthViewerMenuItem.disabled,
+      toggleRulers: this.openedImageCount > 0 && !this.isViewerLoadBlocked,
+      windowPreviewNormal: true,
+      windowPreviewFullscreen: !this.elements.windowFullScreenPreviewMenuItem.disabled,
+      paneReset: !this.elements.windowSinglePaneMenuItem.disabled,
+      paneSplitVertical: !this.elements.windowSplitVerticalMenuItem.disabled,
+      paneSplitHorizontal: !this.elements.windowSplitHorizontalMenuItem.disabled,
+      toggleAppFullscreen: !this.elements.appFullscreenButton.disabled,
+      clearRecentFiles: true
+    };
   }
 
   showDropOverlay(show: boolean): void {
@@ -2700,6 +2728,7 @@ export class ViewerUi implements Disposable {
       this.isLoading || this.isDisplayBusy || !this.exportImageBatchDialog.hasTarget();
     this.elements.screenshotSelectionExportBatchButton.disabled = this.elements.exportImageBatchButton.disabled;
     this.elements.exportColormapButton.disabled = this.isLoading || !this.exportColormapDialog.hasOptions();
+    this.notifyDesktopCommandStateChanged();
   }
 
   private updateViewerModeMenuItemsDisabled(): void {
@@ -2711,6 +2740,7 @@ export class ViewerUi implements Disposable {
     this.elements.imageViewerMenuItem.disabled = disabled;
     this.elements.panoramaViewerMenuItem.disabled = disabled;
     this.elements.depthViewerMenuItem.disabled = disabled || !this.depthModeAvailable;
+    this.notifyDesktopCommandStateChanged();
   }
 
   private updateWindowPaneMenuItemsDisabled(): void {
@@ -2722,6 +2752,11 @@ export class ViewerUi implements Disposable {
     this.elements.windowSplitVerticalMenuItem.disabled = splitDisabled;
     this.elements.windowSplitHorizontalMenuItem.disabled = splitDisabled;
     this.elements.windowSinglePaneMenuItem.disabled = this.isViewerLoadBlocked || this.isSingleViewerPane();
+    this.notifyDesktopCommandStateChanged();
+  }
+
+  private notifyDesktopCommandStateChanged(): void {
+    window.dispatchEvent(new Event('openexr-viewer:desktop-command-state-changed'));
   }
 
   private updateAutoFitImageButtonDisabled(): void {
