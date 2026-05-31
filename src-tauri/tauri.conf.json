@@ -5,7 +5,7 @@
   "identifier": "com.elerac.openexrviewer",
   "build": {
     "frontendDist": "../dist-desktop",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:5173/app/",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build:desktop-web"
   },
@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "OpenEXR Viewer",
+        "url": "app/index.html",
         "width": 1440,
         "height": 960,
         "minWidth": 900,

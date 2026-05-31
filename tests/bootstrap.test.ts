@@ -568,6 +568,7 @@ describe('bootstrap app lifecycle', () => {
     app.openFullViewer();
 
     const url = new URL(openSpy.mock.calls[0]?.[0] as string);
+    expect(url.pathname).toBe('/app/');
     expect(url.searchParams.get('src')).toBe('https://example.com/image.exr');
     expect(url.searchParams.get('name')).toBeNull();
 
@@ -608,6 +609,7 @@ describe('bootstrap app lifecycle', () => {
     app.openFullViewer();
 
     const url = new URL(openSpy.mock.calls[0]?.[0] as string);
+    expect(url.pathname).toBe('/app/');
     expect(url.searchParams.get('src')).toBe('https://example.com/image.exr');
     expect(url.searchParams.get('name')).toBe('Hero Plate');
 

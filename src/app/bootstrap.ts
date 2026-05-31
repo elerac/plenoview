@@ -291,7 +291,7 @@ function openFullViewer(core: ViewerAppCore): void {
   const explicitName = activeSession.displayNameIsCustom ? activeSession.displayName : undefined;
   if (source.kind === 'url') {
     window.open(buildFullViewerUrl({
-      baseUrl: import.meta.env.BASE_URL,
+      baseUrl: getViewerAppBaseUrl(),
       src: source.url,
       name: explicitName,
       state
@@ -308,7 +308,7 @@ function openFullViewer(core: ViewerAppCore): void {
 
   const handoffId = createLocalFileHandoffId();
   const fullWindow = window.open(buildFullViewerUrl({
-    baseUrl: import.meta.env.BASE_URL,
+    baseUrl: getViewerAppBaseUrl(),
     handoffId,
     name: explicitName,
     state
@@ -335,4 +335,14 @@ function openFullViewer(core: ViewerAppCore): void {
       });
     }
   });
+}
+
+function getViewerAppBaseUrl(): string {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  if (baseUrl === './') {
+    return new URL('./', window.location.href).toString();
+  }
+
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  return `${normalizedBase}app/`;
 }

@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 export async function gotoViewerApp(page: Page): Promise<void> {
-  await page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/');
+  await page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/app/');
   await expectViewerAppReady(page);
 }
 

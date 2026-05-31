@@ -104,6 +104,7 @@ describe('embed wrapper public script', () => {
     expect(controller.element.style.width).toBe('300px');
     expect(controller.element.getAttribute('name')).toBe('Beauty pass');
     expect(iframe.style.height).toBe('240px');
+    expect(iframeUrl.pathname).toBe('/app/');
     expect(iframeUrl.searchParams.get('ui')).toBe('embed');
     expect(iframeUrl.searchParams.get('src')).toBe('https://example.com/render.exr');
     expect(iframeUrl.searchParams.get('name')).toBe('Beauty pass');
@@ -149,6 +150,7 @@ describe('embed wrapper public script', () => {
     const iframeUrl = new URL(getViewerIframe(controller.element).src);
 
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(iframeUrl.pathname).toBe('/app/');
     expect(iframeUrl.searchParams.get('src')).toBe('https://example.com/render.exr');
   });
 
@@ -198,12 +200,14 @@ describe('embed wrapper public script', () => {
     });
     const galleryUrl = new URL(getViewerIframe(controller.element).src);
     expect(controller.element.getAttribute('src')).toBeNull();
+    expect(galleryUrl.pathname).toBe('/app/');
     expect(galleryUrl.searchParams.get('gallery')).toBe('cbox-rgb');
     expect(galleryUrl.searchParams.get('name')).toBe('Gallery plate');
     expect(galleryUrl.searchParams.get('view')).toBe('image');
 
     controller.setView('panorama');
     const panoramaUrl = new URL(getViewerIframe(controller.element).src);
+    expect(panoramaUrl.pathname).toBe('/app/');
     expect(panoramaUrl.searchParams.get('view')).toBe('panorama');
 
     controller.destroy();

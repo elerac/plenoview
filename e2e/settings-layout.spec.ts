@@ -331,7 +331,7 @@ async function gotoViewerAppWithoutRuntime(
 
     await route.continue();
   });
-  await page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/', { waitUntil: 'load' });
+  await page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/app/', { waitUntil: 'load' });
 }
 
 async function readInitialPanelLayout(page: Page): Promise<{
@@ -416,7 +416,7 @@ async function gotoViewerAppWithDelayedRuntime(page: Page): Promise<() => Promis
     await route.continue();
   });
 
-  const navigation = page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/', { waitUntil: 'load' });
+  const navigation = page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/app/', { waitUntil: 'load' });
   await page.waitForSelector('#opened-files-list', { state: 'attached' });
   await runtimeScriptRequest;
 
@@ -445,7 +445,7 @@ async function gotoViewerAppWithDelayedColormapManifest(page: Page): Promise<() 
     await route.continue();
   });
 
-  await page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/', { waitUntil: 'domcontentloaded' });
+  await page.goto(process.env.PLAYWRIGHT_APP_PATH ?? '/app/', { waitUntil: 'domcontentloaded' });
   await manifestRequest;
 
   return async () => {

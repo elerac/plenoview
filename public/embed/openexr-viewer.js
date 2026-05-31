@@ -372,9 +372,9 @@
 
   function resolveViewerBaseUrl(scriptUrl) {
     if (!scriptUrl) {
-      return new URL('./', window.location.href).toString();
+      return new URL('./app/', window.location.href).toString();
     }
-    return new URL('../', scriptUrl).toString();
+    return new URL('../app/', scriptUrl).toString();
   }
 
   function shouldParentFetchSource(src, sourceOrigin) {

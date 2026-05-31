@@ -16,8 +16,12 @@ describe('desktop asset scripts', () => {
 
     expect(viteConfig).toContain("outDir: 'dist-desktop'");
     expect(stageScript).toContain("'dist-desktop'");
+    expect(stageScript).toContain("'app', 'colormaps'");
     expect(verifyScript).toContain("'dist-desktop'");
+    expect(verifyScript).toContain("'app'");
     expect(tauriConfig).toContain('"frontendDist": "../dist-desktop"');
+    expect(tauriConfig).toContain('"devUrl": "http://localhost:5173/app/"');
+    expect(tauriConfig).toContain('"url": "app/index.html"');
   });
 
   it('does not verify stale web dist assets during desktop verification', async () => {

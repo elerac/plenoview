@@ -9,10 +9,12 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(repoRoot, 'dist');
 const distIndex = resolve(distDir, 'index.html');
+const distAppIndex = resolve(distDir, 'app', 'index.html');
 const thumbnailPath = resolve(distDir, 'thumbnail.jpg');
 const host = '127.0.0.1';
 const port = Number(process.env.THUMBNAIL_PREVIEW_PORT ?? 4174);
-const appPath = normalizePath(process.env.PLAYWRIGHT_APP_PATH ?? '/openexr_viewer/');
+const appPath = normalizePath(process.env.PLAYWRIGHT_APP_PATH ?? '/openexr_viewer/app/');
+const siteBasePath = resolveSiteBasePath(appPath);
 const appUrl = `http://${host}:${port}${appPath}`;
 const viewerTimeoutMs = Number(process.env.THUMBNAIL_VIEWER_TIMEOUT_MS ?? 60000);
 const viewport = {
@@ -22,6 +24,9 @@ const viewport = {
 
 if (!existsSync(distIndex)) {
   throw new Error('dist/index.html was not found. Run `npm run build` before capturing the thumbnail.');
+}
+if (!existsSync(distAppIndex)) {
+  throw new Error('dist/app/index.html was not found. Run `npm run build` before capturing the thumbnail.');
 }
 
 mkdirSync(dirname(thumbnailPath), { recursive: true });
@@ -238,11 +243,11 @@ function resolveStaticPath(pathname) {
 
 function toDistRelativePath(pathname) {
   if (pathname === appPath.slice(0, -1) || pathname === appPath) {
-    return 'index.html';
+    return 'app/index.html';
   }
 
-  if (pathname.startsWith(appPath)) {
-    return pathname.slice(appPath.length);
+  if (pathname.startsWith(siteBasePath)) {
+    return pathname.slice(siteBasePath.length);
   }
 
   return pathname.replace(/^\/+/, '');
@@ -314,6 +319,15 @@ function contentTypeFor(filePath) {
 function normalizePath(value) {
   const path = value.startsWith('/') ? value : `/${value}`;
   return path.endsWith('/') ? path : `${path}/`;
+}
+
+function resolveSiteBasePath(normalizedAppPath) {
+  const segments = normalizedAppPath.split('/').filter(Boolean);
+  if (segments.at(-1) === 'app') {
+    segments.pop();
+  }
+
+  return segments.length > 0 ? `/${segments.join('/')}/` : '/';
 }
 
 function waitMs(durationMs) {

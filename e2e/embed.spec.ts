@@ -4,7 +4,7 @@ const EMBED_RIGHT_INSET_PX = 8;
 
 test('keeps the embed open-full button right-aligned without a custom name', async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 360 });
-  await gotoEmbed(page, '/?ui=embed&gallery=cbox-rgb');
+  await gotoEmbed(page, '/app/?ui=embed&gallery=cbox-rgb');
 
   const sourceLabel = page.locator('.embed-source-label');
   const openFullButton = page.getByRole('button', { name: 'Open full viewer', exact: true });
@@ -17,7 +17,7 @@ test('keeps the embed open-full button right-aligned without a custom name', asy
 
 test('keeps the embed open-full button right-aligned with a custom name @smoke', async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 360 });
-  await gotoEmbed(page, '/?ui=embed&gallery=cbox-rgb&name=Beauty%20pass');
+  await gotoEmbed(page, '/app/?ui=embed&gallery=cbox-rgb&name=Beauty%20pass');
 
   const sourceLabel = page.locator('.embed-source-label');
   const openFullButton = page.getByRole('button', { name: 'Open full viewer', exact: true });

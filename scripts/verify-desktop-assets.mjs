@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(rootDir, 'dist-desktop');
-const colormapDir = resolve(distDir, 'colormaps');
+const appDir = resolve(distDir, 'app');
+const colormapDir = resolve(appDir, 'colormaps');
 const manifestPath = resolve(colormapDir, 'manifest.json');
 
-await assertFile(resolve(distDir, 'index.html'));
+await assertFile(resolve(appDir, 'index.html'));
 
 const distFiles = await listFiles(distDir);
 const exrFiles = distFiles.filter((file) => extname(file).toLowerCase() === '.exr');

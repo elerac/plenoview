@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAGES: 'true'
-      PLAYWRIGHT_APP_PATH: /openexr_viewer/
+      PLAYWRIGHT_APP_PATH: /openexr_viewer/app/
     steps:
       - name: Checkout
         uses: actions/checkout@v6

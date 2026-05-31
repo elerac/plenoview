@@ -1,0 +1,1302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenEXR Viewer</title>
+    <script>
+      (() => {
+        const panelSplitRanges = {
+          imagePanelWidth: { min: 160, max: 420 },
+          rightPanelWidth: { min: 240, max: 520 },
+          bottomPanelHeight: { min: 72, max: 360 }
+        };
+        const setInitialPanelSplitProperty = (name, value) => {
+          document.documentElement.style.setProperty(name, value);
+        };
+        const readInitialPanelSplitSize = (record, key) => {
+          const value = record[key];
+          const range = panelSplitRanges[key];
+          if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+            return null;
+          }
+
+          return Math.max(range.min, Math.min(range.max, value));
+        };
+
+        try {
+          if (window.localStorage.getItem('openexr-viewer:theme:v1') === 'spectrum-lattice') {
+            document.documentElement.dataset.theme = 'spectrum-lattice';
+          }
+        } catch {
+          // Runtime theme initialization handles storage failures after app boot.
+        }
+
+        try {
+          const storedPanelSplits = window.localStorage.getItem('openexr-viewer:panel-splits:v1');
+          if (!storedPanelSplits) {
+            return;
+          }
+
+          const parsed = JSON.parse(storedPanelSplits);
+          const record = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+          const imagePanelCollapsed = record.imagePanelCollapsed === true;
+          const rightPanelCollapsed = record.rightPanelCollapsed === true;
+          const bottomPanelCollapsed = record.bottomPanelCollapsed === true;
+          const imagePanelWidth = readInitialPanelSplitSize(record, 'imagePanelWidth');
+          const rightPanelWidth = readInitialPanelSplitSize(record, 'rightPanelWidth');
+          const bottomPanelHeight = readInitialPanelSplitSize(record, 'bottomPanelHeight');
+
+          if (imagePanelCollapsed || imagePanelWidth !== null) {
+            setInitialPanelSplitProperty(
+              '--initial-image-panel-width',
+              `${Math.round(imagePanelCollapsed ? 0 : imagePanelWidth)}px`
+            );
+          }
+          if (rightPanelCollapsed || rightPanelWidth !== null) {
+            setInitialPanelSplitProperty(
+              '--initial-right-panel-width',
+              `${Math.round(rightPanelCollapsed ? 0 : rightPanelWidth)}px`
+            );
+          }
+          if (bottomPanelCollapsed || bottomPanelHeight !== null) {
+            setInitialPanelSplitProperty(
+              '--initial-bottom-panel-height',
+              `${Math.round(bottomPanelCollapsed ? 0 : bottomPanelHeight)}px`
+            );
+          }
+          if (imagePanelCollapsed) {
+            setInitialPanelSplitProperty('--initial-image-panel-resizer-width', '0px');
+          }
+          if (rightPanelCollapsed) {
+            setInitialPanelSplitProperty('--initial-right-panel-resizer-width', '0px');
+          }
+          if (bottomPanelCollapsed) {
+            setInitialPanelSplitProperty('--initial-bottom-panel-resizer-height', '0px');
+          }
+        } catch {
+          // Runtime panel layout initialization handles storage failures after app boot.
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <canvas id="spectrum-lattice-canvas" class="spectrum-lattice-canvas hidden" aria-hidden="true"></canvas>
+      <header id="app-menu-bar" class="app-menu-bar" aria-label="Application menu">
+        <div class="app-menu-title">OpenEXR Viewer</div>
+        <nav class="app-menu-nav" aria-label="Main menu">
+          <div class="app-menu">
+            <button id="file-menu-button" class="app-menu-tab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">
+              File
+            </button>
+            <div id="file-menu" class="app-menu-dropdown hidden" role="menu" aria-labelledby="file-menu-button">
+              <button id="open-file-button" class="app-menu-item" type="button" role="menuitem">Open...</button>
+              <button id="open-folder-button" class="app-menu-item" type="button" role="menuitem">Open Folder...</button>
+              <div class="app-menu-separator" role="separator" aria-orientation="horizontal"></div>
+              <button id="export-image-button" class="app-menu-item" type="button" role="menuitem" disabled>Export...</button>
+              <button id="export-screenshot-button" class="app-menu-item" type="button" role="menuitem" disabled>Export Screenshot...</button>
+              <button id="export-image-batch-button" class="app-menu-item" type="button" role="menuitem" disabled>Export Batch...</button>
+              <button id="export-colormap-button" class="app-menu-item" type="button" role="menuitem">Export Colormap...</button>
+              <div class="app-menu-separator" role="separator" aria-orientation="horizontal"></div>
+              <button id="reload-all-opened-images-button" class="app-menu-item" type="button" role="menuitem" disabled>Reload All</button>
+              <button id="close-all-opened-images-button" class="app-menu-item" type="button" role="menuitem" disabled>Close All</button>
+            </div>
+          </div>
+          <div class="app-menu">
+            <button id="view-menu-button" class="app-menu-tab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu">
+              View
+            </button>
+            <div id="view-menu" class="app-menu-dropdown hidden" role="menu" aria-labelledby="view-menu-button">
+              <button
+                id="image-viewer-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitemradio"
+                aria-checked="true"
+              >
+                Image viewer
+              </button>
+              <button
+                id="panorama-viewer-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+              >
+                Panorama viewer
+              </button>
+              <button
+                id="depth-viewer-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+              >
+                Depth map viewer
+              </button>
+              <div class="app-menu-separator" role="separator" aria-orientation="horizontal"></div>
+              <button
+                id="rulers-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked="false"
+              >
+                Rulers
+              </button>
+            </div>
+          </div>
+          <div class="app-menu">
+            <button id="window-menu-button" class="app-menu-tab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="window-menu">
+              Window
+            </button>
+            <div id="window-menu" class="app-menu-dropdown hidden" role="menu" aria-labelledby="window-menu-button">
+              <button
+                id="window-normal-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitemradio"
+                aria-checked="true"
+              >
+                Normal
+              </button>
+              <button
+                id="window-full-screen-preview-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+              >
+                Full Screen Preview
+              </button>
+              <div class="app-menu-separator" role="separator" aria-orientation="horizontal"></div>
+              <button
+                id="window-single-pane-menu-item"
+                class="app-menu-item"
+                type="button"
+                role="menuitem"
+              >
+                Single Pane
+              </button>
+              <button
+                id="window-split-vertical-menu-item"
+                class="app-menu-item app-menu-item--with-shortcut"
+                type="button"
+                role="menuitem"
+              >
+                <span>Split Vertically</span>
+                <span class="app-menu-shortcut" aria-hidden="true">⌘D</span>
+              </button>
+              <button
+                id="window-split-horizontal-menu-item"
+                class="app-menu-item app-menu-item--with-shortcut"
+                type="button"
+                role="menuitem"
+              >
+                <span>Split Horizontally</span>
+                <span class="app-menu-shortcut" aria-hidden="true">⌘⇧D</span>
+              </button>
+            </div>
+          </div>
+          <div class="app-menu">
+            <button id="gallery-menu-button" class="app-menu-tab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="gallery-menu">
+              Gallery
+            </button>
+            <div id="gallery-menu" class="app-menu-dropdown hidden" role="menu" aria-labelledby="gallery-menu-button">
+              <button id="gallery-cbox-rgb-button" class="app-menu-item" type="button" role="menuitem" data-gallery-id="cbox-rgb">cbox_rgb.exr</button>
+              <button id="gallery-beachball-multipart-0001-button" class="app-menu-item" type="button" role="menuitem" data-gallery-id="beachball-multipart-0001">multipart.0001.exr</button>
+              <button id="gallery-brown-photostudio-02-1k-button" class="app-menu-item" type="button" role="menuitem" data-gallery-id="brown-photostudio-02-1k">brown_photostudio_02_1k.exr</button>
+            </div>
+          </div>
+        </nav>
+        <div class="app-menu-actions" aria-label="Quick actions">
+          <button
+            id="app-auto-fit-image-button"
+            class="app-menu-icon-button app-auto-fit-image-button"
+            type="button"
+            aria-label="Auto fit selected images"
+            aria-pressed="false"
+            data-tooltip="Auto fit selected images"
+            title="Auto fit selected images"
+          >
+            <svg
+              class="app-menu-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+              <path d="M9 3H4a1 1 0 0 0-1 1v5" />
+              <path d="M15 3h5a1 1 0 0 1 1 1v5" />
+              <path d="M21 15v5a1 1 0 0 1-1 1h-5" />
+              <path d="M9 21H4a1 1 0 0 1-1-1v-5" />
+            </svg>
+          </button>
+          <button
+            id="app-auto-exposure-button"
+            class="app-menu-icon-button app-auto-exposure-button"
+            type="button"
+            aria-label="Auto exposure"
+            aria-pressed="false"
+            data-tooltip="Auto exposure"
+            title="Auto exposure"
+          >
+            <svg
+              class="app-menu-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" />
+              <path d="M10.5 13.5 12 9.75l1.5 3.75" />
+              <path d="M11.1 12.35h1.8" />
+            </svg>
+          </button>
+          <button
+            id="app-invalid-value-warning-button"
+            class="app-menu-icon-button app-invalid-value-warning-button"
+            type="button"
+            aria-label="Warn invalid values"
+            aria-pressed="true"
+            data-tooltip="Warn invalid values"
+            title="Warn invalid values"
+          >
+            <svg
+              class="app-menu-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M10.3 3.7a2 2 0 0 1 3.4 0l8 14A2 2 0 0 1 20 20.75H4A2 2 0 0 1 2.3 17.7Z" />
+              <path d="M12 8v5" />
+              <path d="M12 17h.01" />
+            </svg>
+          </button>
+          <button
+            id="app-screenshot-button"
+            class="app-menu-icon-button app-screenshot-button"
+            type="button"
+            aria-label="Export Screenshot..."
+            data-tooltip="Export screenshot"
+            title="Export Screenshot..."
+            disabled
+          >
+            <svg
+              class="app-menu-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M14.5 4h-5L8 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3l-1.5-2Z" />
+              <circle cx="12" cy="13" r="3.25" />
+            </svg>
+          </button>
+          <button
+            id="app-metadata-button"
+            class="app-menu-icon-button app-metadata-button"
+            type="button"
+            aria-label="Metadata"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            aria-controls="metadata-dialog"
+            data-tooltip="Metadata"
+            title="Metadata"
+            disabled
+          >
+            <svg
+              class="app-menu-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+          </button>
+          <button
+            id="app-fullscreen-button"
+            class="app-menu-icon-button app-fullscreen-button"
+            type="button"
+            aria-label="Enter app fullscreen"
+            aria-pressed="false"
+            data-tooltip="Enter fullscreen"
+            title="Enter app fullscreen"
+          >
+            <svg
+              class="app-menu-icon app-fullscreen-icon app-fullscreen-icon--enter"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M4 9V5a1 1 0 0 1 1-1h4" />
+              <path d="M15 4h4a1 1 0 0 1 1 1v4" />
+              <path d="M20 15v4a1 1 0 0 1-1 1h-4" />
+              <path d="M9 20H5a1 1 0 0 1-1-1v-4" />
+            </svg>
+          </button>
+          <button
+            id="settings-dialog-button"
+            class="app-menu-icon-button app-settings-button"
+            type="button"
+            aria-label="Settings"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            aria-controls="settings-dialog"
+            data-tooltip="Settings"
+            title="Settings"
+          >
+            <svg
+              class="app-menu-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.08a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.01V3a2 2 0 1 1 4 0v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.08A1.7 1.7 0 0 0 19.4 15Z" />
+            </svg>
+          </button>
+        </div>
+        <div id="app-icon-tooltip" class="app-icon-tooltip hidden" role="tooltip"></div>
+        <input id="file-input" type="file" accept=".exr,image/exr" hidden />
+        <input id="folder-input" type="file" accept=".exr,image/exr" webkitdirectory multiple hidden />
+      </header>
+
+      <div id="settings-dialog-backdrop" class="app-dialog-backdrop hidden">
+        <section
+          id="settings-dialog"
+          class="app-dialog app-dialog--settings"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-dialog-title"
+        >
+          <div class="app-dialog-header">
+            <h2 id="settings-dialog-title" class="app-dialog-title">Settings</h2>
+          </div>
+          <div class="app-dialog-body">
+            <div id="theme-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="theme-select">Theme</label>
+              <select id="theme-select" class="app-menu-setting-input"></select>
+            </div>
+            <div id="spectrum-lattice-motion-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="spectrum-lattice-motion-select">Spectrum lattice motion</label>
+              <select id="spectrum-lattice-motion-select" class="app-menu-setting-input">
+                <option value="animate">Animate</option>
+                <option value="system">Follow system</option>
+              </select>
+            </div>
+            <div id="channel-recognition-settings-control" class="app-menu-setting-group channel-recognition-settings" role="group" aria-labelledby="channel-recognition-settings-label">
+              <div class="app-menu-setting-header-row">
+                <span id="channel-recognition-settings-label" class="app-menu-setting-label">Channel Recognition</span>
+                <button id="channel-recognition-edit-name-rules-button" class="app-menu-setting-action" type="button" aria-expanded="false" aria-controls="channel-recognition-name-rule-editor">
+                  Edit Name Rules
+                </button>
+              </div>
+              <div id="channel-recognition-summary" class="app-menu-setting-summary">Default name rules</div>
+              <div class="channel-recognition-toggle-grid" aria-label="Recognition families">
+                <label class="app-menu-setting-checkbox" for="channel-recognition-component-rgb-checkbox">
+                  <input id="channel-recognition-component-rgb-checkbox" data-channel-recognition-setting="component.rgb" type="checkbox" checked />
+                  RGB
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-component-xyz-checkbox">
+                  <input id="channel-recognition-component-xyz-checkbox" data-channel-recognition-setting="component.xyz" type="checkbox" checked />
+                  XYZ
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-normal-map-checkbox">
+                  <input id="channel-recognition-normal-map-checkbox" data-channel-recognition-setting="normal.map" type="checkbox" checked />
+                  Normal maps
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-component-uv-checkbox">
+                  <input id="channel-recognition-component-uv-checkbox" data-channel-recognition-setting="component.uv" type="checkbox" checked />
+                  UV
+                </label>
+                <label class="app-menu-setting-checkbox" for="spectral-rgb-grouping-checkbox">
+                  <input id="spectral-rgb-grouping-checkbox" data-channel-recognition-setting="spectral.series" type="checkbox" checked />
+                  Spectral
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-stokes-scalar-checkbox">
+                  <input id="channel-recognition-stokes-scalar-checkbox" data-channel-recognition-setting="stokes.scalar" type="checkbox" checked />
+                  Scalar Stokes
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-stokes-rgb-checkbox">
+                  <input id="channel-recognition-stokes-rgb-checkbox" data-channel-recognition-setting="stokes.rgb" type="checkbox" checked />
+                  RGB Stokes
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-stokes-spectral-checkbox">
+                  <input id="channel-recognition-stokes-spectral-checkbox" data-channel-recognition-setting="stokes.spectral" type="checkbox" checked />
+                  Spectral Stokes
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-mueller-scalar-checkbox">
+                  <input id="channel-recognition-mueller-scalar-checkbox" data-channel-recognition-setting="mueller.scalar" type="checkbox" checked />
+                  Scalar Mueller
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-mueller-rgb-checkbox">
+                  <input id="channel-recognition-mueller-rgb-checkbox" data-channel-recognition-setting="mueller.rgb" type="checkbox" checked />
+                  RGB Mueller
+                </label>
+                <label class="app-menu-setting-checkbox" for="channel-recognition-alpha-companions-checkbox">
+                  <input id="channel-recognition-alpha-companions-checkbox" data-channel-recognition-setting="fallback.alphaCompanions" type="checkbox" checked />
+                  Alpha
+                </label>
+              </div>
+              <div id="channel-recognition-name-rule-editor" class="channel-recognition-rule-editor hidden">
+                <div id="channel-recognition-rule-error-summary" class="channel-recognition-rule-error-summary hidden" role="alert"></div>
+                <div class="channel-recognition-rule-list" id="channel-recognition-rules-list" aria-label="Name recognition regex rules"></div>
+                <div class="channel-recognition-rule-actions">
+                  <button id="channel-recognition-reset-rules-button" type="button">Reset Draft to Defaults</button>
+                  <button id="channel-recognition-cancel-rules-button" type="button">Cancel Rule Edits</button>
+                  <button id="channel-recognition-apply-rules-button" type="button">Apply Rules</button>
+                </div>
+              </div>
+            </div>
+            <div id="stokes-default-settings-control" class="app-menu-setting-group app-menu-setting-group--table">
+              <span class="app-menu-setting-label">Stokes Defaults</span>
+              <div id="stokes-invalid-vector-mask-control" class="app-menu-setting-group">
+                <label class="app-menu-setting-checkbox" for="stokes-invalid-vector-mask-checkbox">
+                  <input id="stokes-invalid-vector-mask-checkbox" type="checkbox" checked />
+                  Mask invalid Stokes vectors
+                </label>
+              </div>
+              <div class="app-menu-setting-table-wrap">
+                <table id="stokes-default-settings-table" class="app-menu-setting-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Parameter</th>
+                      <th scope="col">Colormap</th>
+                      <th scope="col">vmin</th>
+                      <th scope="col">vmax</th>
+                      <th scope="col">Zero Center</th>
+                      <th scope="col">Modulation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr data-stokes-group="aolp">
+                      <th scope="row"><span class="app-menu-setting-row-heading"><input id="stokes-default-aolp-enabled-checkbox" data-stokes-control="enabled" type="checkbox" aria-label="AoLP enabled" checked />AoLP</span></th>
+                      <td data-label="Colormap"><select id="stokes-default-aolp-colormap-select" data-stokes-control="colormap"></select></td>
+                      <td data-label="vmin"><input id="stokes-default-aolp-vmin-input" data-stokes-control="vmin" type="number" step="any" aria-label="AoLP vmin" /></td>
+                      <td data-label="vmax"><input id="stokes-default-aolp-vmax-input" data-stokes-control="vmax" type="number" step="any" aria-label="AoLP vmax" /></td>
+                      <td data-label="Zero Center"><input id="stokes-default-aolp-zero-center-checkbox" data-stokes-control="zeroCentered" type="checkbox" aria-label="AoLP zero center" /></td>
+                      <td class="app-menu-setting-modulation-cell" data-label="Modulation">
+                        <label class="app-menu-setting-checkbox">
+                          <input id="stokes-default-aolp-modulation-checkbox" data-stokes-control="modulation" type="checkbox" />
+                          On
+                        </label>
+                        <select id="stokes-default-aolp-modulation-mode-select" data-stokes-control="aolpMode" aria-label="AoLP modulation mode">
+                          <option value="value">Value</option>
+                          <option value="saturation">Saturation</option>
+                        </select>
+                      </td>
+                    </tr>
+                    <tr data-stokes-group="degree">
+                      <th scope="row"><span class="app-menu-setting-row-heading"><input id="stokes-default-degree-enabled-checkbox" data-stokes-control="enabled" type="checkbox" aria-label="Degree enabled" checked />Degree</span></th>
+                      <td data-label="Colormap"><select id="stokes-default-degree-colormap-select" data-stokes-control="colormap"></select></td>
+                      <td data-label="vmin"><input id="stokes-default-degree-vmin-input" data-stokes-control="vmin" type="number" step="any" aria-label="Degree vmin" /></td>
+                      <td data-label="vmax"><input id="stokes-default-degree-vmax-input" data-stokes-control="vmax" type="number" step="any" aria-label="Degree vmax" /></td>
+                      <td data-label="Zero Center"><input id="stokes-default-degree-zero-center-checkbox" data-stokes-control="zeroCentered" type="checkbox" aria-label="Degree zero center" /></td>
+                      <td data-label="Modulation"><span class="app-menu-setting-na">N/A</span></td>
+                    </tr>
+                    <tr data-stokes-group="cop">
+                      <th scope="row"><span class="app-menu-setting-row-heading"><input id="stokes-default-cop-enabled-checkbox" data-stokes-control="enabled" type="checkbox" aria-label="CoP enabled" checked />CoP</span></th>
+                      <td data-label="Colormap"><select id="stokes-default-cop-colormap-select" data-stokes-control="colormap"></select></td>
+                      <td data-label="vmin"><input id="stokes-default-cop-vmin-input" data-stokes-control="vmin" type="number" step="any" aria-label="CoP vmin" /></td>
+                      <td data-label="vmax"><input id="stokes-default-cop-vmax-input" data-stokes-control="vmax" type="number" step="any" aria-label="CoP vmax" /></td>
+                      <td data-label="Zero Center"><input id="stokes-default-cop-zero-center-checkbox" data-stokes-control="zeroCentered" type="checkbox" aria-label="CoP zero center" /></td>
+                      <td data-label="Modulation">
+                        <label class="app-menu-setting-checkbox">
+                          <input id="stokes-default-cop-modulation-checkbox" data-stokes-control="modulation" type="checkbox" />
+                          On
+                        </label>
+                      </td>
+                    </tr>
+                    <tr data-stokes-group="top">
+                      <th scope="row"><span class="app-menu-setting-row-heading"><input id="stokes-default-top-enabled-checkbox" data-stokes-control="enabled" type="checkbox" aria-label="ToP enabled" checked />ToP</span></th>
+                      <td data-label="Colormap"><select id="stokes-default-top-colormap-select" data-stokes-control="colormap"></select></td>
+                      <td data-label="vmin"><input id="stokes-default-top-vmin-input" data-stokes-control="vmin" type="number" step="any" aria-label="ToP vmin" /></td>
+                      <td data-label="vmax"><input id="stokes-default-top-vmax-input" data-stokes-control="vmax" type="number" step="any" aria-label="ToP vmax" /></td>
+                      <td data-label="Zero Center"><input id="stokes-default-top-zero-center-checkbox" data-stokes-control="zeroCentered" type="checkbox" aria-label="ToP zero center" /></td>
+                      <td data-label="Modulation">
+                        <label class="app-menu-setting-checkbox">
+                          <input id="stokes-default-top-modulation-checkbox" data-stokes-control="modulation" type="checkbox" />
+                          On
+                        </label>
+                      </td>
+                    </tr>
+                    <tr data-stokes-group="normalized">
+                      <th scope="row"><span class="app-menu-setting-row-heading"><input id="stokes-default-normalized-enabled-checkbox" data-stokes-control="enabled" type="checkbox" aria-label="Normalized enabled" checked />Normalized</span></th>
+                      <td data-label="Colormap"><select id="stokes-default-normalized-colormap-select" data-stokes-control="colormap"></select></td>
+                      <td data-label="vmin"><input id="stokes-default-normalized-vmin-input" data-stokes-control="vmin" type="number" step="any" aria-label="Normalized vmin" /></td>
+                      <td data-label="vmax"><input id="stokes-default-normalized-vmax-input" data-stokes-control="vmax" type="number" step="any" aria-label="Normalized vmax" /></td>
+                      <td data-label="Zero Center"><input id="stokes-default-normalized-zero-center-checkbox" data-stokes-control="zeroCentered" type="checkbox" aria-label="Normalized zero center" /></td>
+                      <td data-label="Modulation"><span class="app-menu-setting-na">N/A</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div id="auto-exposure-percentile-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="auto-exposure-percentile-input">Auto Exposure Percentile</label>
+              <div class="app-menu-setting-row">
+                <input
+                  id="auto-exposure-percentile-input"
+                  class="app-menu-setting-input"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="0.1"
+                  value="99.5"
+                />
+                <span class="app-menu-setting-unit">%</span>
+              </div>
+            </div>
+            <div id="image-load-workers-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="image-load-workers-input">Image Load Workers</label>
+              <div class="app-menu-setting-row">
+                <input
+                  id="image-load-workers-input"
+                  class="app-menu-setting-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                />
+                <span class="app-menu-setting-unit">workers</span>
+              </div>
+            </div>
+            <div id="display-cache-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="display-cache-budget-input">Memory Budget</label>
+              <div class="app-menu-setting-row">
+                <select id="display-cache-budget-input" class="app-menu-setting-input" aria-describedby="display-cache-usage">
+                  <option value="64">64</option>
+                  <option value="128">128</option>
+                  <option value="256" selected>256</option>
+                  <option value="512">512</option>
+                  <option value="1024">1024</option>
+                </select>
+                <span class="app-menu-setting-unit">MB</span>
+              </div>
+              <span id="display-cache-usage" class="app-menu-setting-value">0 / 256 MB</span>
+            </div>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="reset-settings-button" type="button">Reset Settings</button>
+            <button id="settings-dialog-close-button" type="button">Close</button>
+          </div>
+        </section>
+      </div>
+      <div id="metadata-dialog-backdrop" class="app-dialog-backdrop hidden">
+        <section
+          id="metadata-dialog"
+          class="app-dialog app-dialog--metadata"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="metadata-dialog-title"
+        >
+          <div class="app-dialog-header">
+            <h2 id="metadata-dialog-title" class="app-dialog-title">Metadata</h2>
+          </div>
+          <div class="app-dialog-body">
+            <p id="metadata-empty-state" class="metadata-empty-state">No metadata available.</p>
+            <div id="metadata-table" class="metadata-table hidden" aria-label="EXR metadata"></div>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="metadata-dialog-close-button" type="button">Close</button>
+          </div>
+        </section>
+      </div>
+      <div id="error-banner" class="error-banner hidden"></div>
+      <div id="export-dialog-backdrop" class="app-dialog-backdrop hidden">
+        <form
+          id="export-dialog-form"
+          class="app-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-dialog-title"
+          novalidate
+        >
+          <div class="app-dialog-header">
+            <h2 id="export-dialog-title" class="app-dialog-title">Export Image</h2>
+            <p id="export-dialog-subtitle" class="app-dialog-subtitle">Export the current display as a PNG.</p>
+          </div>
+          <div class="app-dialog-body">
+            <label class="app-dialog-field" for="export-filename-input">
+              <span id="export-filename-field-label" class="app-dialog-field-label">Filename</span>
+              <input id="export-filename-input" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="app-dialog-field" for="export-format-select">
+              <span class="app-dialog-field-label">Format</span>
+              <select id="export-format-select" disabled>
+                <option value="png">PNG</option>
+              </select>
+            </label>
+            <label class="app-dialog-field" for="export-compression-input">
+              <span class="app-dialog-field-label">PNG compression</span>
+              <input id="export-compression-input" type="number" min="0" max="9" step="1" inputmode="numeric" value="9" />
+            </label>
+            <div id="export-size-field" class="app-dialog-field hidden">
+              <span id="export-size-field-label" class="app-dialog-field-label">Size</span>
+              <div class="app-dialog-field-row">
+                <label class="app-dialog-inline-field" for="export-width-input">
+                  <span id="export-width-field-label">Width</span>
+                  <input id="export-width-input" type="number" min="1" step="1" inputmode="numeric" />
+                </label>
+                <label class="app-dialog-inline-field" for="export-height-input">
+                  <span id="export-height-field-label">Height</span>
+                  <input id="export-height-input" type="number" min="1" step="1" inputmode="numeric" />
+                </label>
+              </div>
+            </div>
+            <label
+              id="export-reproduction-metadata-field"
+              class="app-dialog-checkbox hidden"
+              for="export-reproduction-metadata-checkbox"
+            >
+              <input id="export-reproduction-metadata-checkbox" type="checkbox" />
+              <span>Include reproduction JSON</span>
+            </label>
+            <div class="app-dialog-field">
+              <span class="app-dialog-field-label">Preview</span>
+              <div id="export-preview-stage" class="app-dialog-preview-stage">
+                <canvas
+                  id="export-preview-canvas"
+                  class="app-dialog-preview-canvas hidden"
+                  aria-hidden="true"
+                ></canvas>
+                <p
+                  id="export-preview-status"
+                  class="app-dialog-preview-status hidden"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </div>
+            </div>
+            <div
+              id="export-progress"
+              class="export-progress hidden"
+              role="status"
+              aria-live="polite"
+            >
+              <progress id="export-progress-bar" class="export-progress-bar" max="1"></progress>
+              <span id="export-progress-label" class="export-progress-label"></span>
+            </div>
+            <p id="export-dialog-error" class="app-dialog-error hidden" role="alert"></p>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="export-dialog-cancel-button" type="button">Cancel</button>
+            <button id="export-dialog-submit-button" type="submit">Export</button>
+          </div>
+        </form>
+      </div>
+      <div id="export-batch-dialog-backdrop" class="app-dialog-backdrop hidden">
+        <form
+          id="export-batch-dialog-form"
+          class="app-dialog app-dialog--batch"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-batch-dialog-title"
+          novalidate
+        >
+          <div class="app-dialog-header">
+            <h2 id="export-batch-dialog-title" class="app-dialog-title">Export Batch</h2>
+            <p id="export-batch-dialog-subtitle" class="app-dialog-subtitle">Export selected file and channel combinations as a ZIP of PNG images.</p>
+          </div>
+          <div class="app-dialog-body">
+            <label class="app-dialog-field" for="export-batch-archive-filename-input">
+              <span class="app-dialog-field-label">Archive</span>
+              <input id="export-batch-archive-filename-input" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="app-dialog-checkbox" for="export-batch-use-open-files-names-checkbox">
+              <input id="export-batch-use-open-files-names-checkbox" type="checkbox" checked />
+              <span>Use Open Files names</span>
+            </label>
+            <label class="app-dialog-field" for="export-batch-compression-input">
+              <span class="app-dialog-field-label">PNG compression</span>
+              <input id="export-batch-compression-input" type="number" min="0" max="9" step="1" inputmode="numeric" value="9" />
+            </label>
+            <div id="export-batch-size-field" class="app-dialog-field hidden">
+              <span id="export-batch-size-field-label" class="app-dialog-field-label">Size</span>
+              <div class="app-dialog-field-row">
+                <label class="app-dialog-inline-field" for="export-batch-width-input">
+                  <span id="export-batch-width-field-label">Width</span>
+                  <input id="export-batch-width-input" type="number" min="1" step="1" inputmode="numeric" />
+                </label>
+                <label class="app-dialog-inline-field" for="export-batch-height-input">
+                  <span id="export-batch-height-field-label">Height</span>
+                  <input id="export-batch-height-input" type="number" min="1" step="1" inputmode="numeric" />
+                </label>
+              </div>
+            </div>
+            <label
+              id="export-batch-reproduction-metadata-field"
+              class="app-dialog-checkbox hidden"
+              for="export-batch-reproduction-metadata-checkbox"
+            >
+              <input id="export-batch-reproduction-metadata-checkbox" type="checkbox" />
+              <span>Include reproduction JSON</span>
+            </label>
+            <div class="app-dialog-field">
+              <div class="app-dialog-field-heading">
+                <span class="app-dialog-field-label">Images and Channels</span>
+                <div class="export-batch-selection-actions">
+                  <button
+                    id="export-batch-select-all-button"
+                    class="export-batch-selection-button"
+                    type="button"
+                    aria-controls="export-batch-matrix"
+                  >Select all</button>
+                  <button
+                    id="export-batch-deselect-all-button"
+                    class="export-batch-selection-button"
+                    type="button"
+                    aria-controls="export-batch-matrix"
+                  >Deselect all</button>
+                  <button
+                    id="export-batch-split-toggle-button"
+                    class="channel-split-toggle export-batch-split-toggle hidden"
+                    type="button"
+                    aria-pressed="false"
+                    aria-controls="export-batch-matrix"
+                  >Split RGB</button>
+                </div>
+              </div>
+              <div
+                id="export-batch-matrix"
+                class="export-batch-matrix"
+                role="region"
+                aria-label="Batch export file and channel selection"
+              ></div>
+            </div>
+            <p
+              id="export-batch-dialog-status"
+              class="app-dialog-preview-status export-batch-dialog-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <p id="export-batch-dialog-error" class="app-dialog-error hidden" role="alert"></p>
+          </div>
+          <div
+            id="export-batch-progress"
+            class="export-progress export-batch-progress hidden"
+            role="status"
+            aria-live="polite"
+          >
+            <progress id="export-batch-progress-bar" class="export-progress-bar" max="1"></progress>
+            <span id="export-batch-progress-label" class="export-progress-label"></span>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="export-batch-dialog-cancel-button" type="button">Cancel</button>
+            <button id="export-batch-dialog-submit-button" type="submit">Export</button>
+          </div>
+        </form>
+      </div>
+      <div id="folder-load-dialog-backdrop" class="app-dialog-backdrop hidden">
+        <form
+          id="folder-load-dialog-form"
+          class="app-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="folder-load-dialog-title"
+        >
+          <div class="app-dialog-header">
+            <h2 id="folder-load-dialog-title" class="app-dialog-title">Large Folder Load</h2>
+            <p id="folder-load-dialog-summary" class="app-dialog-subtitle"></p>
+          </div>
+          <div class="app-dialog-body">
+            <dl id="folder-load-dialog-stats" class="folder-load-dialog-stats"></dl>
+            <p id="folder-load-dialog-warning" class="app-dialog-warning"></p>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="folder-load-dialog-cancel-button" type="button">Cancel</button>
+            <button id="folder-load-dialog-submit-button" type="submit">Continue</button>
+          </div>
+        </form>
+      </div>
+      <div id="export-colormap-dialog-backdrop" class="app-dialog-backdrop hidden">
+        <form
+          id="export-colormap-dialog-form"
+          class="app-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-colormap-dialog-title"
+          novalidate
+        >
+          <div class="app-dialog-header">
+            <h2 id="export-colormap-dialog-title" class="app-dialog-title">Export Colormap</h2>
+            <p class="app-dialog-subtitle">Export a registered colormap as a PNG gradient.</p>
+          </div>
+          <div class="app-dialog-body">
+            <label class="app-dialog-field" for="export-colormap-select">
+              <span class="app-dialog-field-label">Colormap</span>
+              <select id="export-colormap-select"></select>
+            </label>
+            <div class="app-dialog-field-row">
+              <label class="app-dialog-field" for="export-colormap-width-input">
+                <span class="app-dialog-field-label">Width</span>
+                <input id="export-colormap-width-input" type="number" min="1" step="1" value="256" />
+              </label>
+              <label class="app-dialog-field" for="export-colormap-height-input">
+                <span class="app-dialog-field-label">Height</span>
+                <input id="export-colormap-height-input" type="number" min="1" step="1" value="16" />
+              </label>
+            </div>
+            <label class="app-dialog-field" for="export-colormap-orientation-select">
+              <span class="app-dialog-field-label">Orientation</span>
+              <select id="export-colormap-orientation-select">
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertical</option>
+              </select>
+            </label>
+            <label class="app-dialog-field" for="export-colormap-compression-input">
+              <span class="app-dialog-field-label">PNG compression</span>
+              <input id="export-colormap-compression-input" type="number" min="0" max="9" step="1" inputmode="numeric" value="9" />
+            </label>
+            <div class="app-dialog-field">
+              <span class="app-dialog-field-label">Preview</span>
+              <div id="export-colormap-preview-stage" class="app-dialog-preview-stage">
+                <canvas
+                  id="export-colormap-preview-canvas"
+                  class="app-dialog-preview-canvas hidden"
+                  aria-hidden="true"
+                ></canvas>
+                <p
+                  id="export-colormap-preview-status"
+                  class="app-dialog-preview-status hidden"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </div>
+            </div>
+            <label class="app-dialog-field" for="export-colormap-filename-input">
+              <span class="app-dialog-field-label">Filename</span>
+              <input id="export-colormap-filename-input" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <p id="export-colormap-dialog-error" class="app-dialog-error hidden" role="alert"></p>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="export-colormap-dialog-cancel-button" type="button">Cancel</button>
+            <button id="export-colormap-dialog-submit-button" type="submit">Export</button>
+          </div>
+        </form>
+      </div>
+
+      <main id="main-layout" class="main-layout">
+        <div id="right-stack" class="right-stack panel-shell panel-shell--right">
+          <aside id="inspector-panel" class="side-panel">
+            <div class="side-panel-body">
+              <section id="display-control-panel" class="readout-block display-control-panel" aria-labelledby="display-control-heading">
+                <div class="readout-block-header">
+                  <h2 id="display-control-heading">Display</h2>
+                  <button
+                    id="display-control-toggle"
+                    class="readout-block-toggle"
+                    type="button"
+                    aria-expanded="true"
+                    aria-controls="display-control-content"
+                    aria-label="Collapse Display section"
+                  >
+                    <span class="readout-block-chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="display-control-content" class="readout-block-content display-control-content">
+                  <div class="control-block">
+                    <label class="colormap-palette-control" for="colormap-select">
+                      Palette
+                      <select id="colormap-select"></select>
+                    </label>
+                  </div>
+                  <div id="colormap-range-control" class="control-block colormap-range-control hidden">
+                    <label for="colormap-exposure-slider">EV</label>
+                    <div class="exposure-input-row">
+                      <input id="colormap-exposure-slider" type="range" min="-10" max="10" step="0.1" value="0" />
+                      <input id="colormap-exposure-value" type="number" min="-10" max="10" step="0.1" value="0.0" />
+                    </div>
+                    <label for="colormap-gamma-slider">Gamma</label>
+                    <div class="exposure-input-row">
+                      <input id="colormap-gamma-slider" type="range" min="0.2" max="5" step="0.01" value="1" />
+                      <input id="colormap-gamma-value" type="number" min="0.2" max="5" step="0.01" value="1.0" />
+                    </div>
+                    <div class="colormap-toggle-row">
+                      <label class="checkbox-control colormap-zero-center-control" for="colormap-zero-center-button">
+                        <input id="colormap-zero-center-button" type="checkbox" />
+                        Zero Center
+                      </label>
+                      <label class="checkbox-control colormap-reverse-control" for="colormap-reverse-button">
+                        <input id="colormap-reverse-button" type="checkbox" />
+                        Reverse
+                      </label>
+                    </div>
+                    <div id="stokes-degree-modulation-control" class="stokes-degree-modulation-control hidden">
+                      <button id="stokes-degree-modulation-button" type="button" aria-pressed="false">DoLP Modulation</button>
+                      <div id="stokes-aolp-modulation-mode-control" class="stokes-aolp-modulation-mode-control hidden" role="group" aria-label="AoLP modulation target">
+                        <button id="stokes-aolp-modulation-value-button" type="button" aria-pressed="true" aria-label="Value modulation">V</button>
+                        <button id="stokes-aolp-modulation-saturation-button" type="button" aria-pressed="false" aria-label="Saturation modulation">S</button>
+                      </div>
+                    </div>
+                    <div class="colormap-range-heading">
+                      <span id="colormap-range-reset-label" class="resettable-control-label" title="Double-click to reset range">Range</span>
+                    </div>
+                    <div id="colormap-range-slider" class="colormap-range-slider" aria-label="Colormap vmin and vmax">
+                      <div class="colormap-range-track" aria-hidden="true"></div>
+                      <div class="colormap-range-fill" aria-hidden="true"></div>
+                      <input id="colormap-vmin-slider" class="colormap-range-thumb colormap-range-thumb-min" type="range" min="0" max="1" step="0.001" value="0" aria-label="Colormap vmin" />
+                      <input id="colormap-vmax-slider" class="colormap-range-thumb colormap-range-thumb-max" type="range" min="0" max="1" step="0.001" value="1" aria-label="Colormap vmax" />
+                    </div>
+                    <div class="colormap-range-input-row">
+                      <input id="colormap-vmin-input" type="number" step="any" value="0" aria-label="Colormap vmin" />
+                      <input id="colormap-vmax-input" type="number" step="any" value="1" aria-label="Colormap vmax" />
+                    </div>
+                  </div>
+                  <div id="exposure-control" class="control-block">
+                    <label for="exposure-slider">Exposure (EV)</label>
+                    <div class="exposure-input-row">
+                      <input id="exposure-slider" type="range" min="-10" max="10" step="0.1" value="0" />
+                      <input id="exposure-value" type="number" min="-10" max="10" step="0.1" value="0.0" />
+                    </div>
+                    <label for="gamma-slider">Gamma</label>
+                    <div class="exposure-input-row">
+                      <input id="gamma-slider" type="range" min="0.01" max="5" step="0.01" value="2.2" />
+                      <input id="gamma-value" type="number" min="0.01" max="5" step="0.01" value="2.2" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="probe-panel" class="readout-block">
+                <div class="readout-block-header">
+                  <h2>Probe</h2>
+                  <button
+                    id="probe-toggle"
+                    class="readout-block-toggle"
+                    type="button"
+                    aria-expanded="true"
+                    aria-controls="probe-content"
+                    aria-label="Collapse Probe section"
+                  >
+                    <span class="readout-block-chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="probe-content" class="readout-block-content">
+                  <p id="probe-mode">Hover</p>
+                  <p id="probe-coords">x -   y -</p>
+                  <div id="probe-color-preview" class="probe-color-preview is-empty">
+                    <span id="probe-color-swatch" class="probe-color-swatch" aria-hidden="true"></span>
+                    <div id="probe-color-values" class="probe-color-values" aria-label="Probe display values">
+                      <div class="probe-color-row">
+                        <span class="probe-color-channel">R:</span>
+                        <span class="probe-color-number"></span>
+                      </div>
+                      <div class="probe-color-row">
+                        <span class="probe-color-channel">G:</span>
+                        <span class="probe-color-number"></span>
+                      </div>
+                      <div class="probe-color-row">
+                        <span class="probe-color-channel">B:</span>
+                        <span class="probe-color-number"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section id="spectral-panel" class="readout-block hidden">
+                <div class="readout-block-header">
+                  <h2>Spectral</h2>
+                  <button
+                    id="spectral-toggle"
+                    class="readout-block-toggle"
+                    type="button"
+                    aria-expanded="true"
+                    aria-controls="spectral-content"
+                    aria-label="Collapse Spectral section"
+                  >
+                    <span class="readout-block-chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="spectral-content" class="readout-block-content">
+                  <p id="spectral-empty-state" class="spectral-empty-state"></p>
+                  <div id="spectral-plot" class="spectral-plot hidden" aria-label="Spectral intensity plot"></div>
+                </div>
+              </section>
+
+              <section id="roi-panel" class="readout-block">
+                <div class="readout-block-header">
+                  <h2>ROI</h2>
+                  <button
+                    id="roi-toggle"
+                    class="readout-block-toggle"
+                    type="button"
+                    aria-expanded="true"
+                    aria-controls="roi-content"
+                    aria-label="Collapse ROI section"
+                  >
+                    <span class="readout-block-chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="roi-content" class="readout-block-content">
+                  <p id="roi-empty-state" class="roi-empty-state">Shift-drag in Image viewer to create ROI.</p>
+                  <div id="roi-details" class="roi-details hidden">
+                    <div class="roi-summary">
+                      <div class="roi-summary-row">
+                        <span class="roi-summary-label">Bounds</span>
+                        <span id="roi-bounds" class="roi-summary-value"></span>
+                      </div>
+                      <div class="roi-summary-row">
+                        <span class="roi-summary-label">Size</span>
+                        <span id="roi-size" class="roi-summary-value"></span>
+                      </div>
+                      <div class="roi-summary-row">
+                        <span class="roi-summary-label">Pixels</span>
+                        <span id="roi-pixel-count" class="roi-summary-value"></span>
+                      </div>
+                      <div class="roi-summary-row">
+                        <span class="roi-summary-label">Valid</span>
+                        <span id="roi-valid-count" class="roi-summary-value"></span>
+                      </div>
+                    </div>
+                    <div id="roi-stats" class="roi-stats" aria-label="ROI statistics"></div>
+                    <button id="clear-roi-button" type="button" disabled>Clear ROI</button>
+                  </div>
+                </div>
+              </section>
+
+              <section id="viewer-state-panel" class="readout-block">
+                <div class="readout-block-header">
+                  <h2>View</h2>
+                  <button
+                    id="viewer-state-toggle"
+                    class="readout-block-toggle"
+                    type="button"
+                    aria-expanded="true"
+                    aria-controls="viewer-state-content"
+                    aria-label="Collapse View section"
+                  >
+                    <span class="readout-block-chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="viewer-state-content" class="readout-block-content">
+                  <p id="viewer-state-empty-state" class="viewer-state-empty-state">Open an image to edit view state.</p>
+                  <div id="viewer-state-image-fields" class="viewer-state-fields hidden" aria-label="Image viewer state">
+                    <label for="viewer-state-zoom-input">Zoom</label>
+                    <input id="viewer-state-zoom-input" class="viewer-state-input" type="number" step="any" value="1" />
+                    <label for="viewer-state-pan-x-input">Pan X</label>
+                    <input id="viewer-state-pan-x-input" class="viewer-state-input" type="number" step="any" value="0" />
+                    <label for="viewer-state-pan-y-input">Pan Y</label>
+                    <input id="viewer-state-pan-y-input" class="viewer-state-input" type="number" step="any" value="0" />
+                  </div>
+                  <div id="viewer-state-panorama-fields" class="viewer-state-fields hidden" aria-label="Panorama viewer state">
+                    <label for="viewer-state-yaw-input">Yaw</label>
+                    <input id="viewer-state-yaw-input" class="viewer-state-input" type="number" step="any" value="0" />
+                    <label for="viewer-state-pitch-input">Pitch</label>
+                    <input id="viewer-state-pitch-input" class="viewer-state-input" type="number" step="any" value="0" />
+                    <label for="viewer-state-hfov-input">HFOV</label>
+                    <input id="viewer-state-hfov-input" class="viewer-state-input" type="number" step="any" value="100" />
+                  </div>
+                  <div id="viewer-state-depth-fields" class="viewer-state-fields hidden" aria-label="Depth map viewer state">
+                    <label for="viewer-state-depth-channel-select">Depth</label>
+                    <select id="viewer-state-depth-channel-select" class="viewer-state-input"></select>
+                    <label for="viewer-state-depth-focal-input">Focal</label>
+                    <input id="viewer-state-depth-focal-input" class="viewer-state-input" type="text" inputmode="decimal" autocomplete="off" />
+                    <label for="viewer-state-depth-yaw-input">Yaw</label>
+                    <input id="viewer-state-depth-yaw-input" class="viewer-state-input" type="number" min="-89.9" max="89.9" step="any" value="0" />
+                    <label for="viewer-state-depth-pitch-input">Pitch</label>
+                    <input id="viewer-state-depth-pitch-input" class="viewer-state-input" type="number" min="-89.9" max="89.9" step="any" value="0" />
+                    <label for="viewer-state-depth-zoom-input">Zoom</label>
+                    <input id="viewer-state-depth-zoom-input" class="viewer-state-input" type="number" step="any" value="1" />
+                    <label for="viewer-state-depth-point-size-input">Point</label>
+                    <input id="viewer-state-depth-point-size-input" class="viewer-state-input" type="number" min="1" max="8" step="any" value="2" />
+                  </div>
+                </div>
+              </section>
+
+              <section id="image-stats-panel" class="readout-block">
+                <div class="readout-block-header">
+                  <h2>Image Stats</h2>
+                  <button
+                    id="image-stats-toggle"
+                    class="readout-block-toggle"
+                    type="button"
+                    aria-expanded="true"
+                    aria-controls="image-stats-content"
+                    aria-label="Collapse Image Stats section"
+                  >
+                    <span class="readout-block-chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="image-stats-content" class="readout-block-content">
+                  <p id="image-stats-empty-state" class="image-stats-empty-state">No image statistics available.</p>
+                  <p id="image-stats-loading-state" class="image-stats-loading-state hidden">Calculating...</p>
+                  <div id="image-stats-table" class="image-stats-table hidden" aria-label="Image statistics"></div>
+                </div>
+              </section>
+
+            </div>
+          </aside>
+          <button
+            id="right-panel-collapse-button"
+            class="panel-collapse-button panel-collapse-button--right"
+            type="button"
+            aria-label="Collapse right panel"
+            aria-controls="inspector-panel"
+            aria-expanded="true"
+          ></button>
+        </div>
+
+        <div id="right-panel-resizer" class="layout-resizer layout-resizer--vertical" role="separator" tabindex="0" aria-label="Resize viewer and inspector panels" aria-orientation="vertical"></div>
+
+        <section id="viewer-container" class="viewer-container">
+          <canvas id="gl-canvas"></canvas>
+          <canvas id="overlay-canvas"></canvas>
+          <canvas id="probe-overlay-canvas"></canvas>
+          <svg id="ruler-overlay-svg" aria-hidden="true"></svg>
+          <div id="ruler-label-overlay" class="ruler-label-overlay" aria-hidden="true"></div>
+          <div id="viewer-pane-overlay" class="viewer-pane-overlay" aria-hidden="true"></div>
+          <div id="screenshot-selection-overlay" class="screenshot-selection-overlay hidden" aria-hidden="true">
+            <div id="screenshot-selection-mask-top" class="screenshot-selection-mask"></div>
+            <div id="screenshot-selection-mask-right" class="screenshot-selection-mask"></div>
+            <div id="screenshot-selection-mask-bottom" class="screenshot-selection-mask"></div>
+            <div id="screenshot-selection-mask-left" class="screenshot-selection-mask"></div>
+            <svg id="screenshot-selection-mask-svg" class="screenshot-selection-mask-svg" aria-hidden="true" focusable="false">
+              <path id="screenshot-selection-mask-path" class="screenshot-selection-mask-path" fill-rule="evenodd"></path>
+            </svg>
+            <div id="screenshot-selection-guide-vertical" class="screenshot-selection-guide screenshot-selection-guide--vertical hidden"></div>
+            <div id="screenshot-selection-guide-horizontal" class="screenshot-selection-guide screenshot-selection-guide--horizontal hidden"></div>
+            <div id="screenshot-selection-regions" class="screenshot-selection-regions"></div>
+            <div id="screenshot-selection-box" class="screenshot-selection-box">
+              <span class="screenshot-selection-region-badge"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--nw"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--n"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--ne"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--e"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--se"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--s"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--sw"></span>
+              <span class="screenshot-selection-handle screenshot-selection-handle--w"></span>
+            </div>
+            <div id="screenshot-selection-size" class="screenshot-selection-size hidden"></div>
+            <div id="screenshot-selection-controls" class="screenshot-selection-controls">
+              <button id="screenshot-selection-add-button" type="button">Add</button>
+              <button id="screenshot-selection-fit-button" type="button">Fit</button>
+              <button id="screenshot-selection-delete-button" type="button">Delete</button>
+              <button id="screenshot-selection-cancel-button" type="button">Cancel</button>
+              <button id="screenshot-selection-export-button" type="button">Export...</button>
+              <button id="screenshot-selection-export-batch-button" type="button">Export Batch...</button>
+            </div>
+          </div>
+          <div id="drop-overlay" class="drop-overlay hidden">Drop .exr file(s) or folder to load</div>
+          <div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <span class="loading-message">Loading image...</span>
+          </div>
+          <div id="viewer-context-menu" class="viewer-context-menu app-menu-dropdown hidden" role="menu" aria-label="Image context menu">
+            <button id="viewer-context-copy-image-button" class="app-menu-item" type="button" role="menuitem">Copy Image</button>
+          </div>
+        </section>
+
+        <div id="image-panel-resizer" class="layout-resizer layout-resizer--vertical" role="separator" tabindex="0" aria-label="Resize image and viewer panels" aria-orientation="vertical"></div>
+
+        <div id="image-panel" class="image-panel-shell panel-shell panel-shell--left">
+          <button
+            id="image-panel-collapse-button"
+            class="panel-collapse-button panel-collapse-button--left"
+            type="button"
+            aria-label="Collapse left panel"
+            aria-controls="image-panel-content"
+            aria-expanded="true"
+          ></button>
+          <aside id="image-panel-content" class="image-panel">
+            <section class="image-browser-section" aria-labelledby="opened-files-heading">
+              <div class="image-browser-heading">
+                <button id="opened-files-toggle" class="image-browser-toggle" type="button" aria-label="Toggle Open Files" aria-controls="opened-files-list" aria-expanded="true">
+                  <span class="image-browser-chevron" aria-hidden="true"></span>
+                </button>
+                <h3 id="opened-files-heading">Open Files</h3>
+                <span id="opened-files-count" class="image-browser-count">0</span>
+              </div>
+              <div class="opened-files-filter">
+                <label class="visually-hidden" for="opened-files-filter-input">Filter open files</label>
+                <span class="opened-files-filter-shell">
+                  <input
+                    id="opened-files-filter-input"
+                    class="opened-files-filter-input"
+                    type="search"
+                    placeholder="Filter"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-controls="opened-files-list"
+                    disabled
+                  />
+                </span>
+              </div>
+              <div
+                id="opened-files-list"
+                class="image-browser-list image-browser-list--files is-disabled"
+                role="listbox"
+                aria-label="Open files"
+                aria-describedby="opened-files-reorder-hint"
+              >
+                <p class="image-browser-empty">No open files</p>
+              </div>
+              <p id="opened-files-reorder-hint" class="visually-hidden">Drag rows to reorder open files or drop a row on the image viewer to assign it to a pane. Press Alt+Up/Down or Option+Up/Down to reorder open files.</p>
+              <select id="opened-images-select" class="compat-select" multiple aria-hidden="true" tabindex="-1" disabled></select>
+            </section>
+
+          </aside>
+        </div>
+
+        <div
+          id="bottom-panel-resizer"
+          class="layout-resizer layout-resizer--horizontal"
+          role="separator"
+          tabindex="0"
+          aria-label="Resize viewer and bottom panels"
+          aria-orientation="horizontal"
+        ></div>
+
+        <div id="bottom-panel" class="bottom-panel-shell panel-shell panel-shell--bottom">
+          <aside id="bottom-panel-content" class="bottom-panel" aria-label="Bottom panel">
+            <section class="bottom-panel-section" aria-label="Channel thumbnails">
+              <div
+                id="channel-thumbnail-strip"
+                class="channel-thumbnail-strip"
+                role="listbox"
+                aria-label="Channel thumbnails"
+              ></div>
+            </section>
+          </aside>
+          <button
+            id="bottom-panel-collapse-button"
+            class="panel-collapse-button panel-collapse-button--bottom"
+            type="button"
+            aria-label="Collapse bottom panel"
+            aria-controls="bottom-panel-content"
+            aria-expanded="true"
+          ></button>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      (() => {
+        const viewerContainer = document.getElementById('viewer-container');
+        if (!(viewerContainer instanceof HTMLElement)) {
+          return;
+        }
+
+        const rect = viewerContainer.getBoundingClientRect();
+        const left = Number.isFinite(rect.left) ? rect.left : 0;
+        const top = Number.isFinite(rect.top) ? rect.top : 0;
+        viewerContainer.style.setProperty('--viewer-checker-offset-x', `${-left}px`);
+        viewerContainer.style.setProperty('--viewer-checker-offset-y', `${-top}px`);
+      })();
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

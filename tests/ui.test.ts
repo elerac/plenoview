@@ -7520,7 +7520,7 @@ describe('ui disposal', () => {
   });
 
   it('removes listeners and disconnects observers on dispose', () => {
-    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+    const html = readFileSync(resolve(process.cwd(), 'app/index.html'), 'utf8');
     const bodyMarkup = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;
     document.body.innerHTML = bodyMarkup;
 
@@ -10699,7 +10699,7 @@ describe('global panel arrow navigation', () => {
 });
 
 function installUiFixture(): void {
-  const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+  const html = readFileSync(resolve(process.cwd(), 'app/index.html'), 'utf8');
   const bodyMarkup = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;
   document.body.innerHTML = bodyMarkup;
   resizeObserverRegistrations.length = 0;
@@ -11446,7 +11446,7 @@ function readStyleSheet(): string {
 }
 
 function readIndexMarkup(): string {
-  return readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+  return readFileSync(resolve(process.cwd(), 'app/index.html'), 'utf8');
 }
 
 function createStatsChannel(
