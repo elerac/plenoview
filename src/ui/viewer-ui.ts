@@ -373,7 +373,6 @@ interface StokesDefaultSettingRowElements {
 
 interface ChannelRecognitionRuleRowElements {
   patternInput: HTMLInputElement;
-  caseInsensitiveCheckbox: HTMLInputElement;
   resetButton: HTMLButtonElement;
   hint: HTMLElement;
   error: HTMLElement;
@@ -3480,7 +3479,6 @@ export class ViewerUi implements Disposable {
       if (forcePatternValues || document.activeElement !== row.patternInput) {
         row.patternInput.value = rule.pattern;
       }
-      row.caseInsensitiveCheckbox.checked = rule.caseInsensitive;
       this.renderChannelRecognitionRuleRowValidation(descriptor.id);
     }
   }
@@ -3513,19 +3511,12 @@ export class ViewerUi implements Disposable {
     const options = document.createElement('div');
     options.className = 'channel-recognition-rule-options';
 
-    const caseLabel = document.createElement('label');
-    caseLabel.className = 'app-menu-setting-checkbox channel-recognition-rule-case-toggle';
-    const caseCheckbox = document.createElement('input');
-    caseCheckbox.type = 'checkbox';
-    caseCheckbox.id = getChannelRecognitionRuleCaseInputId(descriptor.id);
-    caseLabel.append(caseCheckbox, document.createTextNode('Ignore case'));
-
     const resetButton = document.createElement('button');
     resetButton.className = 'channel-recognition-rule-reset';
     resetButton.type = 'button';
     resetButton.textContent = 'Reset';
     resetButton.setAttribute('aria-label', `Reset ${descriptor.label} name rule`);
-    options.append(caseLabel, resetButton);
+    options.append(resetButton);
 
     const error = document.createElement('div');
     error.id = getChannelRecognitionRuleErrorId(descriptor.id);
@@ -3536,7 +3527,6 @@ export class ViewerUi implements Disposable {
 
     this.channelRecognitionRuleRows.set(descriptor.id, {
       patternInput: input,
-      caseInsensitiveCheckbox: caseCheckbox,
       resetButton,
       hint,
       error
@@ -3547,15 +3537,6 @@ export class ViewerUi implements Disposable {
       draft[descriptor.id] = {
         ...draft[descriptor.id],
         pattern: input.value
-      };
-      this.renderChannelRecognitionRuleRowValidation(descriptor.id);
-      this.renderChannelRecognitionRulePreview();
-    });
-    this.disposables.addEventListener(caseCheckbox, 'change', () => {
-      const draft = this.ensureChannelRecognitionRuleDraft();
-      draft[descriptor.id] = {
-        ...draft[descriptor.id],
-        caseInsensitive: caseCheckbox.checked
       };
       this.renderChannelRecognitionRuleRowValidation(descriptor.id);
       this.renderChannelRecognitionRulePreview();
@@ -3817,16 +3798,11 @@ function sameChannelRecognitionNameRulesForId(
   rules: ChannelRecognitionNameRules,
   defaults: ChannelRecognitionNameRules
 ): boolean {
-  return rules[id].pattern === defaults[id].pattern &&
-    rules[id].caseInsensitive === defaults[id].caseInsensitive;
+  return rules[id].pattern === defaults[id].pattern;
 }
 
 function getChannelRecognitionRulePatternInputId(id: ChannelRecognitionNameRuleId): string {
   return `channel-recognition-rule-${id.replaceAll('.', '-')}-pattern`;
-}
-
-function getChannelRecognitionRuleCaseInputId(id: ChannelRecognitionNameRuleId): string {
-  return `channel-recognition-rule-${id.replaceAll('.', '-')}-case`;
 }
 
 function getChannelRecognitionRuleHintId(id: ChannelRecognitionNameRuleId): string {

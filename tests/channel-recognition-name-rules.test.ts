@@ -49,6 +49,11 @@ describe('channel recognition name rules', () => {
       wavelength: 450,
       suffix: '450nm'
     });
+    expect(parseSpectralStokesChannelNameWithRules('s2.450NM', compiled)).toMatchObject({
+      component: 'S2',
+      wavelength: 450,
+      suffix: '450nm'
+    });
     expect(parseScalarStokesChannelNameWithRules('S3.mask', compiled)).toEqual({
       component: 'S3',
       suffix: 'mask'
@@ -57,7 +62,15 @@ describe('channel recognition name rules', () => {
       component: 'S1',
       rgb: 'G'
     });
+    expect(parseRgbStokesChannelNameWithRules('s1.g', compiled)).toEqual({
+      component: 'S1',
+      rgb: 'G'
+    });
     expect(parseMuellerMatrixChannelNameWithRules('M23.diffuse', compiled)).toEqual({
+      element: 'M23',
+      suffix: 'diffuse'
+    });
+    expect(parseMuellerMatrixChannelNameWithRules('m23.diffuse', compiled)).toEqual({
       element: 'M23',
       suffix: 'diffuse'
     });
@@ -66,37 +79,35 @@ describe('channel recognition name rules', () => {
   it('recognizes custom component aliases after applying custom regexes', () => {
     const rules = createDefaultChannelRecognitionNameRules();
     rules['component.rgb'] = {
-      pattern: '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$',
-      caseInsensitive: true
+      pattern: '^(?<base>.+)_(?:(?<r>[rR][eE][dD])|(?<g>[gG][rR][eE][eE][nN])|(?<b>[bB][lL][uU][eE])|(?<a>[aA][lL][pP][hH][aA]))$'
     };
 
     const result = recognizeLayerChannels(
-      ['beauty_red', 'beauty_green', 'beauty_blue', 'beauty_alpha'],
+      ['beauty_Red', 'beauty_GREEN', 'beauty_blue', 'beauty_Alpha'],
       { channelRecognitionNameRules: rules }
     );
 
     expect(result.candidates.find((candidate) => candidate.key === 'group:beauty')).toMatchObject({
       kind: 'componentGroup',
-      channels: ['beauty_red', 'beauty_green', 'beauty_blue', 'beauty_alpha']
+      channels: ['beauty_Red', 'beauty_GREEN', 'beauty_blue', 'beauty_Alpha']
     });
   });
 
   it('recognizes custom normal-map aliases after applying custom regexes', () => {
     const rules = createDefaultChannelRecognitionNameRules();
     rules['normal.map'] = {
-      pattern: '^(?<base>.+)_(?:(?<x>nx)|(?<y>ny)|(?<z>nz))$',
-      caseInsensitive: true
+      pattern: '^(?<base>.+)_(?:(?<x>[nN][xX])|(?<y>[nN][yY])|(?<z>[nN][zZ]))$'
     };
 
     const result = recognizeLayerChannels(
-      ['surface_nx', 'surface_ny', 'surface_nz'],
+      ['surface_NX', 'surface_nY', 'surface_Nz'],
       { channelRecognitionNameRules: rules }
     );
 
     expect(result.candidates.find((candidate) => candidate.key === 'normalMap:surface')).toMatchObject({
       kind: 'normalMap',
       ruleId: 'normal.map',
-      channels: ['surface_nx', 'surface_ny', 'surface_nz'],
+      channels: ['surface_NX', 'surface_nY', 'surface_Nz'],
       selection: {
         kind: 'channelRgb',
         colorMapping: 'normalMap'
@@ -106,8 +117,7 @@ describe('channel recognition name rules', () => {
 
   it('validates regex syntax and required named captures without losing input', () => {
     expect(validateChannelRecognitionNameRule('spectral.series', {
-      pattern: '^(?<series>.+)$',
-      caseInsensitive: false
+      pattern: '^(?<series>.+)$'
     })).toEqual([
       {
         id: 'spectral.series',
@@ -115,8 +125,7 @@ describe('channel recognition name rules', () => {
       }
     ]);
     expect(validateChannelRecognitionNameRule('normal.map', {
-      pattern: '^(?<base>.+)_(?<x>nx)$',
-      caseInsensitive: true
+      pattern: '^(?<base>.+)_(?<x>nx)$'
     })).toEqual([
       {
         id: 'normal.map',
@@ -130,8 +139,7 @@ describe('channel recognition name rules', () => {
 
     const invalid = cloneChannelRecognitionNameRules(createDefaultChannelRecognitionNameRules());
     invalid['component.rgb'] = {
-      pattern: '(?<r>R',
-      caseInsensitive: false
+      pattern: '(?<r>R'
     };
     const validation = validateChannelRecognitionNameRules(invalid);
     expect(validation.valid).toBe(false);
@@ -154,9 +162,11 @@ describe('channel recognition name rules', () => {
 
     const rules = createDefaultChannelRecognitionNameRules();
     rules['mueller.scalar'] = {
-      pattern: '^(?<element>m[0-3][0-3])(?:_(?<suffix>.+))?$',
-      caseInsensitive: true
+      pattern: '^(?<element>[mM][0-3][0-3])(?:_(?<suffix>.+))?$'
     };
+
+    store.set('openexr-viewer:channel-recognition-name-rules:v1', JSON.stringify(rules));
+    expect(readStoredChannelRecognitionNameRules()).toEqual(createDefaultChannelRecognitionNameRules());
 
     saveStoredChannelRecognitionNameRules(rules);
     expect(readStoredChannelRecognitionNameRules()).toEqual(rules);
@@ -164,8 +174,7 @@ describe('channel recognition name rules', () => {
     store.set(CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY, JSON.stringify({
       ...rules,
       'mueller.scalar': {
-        pattern: '(',
-        caseInsensitive: true
+        pattern: '('
       }
     }));
     expect(readStoredChannelRecognitionNameRules()).toEqual(createDefaultChannelRecognitionNameRules());

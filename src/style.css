@@ -792,10 +792,6 @@ output {
   flex-wrap: wrap;
 }
 
-.channel-recognition-rule-case-toggle {
-  min-height: var(--control-height-dense);
-}
-
 .channel-recognition-rule-hint,
 .channel-recognition-rule-error {
   grid-column: 2 / -1;

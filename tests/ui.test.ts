@@ -3067,7 +3067,6 @@ describe('view menu', () => {
     const editButton = document.getElementById('channel-recognition-edit-name-rules-button') as HTMLButtonElement;
     const editor = document.getElementById('channel-recognition-name-rule-editor') as HTMLElement;
     const patternInput = document.getElementById('channel-recognition-rule-component-rgb-pattern') as HTMLInputElement;
-    const caseCheckbox = document.getElementById('channel-recognition-rule-component-rgb-case') as HTMLInputElement;
     const sampleTextarea = document.getElementById('channel-recognition-preview-sample-textarea') as HTMLTextAreaElement;
     const previewResults = document.getElementById('channel-recognition-preview-results') as HTMLElement;
     const applyButton = document.getElementById('channel-recognition-apply-rules-button') as HTMLButtonElement;
@@ -3078,6 +3077,8 @@ describe('view menu', () => {
     expect(editor.classList.contains('hidden')).toBe(false);
     expect(patternInput.disabled).toBe(false);
     expect(patternInput.value).toBe(defaults['component.rgb'].pattern);
+    expect(document.getElementById('channel-recognition-rule-component-rgb-case')).toBeNull();
+    expect(editor.textContent).not.toContain('Ignore case');
 
     patternInput.value = '(?<r>R';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3090,8 +3091,6 @@ describe('view menu', () => {
 
     patternInput.value = '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
-    caseCheckbox.checked = true;
-    caseCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
     sampleTextarea.value = [
       'beauty_red',
       'beauty_green',
@@ -3106,18 +3105,14 @@ describe('view menu', () => {
     resetRowButton.click();
 
     expect(patternInput.value).toBe(defaults['component.rgb'].pattern);
-    expect(caseCheckbox.checked).toBe(defaults['component.rgb'].caseInsensitive);
 
     patternInput.value = '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
-    caseCheckbox.checked = true;
-    caseCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
     applyButton.click();
 
     expect(onChannelRecognitionNameRulesChange).toHaveBeenCalledTimes(1);
     expect(onChannelRecognitionNameRulesChange.mock.calls[0]?.[0]['component.rgb']).toEqual({
-      pattern: '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$',
-      caseInsensitive: true
+      pattern: '^(?<base>.+)_(?:(?<r>red)|(?<g>green)|(?<b>blue)|(?<a>alpha))$'
     });
   });
 

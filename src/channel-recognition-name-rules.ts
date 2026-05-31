@@ -19,7 +19,6 @@ export type RgbNameRuleComponent = 'R' | 'G' | 'B';
 
 export interface ChannelRecognitionNameRule {
   pattern: string;
-  caseInsensitive: boolean;
 }
 
 export type ChannelRecognitionNameRules = Record<ChannelRecognitionNameRuleId, ChannelRecognitionNameRule>;
@@ -98,7 +97,7 @@ export interface ParsedRgbMuellerMatrixChannelName {
   rgb: RgbNameRuleComponent;
 }
 
-export const CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY = 'openexr-viewer:channel-recognition-name-rules:v1';
+export const CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY = 'openexr-viewer:channel-recognition-name-rules:v2';
 
 export const CHANNEL_RECOGNITION_NAME_RULE_DESCRIPTORS: readonly ChannelRecognitionNameRuleDescriptor[] = [
   {
@@ -173,48 +172,37 @@ const CHANNEL_RECOGNITION_NAME_RULE_IDS = CHANNEL_RECOGNITION_NAME_RULE_DESCRIPT
 
 const DEFAULT_CHANNEL_RECOGNITION_NAME_RULES: ChannelRecognitionNameRules = {
   'component.rgb': {
-    pattern: '^(?:(?<base>.+)\\.)?(?:(?<r>R)|(?<g>G)|(?<b>B)|(?<a>A))$',
-    caseInsensitive: false
+    pattern: '^(?:(?<base>.+)\\.)?(?:(?<r>R)|(?<g>G)|(?<b>B)|(?<a>A))$'
   },
   'component.xyz': {
-    pattern: '^(?:(?<base>.+)\\.)?(?:(?<x>X)|(?<y>Y)|(?<z>Z)|(?<a>A))$',
-    caseInsensitive: false
+    pattern: '^(?:(?<base>.+)\\.)?(?:(?<x>X)|(?<y>Y)|(?<z>Z)|(?<a>A))$'
   },
   'component.uv': {
-    pattern: '^(?:(?<base>.+)\\.)?(?:(?<u>U)|(?<v>V)|(?<a>A))$',
-    caseInsensitive: false
+    pattern: '^(?:(?<base>.+)\\.)?(?:(?<u>U)|(?<v>V)|(?<a>A))$'
   },
   'normal.map': {
-    pattern: '^(?<base>N|normal|.+_normal)\\.(?:(?<x>X)|(?<y>Y)|(?<z>Z))$',
-    caseInsensitive: false
+    pattern: '^(?<base>N|normal|.+_normal)\\.(?:(?<x>X)|(?<y>Y)|(?<z>Z))$'
   },
   'spectral.series': {
-    pattern: '^(?![sS]4\\.)(?![sS][0-3]\\.\\d+\\.\\d+(?:[eE][-+]?\\d+)?nm$)(?![tT]\\.\\d+\\.\\d+(?:[eE][-+]?\\d+)?nm$)(?:(?<series>S[0-3]|T|(?!(?:S[0-4]|T)\\.)[A-Za-z_][A-Za-z0-9_.-]*?)\\.|[A-Za-z_][A-Za-z0-9_-]*?(?=\\d))?(?<wavelength>\\d+(?:[.,]\\d+)?(?:[eE][-+]?\\d+)?)nm$',
-    caseInsensitive: true
+    pattern: '^(?![sS]4\\.)(?![sS][0-3]\\.\\d+\\.\\d+(?:[eE][-+]?\\d+)?[nN][mM]$)(?![tT]\\.\\d+\\.\\d+(?:[eE][-+]?\\d+)?[nN][mM]$)(?:(?<series>[sS][0-3]|[tT]|(?!(?:[sS][0-4]|[tT])\\.)[A-Za-z_][A-Za-z0-9_.-]*?)\\.|[A-Za-z_][A-Za-z0-9_-]*?(?=\\d))?(?<wavelength>\\d+(?:[.,]\\d+)?(?:[eE][-+]?\\d+)?)[nN][mM]$'
   },
   'stokes.scalar': {
-    pattern: '^(?:(?<s0>S0)|(?<s1>S1)|(?<s2>S2)|(?<s3>S3))(?:\\.(?<suffix>.+))?$',
-    caseInsensitive: true
+    pattern: '^(?:(?<s0>[sS]0)|(?<s1>[sS]1)|(?<s2>[sS]2)|(?<s3>[sS]3))(?:\\.(?<suffix>.+))?$'
   },
   'stokes.rgb': {
-    pattern: '^(?:(?<s0>S0)|(?<s1>S1)|(?<s2>S2)|(?<s3>S3))\\.(?:(?<r>R)|(?<g>G)|(?<b>B))$',
-    caseInsensitive: true
+    pattern: '^(?:(?<s0>[sS]0)|(?<s1>[sS]1)|(?<s2>[sS]2)|(?<s3>[sS]3))\\.(?:(?<r>[rR])|(?<g>[gG])|(?<b>[bB]))$'
   },
   'stokes.spectral': {
-    pattern: '^(?:(?<s0>S0)|(?<s1>S1)|(?<s2>S2)|(?<s3>S3))\\.(?<wavelength>\\d+(?:[.,]\\d+)?(?:[eE][-+]?\\d+)?)nm$',
-    caseInsensitive: true
+    pattern: '^(?:(?<s0>[sS]0)|(?<s1>[sS]1)|(?<s2>[sS]2)|(?<s3>[sS]3))\\.(?<wavelength>\\d+(?:[.,]\\d+)?(?:[eE][-+]?\\d+)?)[nN][mM]$'
   },
   'mueller.scalar': {
-    pattern: '^(?<element>M[0-3][0-3])(?:\\.(?<suffix>.+))?$',
-    caseInsensitive: true
+    pattern: '^(?<element>[mM][0-3][0-3])(?:\\.(?<suffix>.+))?$'
   },
   'mueller.rgb': {
-    pattern: '^(?<element>M[0-3][0-3])\\.(?:(?<r>R)|(?<g>G)|(?<b>B))$',
-    caseInsensitive: true
+    pattern: '^(?<element>[mM][0-3][0-3])\\.(?:(?<r>[rR])|(?<g>[gG])|(?<b>[bB]))$'
   },
   'fallback.alphaCompanions': {
-    pattern: '^(?:(?<base>.+)\\.)?(?:(?<a>A)|(?<alpha>Alpha))$',
-    caseInsensitive: false
+    pattern: '^(?:(?<base>.+)\\.)?(?:(?<a>A)|(?<alpha>Alpha))$'
   }
 };
 
@@ -229,8 +217,7 @@ export function cloneChannelRecognitionNameRules(
   for (const id of CHANNEL_RECOGNITION_NAME_RULE_IDS) {
     const rule = rules[id] ?? DEFAULT_CHANNEL_RECOGNITION_NAME_RULES[id];
     next[id] = {
-      pattern: rule.pattern,
-      caseInsensitive: rule.caseInsensitive
+      pattern: rule.pattern
     };
   }
   return next;
@@ -247,12 +234,7 @@ export function normalizeChannelRecognitionNameRules(input: unknown): ChannelRec
     }
 
     const pattern = typeof value.pattern === 'string' ? value.pattern : defaults[id].pattern;
-    defaults[id] = {
-      pattern,
-      caseInsensitive: typeof value.caseInsensitive === 'boolean'
-        ? value.caseInsensitive
-        : defaults[id].caseInsensitive
-    };
+    defaults[id] = { pattern };
   }
 
   return defaults;
@@ -263,18 +245,14 @@ export function sameChannelRecognitionNameRules(
   b: ChannelRecognitionNameRules
 ): boolean {
   return CHANNEL_RECOGNITION_NAME_RULE_IDS.every((id) => (
-    a[id].pattern === b[id].pattern &&
-    a[id].caseInsensitive === b[id].caseInsensitive
+    a[id].pattern === b[id].pattern
   ));
 }
 
 export function serializeChannelRecognitionNameRulesKey(rules: ChannelRecognitionNameRules): string {
   const normalized = normalizeChannelRecognitionNameRules(rules);
   return CHANNEL_RECOGNITION_NAME_RULE_IDS
-    .map((id) => {
-      const rule = normalized[id];
-      return `${id}:${rule.caseInsensitive ? 'i' : '-'}:${rule.pattern}`;
-    })
+    .map((id) => `${id}:${normalized[id].pattern}`)
     .join(',');
 }
 
@@ -301,7 +279,7 @@ export function validateChannelRecognitionNameRule(
   }
 
   try {
-    new RegExp(pattern, rule.caseInsensitive ? 'i' : '');
+    new RegExp(pattern);
   } catch (error) {
     issues.push({
       id,
@@ -335,7 +313,7 @@ export function compileChannelRecognitionNameRules(
     const rule = validRules[id];
     compiled[id] = {
       source: rule,
-      regex: new RegExp(rule.pattern, rule.caseInsensitive ? 'i' : '')
+      regex: new RegExp(rule.pattern)
     };
   }
   return { rules: compiled };
