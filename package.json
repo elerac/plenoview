@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:desktop-web": "vite build --mode desktop && node scripts/stage-desktop-assets.mjs",
+    "build:desktop-web": "vite build --mode desktop && node scripts/stage-desktop-assets.mjs && node scripts/verify-desktop-assets.mjs",
     "build:e2e": "VITE_E2E=true vite build",
     "capture:thumbnail": "node scripts/capture-thumbnail.mjs",
     "lint": "eslint src tests e2e playwright.config.ts vite.config.ts vitest.config.ts --max-warnings=0",
@@ -24,9 +24,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
+    "desktop:check": "cd src-tauri && cargo fmt --check && cargo check --locked && cargo test --locked",
     "desktop:build": "tauri build"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "exrs": "^1.0.3",
     "fflate": "^0.8.2"
   },

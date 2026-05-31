@@ -40,6 +40,7 @@ import type { ChannelThumbnailService } from '../../services/channel-thumbnail-s
 import type { WebGlExrRenderer } from '../../renderer';
 import type { DisplaySelection } from '../../display-model';
 import { saveStoredInvalidValueWarningSetting } from '../../invalid-value-warning-settings';
+import type { ViewerHost } from '../../platform';
 
 interface InteractionInputBridge {
   setViewerKeyboardNavigationInput(input: ViewerKeyboardNavigationInput): void;
@@ -54,6 +55,7 @@ interface CreateViewerUiDependencies {
   getRenderCache: () => RenderCacheService;
   getRenderer: () => WebGlExrRenderer;
   getInteraction: () => InteractionInputBridge | null;
+  host: ViewerHost;
   resolveColormapExportPixels: (
     request: ExportColormapPreviewRequest | ExportColormapRequest,
     options?: { signal?: AbortSignal; previewMaxLongestEdge?: number }
@@ -74,6 +76,7 @@ export function createViewerUi({
   getRenderCache,
   getRenderer,
   getInteraction,
+  host,
   resolveColormapExportPixels,
   resolveImageExportPixels,
   onImageLoadWorkersChange,
@@ -81,12 +84,26 @@ export function createViewerUi({
 }: CreateViewerUiDependencies): ViewerUi {
   const callbacks: UiCallbacks = {
     onOpenFileClick: () => {
-      const input = document.getElementById('file-input') as HTMLInputElement;
-      input.click();
+      host.openFiles({
+        fallback: () => {
+          const input = document.getElementById('file-input') as HTMLInputElement;
+          input.click();
+        },
+        onPaths: (paths) => {
+          void getSessionController().enqueuePaths(paths);
+        }
+      });
     },
     onOpenFolderClick: () => {
-      const input = document.getElementById('folder-input') as HTMLInputElement;
-      input.click();
+      host.openFolder({
+        fallback: () => {
+          const input = document.getElementById('folder-input') as HTMLInputElement;
+          input.click();
+        },
+        onFolderPath: (path) => {
+          void getSessionController().enqueueFolderPath(path);
+        }
+      });
     },
     onExportImage: async (
       request: ExportImageRequest,
@@ -95,6 +112,7 @@ export function createViewerUi({
       await handleExportImage(request, {
         core,
         resolveImageExportPixels,
+        exportSink: host,
         isDisposed
       }, onProgress);
     },
@@ -102,6 +120,7 @@ export function createViewerUi({
       await handleCopyImageToClipboard({
         core,
         resolveImageExportPixels,
+        exportSink: host,
         isDisposed
       });
     },
@@ -112,6 +131,7 @@ export function createViewerUi({
       await handleExportScreenshotRegions(request, {
         core,
         resolveImageExportPixels,
+        exportSink: host,
         isDisposed
       }, onProgress);
     },
@@ -130,6 +150,7 @@ export function createViewerUi({
         core,
         getRenderCache,
         getRenderer,
+        exportSink: host,
         isDisposed
       }, onProgress);
     },
@@ -146,6 +167,7 @@ export function createViewerUi({
       await handleExportColormap(request, {
         core,
         resolveColormapExportPixels,
+        exportSink: host,
         isDisposed
       });
     },

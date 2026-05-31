@@ -29,6 +29,7 @@ import { registerBootstrapEffects } from './bootstrap/register-effects';
 import { createViewerInteraction, initializeViewportLifecycle } from './bootstrap/viewport-lifecycle';
 import { installE2EHooks } from './e2e-hooks';
 import { selectActiveSession } from './viewer-app-selectors';
+import { createViewerHost } from '../platform';
 import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
 
 export interface BootstrapAppOptions {
@@ -61,6 +62,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
   const initialImageLoadWorkers = readStoredImageLoadWorkers();
   setMaxDecodeWorkers(initialImageLoadWorkers);
   const loadQueue = new LoadQueueService({ maxWorkers: initialImageLoadWorkers });
+  const host = createViewerHost();
   const resolveColormapExportPixels = createColormapExportPixelsResolver({
     core,
     isDisposed
@@ -107,6 +109,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
         getRenderCache: () => getServices().renderCache,
         getRenderer: () => getServices().renderer,
         getInteraction: () => interaction,
+        host,
         resolveColormapExportPixels,
         resolveImageExportPixels,
         onImageLoadWorkersChange: (workerCount) => {
@@ -168,8 +171,38 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
       core,
       ui,
       loadQueue,
+      pathFileProvider: host.pathFileProvider,
+      onPathSessionLoaded: (entry) => {
+        host.recordRecentFile(entry);
+      },
+      onPathSessionLoadFailed: (entry, error) => {
+        host.recordPathLoadFailure(entry, error);
+      },
       isDisposed
     });
+    if (host.kind === 'tauri') {
+      const recentMenu = host.installRecentFilesMenu({
+        onOpenPath: (path) => {
+          void getServices().sessionController.enqueuePaths([path]);
+        }
+      });
+      unsubscribers.push(() => recentMenu.dispose());
+
+      void host.setupDesktopEvents({
+        onPaths: (paths) => {
+          void getServices().sessionController.enqueuePaths(paths);
+        }
+      }).then((events) => {
+        if (disposed) {
+          events.dispose();
+          return;
+        }
+        unsubscribers.push(() => events.dispose());
+      }).catch((error) => {
+        const message = error instanceof Error ? error.message : 'Failed to initialize desktop file events.';
+        core.dispatch({ type: 'errorSet', message });
+      });
+    }
     unsubscribers.push(...registerBootstrapEffects({
       core,
       ui,
@@ -221,6 +254,13 @@ function openFullViewer(core: ViewerAppCore): void {
       name: explicitName,
       state
     }), '_blank');
+    return;
+  }
+  if (source.kind === 'path') {
+    core.dispatch({
+      type: 'errorSet',
+      message: 'Opening a desktop path file in a separate browser viewer is not supported.'
+    });
     return;
   }
 

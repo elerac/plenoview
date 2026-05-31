@@ -188,6 +188,12 @@ function resolveSourceIdentity(session: OpenedImageSession): ScreenshotReproduct
       detail: session.source.url
     };
   }
+  if (session.source.kind === 'path') {
+    return {
+      kind: 'file',
+      detail: session.source.displayPath ?? session.source.path
+    };
+  }
 
   const relativePath = session.source.file.webkitRelativePath.trim();
   return {

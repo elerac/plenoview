@@ -29,6 +29,7 @@ import type {
   ViewportInsets
 } from '../types';
 import type { ViewerPanePath } from '../viewer-pane-layout';
+import type { DesktopFileEntry, PathFileProvider } from '../platform';
 
 const DESKTOP_CBOX_RGB_URL = 'https://raw.githubusercontent.com/elerac/openexr_viewer/main/public/cbox_rgb.exr';
 const CBOX_RGB_GALLERY_IMAGE = import.meta.env.MODE === 'desktop'
@@ -76,6 +77,11 @@ interface ReservedFileLoad {
   reservation: PendingOpenedImageReservation;
 }
 
+interface ReservedPathLoad {
+  entry: DesktopFileEntry;
+  reservation: PendingOpenedImageReservation;
+}
+
 interface PendingOpenedImageReservationGroup {
   priority: LoadQueuePriority;
   category: string;
@@ -99,6 +105,23 @@ interface OrderedFileLoadGroup {
   activatedLoadedFile: boolean;
 }
 
+type OrderedPathLoadResult =
+  | {
+      status: 'loaded';
+      decoded: DecodedExrImage;
+    }
+  | {
+      status: 'failed';
+      error: unknown;
+    };
+
+interface OrderedPathLoadGroup {
+  reservedLoads: ReservedPathLoad[];
+  results: Array<OrderedPathLoadResult | null>;
+  nextCommitIndex: number;
+  activatedLoadedFile: boolean;
+}
+
 export interface FolderLoadOptions {
   overrideLimits?: boolean;
 }
@@ -111,6 +134,9 @@ export interface SessionControllerDependencies {
   core: ViewerAppCore;
   loadQueue: LoadQueueService;
   decodeBytes: (bytes: Uint8Array, options?: DecodeBytesOptions) => Promise<DecodedExrImage>;
+  pathFileProvider?: PathFileProvider | null;
+  onPathSessionLoaded?: (entry: DesktopFileEntry) => void;
+  onPathSessionLoadFailed?: (entry: DesktopFileEntry, error: unknown) => void;
   getViewport: () => ViewportInfo;
   getFitInsets: () => ViewportInsets | undefined;
 }
@@ -119,6 +145,9 @@ export class SessionController implements Disposable {
   private readonly core: ViewerAppCore;
   private readonly loadQueue: LoadQueueService;
   private readonly decodeBytes: SessionControllerDependencies['decodeBytes'];
+  private readonly pathFileProvider: PathFileProvider | null;
+  private readonly onPathSessionLoaded: NonNullable<SessionControllerDependencies['onPathSessionLoaded']>;
+  private readonly onPathSessionLoadFailed: NonNullable<SessionControllerDependencies['onPathSessionLoadFailed']>;
   private readonly getViewport: SessionControllerDependencies['getViewport'];
   private readonly getFitInsets: SessionControllerDependencies['getFitInsets'];
 
@@ -134,6 +163,9 @@ export class SessionController implements Disposable {
     this.core = dependencies.core;
     this.loadQueue = dependencies.loadQueue;
     this.decodeBytes = dependencies.decodeBytes;
+    this.pathFileProvider = dependencies.pathFileProvider ?? null;
+    this.onPathSessionLoaded = dependencies.onPathSessionLoaded ?? (() => {});
+    this.onPathSessionLoadFailed = dependencies.onPathSessionLoadFailed ?? (() => {});
     this.getViewport = dependencies.getViewport;
     this.getFitInsets = dependencies.getFitInsets;
   }
@@ -153,6 +185,52 @@ export class SessionController implements Disposable {
     return this.enqueueOrderedFileLoadGroup(reservedLoads, {
       priority: 'foreground',
       category: LOAD_CATEGORY_OPEN_FILES
+    });
+  }
+
+  enqueuePaths(paths: string[], options: FileLoadOptions = {}): Promise<void> {
+    if (this.disposed || paths.length === 0) {
+      return Promise.resolve();
+    }
+    if (!this.pathFileProvider) {
+      this.core.dispatch({
+        type: 'errorSet',
+        message: 'Desktop path loading is unavailable.'
+      });
+      return Promise.resolve();
+    }
+
+    this.cancelBackgroundLoads('Foreground load superseded background work.');
+    return this.resolvePathEntries(
+      (signal) => this.pathFileProvider!.resolveExrPaths(paths, signal),
+      true,
+      (error) => {
+        for (const path of paths) {
+          this.onPathSessionLoadFailed({
+            path,
+            filename: inferFilenameFromUrl(path),
+            displayPath: path,
+            fileSizeBytes: 0
+          }, error);
+        }
+      }
+    ).then((entries) => {
+      if (this.disposed) {
+        return;
+      }
+      if (entries.length === 0) {
+        this.core.dispatch({
+          type: 'errorSet',
+          message: 'No OpenEXR files found.'
+        });
+        return;
+      }
+
+      return this.loadPathEntries(entries, {
+        priority: 'foreground',
+        category: LOAD_CATEGORY_OPEN_FILES,
+        displayName: entries.length === 1 ? options.displayName : undefined
+      });
     });
   }
 
@@ -189,6 +267,43 @@ export class SessionController implements Disposable {
       priority: 'background',
       category: LOAD_CATEGORY_FOLDER,
       groupId
+    });
+  }
+
+  enqueueFolderPath(path: string, options: FolderLoadOptions = {}): Promise<void> {
+    if (this.disposed) {
+      return Promise.resolve();
+    }
+    if (!this.pathFileProvider) {
+      this.core.dispatch({
+        type: 'errorSet',
+        message: 'Desktop folder loading is unavailable.'
+      });
+      return Promise.resolve();
+    }
+
+    const groupId = this.takeLoadGroupId('folder');
+    return this.resolvePathEntries(
+      (signal) => this.pathFileProvider!.listExrFolder(path, signal),
+      true
+    ).then((entries) => {
+      if (this.disposed) {
+        return;
+      }
+      if (entries.length === 0) {
+        this.core.dispatch({
+          type: 'errorSet',
+          message: 'No OpenEXR files found in the selected folder.'
+        });
+        return;
+      }
+
+      return this.loadPathEntries(entries, {
+        priority: 'background',
+        category: LOAD_CATEGORY_FOLDER,
+        groupId,
+        folderOptions: options
+      });
     });
   }
 
@@ -499,6 +614,117 @@ export class SessionController implements Disposable {
     });
   }
 
+  private async resolvePathEntries(
+    resolve: (signal: AbortSignal) => Promise<DesktopFileEntry[]>,
+    clearError: boolean,
+    onError?: (error: unknown) => void
+  ): Promise<DesktopFileEntry[]> {
+    const loadResource = this.beginQueuedLoad(clearError);
+    try {
+      this.throwIfStopped(this.abortController.signal);
+      const entries = await resolve(this.abortController.signal);
+      this.throwIfStopped(this.abortController.signal);
+      this.finishQueuedLoad(loadResource);
+      return entries;
+    } catch (error) {
+      this.finishQueuedLoad(loadResource, error);
+      if (isAbortError(error)) {
+        return [];
+      }
+      onError?.(error);
+      const message = error instanceof Error ? error.message : 'Failed to inspect desktop paths.';
+      this.core.dispatch({ type: 'errorSet', message });
+      return [];
+    }
+  }
+
+  private async loadPathEntries(
+    entries: DesktopFileEntry[],
+    options: LoadQueueOptions & {
+      displayName?: string;
+      folderOptions?: FolderLoadOptions;
+    }
+  ): Promise<void> {
+    if (entries.length === 0) {
+      return;
+    }
+
+    const priority = options.priority ?? 'foreground';
+    const category = options.category ?? LOAD_CATEGORY_OPEN_FILES;
+
+    if (category === LOAD_CATEGORY_FOLDER) {
+      const admission = createFolderLoadAdmission(getPathLoadStats(entries), DEFAULT_FOLDER_LOAD_LIMITS);
+      if (admission.exceeded && !options.folderOptions?.overrideLimits) {
+        this.core.dispatch({
+          type: 'errorSet',
+          message: formatFolderLimitMessage(admission.reasons)
+        });
+        return;
+      }
+    }
+
+    const reservedLoads = this.reservePendingPathLoads(entries, {
+      priority,
+      category,
+      displayName: entries.length === 1 ? options.displayName : undefined
+    });
+
+    await this.enqueueOrderedPathLoadGroup(reservedLoads, {
+      priority,
+      category,
+      groupId: options.groupId
+    });
+  }
+
+  private enqueueOrderedPathLoadGroup(
+    reservedLoads: ReservedPathLoad[],
+    options: LoadQueueOptions
+  ): Promise<void> {
+    if (reservedLoads.length === 0) {
+      return Promise.resolve();
+    }
+
+    const group: OrderedPathLoadGroup = {
+      reservedLoads,
+      results: reservedLoads.map(() => null),
+      nextCommitIndex: 0,
+      activatedLoadedFile: false
+    };
+
+    const promises = reservedLoads.map((load, index) => {
+      return this.enqueueLoadTask(async (signal) => {
+        this.throwIfStopped(signal);
+        try {
+          const decoded = await this.decodePathEntry(load.entry, signal);
+          this.throwIfStopped(signal);
+          group.results[index] = {
+            status: 'loaded',
+            decoded
+          };
+        } catch (error) {
+          if (isAbortError(error)) {
+            throw error;
+          }
+
+          this.throwIfStopped(signal);
+          group.results[index] = {
+            status: 'failed',
+            error
+          };
+        }
+
+        this.commitReadyOrderedPathLoads(group);
+      }, {
+        ...options,
+        sessionId: load.reservation.id
+      }, index === 0);
+    });
+
+    return Promise.all(promises).then(() => undefined).finally(() => {
+      this.clearPendingOpenedImageReservations(reservedLoads.map((load) => load.reservation.id));
+    });
+  }
+
   private commitReadyOrderedFileLoads(group: OrderedFileLoadGroup): void {
     while (group.nextCommitIndex < group.results.length) {
       const result = group.results[group.nextCommitIndex];
@@ -526,6 +752,46 @@ export class SessionController implements Disposable {
         continue;
       }
 
+      this.clearPendingOpenedImageReservations([load.reservation.id]);
+      if (!this.disposed) {
+        this.core.dispatch({
+          type: 'errorSet',
+          message: result.error instanceof Error ? `Load failed: ${result.error.message}` : 'Load failed.'
+        });
+      }
+    }
+  }
+
+  private commitReadyOrderedPathLoads(group: OrderedPathLoadGroup): void {
+    while (group.nextCommitIndex < group.results.length) {
+      const result = group.results[group.nextCommitIndex];
+      if (!result) {
+        return;
+      }
+
+      const load = group.reservedLoads[group.nextCommitIndex];
+      group.nextCommitIndex += 1;
+      if (!load) {
+        continue;
+      }
+
+      if (result.status === 'loaded') {
+        this.applyDecodedImage(result.decoded, load.entry.filename, load.entry.fileSizeBytes, {
+          kind: 'path',
+          path: load.entry.path,
+          ...(load.entry.displayPath ? { displayPath: load.entry.displayPath } : {})
+        }, {
+          activate: !group.activatedLoadedFile,
+          sessionId: load.reservation.id,
+          displayName: load.reservation.displayNameIsCustom ? load.reservation.displayName : undefined
+        });
+        group.activatedLoadedFile = true;
+        this.onPathSessionLoaded(load.entry);
+        this.clearPendingOpenedImageReservations([load.reservation.id]);
+        continue;
+      }
+
+      this.onPathSessionLoadFailed(load.entry, result.error);
       this.clearPendingOpenedImageReservations([load.reservation.id]);
       if (!this.disposed) {
         this.core.dispatch({
@@ -622,6 +888,56 @@ export class SessionController implements Disposable {
       existingFilenames.push(filename);
       return {
         file,
+        reservation
+      };
+    });
+
+    const sessionIds = reservedLoads.map((load) => load.reservation.id);
+    const groupId = this.takePendingReservationGroupId(options.category);
+    this.pendingOpenedImageReservationGroups.set(groupId, {
+      priority: options.priority,
+      category: options.category,
+      sessionIds
+    });
+    this.core.dispatch({
+      type: 'pendingOpenedImagesReserved',
+      reservations: reservedLoads.map((load) => load.reservation)
+    });
+
+    return reservedLoads;
+  }
+
+  private reservePendingPathLoads(
+    entries: DesktopFileEntry[],
+    options: { priority: LoadQueuePriority; category: string; displayName?: string }
+  ): ReservedPathLoad[] {
+    if (entries.length === 0) {
+      return [];
+    }
+
+    const customDisplayName = entries.length === 1 ? normalizeSessionDisplayName(options.displayName) : null;
+    const currentState = this.core.getState();
+    const existingFilenames = [
+      ...currentState.sessions.map((session) => session.filename),
+      ...currentState.pendingOpenedImages.map((reservation) => reservation.filename)
+    ];
+    const reservedLoads = entries.map((entry) => {
+      const filename = entry.filename;
+      const reservation: PendingOpenedImageReservation = {
+        id: this.core.issueSessionId(),
+        filename,
+        displayName: customDisplayName ?? buildSessionDisplayName(filename, existingFilenames),
+        ...(customDisplayName ? { displayNameIsCustom: true } : {}),
+        fileSizeBytes: entry.fileSizeBytes,
+        source: {
+          kind: 'path',
+          path: entry.path,
+          ...(entry.displayPath ? { displayPath: entry.displayPath } : {})
+        }
+      };
+      existingFilenames.push(filename);
+      return {
+        entry,
         reservation
       };
     });
@@ -777,6 +1093,25 @@ export class SessionController implements Disposable {
     return decoded;
   }
 
+  private async decodePathEntry(
+    entry: DesktopFileEntry,
+    signal: AbortSignal
+  ): Promise<DecodedExrImage> {
+    if (!this.pathFileProvider) {
+      throw new Error('Desktop path loading is unavailable.');
+    }
+
+    this.throwIfStopped(signal);
+    const file = await this.pathFileProvider.readExrFile(entry.path, signal);
+    this.throwIfStopped(signal);
+    const decoded = await this.decodeBytes(file.bytes, {
+      signal,
+      filename: entry.relativePath || file.filename || entry.filename
+    });
+    this.throwIfStopped(signal);
+    return decoded;
+  }
+
   private applyDecodedImage(
     decoded: DecodedExrImage,
     filename: string,
@@ -823,7 +1158,13 @@ export class SessionController implements Disposable {
     }
 
     try {
-      const decoded = await decodeExrFromSessionSource(session.source, session.filename, this.decodeBytes, signal);
+      const decoded = await decodeExrFromSessionSource(
+        session.source,
+        session.filename,
+        this.decodeBytes,
+        this.pathFileProvider,
+        signal
+      );
       this.throwIfStopped(signal);
       const baseState = this.getActiveSessionId() === sessionId
         ? this.core.getState().sessionState
@@ -889,6 +1230,7 @@ async function decodeExrFromSessionSource(
   source: SessionSource,
   filename: string,
   decodeBytes: (bytes: Uint8Array, options?: DecodeBytesOptions) => Promise<DecodedExrImage>,
+  pathFileProvider: PathFileProvider | null,
   signal?: AbortSignal
 ): Promise<DecodedExrImage> {
   if (source.kind === 'url') {
@@ -904,6 +1246,20 @@ async function decodeExrFromSessionSource(
     return decodeBytes(bytes, { signal, filename });
   }
 
+  if (source.kind === 'path') {
+    if (!pathFileProvider) {
+      throw new Error('Desktop path loading is unavailable.');
+    }
+    const file = await pathFileProvider.readExrFile(source.path, signal);
+    if (signal) {
+      throwIfAborted(signal, 'Session reload was aborted.');
+    }
+    return decodeBytes(file.bytes, {
+      signal,
+      filename: file.filename || filename
+    });
+  }
+
   const bytes = new Uint8Array(await source.file.arrayBuffer());
   if (signal) {
     throwIfAborted(signal, 'Session reload was aborted.');
@@ -917,6 +1273,14 @@ async function decodeExrFromSessionSource(
 function getFileDecodeName(file: File): string {
   const relativePath = file.webkitRelativePath.trim();
   return relativePath || file.name;
+}
+
+function getPathLoadStats(entries: DesktopFileEntry[]) {
+  return {
+    exrFileCount: entries.length,
+    totalBytes: entries.reduce((total, entry) => total + entry.fileSizeBytes, 0),
+    partial: false
+  };
 }
 
 function formatFolderLimitMessage(reasons: string[]): string {

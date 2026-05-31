@@ -222,6 +222,11 @@ export type SessionSource =
   | {
       kind: 'file';
       file: File;
+    }
+  | {
+      kind: 'path';
+      path: string;
+      displayPath?: string;
     };
 
 export interface OpenedImageSession {

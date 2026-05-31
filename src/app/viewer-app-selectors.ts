@@ -332,8 +332,11 @@ export function getSessionSourceDetail(session: OpenedImageSession): string {
 }
 
 function getBatchExportSourcePath(session: OpenedImageSession): string {
-  if (session.source.kind !== 'file') {
+  if (session.source.kind === 'url') {
     return session.filename;
+  }
+  if (session.source.kind === 'path') {
+    return session.source.displayPath ?? session.source.path;
   }
 
   const relativePath = session.source.file.webkitRelativePath.trim();
@@ -346,6 +349,9 @@ function getOpenedImageSourceDetail(
 ): string {
   if (source.kind === 'url') {
     return source.url;
+  }
+  if (source.kind === 'path') {
+    return source.displayPath ?? source.path;
   }
 
   const relativePath = source.file.webkitRelativePath.trim();

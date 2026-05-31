@@ -12,6 +12,7 @@ import { DisplayController } from '../../controllers/display-controller';
 import { SessionController } from '../../controllers/session-controller';
 import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 import { ViewerAppCore } from '../viewer-app-core';
+import type { DesktopFileEntry, PathFileProvider } from '../../platform';
 
 export interface BootstrapServices {
   renderer: WebGlExrRenderer;
@@ -28,6 +29,9 @@ interface CreateBootstrapServicesArgs {
   core: ViewerAppCore;
   ui: ViewerRuntimeUi;
   loadQueue: LoadQueueService;
+  pathFileProvider?: PathFileProvider | null;
+  onPathSessionLoaded?: (entry: DesktopFileEntry) => void;
+  onPathSessionLoadFailed?: (entry: DesktopFileEntry, error: unknown) => void;
   isDisposed: () => boolean;
 }
 
@@ -35,6 +39,9 @@ export function createBootstrapServices({
   core,
   ui,
   loadQueue,
+  pathFileProvider,
+  onPathSessionLoaded,
+  onPathSessionLoadFailed,
   isDisposed
 }: CreateBootstrapServicesArgs): BootstrapServices {
   const renderer = new WebGlExrRenderer(
@@ -123,6 +130,9 @@ export function createBootstrapServices({
     core,
     loadQueue,
     decodeBytes: loadExrOffMainThread,
+    pathFileProvider,
+    onPathSessionLoaded,
+    onPathSessionLoadFailed,
     getViewport: () => ui.getActiveViewerPane().viewport,
     getFitInsets: () => resolveRulerFitInsets(core.getState().rulersVisible)
   });

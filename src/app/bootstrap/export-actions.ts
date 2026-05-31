@@ -51,6 +51,7 @@ import type {
   VisualizationMode
 } from '../../types';
 import type { WebGlExrRenderer } from '../../renderer';
+import type { ExportSink } from '../../platform';
 
 type BatchPreviewRangeStrategy = 'exact' | 'sampledPreview';
 
@@ -92,18 +93,21 @@ interface ImageExportResolverDependencies {
 interface ExportImageActionDependencies {
   core: ViewerAppCore;
   resolveImageExportPixels: ReturnType<typeof createImageExportPixelsResolver>;
+  exportSink?: ExportSink;
   isDisposed: () => boolean;
 }
 
 interface CopyImageToClipboardActionDependencies {
   core: ViewerAppCore;
   resolveImageExportPixels: ReturnType<typeof createImageExportPixelsResolver>;
+  exportSink?: ExportSink;
   isDisposed: () => boolean;
 }
 
 interface ExportScreenshotRegionsActionDependencies {
   core: ViewerAppCore;
   resolveImageExportPixels: ReturnType<typeof createImageExportPixelsResolver>;
+  exportSink?: ExportSink;
   isDisposed: () => boolean;
 }
 
@@ -111,6 +115,7 @@ interface ExportImageBatchActionDependencies {
   core: ViewerAppCore;
   getRenderCache: () => RenderCacheService;
   getRenderer: () => WebGlExrRenderer;
+  exportSink?: ExportSink;
   isDisposed: () => boolean;
 }
 
@@ -139,8 +144,33 @@ interface PendingBatchEncode {
 interface ExportColormapActionDependencies {
   core: ViewerAppCore;
   resolveColormapExportPixels: ReturnType<typeof createColormapExportPixelsResolver>;
+  exportSink?: ExportSink;
   isDisposed: () => boolean;
 }
+
+const BROWSER_EXPORT_SINK: ExportSink = {
+  async saveBlob(blob, options) {
+    triggerBrowserDownload(blob, options.filename);
+    return true;
+  },
+  validateCopyPngBlob() {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      throw new Error('Copying images to the clipboard is not supported by this browser.');
+    }
+    if (typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports('image/png')) {
+      throw new Error('Copying PNG images to the clipboard is not supported by this browser.');
+    }
+  },
+  async copyPngBlob(blob) {
+    this.validateCopyPngBlob?.();
+
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'image/png': blob
+      })
+    ]);
+  }
+};
 
 export function createColormapExportPixelsResolver({
   core,
@@ -320,6 +350,7 @@ export async function handleExportImage(
   {
     core,
     resolveImageExportPixels,
+    exportSink = BROWSER_EXPORT_SINK,
     isDisposed
   }: ExportImageActionDependencies,
   onProgress?: ExportProgressReporter
@@ -367,9 +398,17 @@ export async function handleExportImage(
         [request.filename]: new Uint8Array(await blob.arrayBuffer()),
         [jsonFilename]: new Uint8Array(await createJsonBlob(metadata).arrayBuffer())
       });
-      triggerBrowserDownload(zipBlob, buildScreenshotMetadataBundleFilename(request.filename));
+      await exportSink.saveBlob(zipBlob, {
+        filename: buildScreenshotMetadataBundleFilename(request.filename),
+        title: 'Export Screenshot Metadata',
+        extensions: ['zip']
+      });
     } else {
-      triggerBrowserDownload(blob, request.filename);
+      await exportSink.saveBlob(blob, {
+        filename: request.filename,
+        title: 'Export Image',
+        extensions: ['png']
+      });
     }
   } catch (error) {
     if (isDisposed()) {
@@ -389,6 +428,7 @@ export async function handleExportImage(
 export async function handleCopyImageToClipboard({
   core,
   resolveImageExportPixels,
+  exportSink = BROWSER_EXPORT_SINK,
   isDisposed
 }: CopyImageToClipboardActionDependencies): Promise<void> {
   if (isDisposed()) {
@@ -397,12 +437,7 @@ export async function handleCopyImageToClipboard({
 
   let pngBlob: Promise<Blob> | null = null;
   try {
-    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
-      throw new Error('Copying images to the clipboard is not supported by this browser.');
-    }
-    if (typeof ClipboardItem.supports === 'function' && !ClipboardItem.supports('image/png')) {
-      throw new Error('Copying PNG images to the clipboard is not supported by this browser.');
-    }
+    exportSink.validateCopyPngBlob?.();
 
     const stateSnapshot = core.getState();
     const sourceSession = selectActiveSession(stateSnapshot);
@@ -414,11 +449,7 @@ export async function handleCopyImageToClipboard({
       return await createPngBlobFromPixels(pixels);
     })();
 
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        'image/png': pngBlob
-      })
-    ]);
+    await exportSink.copyPngBlob(await pngBlob);
     if (sourceSession) {
       assertActiveSessionCurrent(core.getState(), sourceSession);
     }
@@ -444,6 +475,7 @@ export async function handleExportScreenshotRegions(
   {
     core,
     resolveImageExportPixels,
+    exportSink = BROWSER_EXPORT_SINK,
     isDisposed
   }: ExportScreenshotRegionsActionDependencies,
   onProgress?: ExportProgressReporter
@@ -554,7 +586,11 @@ export async function handleExportScreenshotRegions(
       total: request.regions.length,
       stage: 'packaging'
     });
-    triggerBrowserDownload(createZipBlob(files), request.archiveFilename);
+    await exportSink.saveBlob(createZipBlob(files), {
+      filename: request.archiveFilename,
+      title: 'Export Screenshot Regions',
+      extensions: ['zip']
+    });
   } catch (error) {
     if (isDisposed()) {
       throw error instanceof Error ? error : createAbortError('Viewer application has been disposed.');
@@ -577,6 +613,7 @@ export async function handleExportImageBatch(
     core,
     getRenderCache,
     getRenderer,
+    exportSink = BROWSER_EXPORT_SINK,
     isDisposed
   }: ExportImageBatchActionDependencies,
   onProgress?: ExportProgressReporter
@@ -699,7 +736,11 @@ export async function handleExportImageBatch(
     if (isDisposed()) {
       throw createAbortError('Viewer application has been disposed.');
     }
-    triggerBrowserDownload(zipBlob, request.archiveFilename);
+    await exportSink.saveBlob(zipBlob, {
+      filename: request.archiveFilename,
+      title: 'Export Batch',
+      extensions: ['zip']
+    });
   } catch (error) {
     if (!exportSignal.aborted) {
       exportAbortController.abort(createAbortError('Batch export cancelled.'));
@@ -858,6 +899,7 @@ export async function handleExportColormap(
   {
     core,
     resolveColormapExportPixels,
+    exportSink = BROWSER_EXPORT_SINK,
     isDisposed
   }: ExportColormapActionDependencies
 ): Promise<void> {
@@ -874,7 +916,11 @@ export async function handleExportColormap(
       throw createAbortError('Viewer application has been disposed.');
     }
 
-    triggerBrowserDownload(blob, request.filename);
+    await exportSink.saveBlob(blob, {
+      filename: request.filename,
+      title: 'Export Colormap',
+      extensions: ['png']
+    });
   } catch (error) {
     if (isDisposed()) {
       throw error instanceof Error ? error : createAbortError('Viewer application has been disposed.');
