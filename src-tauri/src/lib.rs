@@ -71,7 +71,7 @@ pub fn run() {
 }
 
 #[tauri::command]
-fn open_exr_files_dialog(
+async fn open_exr_files_dialog(
     app: AppHandle,
     state: tauri::State<'_, DesktopState>,
 ) -> DesktopResult<Vec<DesktopFileEntry>> {
@@ -79,7 +79,7 @@ fn open_exr_files_dialog(
 }
 
 #[tauri::command]
-fn open_exr_folder_dialog(
+async fn open_exr_folder_dialog(
     app: AppHandle,
     state: tauri::State<'_, DesktopState>,
 ) -> DesktopResult<Vec<DesktopFileEntry>> {
@@ -103,7 +103,7 @@ fn read_exr_file(
 }
 
 #[tauri::command]
-fn save_export_file(
+async fn save_export_file(
     app: AppHandle,
     filename: String,
     title: Option<String>,
