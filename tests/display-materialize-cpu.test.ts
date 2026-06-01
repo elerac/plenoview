@@ -154,9 +154,26 @@ describe('display CPU materialization', () => {
       S2: [0],
       S3: [0]
     }, 'invalid-stokes-angle');
+    const stokesOptions = { maskInvalidStokesVectors: true };
 
-    const texture = buildSelectedDisplayTexture(layer, 1, 1, createStokesSelection('aolp'));
-    const sample = samplePixelValuesForDisplay(layer, 1, 1, { ix: 0, iy: 0 }, createStokesSelection('aolp'));
+    const texture = buildSelectedDisplayTexture(
+      layer,
+      1,
+      1,
+      createStokesSelection('aolp'),
+      'rgb',
+      undefined,
+      stokesOptions
+    );
+    const sample = samplePixelValuesForDisplay(
+      layer,
+      1,
+      1,
+      { ix: 0, iy: 0 },
+      createStokesSelection('aolp'),
+      'rgb',
+      stokesOptions
+    );
 
     expect(texture[0]).toBeNaN();
     expect(texture[1]).toBeNaN();
@@ -308,14 +325,25 @@ describe('display CPU materialization', () => {
       'S3.G': [0],
       'S3.B': [0]
     }, 'invalid-stokes-rgb');
+    const stokesOptions = { maskInvalidStokesVectors: true };
 
-    const texture = buildSelectedDisplayTexture(layer, 1, 1, createStokesSelection('dolp', 'stokesRgb'));
+    const texture = buildSelectedDisplayTexture(
+      layer,
+      1,
+      1,
+      createStokesSelection('dolp', 'stokesRgb'),
+      'rgb',
+      undefined,
+      stokesOptions
+    );
     const sample = samplePixelValuesForDisplay(
       layer,
       1,
       1,
       { ix: 0, iy: 0 },
-      createStokesSelection('dolp', 'stokesRgb')
+      createStokesSelection('dolp', 'stokesRgb'),
+      'rgb',
+      stokesOptions
     );
 
     expect(texture[0]).toBeNaN();
@@ -421,14 +449,25 @@ describe('display CPU materialization', () => {
       channelValues[`S3.${wavelength}nm`] = [0];
     }
     const layer = createLayerFromChannels(channelValues, 'invalid-spectral-stokes');
+    const stokesOptions = { maskInvalidStokesVectors: true };
 
-    const texture = buildSelectedDisplayTexture(layer, 1, 1, createStokesSelection('aolp', 'stokesSpectralRgb'));
+    const texture = buildSelectedDisplayTexture(
+      layer,
+      1,
+      1,
+      createStokesSelection('aolp', 'stokesSpectralRgb'),
+      'rgb',
+      undefined,
+      stokesOptions
+    );
     const sample = samplePixelValuesForDisplay(
       layer,
       1,
       1,
       { ix: 0, iy: 0 },
-      createStokesSelection('aolp', 'stokesSpectralRgb')
+      createStokesSelection('aolp', 'stokesSpectralRgb'),
+      'rgb',
+      stokesOptions
     );
 
     expect(texture[0]).toBeNaN();

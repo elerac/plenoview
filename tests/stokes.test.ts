@@ -539,26 +539,28 @@ describe('stokes', () => {
   });
 
   it('returns NaN for computed Stokes values with invalid full vectors', () => {
-    expect(computeStokesDisplayValue('aolp', 1, 2, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('dolp', 1, 2, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('dop', 1, 2, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('s1_over_s0', 1, 2, 0, 0)).toBeNaN();
+    const options = { maskInvalidStokesVectors: true };
 
-    expect(computeStokesDisplayValue('aolp', 0, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('top', 0, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('dolp', 0, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('dop', 0, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('s1_over_s0', 0, 0, 0, 0)).toBeNaN();
+    expect(computeStokesDisplayValue('aolp', 1, 2, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('dolp', 1, 2, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('dop', 1, 2, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('s1_over_s0', 1, 2, 0, 0, options)).toBeNaN();
 
-    expect(computeStokesDisplayValue('aolp', 1, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('top', 1, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDisplayValue('dolp', 1, 0, 0, 0)).toBe(0);
-    expect(computeStokesDisplayValue('dop', 1, 0, 0, 0)).toBe(0);
+    expect(computeStokesDisplayValue('aolp', 0, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('top', 0, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('dolp', 0, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('dop', 0, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('s1_over_s0', 0, 0, 0, 0, options)).toBeNaN();
 
-    expect(computeStokesDegreeModulationValue('aolp', 1, 2, 0, 0)).toBeNaN();
-    expect(computeStokesDegreeModulationValue('top', 0, 0, 0, 0)).toBeNaN();
-    expect(computeStokesDegreeModulationValue('dolp', 1, 2, 0, 0)).toBeNull();
-    expect(computeStokesDegreeModulationDisplayValue('aolp', 1, 2, 0, 0)).toBeNaN();
+    expect(computeStokesDisplayValue('aolp', 1, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('top', 1, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDisplayValue('dolp', 1, 0, 0, 0, options)).toBe(0);
+    expect(computeStokesDisplayValue('dop', 1, 0, 0, 0, options)).toBe(0);
+
+    expect(computeStokesDegreeModulationValue('aolp', 1, 2, 0, 0, options)).toBeNaN();
+    expect(computeStokesDegreeModulationValue('top', 0, 0, 0, 0, options)).toBeNaN();
+    expect(computeStokesDegreeModulationValue('dolp', 1, 2, 0, 0, options)).toBeNull();
+    expect(computeStokesDegreeModulationDisplayValue('aolp', 1, 2, 0, 0, options)).toBeNaN();
   });
 
   it('can compute finite physically invalid Stokes vectors when masking is disabled', () => {
