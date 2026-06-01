@@ -206,7 +206,12 @@
             </button>
             <div id="gallery-menu" class="app-menu-dropdown hidden" role="menu" aria-labelledby="gallery-menu-button">
               <button id="gallery-cbox-rgb-button" class="app-menu-item" type="button" role="menuitem" data-gallery-id="cbox-rgb">cbox_rgb.exr</button>
-              <button id="gallery-beachball-multipart-0001-button" class="app-menu-item" type="button" role="menuitem" data-gallery-id="beachball-multipart-0001">multipart.0001.exr</button>
+              <div class="app-menu-submenu">
+                <button id="gallery-beachball-menu-button" class="app-menu-item app-menu-submenu-trigger" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="gallery-beachball-menu">Beachball</button>
+                <div id="gallery-beachball-menu" class="app-menu-dropdown app-menu-submenu-dropdown hidden" role="menu" aria-labelledby="gallery-beachball-menu-button">
+                  <button id="gallery-beachball-multipart-0001-button" class="app-menu-item" type="button" role="menuitem" data-gallery-id="beachball-multipart-0001">multipart.0001.exr</button>
+                </div>
+              </div>
               <div class="app-menu-submenu">
                 <button id="gallery-polyhaven-menu-button" class="app-menu-item app-menu-submenu-trigger" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" aria-controls="gallery-polyhaven-menu">Poly Haven</button>
                 <div id="gallery-polyhaven-menu" class="app-menu-dropdown app-menu-submenu-dropdown hidden" role="menu" aria-labelledby="gallery-polyhaven-menu-button">

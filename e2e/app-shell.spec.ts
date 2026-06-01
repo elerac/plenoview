@@ -194,6 +194,8 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   const settingsDialogButton = page.locator('#settings-dialog-button');
   const settingsDialog = page.locator('#settings-dialog');
   const galleryCboxItem = page.getByRole('menuitem', { name: 'cbox_rgb.exr', exact: true });
+  const galleryBeachballItem = page.locator('#gallery-beachball-menu-button');
+  const galleryBeachballMenu = page.locator('#gallery-beachball-menu');
   const galleryMultipartItem = page.getByRole('menuitem', { name: 'multipart.0001.exr', exact: true });
   const galleryPolyHavenItem = page.locator('#gallery-polyhaven-menu-button');
   const galleryPolyHavenMenu = page.locator('#gallery-polyhaven-menu');
@@ -292,8 +294,15 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   await expect(galleryMenu).toBeVisible();
   await expect(galleryCboxItem).toBeVisible();
   await expect(galleryCboxItem).toBeEnabled();
+  await expect(galleryBeachballItem).toBeVisible();
+  await expect(galleryBeachballItem).toBeEnabled();
+  await expect(galleryBeachballMenu).toBeHidden();
+  await galleryBeachballItem.click();
+  await expect(galleryBeachballMenu).toBeVisible();
   await expect(galleryMultipartItem).toBeVisible();
   await expect(galleryMultipartItem).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(galleryBeachballMenu).toBeHidden();
   await expect(galleryPolyHavenItem).toBeVisible();
   await expect(galleryPolyHavenItem).toBeEnabled();
   await expect(galleryPolyHavenMenu).toBeHidden();

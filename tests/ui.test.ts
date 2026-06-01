@@ -2506,7 +2506,7 @@ describe('view menu', () => {
 
     expect(galleryTopLevelLabels).toEqual([
       'cbox_rgb.exr',
-      'multipart.0001.exr',
+      'Beachball',
       'Poly Haven',
       'KAIST Hyperspectral',
       'Polanalyser'
@@ -3682,6 +3682,10 @@ describe('view menu', () => {
 
     new ViewerUi(createUiCallbacks());
     const galleryButton = document.getElementById('gallery-menu-button') as HTMLButtonElement;
+    const beachballButton = document.getElementById('gallery-beachball-menu-button') as HTMLButtonElement;
+    const beachballRoot = beachballButton.closest('.app-menu-submenu') as HTMLElement;
+    const beachballMenu = document.getElementById('gallery-beachball-menu') as HTMLElement;
+    const multipartButton = document.getElementById('gallery-beachball-multipart-0001-button') as HTMLButtonElement;
     const polyHavenButton = document.getElementById('gallery-polyhaven-menu-button') as HTMLButtonElement;
     const polyHavenRoot = polyHavenButton.closest('.app-menu-submenu') as HTMLElement;
     const polyHavenMenu = document.getElementById('gallery-polyhaven-menu') as HTMLElement;
@@ -3699,12 +3703,31 @@ describe('view menu', () => {
 
     galleryButton.click();
     expectTopMenuOpen('gallery-menu-button', 'gallery-menu');
+    expect(beachballMenu.classList.contains('hidden')).toBe(true);
+    expect(beachballButton.getAttribute('aria-expanded')).toBe('false');
     expect(polyHavenMenu.classList.contains('hidden')).toBe(true);
     expect(polyHavenButton.getAttribute('aria-expanded')).toBe('false');
     expect(kaistMenu.classList.contains('hidden')).toBe(true);
     expect(kaistButton.getAttribute('aria-expanded')).toBe('false');
     expect(polanalyserMenu.classList.contains('hidden')).toBe(true);
     expect(polanalyserButton.getAttribute('aria-expanded')).toBe('false');
+
+    beachballRoot.dispatchEvent(new Event('pointerenter'));
+    expect(beachballMenu.classList.contains('hidden')).toBe(false);
+    expect(beachballButton.getAttribute('aria-expanded')).toBe('true');
+
+    beachballRoot.dispatchEvent(new MouseEvent('pointerleave', { relatedTarget: document.body }));
+    expect(beachballMenu.classList.contains('hidden')).toBe(true);
+    expect(beachballButton.getAttribute('aria-expanded')).toBe('false');
+
+    beachballButton.focus();
+    beachballButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(beachballMenu.classList.contains('hidden')).toBe(false);
+    expect(document.activeElement).toBe(multipartButton);
+
+    multipartButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    expect(beachballMenu.classList.contains('hidden')).toBe(true);
+    expect(document.activeElement).toBe(beachballButton);
 
     polyHavenRoot.dispatchEvent(new Event('pointerenter'));
     expect(polyHavenMenu.classList.contains('hidden')).toBe(false);
