@@ -1,4 +1,4 @@
-# OpenEXR Viewer (Web, Browser-based)
+# OpenEXR Viewer
 
 Browser-based OpenEXR viewer for graphics/computer-vision workflows, with tev-like interaction and exact value inspection.
 
