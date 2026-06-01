@@ -456,7 +456,7 @@ export function createViewerUi({
   return new ViewerUi(callbacks, host.appFullscreen);
 }
 
-function promoteActiveChannelThumbnail(
+export function promoteActiveChannelThumbnail(
   core: ViewerAppCore,
   getChannelThumbnailService: () => ChannelThumbnailService,
   selection: DisplaySelection

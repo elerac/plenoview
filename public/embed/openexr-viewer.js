@@ -13,6 +13,7 @@
     'height',
     'viewer-url',
     'source-origin',
+    'bottom-panel',
     'auto-load',
     'autoload'
   ];
@@ -143,6 +144,7 @@
       const view = normalizeNonEmpty(this.getAttribute('view'));
       const name = normalizeNonEmpty(this.getAttribute('name'));
       const autoLoad = this.getAutoLoad();
+      const bottomPanel = normalizeEmbedBottomPanel(this.getAttribute('bottom-panel'));
       const srcUsesParentFetch = src && shouldParentFetchSource(src, this.getSourceOrigin());
 
       url.searchParams.set('ui', 'embed');
@@ -157,6 +159,9 @@
       }
       if (name) {
         url.searchParams.set('name', name);
+      }
+      if (bottomPanel !== 'probe') {
+        url.searchParams.set('bottomPanel', bottomPanel);
       }
       return url.toString();
     }
@@ -379,6 +384,7 @@
       view: options.view,
       'viewer-url': options.viewerUrl,
       'source-origin': options.sourceOrigin,
+      'bottom-panel': hasOwn(options, 'bottomPanel') ? normalizeEmbedBottomPanel(options.bottomPanel) : undefined,
       'auto-load': hasOwn(options, 'autoLoad') ? serializeAutoLoad(options.autoLoad) : undefined
     };
 
@@ -437,6 +443,15 @@
 
   function serializeAutoLoad(value) {
     return parseAutoLoad(value) ? 'true' : 'false';
+  }
+
+  function normalizeEmbedBottomPanel(value) {
+    const normalized = normalizeNonEmpty(value);
+    if (normalized === null) {
+      return 'probe';
+    }
+    const lower = normalized.toLowerCase();
+    return lower === 'channels' || lower === 'none' ? lower : 'probe';
   }
 
   function parseAutoLoad(value) {

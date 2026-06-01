@@ -198,8 +198,9 @@ Common attributes:
 | `width` / `height` | CSS sizes; numeric values become pixels. Defaults: `100%` / `320px`. |
 | `viewer-url` | Viewer deployment URL, needed if the wrapper script is served from another location. |
 | `source-origin` | Loading policy: `auto`, `parent`, or `viewer`. |
+| `bottom-panel` | Embed bottom content: `probe`, `channels`, or `none`. Defaults to `probe`. |
 
-The embed supports pan, zoom, hover probe, and an `Open full viewer` button.
+The embed supports pan, zoom, hover probe or compact channel selection, and an `Open full viewer` button.
 
 ### JavaScript API
 
@@ -214,6 +215,7 @@ Use `OpenExrViewer.create(target, options)` for dynamic sources:
     name: 'Cornell Box',
     width: 640,
     height: 420,
+    bottomPanel: 'channels',
     autoLoad: true,
     viewerUrl: 'https://elerac.github.io/openexr_viewer/app/'
   });

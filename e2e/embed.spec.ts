@@ -48,6 +48,15 @@ test('defers embed URL loads when autoLoad is false', async ({ page }) => {
   });
 });
 
+test('shows compact channel selection in the embed bottom panel', async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 360 });
+  await gotoEmbed(page, '/app/?ui=embed&src=%2Fcbox_rgb.exr&bottomPanel=channels');
+
+  await expect(page.locator('.embed-probe')).toBeHidden();
+  await expect(page.locator('.embed-channel-panel')).toBeVisible();
+  await expect(page.locator('.embed-channel-panel [role="option"]').first()).toBeVisible();
+});
+
 async function gotoEmbed(page: Page, path: string): Promise<void> {
   await page.goto(path);
   await expect(page.locator('#gl-canvas')).toBeVisible();

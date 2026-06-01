@@ -29,6 +29,7 @@ describe('embed runtime', () => {
       name: 'Beauty pass',
       view: null,
       autoLoad: true,
+      bottomPanel: 'probe',
       handoffId: null,
       state: null
     }, urlApp);
@@ -53,6 +54,7 @@ describe('embed runtime', () => {
       name: 'Beauty pass',
       view: 'panorama',
       autoLoad: false,
+      bottomPanel: 'probe',
       handoffId: null,
       state: null
     }, urlApp);

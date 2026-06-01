@@ -9,13 +9,13 @@ import {
   createEmbedViewerStateSnapshot,
   type EmbedViewerStateSnapshot
 } from '../embed/embed-state';
-import { buildFullViewerUrl } from '../embed/embed-params';
+import { buildFullViewerUrl, type EmbedBottomPanelMode } from '../embed/embed-params';
 import {
   createLocalFileHandoffId,
   startLocalFileHandoffSender
 } from '../embed/local-file-handoff';
 import { ViewerAppCore } from './viewer-app-core';
-import { createViewerUi } from './bootstrap/create-ui';
+import { createViewerUi, promoteActiveChannelThumbnail } from './bootstrap/create-ui';
 import {
   createBootstrapServices,
   disposeBootstrapServices,
@@ -34,6 +34,7 @@ import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
 
 export interface BootstrapAppOptions {
   mode?: 'full' | 'embed';
+  embedBottomPanel?: EmbedBottomPanelMode;
 }
 
 export interface AppHandle {
@@ -105,6 +106,11 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
   };
   const ui: ViewerRuntimeUi = options.mode === 'embed'
     ? new EmbedViewerUi({
+        bottomPanel: options.embedBottomPanel ?? 'probe',
+        onChannelSelection: (selection) => {
+          promoteActiveChannelThumbnail(core, () => getServices().channelThumbnailService, selection);
+          void getServices().displayController.applyDisplaySelection(selection);
+        },
         onOpenFull: () => {
           app.openFullViewer();
         }

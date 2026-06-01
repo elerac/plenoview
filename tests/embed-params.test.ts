@@ -25,6 +25,7 @@ describe('embed params', () => {
       src: 'https://example.com/a.exr',
       view: 'image',
       autoLoad: true,
+      bottomPanel: 'probe',
       handoffId: 'local-1',
       state
     });
@@ -69,5 +70,21 @@ describe('embed params', () => {
         hash: ''
       }).autoLoad).toBe(false);
     }
+  });
+
+  it('parses embed bottom panel modes', () => {
+    expect(parseViewerBootstrapParams({ search: '', hash: '' }).bottomPanel).toBe('probe');
+
+    for (const value of ['probe', 'channels', 'none']) {
+      expect(parseViewerBootstrapParams({
+        search: `?bottomPanel=${encodeURIComponent(value)}`,
+        hash: ''
+      }).bottomPanel).toBe(value);
+    }
+
+    expect(parseViewerBootstrapParams({
+      search: '?bottomPanel=unexpected',
+      hash: ''
+    }).bottomPanel).toBe('probe');
   });
 });

@@ -5,12 +5,15 @@ import {
 } from './embed-state';
 import type { ViewerSessionState } from '../types';
 
+export type EmbedBottomPanelMode = 'probe' | 'channels' | 'none';
+
 export interface ViewerBootstrapParams {
   uiMode: 'full' | 'embed';
   src: string | null;
   name: string | null;
   view: ViewerSessionState['viewerMode'] | null;
   autoLoad: boolean;
+  bottomPanel: EmbedBottomPanelMode;
   handoffId: string | null;
   state: EmbedViewerStateSnapshot | null;
 }
@@ -31,6 +34,7 @@ export function parseViewerBootstrapParams(location: Pick<Location, 'search' | '
     name: normalizeNonEmpty(params.get('name')),
     view: parseViewerMode(params.get('view')),
     autoLoad: parseBooleanParam(params.get('autoLoad') ?? params.get('autoload')),
+    bottomPanel: parseEmbedBottomPanelMode(params.get('bottomPanel')),
     handoffId: normalizeNonEmpty(params.get('handoff')),
     state: decodeEmbedViewerState(params.get('state'))
   };
@@ -88,6 +92,14 @@ function normalizeNonEmpty(value: string | null): string | null {
 
 function parseViewerMode(value: string | null): ViewerSessionState['viewerMode'] | null {
   return value === 'image' || value === 'panorama' || value === 'depth' ? value : null;
+}
+
+function parseEmbedBottomPanelMode(value: string | null): EmbedBottomPanelMode {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  if (normalized === 'channels' || normalized === 'none') {
+    return normalized;
+  }
+  return 'probe';
 }
 
 function parseBooleanParam(value: string | null): boolean {

@@ -60,6 +60,7 @@ test('serves the project page with app and desktop download calls to action @smo
   await expect(stokesEmbed).toHaveAttribute('name', 'Owl Spheres Linear Stokes');
   await expect(stokesEmbed).toHaveAttribute('width', '100%');
   await expect(stokesEmbed).toHaveAttribute('height', '420');
+  await expect(stokesEmbed).toHaveAttribute('bottom-panel', 'channels');
   await expect(stokesEmbed).toHaveAttribute('auto-load', 'false');
 
   const iframeSrc = await cornellEmbed.evaluate((element) => {
@@ -77,6 +78,7 @@ test('serves the project page with app and desktop download calls to action @smo
   expect(stokesIframeSrc).toContain('/app/?ui=embed');
   expect(stokesIframeSrc).toContain(`src=${encodeURIComponent(OWL_SPHERES_LINEAR_STOKES_URL)}`);
   expect(stokesIframeSrc).toContain('name=Owl+Spheres+Linear+Stokes');
+  expect(stokesIframeSrc).toContain('bottomPanel=channels');
   expect(stokesIframeSrc).toContain('autoLoad=false');
 
   const embeddedViewer = cornellEmbed.frameLocator('iframe');

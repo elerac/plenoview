@@ -1,9 +1,22 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmbedViewerUi } from '../src/embed/embed-viewer-ui';
 
 describe('EmbedViewerUi', () => {
+  beforeEach(() => {
+    class ResizeObserverMock {
+      observe(): void {}
+      disconnect(): void {}
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
   it('creates a single-pane viewer surface with inactive screenshot selection', () => {
     const ui = new EmbedViewerUi({ onOpenFull: vi.fn() });
 
@@ -132,6 +145,96 @@ describe('EmbedViewerUi', () => {
     expect(document.querySelector('.embed-probe')?.classList.contains('is-empty')).toBe(false);
     expect(document.querySelector<HTMLElement>('.embed-probe-swatch')?.style.backgroundColor).toBe('rgb(255, 0, 0)');
     expect(document.querySelector('.embed-probe-values')?.textContent).toContain('R 1.00');
+
+    ui.dispose();
+  });
+
+  it('renders compact channel selection in channels bottom mode', () => {
+    const onChannelSelection = vi.fn();
+    const ui = new EmbedViewerUi({
+      bottomPanel: 'channels',
+      onChannelSelection,
+      onOpenFull: vi.fn()
+    });
+    const selected = {
+      kind: 'channelMono' as const,
+      channel: 'R',
+      alpha: null
+    };
+    const nextSelection = {
+      kind: 'channelMono' as const,
+      channel: 'G',
+      alpha: null
+    };
+
+    ui.setRgbGroupOptions(['R', 'G'], selected, [
+      {
+        value: 'channel:R',
+        label: 'R',
+        meta: '',
+        swatches: ['#f00'],
+        selection: selected,
+        selectionKey: 'channelMono:R',
+        recognitionKey: 'channel:R',
+        mergedParentKey: null,
+        splitChildKeys: [],
+        mergedOrder: 0,
+        splitOrder: 0,
+        thumbnailDataUrl: null
+      },
+      {
+        value: 'channel:G',
+        label: 'G',
+        meta: '',
+        swatches: ['#0f0'],
+        selection: nextSelection,
+        selectionKey: 'channelMono:G',
+        recognitionKey: 'channel:G',
+        mergedParentKey: null,
+        splitChildKeys: [],
+        mergedOrder: 1,
+        splitOrder: 1,
+        thumbnailDataUrl: null
+      }
+    ], 'session-1:0');
+
+    const panel = document.querySelector('.embed-channel-panel');
+    const probe = document.querySelector('.embed-probe');
+    const labels = Array.from(document.querySelectorAll('.channel-thumbnail-tile-label')).map((item) => item.textContent);
+    expect(panel?.classList.contains('hidden')).toBe(false);
+    expect(probe?.classList.contains('hidden')).toBe(true);
+    expect(labels).toEqual(['R', 'G']);
+    expect(document.querySelector<HTMLButtonElement>('[data-channel-value="channel:R"]')?.getAttribute('aria-selected')).toBe('true');
+
+    const nextButton = document.querySelector<HTMLButtonElement>('[data-channel-value="channel:G"]');
+    ui.setLoading(true, true);
+    expect(nextButton?.disabled).toBe(true);
+    ui.setLoading(false, false);
+    expect(nextButton?.disabled).toBe(false);
+
+    nextButton?.click();
+    expect(onChannelSelection).toHaveBeenCalledWith(nextSelection);
+
+    ui.dispose();
+  });
+
+  it('hides bottom content in none mode', () => {
+    const ui = new EmbedViewerUi({
+      bottomPanel: 'none',
+      onOpenFull: vi.fn()
+    });
+
+    ui.setProbeReadout(
+      'Hover',
+      { x: 2, y: 3, values: { R: 1 } },
+      {
+        cssColor: 'rgb(255, 0, 0)',
+        displayValues: [{ label: 'R', value: '1.00' }]
+      }
+    );
+
+    expect(document.querySelector('.embed-probe')?.classList.contains('hidden')).toBe(true);
+    expect(document.querySelector('.embed-channel-panel')?.classList.contains('hidden')).toBe(true);
 
     ui.dispose();
   });

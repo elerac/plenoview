@@ -40,6 +40,7 @@ interface OpenExrViewerApiForTest {
     height?: number | string;
     viewerUrl?: string;
     sourceOrigin?: string;
+    bottomPanel?: string;
     autoLoad?: boolean | string;
   }): OpenExrViewerControllerForTest;
 }
@@ -92,7 +93,8 @@ describe('embed wrapper public script', () => {
       name: 'Beauty pass',
       width: 300,
       height: 240,
-      view: 'panorama'
+      view: 'panorama',
+      bottomPanel: 'channels'
     });
 
     const iframe = getViewerIframe(controller.element);
@@ -101,6 +103,7 @@ describe('embed wrapper public script', () => {
     expect(controller.element.parentElement?.id).toBe('target');
     expect(controller.element.style.width).toBe('300px');
     expect(controller.element.getAttribute('name')).toBe('Beauty pass');
+    expect(controller.element.getAttribute('bottom-panel')).toBe('channels');
     expect(iframe.style.height).toBe('240px');
     expect(iframe.allowFullscreen).toBe(false);
     expect(iframeUrl.pathname).toBe('/app/');
@@ -108,6 +111,22 @@ describe('embed wrapper public script', () => {
     expect(iframeUrl.searchParams.get('src')).toBe('https://example.com/render.exr');
     expect(iframeUrl.searchParams.get('name')).toBe('Beauty pass');
     expect(iframeUrl.searchParams.get('view')).toBe('panorama');
+    expect(iframeUrl.searchParams.get('bottomPanel')).toBe('channels');
+  });
+
+  it('passes bottom-panel markup through and omits the default probe query param', () => {
+    const defaultElement = document.createElement('openexr-viewer');
+    defaultElement.setAttribute('src', 'https://example.com/default.exr');
+    document.body.append(defaultElement);
+
+    expect(new URL(getViewerIframe(defaultElement).src).searchParams.get('bottomPanel')).toBeNull();
+
+    const noneElement = document.createElement('openexr-viewer');
+    noneElement.setAttribute('src', 'https://example.com/hidden.exr');
+    noneElement.setAttribute('bottom-panel', 'none');
+    document.body.append(noneElement);
+
+    expect(new URL(getViewerIframe(noneElement).src).searchParams.get('bottomPanel')).toBe('none');
   });
 
   it('parent-fetches relative sources and posts them to the iframe', async () => {

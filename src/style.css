@@ -269,6 +269,26 @@ body.embed-body {
   white-space: nowrap;
 }
 
+.embed-channel-panel {
+  position: absolute;
+  z-index: 20;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  height: 34px;
+  min-height: 34px;
+  border: 1px solid rgba(215, 221, 232, 0.22);
+  border-radius: 4px;
+  background: rgba(5, 7, 10, 0.78);
+  color: var(--text);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.embed-channel-panel .channel-thumbnail-strip {
+  height: 100%;
+}
+
 button,
 select,
 input,

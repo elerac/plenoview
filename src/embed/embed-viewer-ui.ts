@@ -1,5 +1,18 @@
 import { formatProbeCoordinates } from '../ui/probe-readout';
 import type { ViewerRuntimeUi, ScreenshotSelectionInteractionState } from '../ui/viewer-runtime-ui';
+import { ChannelThumbnailStrip } from '../ui/channel-thumbnail-strip';
+import {
+  buildChannelViewStacks,
+  findSelectedChannelViewItem,
+  pruneExpandedChannelStackKeys,
+  selectStackedChannelViewItems,
+  type ChannelViewStackInfo,
+  type ChannelViewStackedThumbnailItem
+} from '../channel-view-items';
+import {
+  cloneDisplaySelection,
+  sameDisplaySelection
+} from '../display-model';
 import type { ViewportClientRect } from '../interaction/image-geometry';
 import type {
   ScreenshotSelectionHandle,
@@ -39,12 +52,27 @@ import type {
   ViewerPaneRenderInfo
 } from '../viewer-pane-layout';
 import type { ChannelThumbnailOptionItem } from '../ui/viewer-ui';
+import type { EmbedBottomPanelMode } from './embed-params';
 
 interface EmbedViewerUiCallbacks {
+  bottomPanel?: EmbedBottomPanelMode;
+  onChannelSelection?: (selection: DisplaySelection) => void;
   onOpenFull: () => void;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const EMBED_CHANNEL_PANEL_STOP_EVENTS = [
+  'pointerdown',
+  'pointermove',
+  'pointerup',
+  'pointercancel',
+  'click',
+  'dblclick',
+  'contextmenu',
+  'wheel',
+  'keydown',
+  'keyup'
+];
 
 export class EmbedViewerUi implements ViewerRuntimeUi {
   readonly viewerContainer: HTMLElement;
@@ -61,13 +89,23 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
   private readonly probeSwatch: HTMLElement;
   private readonly probeCoords: HTMLElement;
   private readonly probeValues: HTMLElement;
+  private readonly channelPanel: HTMLElement;
+  private readonly channelThumbnailStripElement: HTMLElement;
+  private readonly channelThumbnailStrip: ChannelThumbnailStrip | null;
   private readonly deferredLoadButton: HTMLButtonElement;
   private readonly openFullButton: HTMLButtonElement;
+  private readonly bottomPanelMode: EmbedBottomPanelMode;
+  private channelThumbnailItems: ChannelThumbnailOptionItem[] = [];
+  private rgbGroupChannelNames: string[] = [];
+  private currentChannelSelection: DisplaySelection | null = null;
+  private channelStackScopeKey = 'default';
+  private readonly expandedChannelStackKeysByScope = new Map<string, Set<string>>();
   private deferredLoadHandler: (() => void | Promise<void>) | null = null;
   private viewport = { width: 1, height: 1 };
   private disposed = false;
 
   constructor(private readonly callbacks: EmbedViewerUiCallbacks) {
+    this.bottomPanelMode = callbacks.bottomPanel ?? 'probe';
     document.body.replaceChildren();
     document.body.classList.add('embed-body');
 
@@ -128,6 +166,35 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.probeValues = document.createElement('span');
     this.probeValues.className = 'embed-probe-values';
     this.probe.append(this.probeSwatch, this.probeCoords, this.probeValues);
+    this.probe.classList.toggle('hidden', this.bottomPanelMode !== 'probe');
+
+    this.channelPanel = document.createElement('aside');
+    this.channelPanel.className = 'embed-channel-panel bottom-panel is-collapsed hidden';
+    this.channelPanel.setAttribute('aria-label', 'Channel selection');
+    this.channelThumbnailStripElement = document.createElement('div');
+    this.channelThumbnailStripElement.className = 'channel-thumbnail-strip';
+    this.channelThumbnailStripElement.setAttribute('role', 'listbox');
+    this.channelThumbnailStripElement.setAttribute('aria-label', 'Channel thumbnails');
+    this.channelPanel.append(this.channelThumbnailStripElement);
+    for (const eventName of EMBED_CHANNEL_PANEL_STOP_EVENTS) {
+      this.channelPanel.addEventListener(eventName, stopViewerInteractionEvent);
+    }
+    this.channelThumbnailStrip = this.bottomPanelMode === 'channels'
+      ? new ChannelThumbnailStrip({
+          channelThumbnailStrip: this.channelThumbnailStripElement,
+          viewerContainer: this.viewerContainer
+        }, {
+          onChannelViewChange: (value) => {
+            this.handleChannelViewValueChange(value);
+          },
+          onChannelStackToggle: (stackKey) => {
+            this.handleChannelStackToggle(stackKey);
+          },
+          onCollapsedContentAvailabilityChange: (available) => {
+            this.channelPanel.classList.toggle('hidden', !available);
+          }
+        })
+      : null;
 
     this.viewerContainer.append(
       this.glCanvas,
@@ -138,7 +205,8 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
       toolbar,
       this.deferredLoadButton,
       this.status,
-      this.probe
+      this.probe,
+      this.channelPanel
     );
     this.root.append(this.viewerContainer);
     document.body.append(this.root);
@@ -155,6 +223,10 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.deferredLoadButton.removeEventListener('click', this.handleDeferredLoadClick);
     this.openFullButton.removeEventListener('pointerdown', stopViewerInteractionEvent);
     this.openFullButton.removeEventListener('click', this.handleOpenFullClick);
+    for (const eventName of EMBED_CHANNEL_PANEL_STOP_EVENTS) {
+      this.channelPanel.removeEventListener(eventName, stopViewerInteractionEvent);
+    }
+    this.channelThumbnailStrip?.dispose();
     document.body.classList.remove('embed-body');
   }
 
@@ -175,10 +247,12 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.status.textContent = message;
   }
 
-  setLoading(loading: boolean): void {
+  setLoading(loading: boolean, viewerBlocked = loading): void {
     if (this.disposed) {
       return;
     }
+
+    this.channelThumbnailStrip?.setLoading(viewerBlocked);
 
     if (loading) {
       this.deferredLoadButton.classList.add('hidden');
@@ -328,12 +402,36 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
   setLayerOptions(_items: ViewerLayerOption[], _activeIndex: number): void {}
   setMetadata(_metadata: ExrMetadataEntry[] | null): void {}
   setRgbGroupOptions(
-    _channelNames: string[],
-    _selected: DisplaySelection | null,
-    _channelThumbnailItems: ChannelThumbnailOptionItem[] = [],
-    _channelStackScopeKey = 'default'
-  ): void {}
-  clearImageBrowserPanels(): void {}
+    channelNames: string[],
+    selected: DisplaySelection | null,
+    channelThumbnailItems: ChannelThumbnailOptionItem[] = [],
+    channelStackScopeKey = 'default'
+  ): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.rgbGroupChannelNames = [...channelNames];
+    this.channelThumbnailItems = [...channelThumbnailItems];
+    this.channelStackScopeKey = channelStackScopeKey;
+    this.pruneExpandedChannelStackKeys();
+    this.expandChannelStackForSelection(selected);
+    this.currentChannelSelection = cloneDisplaySelection(selected);
+    this.renderChannelViewControls();
+  }
+
+  clearImageBrowserPanels(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.rgbGroupChannelNames = [];
+    this.channelThumbnailItems = [];
+    this.currentChannelSelection = null;
+    this.channelStackScopeKey = 'default';
+    this.channelThumbnailStrip?.clearForNoImage();
+    this.channelPanel.classList.add('hidden');
+  }
 
   setProbeReadout(
     mode: 'Hover' | 'Locked',
@@ -354,6 +452,139 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
   setRoiReadout(_readout: { roi: ImageRoi | null; stats: RoiStats | null }): void {}
   setViewerStateReadout(_readout: ViewerStateReadoutModel): void {}
   setImageStats(_readout: ImageStatsReadoutModel): void {}
+
+  private handleChannelViewValueChange(value: string): void {
+    const item = this.channelThumbnailItems.find((entry) => entry.value === value);
+    if (!item) {
+      return;
+    }
+
+    this.currentChannelSelection = cloneDisplaySelection(item.selection);
+    this.renderChannelViewControls();
+    this.callbacks.onChannelSelection?.(item.selection);
+  }
+
+  private handleChannelStackToggle(stackKey: string): void {
+    const stack = this.getChannelViewStacks().find((entry) => entry.key === stackKey);
+    if (!stack) {
+      return;
+    }
+
+    const itemByValue = this.getChannelThumbnailItemsByValue();
+    const parent = itemByValue.get(stack.parentValue) ?? null;
+    const children = stack.childValues
+      .map((value) => itemByValue.get(value) ?? null)
+      .filter((item): item is ChannelThumbnailOptionItem => item !== null);
+    if (!parent || children.length === 0) {
+      return;
+    }
+
+    const expandedStackKeys = new Set(this.getExpandedChannelStackKeys());
+    const expanded = expandedStackKeys.has(stack.key);
+    let remappedSelection: DisplaySelection | null = null;
+
+    if (expanded) {
+      expandedStackKeys.delete(stack.key);
+      if (children.some((child) => sameDisplaySelection(child.selection, this.currentChannelSelection))) {
+        remappedSelection = parent.selection;
+      }
+    } else {
+      expandedStackKeys.add(stack.key);
+      if (sameDisplaySelection(parent.selection, this.currentChannelSelection)) {
+        remappedSelection = children[0]?.selection ?? null;
+      }
+    }
+
+    this.setExpandedChannelStackKeys(expandedStackKeys);
+    if (remappedSelection) {
+      this.currentChannelSelection = cloneDisplaySelection(remappedSelection);
+    }
+    this.renderChannelViewControls();
+
+    if (remappedSelection) {
+      this.callbacks.onChannelSelection?.(remappedSelection);
+    }
+  }
+
+  private getVisibleChannelViewItems(): ChannelViewStackedThumbnailItem[] {
+    return selectStackedChannelViewItems(
+      this.rgbGroupChannelNames,
+      this.channelThumbnailItems,
+      this.getExpandedChannelStackKeys()
+    );
+  }
+
+  private getChannelViewStacks(): ChannelViewStackInfo[] {
+    return buildChannelViewStacks(this.rgbGroupChannelNames, this.channelThumbnailItems);
+  }
+
+  private getChannelThumbnailItemsByValue(): Map<string, ChannelThumbnailOptionItem> {
+    return new Map(this.channelThumbnailItems.map((item) => [item.value, item]));
+  }
+
+  private getExpandedChannelStackKeys(): Set<string> {
+    const existing = this.expandedChannelStackKeysByScope.get(this.channelStackScopeKey);
+    if (existing) {
+      return existing;
+    }
+
+    const created = new Set<string>();
+    this.expandedChannelStackKeysByScope.set(this.channelStackScopeKey, created);
+    return created;
+  }
+
+  private setExpandedChannelStackKeys(stackKeys: ReadonlySet<string>): void {
+    this.expandedChannelStackKeysByScope.set(this.channelStackScopeKey, new Set(stackKeys));
+  }
+
+  private pruneExpandedChannelStackKeys(): void {
+    const current = this.getExpandedChannelStackKeys();
+    const pruned = pruneExpandedChannelStackKeys(
+      this.rgbGroupChannelNames,
+      this.channelThumbnailItems,
+      current
+    );
+    if (!sameStringSet(current, pruned)) {
+      this.setExpandedChannelStackKeys(pruned);
+    }
+  }
+
+  private expandChannelStackForSelection(selection: DisplaySelection | null): void {
+    if (!selection) {
+      return;
+    }
+
+    const itemByValue = this.getChannelThumbnailItemsByValue();
+    const expandedStackKeys = new Set(this.getExpandedChannelStackKeys());
+    for (const stack of this.getChannelViewStacks()) {
+      for (const childValue of stack.childValues) {
+        const child = itemByValue.get(childValue);
+        if (child && sameDisplaySelection(child.selection, selection)) {
+          expandedStackKeys.add(stack.key);
+          this.setExpandedChannelStackKeys(expandedStackKeys);
+          return;
+        }
+      }
+    }
+  }
+
+  private renderChannelViewControls(): void {
+    this.pruneExpandedChannelStackKeys();
+    const visibleItems = this.getVisibleChannelViewItems();
+    const selectedItem = findSelectedChannelViewItem(visibleItems, this.currentChannelSelection) ?? visibleItems[0] ?? null;
+    const selectedValue = selectedItem?.value ?? '';
+    if (!findSelectedChannelViewItem(visibleItems, this.currentChannelSelection) && selectedItem) {
+      this.currentChannelSelection = cloneDisplaySelection(selectedItem.selection);
+    }
+
+    if (visibleItems.length > 0) {
+      this.channelThumbnailStrip?.setChannelViewItems(visibleItems, selectedValue);
+    } else {
+      this.channelThumbnailStrip?.clearForNoImage();
+    }
+
+    this.channelPanel.classList.toggle('hidden', this.bottomPanelMode !== 'channels' || visibleItems.length === 0);
+  }
 
   private readonly handleOpenFullClick = (event: MouseEvent): void => {
     event.preventDefault();
@@ -382,4 +613,16 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
 
 function stopViewerInteractionEvent(event: Event): void {
   event.stopPropagation();
+}
+
+function sameStringSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const value of a) {
+    if (!b.has(value)) {
+      return false;
+    }
+  }
+  return true;
 }
