@@ -19,6 +19,7 @@ import {
   serializeChannelRecognitionNameRulesKey,
   type ChannelRecognitionNameRules
 } from './channel-recognition-name-rules';
+import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from './stokes';
 
 export function serializeChannelThumbnailContextKey(
   sessionId: string,
@@ -43,7 +44,7 @@ export function serializeChannelThumbnailRequestKey(args: {
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
 }): string {
   const maskKey = isStokesThumbnailSelection(args.selection)
-    ? `|maskInvalidStokesVectors:${args.maskInvalidStokesVectors !== false ? '1' : '0'}`
+    ? `|maskInvalidStokesVectors:${(args.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS) ? '1' : '0'}`
     : '';
   const spectralKey = isSpectralThumbnailSelection(args.selection)
     ? `|spectralRgbGrouping:${args.spectralRgbGroupingEnabled !== false ? '1' : '0'}`

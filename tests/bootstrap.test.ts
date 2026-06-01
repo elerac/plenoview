@@ -1284,7 +1284,7 @@ describe('bootstrap app lifecycle', () => {
       session,
       expect.objectContaining({
         ...mocks.coreState.sessionState,
-        maskInvalidStokesVectors: true
+        maskInvalidStokesVectors: false
       })
     );
     expect(mocks.rendererReadExportPixels).toHaveBeenCalledWith(expect.objectContaining({
@@ -1453,7 +1453,7 @@ describe('bootstrap app lifecycle', () => {
       session,
       expect.objectContaining({
         ...mocks.coreState.sessionState,
-        maskInvalidStokesVectors: true
+        maskInvalidStokesVectors: false
       })
     );
     expect(mocks.rendererReadExportPixels).toHaveBeenCalledWith(expect.objectContaining({

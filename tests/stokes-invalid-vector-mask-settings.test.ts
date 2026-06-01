@@ -13,22 +13,22 @@ describe('stokes invalid vector mask settings', () => {
     window.localStorage.clear();
   });
 
-  it('normalizes only booleans and defaults to enabled', () => {
+  it('normalizes only booleans and defaults to disabled', () => {
     expect(normalizeStokesInvalidVectorMaskSetting(false)).toBe(false);
     expect(normalizeStokesInvalidVectorMaskSetting(true)).toBe(true);
-    expect(normalizeStokesInvalidVectorMaskSetting('false')).toBe(true);
-    expect(normalizeStokesInvalidVectorMaskSetting(null)).toBe(true);
+    expect(normalizeStokesInvalidVectorMaskSetting('false')).toBe(false);
+    expect(normalizeStokesInvalidVectorMaskSetting(null)).toBe(false);
   });
 
-  it('persists disabled and clears storage for the default enabled value', () => {
-    saveStoredStokesInvalidVectorMaskSetting(false);
-
-    expect(window.localStorage.getItem(STOKES_INVALID_VECTOR_MASK_STORAGE_KEY)).toBe('false');
-    expect(readStoredStokesInvalidVectorMaskSetting()).toBe(false);
-
+  it('persists enabled and clears storage for the default disabled value', () => {
     saveStoredStokesInvalidVectorMaskSetting(true);
 
-    expect(window.localStorage.getItem(STOKES_INVALID_VECTOR_MASK_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(STOKES_INVALID_VECTOR_MASK_STORAGE_KEY)).toBe('true');
     expect(readStoredStokesInvalidVectorMaskSetting()).toBe(true);
+
+    saveStoredStokesInvalidVectorMaskSetting(false);
+
+    expect(window.localStorage.getItem(STOKES_INVALID_VECTOR_MASK_STORAGE_KEY)).toBeNull();
+    expect(readStoredStokesInvalidVectorMaskSetting()).toBe(false);
   });
 });

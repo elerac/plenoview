@@ -109,7 +109,7 @@ export const DEFAULT_STOKES_DEGREE_MODULATION: StokesDegreeModulationState = {
   top: true
 };
 export const DEFAULT_STOKES_AOLP_DEGREE_MODULATION_MODE: StokesAolpDegreeModulationMode = 'value';
-export const DEFAULT_MASK_INVALID_STOKES_VECTORS = true;
+export const DEFAULT_MASK_INVALID_STOKES_VECTORS = false;
 export const STOKES_COLORMAP_DEFAULT_GROUPS: readonly StokesColormapDefaultGroup[] = [
   'aolp',
   'degree',

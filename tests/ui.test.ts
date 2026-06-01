@@ -2374,7 +2374,7 @@ describe('panel split sizing', () => {
     expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
     expect(imageLoadWorkersInput.value).toBe('1');
     expect(stokesAolpSelect.value).toBe('0');
-    stokesMaskCheckbox.checked = false;
+    stokesMaskCheckbox.checked = true;
     spectralGroupingCheckbox.checked = false;
     invalidValueWarningButton.click();
     expect(invalidValueWarningButton.getAttribute('aria-pressed')).toBe('false');
@@ -2386,7 +2386,7 @@ describe('panel split sizing', () => {
     resetSettingsButton.click();
 
     expect(onResetSettings).toHaveBeenCalledTimes(1);
-    expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(true);
+    expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(false);
     expect(onChannelRecognitionSettingsChange).toHaveBeenCalledWith(createDefaultChannelRecognitionSettings());
     expect(onInvalidValueWarningChange).toHaveBeenCalledWith(true);
     expect(themeSelect.value).toBe('default');
@@ -2394,7 +2394,7 @@ describe('panel split sizing', () => {
     expect(autoExposurePercentileInput.value).toBe('99.5');
     expect(imageLoadWorkersInput.value).toBe(String(getDefaultImageLoadWorkers()));
     expect(stokesAolpSelect.value).toBe('1');
-    expect(stokesMaskCheckbox.checked).toBe(true);
+    expect(stokesMaskCheckbox.checked).toBe(false);
     expect(spectralGroupingCheckbox.checked).toBe(true);
     expect(invalidValueWarningButton.getAttribute('aria-pressed')).toBe('true');
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
@@ -3038,17 +3038,17 @@ describe('view menu', () => {
       document.getElementById('stokes-default-settings-control')
     );
     expect(checkbox).not.toBeNull();
-    expect(checkbox.checked).toBe(true);
+    expect(checkbox.checked).toBe(false);
     expect(checkbox.closest('#settings-dialog')).toBe(document.getElementById('settings-dialog'));
 
-    checkbox.checked = false;
+    checkbox.checked = true;
     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
 
-    expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(false);
+    expect(onMaskInvalidStokesVectorsChange).toHaveBeenCalledWith(true);
 
-    ui.setMaskInvalidStokesVectors(true);
+    ui.setMaskInvalidStokesVectors(false);
 
-    expect(checkbox.checked).toBe(true);
+    expect(checkbox.checked).toBe(false);
   });
 
   it('renders and dispatches Channel Recognition settings from Settings', () => {

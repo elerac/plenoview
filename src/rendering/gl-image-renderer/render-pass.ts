@@ -1,4 +1,8 @@
-import { isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from '../../stokes';
+import {
+  DEFAULT_MASK_INVALID_STOKES_VECTORS,
+  isStokesDegreeModulationEnabled,
+  resolveStokesDegreeModulationMode
+} from '../../stokes';
 import {
   resolveAlphaOutputModeUniformValue,
   resolveDisplaySourceModeUniformValue,
@@ -227,7 +231,10 @@ function setCommonUniforms(
   gl.uniform1i(uniforms.colormapEntryCount, state.colormapEntryCount);
   gl.uniform1i(uniforms.displayMode, resolveDisplaySourceModeUniformValue(state.activeBinding.mode));
   gl.uniform1i(uniforms.stokesParameter, resolveStokesParameterUniformValue(state.activeBinding.stokesParameter));
-  gl.uniform1i(uniforms.maskInvalidStokesVectors, viewerState.maskInvalidStokesVectors !== false ? 1 : 0);
+  gl.uniform1i(
+    uniforms.maskInvalidStokesVectors,
+    (viewerState.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS) ? 1 : 0
+  );
   gl.uniform1i(
     uniforms.warnInvalidValues,
     (options.warnInvalidValues ?? viewerState.invalidValueWarningEnabled) ? 1 : 0

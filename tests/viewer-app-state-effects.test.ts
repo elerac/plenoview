@@ -181,13 +181,13 @@ describe('viewer app state effects', () => {
       {
         autoExposureEnabled: true,
         autoExposurePercentile: 99.5,
-        maskInvalidStokesVectors: true,
+        maskInvalidStokesVectors: false,
         spectralRgbGroupingEnabled: true
       },
       {
         autoExposureEnabled: true,
         autoExposurePercentile: 99.5,
-        maskInvalidStokesVectors: true,
+        maskInvalidStokesVectors: false,
         spectralRgbGroupingEnabled: true
       }
     ]);
@@ -200,13 +200,13 @@ describe('viewer app state effects', () => {
       {
         autoExposureEnabled: true,
         autoExposurePercentile: 98.2,
-        maskInvalidStokesVectors: true,
+        maskInvalidStokesVectors: false,
         spectralRgbGroupingEnabled: true
       },
       {
         autoExposureEnabled: true,
         autoExposurePercentile: 98.2,
-        maskInvalidStokesVectors: true,
+        maskInvalidStokesVectors: false,
         spectralRgbGroupingEnabled: true
       }
     ]);
@@ -219,13 +219,13 @@ describe('viewer app state effects', () => {
       {
         autoExposureEnabled: false,
         autoExposurePercentile: 98.2,
-        maskInvalidStokesVectors: true,
+        maskInvalidStokesVectors: false,
         spectralRgbGroupingEnabled: true
       },
       {
         autoExposureEnabled: false,
         autoExposurePercentile: 98.2,
-        maskInvalidStokesVectors: true,
+        maskInvalidStokesVectors: false,
         spectralRgbGroupingEnabled: true
       }
     ]);

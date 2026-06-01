@@ -28,30 +28,30 @@ describe('display revision keys', () => {
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 1,
       displaySelection: createStokesSelection('aolp', 'stokesRgb', 'G')
-    })).toBe('1:stokesAngle:aolp:rgbComponent:G:maskInvalidStokesVectors:true');
+    })).toBe('1:stokesAngle:aolp:rgbComponent:G:maskInvalidStokesVectors:false');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 2,
       displaySelection: createStokesSelection('dolp', 'stokesRgb'),
       visualizationMode: 'rgb'
-    })).toBe('2:stokesScalar:dolp:rgbLuminance:rgb:maskInvalidStokesVectors:true');
+    })).toBe('2:stokesScalar:dolp:rgbLuminance:rgb:maskInvalidStokesVectors:false');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 2,
       displaySelection: createStokesSelection('dolp', 'stokesRgb'),
       visualizationMode: 'colormap'
-    })).toBe('2:stokesScalar:dolp:rgbLuminance:colormap:maskInvalidStokesVectors:true');
+    })).toBe('2:stokesScalar:dolp:rgbLuminance:colormap:maskInvalidStokesVectors:false');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 2,
       displaySelection: createStokesSelection('dolp', 'stokesScalar', null, '500nm')
-    })).toBe('2:stokesScalar:dolp:scalar:500nm:maskInvalidStokesVectors:true');
+    })).toBe('2:stokesScalar:dolp:scalar:500nm:maskInvalidStokesVectors:false');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 3,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       visualizationMode: 'colormap'
-    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:colormap:maskInvalidStokesVectors:true:spectralRgbGrouping:true');
+    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:colormap:maskInvalidStokesVectors:false:spectralRgbGrouping:true');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 4,
@@ -79,19 +79,19 @@ describe('display revision keys', () => {
       activeLayer: 3,
       displaySelection: createStokesSelection('aolp', 'stokesRgb'),
       visualizationMode: 'rgb'
-    })).toBe('3:stokesAngle:aolp:rgbLuminance:rgb:maskInvalidStokesVectors:true');
+    })).toBe('3:stokesAngle:aolp:rgbLuminance:rgb:maskInvalidStokesVectors:false');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 3,
       displaySelection: createStokesSelection('aolp', 'stokesRgb'),
       visualizationMode: 'colormap'
-    })).toBe('3:stokesAngle:aolp:rgbLuminance:colormap:maskInvalidStokesVectors:true');
+    })).toBe('3:stokesAngle:aolp:rgbLuminance:colormap:maskInvalidStokesVectors:false');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 3,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       visualizationMode: 'rgb'
-    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:true:spectralRgbGrouping:true');
+    })).toBe('3:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:false:spectralRgbGrouping:true');
 
     expect(buildDisplayLuminanceRevisionKey({
       activeLayer: 4,
@@ -136,7 +136,7 @@ describe('display revision keys', () => {
       activeLayer: 1,
       displaySelection: createStokesSelection('s1_over_s0', 'stokesSpectralRgb'),
       spectralRgbGroupingEnabled: false
-    })).toBe('1:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:true:spectralRgbGrouping:false');
+    })).toBe('1:stokesScalar:s1_over_s0:spectralRgb:rgb:maskInvalidStokesVectors:false:spectralRgbGrouping:false');
 
     expect(buildDisplayTextureRevisionKey({
       activeLayer: 1,

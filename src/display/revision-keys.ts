@@ -9,6 +9,7 @@ import {
   serializeDisplaySelectionKey,
   type DisplaySelection
 } from '../display-model';
+import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from '../stokes';
 import {
   createDefaultChannelRecognitionSettings,
   sameChannelRecognitionSettings,
@@ -137,7 +138,7 @@ function appendStokesMaskRevisionKey(
     return key;
   }
 
-  return `${key}:maskInvalidStokesVectors:${state.maskInvalidStokesVectors !== false}`;
+  return `${key}:maskInvalidStokesVectors:${state.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS}`;
 }
 
 function appendSpectralRgbGroupingRevisionKey(
