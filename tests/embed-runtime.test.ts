@@ -14,6 +14,7 @@ function createAppHandle(): AppHandle {
     loadGallery: vi.fn(async () => undefined),
     loadFile: vi.fn(async () => undefined),
     applyState: vi.fn(),
+    deferInitialLoad: vi.fn(),
     openFullViewer: vi.fn(),
     dispose: vi.fn()
   };
@@ -27,6 +28,7 @@ describe('embed runtime', () => {
       src: 'https://example.com/beauty.exr',
       name: 'Beauty pass',
       view: null,
+      autoLoad: true,
       handoffId: null,
       state: null
     }, urlApp);
@@ -36,6 +38,39 @@ describe('embed runtime', () => {
       state: null
     });
     expect(urlApp.loadGallery).not.toHaveBeenCalled();
+  });
+
+  it('defers initial embed URL loads when autoLoad is false', async () => {
+    const urlApp = createAppHandle();
+    const deferred: { load: (() => void | Promise<void>) | null } = { load: null };
+    vi.mocked(urlApp.deferInitialLoad).mockImplementation((load) => {
+      deferred.load = load;
+    });
+
+    runInitialBootstrapLoad({
+      uiMode: 'embed',
+      src: 'https://example.com/beauty.exr',
+      name: 'Beauty pass',
+      view: 'panorama',
+      autoLoad: false,
+      handoffId: null,
+      state: null
+    }, urlApp);
+
+    expect(urlApp.loadUrl).not.toHaveBeenCalled();
+    expect(urlApp.deferInitialLoad).toHaveBeenCalledTimes(1);
+
+    const deferredLoad = deferred.load;
+    if (!deferredLoad) {
+      throw new Error('Expected deferred load callback to be registered.');
+    }
+    await deferredLoad();
+    expect(urlApp.loadUrl).toHaveBeenCalledWith('https://example.com/beauty.exr', {
+      name: 'Beauty pass',
+      state: {
+        viewerMode: 'panorama'
+      }
+    });
   });
 
   it('passes wrapper-provided local file names to app file loads', () => {

@@ -61,7 +61,9 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
   private readonly probeSwatch: HTMLElement;
   private readonly probeCoords: HTMLElement;
   private readonly probeValues: HTMLElement;
+  private readonly deferredLoadButton: HTMLButtonElement;
   private readonly openFullButton: HTMLButtonElement;
+  private deferredLoadHandler: (() => void | Promise<void>) | null = null;
   private viewport = { width: 1, height: 1 };
   private disposed = false;
 
@@ -95,6 +97,13 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.status.setAttribute('role', 'status');
     this.status.setAttribute('aria-live', 'polite');
 
+    this.deferredLoadButton = document.createElement('button');
+    this.deferredLoadButton.className = 'embed-deferred-load-button hidden';
+    this.deferredLoadButton.type = 'button';
+    this.deferredLoadButton.textContent = 'Load image';
+    this.deferredLoadButton.addEventListener('pointerdown', stopViewerInteractionEvent);
+    this.deferredLoadButton.addEventListener('click', this.handleDeferredLoadClick);
+
     const toolbar = document.createElement('div');
     toolbar.className = 'embed-toolbar';
     this.sourceLabel = document.createElement('div');
@@ -127,6 +136,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
       this.rulerOverlaySvg,
       this.rulerLabelOverlay,
       toolbar,
+      this.deferredLoadButton,
       this.status,
       this.probe
     );
@@ -140,6 +150,9 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     }
 
     this.disposed = true;
+    this.deferredLoadHandler = null;
+    this.deferredLoadButton.removeEventListener('pointerdown', stopViewerInteractionEvent);
+    this.deferredLoadButton.removeEventListener('click', this.handleDeferredLoadClick);
     this.openFullButton.removeEventListener('pointerdown', stopViewerInteractionEvent);
     this.openFullButton.removeEventListener('click', this.handleOpenFullClick);
     document.body.classList.remove('embed-body');
@@ -167,6 +180,11 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
       return;
     }
 
+    if (loading) {
+      this.deferredLoadButton.classList.add('hidden');
+      this.deferredLoadButton.disabled = true;
+    }
+
     if (!loading) {
       if (!this.status.classList.contains('is-error')) {
         this.status.classList.add('hidden');
@@ -177,6 +195,16 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
 
     this.status.classList.remove('hidden', 'is-error');
     this.status.textContent = 'Loading image...';
+  }
+
+  setDeferredLoad(handler: (() => void | Promise<void>) | null): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.deferredLoadHandler = handler;
+    this.deferredLoadButton.disabled = false;
+    this.deferredLoadButton.classList.toggle('hidden', !handler);
   }
 
   setRgbViewLoading(displayBusy: boolean, overlayLoading = displayBusy): void {
@@ -331,6 +359,24 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     event.preventDefault();
     event.stopPropagation();
     this.callbacks.onOpenFull();
+  };
+
+  private readonly handleDeferredLoadClick = (event: MouseEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    const handler = this.deferredLoadHandler;
+    if (!handler) {
+      return;
+    }
+
+    this.deferredLoadButton.disabled = true;
+    void Promise.resolve(handler()).catch(() => {
+      if (this.disposed || this.deferredLoadHandler !== handler) {
+        return;
+      }
+      this.deferredLoadButton.disabled = false;
+      this.deferredLoadButton.classList.remove('hidden');
+    });
   };
 }
 

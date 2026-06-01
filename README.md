@@ -194,6 +194,7 @@ Common attributes:
 | `src` | EXR URL to load. |
 | `name` | Embedded source label and opened file name when applicable. |
 | `view` | Initial mode: `image`, `panorama`, or `depth`. |
+| `auto-load` | Set to `false` to defer loading until the embedded `Load image` button is clicked. Defaults to `true`. |
 | `width` / `height` | CSS sizes; numeric values become pixels. Defaults: `100%` / `320px`. |
 | `viewer-url` | Viewer deployment URL, needed if the wrapper script is served from another location. |
 | `source-origin` | Loading policy: `auto`, `parent`, or `viewer`. |
@@ -213,6 +214,7 @@ Use `OpenExrViewer.create(target, options)` for dynamic sources:
     name: 'Cornell Box',
     width: 640,
     height: 420,
+    autoLoad: true,
     viewerUrl: 'https://elerac.github.io/openexr_viewer/app/'
   });
 </script>

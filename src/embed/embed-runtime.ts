@@ -8,6 +8,7 @@ import {
   isEmbedLoadFileMessage,
   isLocalFileHandoffFileMessage,
   loadStoredLocalFileHandoff,
+  postEmbedDeferredLoad,
   storeLocalFileHandoff
 } from './local-file-handoff';
 import type { ViewerSessionState } from '../types';
@@ -92,13 +93,24 @@ export function runInitialBootstrapLoad(params: ViewerBootstrapParams, app: AppH
     return;
   }
   if (params.src) {
-    void app.loadUrl(params.src, {
+    const src = params.src;
+    const loadSource = () => app.loadUrl(src, {
       name: params.name ?? undefined,
       state
     });
+    if (params.uiMode === 'embed' && !params.autoLoad) {
+      app.deferInitialLoad(loadSource);
+      return;
+    }
+    void loadSource();
     return;
   }
   app.applyState(state);
+  if (params.uiMode === 'embed' && !params.autoLoad) {
+    app.deferInitialLoad(() => {
+      postEmbedDeferredLoad();
+    });
+  }
 }
 
 function mergeViewParam(

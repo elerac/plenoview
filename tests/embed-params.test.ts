@@ -24,6 +24,7 @@ describe('embed params', () => {
       uiMode: 'embed',
       src: 'https://example.com/a.exr',
       view: 'image',
+      autoLoad: true,
       handoffId: 'local-1',
       state
     });
@@ -48,5 +49,25 @@ describe('embed params', () => {
     expect(parsed.searchParams.get('name')).toBe('render');
     expect(parsed.searchParams.get('state')).toBeTruthy();
     expect(parsed.hash).toBe('#handoff=abc');
+  });
+
+  it('parses autoLoad as true by default and for true-ish values', () => {
+    expect(parseViewerBootstrapParams({ search: '', hash: '' }).autoLoad).toBe(true);
+
+    for (const value of ['', 'true', '1', 'yes', 'on', 'unexpected']) {
+      expect(parseViewerBootstrapParams({
+        search: `?autoLoad=${encodeURIComponent(value)}`,
+        hash: ''
+      }).autoLoad).toBe(true);
+    }
+  });
+
+  it('parses autoLoad false-ish values', () => {
+    for (const value of ['false', '0', 'no', 'off']) {
+      expect(parseViewerBootstrapParams({
+        search: `?autoLoad=${encodeURIComponent(value)}`,
+        hash: ''
+      }).autoLoad).toBe(false);
+    }
   });
 });

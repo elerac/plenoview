@@ -1,6 +1,7 @@
 (() => {
   const EMBED_READY_MESSAGE = 'openexr-viewer:embed-ready';
   const EMBED_LOAD_FILE_MESSAGE = 'openexr-viewer:load-file';
+  const EMBED_DEFERRED_LOAD_MESSAGE = 'openexr-viewer:deferred-load';
   const SOURCE_ORIGIN_AUTO = 'auto';
   const SOURCE_ORIGIN_PARENT = 'parent';
   const SOURCE_ORIGIN_VIEWER = 'viewer';
@@ -11,7 +12,9 @@
     'width',
     'height',
     'viewer-url',
-    'source-origin'
+    'source-origin',
+    'auto-load',
+    'autoload'
   ];
   const currentScriptUrl = document.currentScript instanceof HTMLScriptElement
     ? document.currentScript.src
@@ -33,6 +36,7 @@
       this.viewerOrigin = new URL(this.viewerBaseUrl).origin;
       this.viewerTargetOrigin = normalizePostMessageTargetOrigin(this.viewerOrigin);
       this.sourceLoadId = 0;
+      this.deferredFileLoad = null;
       this.updatingAttributes = false;
       this.handleMessage = this.handleMessage.bind(this);
     }
@@ -68,8 +72,10 @@
         src: sourceUrl,
         name: hasOwn(options, 'name') ? options.name : undefined,
         view: hasOwn(options, 'view') ? options.view : undefined,
-        'source-origin': hasOwn(options, 'sourceOrigin') ? nextSourceOrigin : undefined
+        'source-origin': hasOwn(options, 'sourceOrigin') ? nextSourceOrigin : undefined,
+        'auto-load': 'true'
       });
+      this.deferredFileLoad = null;
 
       if (shouldParentFetchSource(sourceUrl, nextSourceOrigin)) {
         return this.loadParentFetchedUrl(sourceUrl, {
@@ -85,6 +91,7 @@
       if (!(file instanceof File)) {
         return Promise.reject(new TypeError('openexr-viewer.loadFile(file) expects a File.'));
       }
+      this.deferredFileLoad = null;
       this.sourceLoadId += 1;
       return this.enqueueFileLoad(file, {
         name: normalizeNonEmpty(options.name)
@@ -135,9 +142,13 @@
       const src = normalizeNonEmpty(this.getAttribute('src'));
       const view = normalizeNonEmpty(this.getAttribute('view'));
       const name = normalizeNonEmpty(this.getAttribute('name'));
+      const autoLoad = this.getAutoLoad();
       const srcUsesParentFetch = src && shouldParentFetchSource(src, this.getSourceOrigin());
 
       url.searchParams.set('ui', 'embed');
+      if (!autoLoad) {
+        url.searchParams.set('autoLoad', 'false');
+      }
       if (src && !srcUsesParentFetch) {
         url.searchParams.set('src', src);
       }
@@ -154,11 +165,17 @@
       if (!this.iframe || event.source !== this.iframe.contentWindow) {
         return;
       }
-      if (event.origin !== this.viewerOrigin || event.data?.type !== EMBED_READY_MESSAGE) {
+      if (event.origin !== this.viewerOrigin) {
         return;
       }
-      this.ready = true;
-      this.postPendingFiles();
+      if (event.data?.type === EMBED_READY_MESSAGE) {
+        this.ready = true;
+        this.postPendingFiles();
+        return;
+      }
+      if (event.data?.type === EMBED_DEFERRED_LOAD_MESSAGE) {
+        void this.loadDeferredAttributeSource();
+      }
     }
 
     resolveViewerBaseUrl() {
@@ -171,6 +188,13 @@
 
     getSourceOrigin() {
       return normalizeSourceOrigin(this.getAttribute('source-origin'));
+    }
+
+    getAutoLoad() {
+      if (this.hasAttribute('auto-load')) {
+        return parseAutoLoad(this.getAttribute('auto-load'));
+      }
+      return parseAutoLoad(this.getAttribute('autoload'));
     }
 
     updateAttributes(attributes) {
@@ -197,6 +221,30 @@
     }
 
     loadAttributeSource() {
+      const src = normalizeNonEmpty(this.getAttribute('src'));
+      const sourceOrigin = this.getSourceOrigin();
+      if (!this.getAutoLoad() || !src || !shouldParentFetchSource(src, sourceOrigin)) {
+        this.sourceLoadId += 1;
+        return Promise.resolve();
+      }
+
+      return this.loadParentFetchedUrl(src, {
+        name: normalizeNonEmpty(this.getAttribute('name'))
+      }).catch((error) => {
+        logEmbedError(`Failed to load ${src} from the embedding page.`, error);
+      });
+    }
+
+    loadDeferredAttributeSource() {
+      if (this.deferredFileLoad) {
+        const pending = this.deferredFileLoad;
+        this.deferredFileLoad = null;
+        this.sourceLoadId += 1;
+        return this.enqueueFileLoad(pending.file, {
+          name: pending.name
+        });
+      }
+
       const src = normalizeNonEmpty(this.getAttribute('src'));
       const sourceOrigin = this.getSourceOrigin();
       if (!src || !shouldParentFetchSource(src, sourceOrigin)) {
@@ -232,6 +280,13 @@
       await this.enqueueFileLoad(file, {
         name: normalizeNonEmpty(options.name)
       });
+    }
+
+    setDeferredFileLoad(file, options = {}) {
+      this.deferredFileLoad = {
+        file,
+        name: normalizeNonEmpty(options.name)
+      };
     }
 
     enqueueFileLoad(file, options = {}) {
@@ -270,8 +325,20 @@
   function createOpenExrViewer(target, options = {}) {
     const container = resolveTargetElement(target);
     const element = document.createElement('openexr-viewer');
+    const autoLoad = hasOwn(options, 'autoLoad') ? parseAutoLoad(options.autoLoad) : true;
 
     applyCreateOptions(element, options);
+    if (!autoLoad && options.src && !options.file) {
+      const sourceUrl = normalizeNonEmpty(options.src);
+      if (sourceUrl) {
+        element.setAttribute('src', sourceUrl);
+      }
+    }
+    if (!autoLoad && options.file) {
+      element.setDeferredFileLoad(options.file, {
+        name: options.name
+      });
+    }
     container.appendChild(element);
 
     const controller = {
@@ -287,11 +354,11 @@
       }
     };
 
-    if (options.file) {
+    if (autoLoad && options.file) {
       void controller.loadFile(options.file, { name: options.name }).catch((error) => {
         logEmbedError('Failed to load the provided OpenEXR file.', error);
       });
-    } else if (options.src) {
+    } else if (autoLoad && options.src) {
       void controller.loadUrl(options.src, {
         name: options.name,
         view: options.view,
@@ -311,7 +378,8 @@
       name: options.name,
       view: options.view,
       'viewer-url': options.viewerUrl,
-      'source-origin': options.sourceOrigin
+      'source-origin': options.sourceOrigin,
+      'auto-load': hasOwn(options, 'autoLoad') ? serializeAutoLoad(options.autoLoad) : undefined
     };
 
     for (const [key, value] of Object.entries(attributes)) {
@@ -365,6 +433,23 @@
       return normalized;
     }
     return SOURCE_ORIGIN_AUTO;
+  }
+
+  function serializeAutoLoad(value) {
+    return parseAutoLoad(value) ? 'true' : 'false';
+  }
+
+  function parseAutoLoad(value) {
+    if (value === false || value === 0) {
+      return false;
+    }
+    const normalized = normalizeNonEmpty(value);
+    if (normalized === null) {
+      return true;
+    }
+
+    const lower = normalized.toLowerCase();
+    return !(lower === 'false' || lower === '0' || lower === 'no' || lower === 'off');
   }
 
   function normalizePostMessageTargetOrigin(origin) {

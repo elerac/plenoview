@@ -58,6 +58,7 @@ export interface ViewerRuntimeUi extends Disposable {
   setError(message: string | null): void;
   setLoading(loading: boolean, viewerBlocked?: boolean): void;
   setRgbViewLoading(displayBusy: boolean, overlayLoading?: boolean): void;
+  setDeferredLoad?(handler: (() => void | Promise<void>) | null): void;
   setDisplayCacheBudget(mb: number): void;
   setDisplayCacheUsage(usedBytes: number, budgetBytes: number): void;
 

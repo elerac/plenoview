@@ -39,6 +39,38 @@ describe('EmbedViewerUi', () => {
     ui.dispose();
   });
 
+  it('renders and cleans up the deferred load button', () => {
+    const onDeferredLoad = vi.fn();
+    const ui = new EmbedViewerUi({ onOpenFull: vi.fn() });
+    const button = document.querySelector<HTMLButtonElement>('.embed-deferred-load-button');
+
+    expect(button).toBeInstanceOf(HTMLButtonElement);
+    expect(button?.classList.contains('hidden')).toBe(true);
+
+    ui.setDeferredLoad(onDeferredLoad);
+    expect(button?.classList.contains('hidden')).toBe(false);
+    expect(button?.disabled).toBe(false);
+
+    button?.click();
+    expect(onDeferredLoad).toHaveBeenCalledTimes(1);
+    expect(button?.disabled).toBe(true);
+
+    ui.setDeferredLoad(onDeferredLoad);
+    ui.setLoading(true);
+    expect(button?.classList.contains('hidden')).toBe(true);
+    expect(button?.disabled).toBe(true);
+
+    ui.setDeferredLoad(null);
+    expect(button?.classList.contains('hidden')).toBe(true);
+    expect(button?.disabled).toBe(false);
+
+    const onDisposedDeferredLoad = vi.fn();
+    ui.setDeferredLoad(onDisposedDeferredLoad);
+    ui.dispose();
+    button?.click();
+    expect(onDisposedDeferredLoad).not.toHaveBeenCalled();
+  });
+
   it('renders minimal loading, error, open-full, and probe states', () => {
     const onOpenFull = vi.fn();
     const ui = new EmbedViewerUi({ onOpenFull });

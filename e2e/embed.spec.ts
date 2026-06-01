@@ -29,6 +29,25 @@ test('keeps the embed open-full button right-aligned with a custom name @smoke',
   await expectNoToolbarOverlap(page);
 });
 
+test('defers embed URL loads when autoLoad is false', async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.goto('/app/?ui=embed&src=%2Fcbox_rgb.exr&autoLoad=false');
+
+  await expect(page.locator('#gl-canvas')).toBeVisible();
+  const openFullButton = page.getByRole('button', { name: 'Open full viewer', exact: true });
+  const loadButton = page.getByRole('button', { name: 'Load image', exact: true });
+
+  await expect(openFullButton).toBeDisabled();
+  await expect(loadButton).toBeVisible();
+
+  await loadButton.click();
+
+  await expect(loadButton).toBeHidden();
+  await expect(openFullButton).toBeEnabled({
+    timeout: 30000
+  });
+});
+
 async function gotoEmbed(page: Page, path: string): Promise<void> {
   await page.goto(path);
   await expect(page.locator('#gl-canvas')).toBeVisible();

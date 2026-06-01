@@ -167,6 +167,7 @@ body.embed-body {
 
 .embed-source-label,
 .embed-open-full-button,
+.embed-deferred-load-button,
 .embed-status,
 .embed-probe {
   border: 1px solid rgba(215, 221, 232, 0.22);
@@ -195,6 +196,23 @@ body.embed-body {
 }
 
 .embed-open-full-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.embed-deferred-load-button {
+  position: absolute;
+  z-index: 22;
+  top: 50%;
+  left: 50%;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+.embed-deferred-load-button:disabled {
   cursor: default;
   opacity: 0.55;
 }

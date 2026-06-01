@@ -10,6 +10,7 @@ export interface ViewerBootstrapParams {
   src: string | null;
   name: string | null;
   view: ViewerSessionState['viewerMode'] | null;
+  autoLoad: boolean;
   handoffId: string | null;
   state: EmbedViewerStateSnapshot | null;
 }
@@ -29,6 +30,7 @@ export function parseViewerBootstrapParams(location: Pick<Location, 'search' | '
     src: normalizeNonEmpty(params.get('src')),
     name: normalizeNonEmpty(params.get('name')),
     view: parseViewerMode(params.get('view')),
+    autoLoad: parseBooleanParam(params.get('autoLoad') ?? params.get('autoload')),
     handoffId: normalizeNonEmpty(params.get('handoff')),
     state: decodeEmbedViewerState(params.get('state'))
   };
@@ -86,4 +88,12 @@ function normalizeNonEmpty(value: string | null): string | null {
 
 function parseViewerMode(value: string | null): ViewerSessionState['viewerMode'] | null {
   return value === 'image' || value === 'panorama' || value === 'depth' ? value : null;
+}
+
+function parseBooleanParam(value: string | null): boolean {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
+    return false;
+  }
+  return true;
 }

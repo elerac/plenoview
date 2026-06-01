@@ -2,6 +2,7 @@ import type { EmbedViewerStateSnapshot } from './embed-state';
 
 export const EMBED_READY_MESSAGE = 'openexr-viewer:embed-ready';
 export const EMBED_LOAD_FILE_MESSAGE = 'openexr-viewer:load-file';
+export const EMBED_DEFERRED_LOAD_MESSAGE = 'openexr-viewer:deferred-load';
 export const LOCAL_HANDOFF_READY_MESSAGE = 'openexr-viewer:local-handoff-ready';
 export const LOCAL_HANDOFF_FILE_MESSAGE = 'openexr-viewer:local-handoff-file';
 
@@ -18,6 +19,10 @@ export interface EmbedLoadFileMessage {
   type: typeof EMBED_LOAD_FILE_MESSAGE;
   file: File;
   name?: string;
+}
+
+export interface EmbedDeferredLoadMessage {
+  type: typeof EMBED_DEFERRED_LOAD_MESSAGE;
 }
 
 export interface LocalFileHandoffReadyMessage {
@@ -59,6 +64,14 @@ export function isEmbedLoadFileMessage(value: unknown): value is EmbedLoadFileMe
     isOptionalString(record.name);
 }
 
+export function isEmbedDeferredLoadMessage(value: unknown): value is EmbedDeferredLoadMessage {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return record.type === EMBED_DEFERRED_LOAD_MESSAGE;
+}
+
 export function isLocalFileHandoffReadyMessage(value: unknown): value is LocalFileHandoffReadyMessage {
   if (!value || typeof value !== 'object') {
     return false;
@@ -83,6 +96,13 @@ export function postEmbedReady(target: Window = window.parent): void {
     return;
   }
   target.postMessage({ type: EMBED_READY_MESSAGE } satisfies EmbedReadyMessage, '*');
+}
+
+export function postEmbedDeferredLoad(target: Window = window.parent): void {
+  if (target === window) {
+    return;
+  }
+  target.postMessage({ type: EMBED_DEFERRED_LOAD_MESSAGE } satisfies EmbedDeferredLoadMessage, '*');
 }
 
 export function startLocalFileHandoffSender(options: {

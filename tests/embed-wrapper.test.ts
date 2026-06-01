@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 const EMBED_LOAD_FILE_MESSAGE = 'openexr-viewer:load-file';
 const EMBED_READY_MESSAGE = 'openexr-viewer:embed-ready';
+const EMBED_DEFERRED_LOAD_MESSAGE = 'openexr-viewer:deferred-load';
 const embedScript = readFileSync(resolve(process.cwd(), 'public/embed/openexr-viewer.js'), 'utf8');
 const originalFetch = window.fetch;
 const originalIframeContentWindow = Object.getOwnPropertyDescriptor(
@@ -39,6 +40,7 @@ interface OpenExrViewerApiForTest {
     height?: number | string;
     viewerUrl?: string;
     sourceOrigin?: string;
+    autoLoad?: boolean | string;
   }): OpenExrViewerControllerForTest;
 }
 
@@ -136,6 +138,41 @@ describe('embed wrapper public script', () => {
     expect(postMessage.mock.calls[0]?.[1]).toBe(controller.element.viewerTargetOrigin);
   });
 
+  it('defers parent-fetched relative sources when autoLoad is false', async () => {
+    document.body.innerHTML = '<div id="target"></div>';
+    const fetchMock = stubFetchOk();
+
+    const controller = getOpenExrViewer().create('#target', {
+      src: './public/cbox_rgb.exr',
+      name: 'Deferred Cornell Box',
+      autoLoad: false
+    });
+    const iframe = getViewerIframe(controller.element);
+    const postMessage = spyOnIframePostMessage(iframe);
+    const iframeUrl = new URL(iframe.src);
+
+    expect(controller.element.getAttribute('auto-load')).toBe('false');
+    expect(iframeUrl.searchParams.get('autoLoad')).toBe('false');
+    expect(iframeUrl.searchParams.get('src')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    dispatchEmbedReady(controller.element, iframe);
+    await flushPromises();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(postMessage).not.toHaveBeenCalled();
+
+    dispatchEmbedDeferredLoad(controller.element, iframe);
+    await flushPromises();
+
+    const posted = postMessage.mock.calls[0]?.[0] as { type: string; file: File; name?: string };
+    expect(fetchMock).toHaveBeenCalledWith(new URL('./public/cbox_rgb.exr', document.baseURI).toString());
+    expect(posted).toMatchObject({
+      type: EMBED_LOAD_FILE_MESSAGE,
+      name: 'Deferred Cornell Box'
+    });
+    expect(posted.file.name).toBe('Deferred Cornell Box');
+  });
+
   it('keeps absolute HTTPS sources in the iframe URL by default', () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
@@ -149,6 +186,33 @@ describe('embed wrapper public script', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(iframeUrl.pathname).toBe('/app/');
     expect(iframeUrl.searchParams.get('src')).toBe('https://example.com/render.exr');
+  });
+
+  it('passes autoLoad=false through for viewer-fetched absolute sources', () => {
+    document.body.innerHTML = '<div id="target"></div>';
+    const fetchMock = stubFetchOk();
+
+    const controller = getOpenExrViewer().create('#target', {
+      src: 'https://example.com/render.exr',
+      name: 'Deferred remote render',
+      autoLoad: false
+    });
+    const iframeUrl = new URL(getViewerIframe(controller.element).src);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(controller.element.getAttribute('auto-load')).toBe('false');
+    expect(iframeUrl.searchParams.get('src')).toBe('https://example.com/render.exr');
+    expect(iframeUrl.searchParams.get('autoLoad')).toBe('false');
+  });
+
+  it('accepts autoload as a markup alias for auto-load', () => {
+    const element = document.createElement('openexr-viewer');
+    element.setAttribute('src', 'https://example.com/render.exr');
+    element.setAttribute('autoload', 'false');
+    document.body.append(element);
+
+    const iframeUrl = new URL(getViewerIframe(element).src);
+    expect(iframeUrl.searchParams.get('autoLoad')).toBe('false');
   });
 
   it('forces parent fetch when sourceOrigin is parent', async () => {
@@ -230,6 +294,16 @@ function dispatchEmbedReady(element: OpenExrViewerElementForTest, iframe: HTMLIF
     origin: element.viewerOrigin,
     data: {
       type: EMBED_READY_MESSAGE
+    }
+  }));
+}
+
+function dispatchEmbedDeferredLoad(element: OpenExrViewerElementForTest, iframe: HTMLIFrameElement): void {
+  window.dispatchEvent(new MessageEvent('message', {
+    source: iframe.contentWindow,
+    origin: element.viewerOrigin,
+    data: {
+      type: EMBED_DEFERRED_LOAD_MESSAGE
     }
   }));
 }
