@@ -547,7 +547,7 @@ output {
 
 .app-menu-submenu-dropdown {
   top: -5px;
-  left: calc(100% + 2px);
+  left: calc(100% - 1px);
   min-width: 9rem;
   max-height: min(70vh, 28rem);
   overflow-y: auto;
@@ -555,7 +555,7 @@ output {
 
 @media (max-width: 620px) {
   .app-menu-submenu-dropdown {
-    top: calc(100% + 2px);
+    top: calc(100% - 1px);
     left: 0;
   }
 }

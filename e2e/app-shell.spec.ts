@@ -381,6 +381,51 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   await expect(settingsDialog).toBeHidden();
 });
 
+test('keeps Gallery directory submenu open across the trigger boundary', async ({ page }) => {
+  await gotoViewerApp(page);
+
+  const galleryMenuButton = page.getByRole('button', { name: 'Gallery', exact: true });
+  const galleryMenu = page.locator('#gallery-menu');
+  const galleryPolyHavenItem = page.locator('#gallery-polyhaven-menu-button');
+  const galleryPolyHavenMenu = page.locator('#gallery-polyhaven-menu');
+  const galleryArtistWorkshopItem = page.locator('#gallery-polyhaven-artist-workshop-1k-button');
+
+  await galleryMenuButton.click();
+  await expect(galleryMenu).toBeVisible();
+  await galleryPolyHavenItem.hover();
+  await expect(galleryPolyHavenMenu).toBeVisible();
+  await expect(galleryArtistWorkshopItem).toBeVisible();
+
+  const [triggerBox, submenuBox, itemBox] = await Promise.all([
+    galleryPolyHavenItem.boundingBox(),
+    galleryPolyHavenMenu.boundingBox(),
+    galleryArtistWorkshopItem.boundingBox()
+  ]);
+  if (!triggerBox || !submenuBox || !itemBox) {
+    throw new Error('Expected Gallery submenu targets to be visible.');
+  }
+
+  const triggerRight = triggerBox.x + triggerBox.width;
+  const triggerCenter = getBoxCenter(triggerBox);
+  const itemCenter = getBoxCenter(itemBox);
+  const boundaryY = Math.min(
+    Math.max(triggerCenter.y, submenuBox.y + 2),
+    submenuBox.y + submenuBox.height - 2
+  );
+
+  expect(submenuBox.x).toBeLessThanOrEqual(triggerRight);
+  await page.mouse.move(triggerCenter.x, triggerCenter.y);
+  await page.mouse.move(triggerRight - 0.5, boundaryY);
+  await page.mouse.move(triggerRight + 1, boundaryY);
+
+  await expect(galleryPolyHavenMenu).toBeVisible();
+  await expect(galleryArtistWorkshopItem).toBeVisible();
+
+  await page.mouse.move(itemCenter.x, itemCenter.y, { steps: 8 });
+  await expect(galleryPolyHavenMenu).toBeVisible();
+  await expect(galleryArtistWorkshopItem).toBeVisible();
+});
+
 test('does not expose unchecked view menu checkmarks in the accessibility tree', async ({ page }) => {
   await gotoViewerApp(page);
 
