@@ -244,6 +244,38 @@ describe('tauri host', () => {
     expect(setAsAppMenuMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the native Window menu while hiding pane entries', async () => {
+    invokeMock.mockResolvedValueOnce([]);
+
+    await tauriHost.setupDesktopCommands({
+      onCommand: vi.fn(),
+      onOpenRecent: vi.fn()
+    });
+
+    const submenuLabels = submenuNewMock.mock.calls.map((call) => call[0].text);
+    const windowMenuOptions = submenuNewMock.mock.calls
+      .map((call) => call[0])
+      .find((options) => options.text === 'Window');
+    const menuOptions = menuNewMock.mock.calls.at(-1)?.[0];
+    const nativeMenuLabels = menuOptions.items.map((item: { text?: string }) => item.text);
+    const nativeWindowMenuItemLabels = windowMenuOptions.items
+      .map((item: { text?: string }) => item.text)
+      .filter((text: string | undefined): text is string => text !== undefined);
+
+    expect(nativeMenuLabels).toEqual(['File', 'Edit', 'View', 'Window']);
+    expect(submenuLabels).toContain('Window');
+    expect(nativeWindowMenuItemLabels).toEqual([
+      'Normal Preview',
+      'Full Screen Preview',
+      'Toggle App Fullscreen'
+    ]);
+    expect(nativeWindowMenuItemLabels).not.toEqual(expect.arrayContaining([
+      'Single Pane',
+      'Split Vertically',
+      'Split Horizontally'
+    ]));
+  });
+
   it('applies native menu command enabled state', async () => {
     invokeMock.mockResolvedValueOnce([]);
 

@@ -35,8 +35,14 @@ test('splits the viewer with Cmd+D shortcuts and resets to a single pane', async
 
   await expectPaneCount(page, 3);
 
+  await expect(page.locator('#window-menu-button')).toBeVisible();
   await page.getByRole('button', { name: 'Window', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Single Pane', exact: true }).click();
+  await expect(page.locator('#window-normal-menu-item')).toBeVisible();
+  await expect(page.locator('#window-full-screen-preview-menu-item')).toBeVisible();
+  await expect(page.locator('#window-single-pane-menu-item')).toBeHidden();
+  await page.locator('#window-single-pane-menu-item').evaluate((element) => {
+    (element as HTMLButtonElement).click();
+  });
 
   await expectPaneCount(page, 0);
   await expect(exportScreenshot).toBeEnabled();

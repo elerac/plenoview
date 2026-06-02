@@ -422,10 +422,6 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks, options: { 
       { text: 'Normal Preview', enabled: isEnabled('windowPreviewNormal'), action: command('windowPreviewNormal') },
       { text: 'Full Screen Preview', enabled: isEnabled('windowPreviewFullscreen'), action: command('windowPreviewFullscreen') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
-      { text: 'Single Pane', enabled: isEnabled('paneReset'), action: command('paneReset') },
-      { text: 'Split Vertically', accelerator: 'CmdOrCtrl+D', enabled: isEnabled('paneSplitVertical'), action: command('paneSplitVertical') },
-      { text: 'Split Horizontally', accelerator: 'CmdOrCtrl+Shift+D', enabled: isEnabled('paneSplitHorizontal'), action: command('paneSplitHorizontal') },
-      await PredefinedMenuItem.new({ item: 'Separator' }),
       { text: 'Toggle App Fullscreen', accelerator: 'F11', enabled: isEnabled('toggleAppFullscreen'), action: command('toggleAppFullscreen') },
       await PredefinedMenuItem.new({ item: 'Separator' }),
       await PredefinedMenuItem.new({ item: 'Minimize' }),
@@ -433,7 +429,6 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks, options: { 
       await PredefinedMenuItem.new({ item: 'CloseWindow' })
     ]
   });
-
   const menu = await Menu.new({
     items: [fileMenu, editMenu, viewMenu, windowMenu]
   });

@@ -2470,14 +2470,18 @@ describe('view menu', () => {
     expect(fileMenu.querySelectorAll('.app-menu-separator[role="menuitem"]')).toHaveLength(0);
   });
 
-  it('renders the top menu tabs in file-view-window-gallery order without Settings in the menu nav', () => {
+  it('renders the visible top menu tabs in file-view-window-gallery order without Settings in the menu nav', () => {
     installUiFixture();
 
     const menuNav = document.querySelector('.app-menu-nav') as HTMLElement;
-    const labels = Array.from(menuNav.querySelectorAll('.app-menu-tab')).map((item) => item.textContent?.trim());
-    const navButtonLabels = Array.from(menuNav.querySelectorAll('button')).map((item) => item.textContent?.trim());
+    const windowButton = document.getElementById('window-menu-button') as HTMLButtonElement;
+    const labels = Array.from(menuNav.querySelectorAll('.app-menu-tab:not(.hidden)')).map((item) => item.textContent?.trim());
+    const navButtonLabels = Array.from(menuNav.querySelectorAll('button:not(.hidden)')).map((item) => item.textContent?.trim());
 
     expect(labels).toEqual(['File', 'View', 'Window', 'Gallery']);
+    expect(windowButton).not.toBeNull();
+    expect(windowButton.classList.contains('hidden')).toBe(false);
+    expect(navButtonLabels).toContain('Window');
     expect(navButtonLabels).not.toContain('Settings');
   });
 
@@ -2812,19 +2816,28 @@ describe('view menu', () => {
     expect(previewItem.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('renders the Window menu items in preview and pane command order', () => {
+  it('keeps Window menu controls in the DOM while hiding the requested menu buttons', () => {
     installUiFixture();
 
-    const labels = Array.from(document.querySelectorAll('#window-menu .app-menu-item')).map((item) => (
+    const windowButton = document.getElementById('window-menu-button') as HTMLButtonElement;
+    const singlePaneItem = document.getElementById('window-single-pane-menu-item') as HTMLButtonElement;
+    const splitVerticalItem = document.getElementById('window-split-vertical-menu-item') as HTMLButtonElement;
+    const splitHorizontalItem = document.getElementById('window-split-horizontal-menu-item') as HTMLButtonElement;
+    const visibleLabels = Array.from(document.querySelectorAll('#window-menu .app-menu-item:not(.hidden)')).map((item) => (
       item.textContent?.replace(/\s+/g, ' ').trim()
     ));
-    expect(labels).toEqual([
-      'Normal',
-      'Full Screen Preview',
-      'Single Pane',
-      'Split Vertically ⌘D',
-      'Split Horizontally ⌘⇧D'
-    ]);
+    const visibleSeparators = Array.from(document.querySelectorAll('#window-menu .app-menu-separator:not(.hidden)'));
+    const hiddenPaneLabels = [singlePaneItem, splitVerticalItem, splitHorizontalItem].map((item) => (
+      item.textContent?.replace(/\s+/g, ' ').trim()
+    ));
+
+    expect(windowButton.classList.contains('hidden')).toBe(false);
+    expect(visibleLabels).toEqual(['Normal', 'Full Screen Preview']);
+    expect(visibleSeparators).toHaveLength(0);
+    expect(hiddenPaneLabels).toEqual(['Single Pane', 'Split Vertically ⌘D', 'Split Horizontally ⌘⇧D']);
+    expect(singlePaneItem.classList.contains('hidden')).toBe(true);
+    expect(splitVerticalItem.classList.contains('hidden')).toBe(true);
+    expect(splitHorizontalItem.classList.contains('hidden')).toBe(true);
   });
 
   it('routes Window pane menu commands through pane callbacks and disables screenshots while split', () => {
@@ -2841,6 +2854,9 @@ describe('view menu', () => {
     const splitHorizontalItem = document.getElementById('window-split-horizontal-menu-item') as HTMLButtonElement;
     const screenshotButton = document.getElementById('export-screenshot-button') as HTMLButtonElement;
 
+    expect(singlePaneItem.classList.contains('hidden')).toBe(true);
+    expect(splitVerticalItem.classList.contains('hidden')).toBe(true);
+    expect(splitHorizontalItem.classList.contains('hidden')).toBe(true);
     expect(splitVerticalItem.disabled).toBe(false);
     expect(splitHorizontalItem.disabled).toBe(false);
     expect(singlePaneItem.disabled).toBe(true);
