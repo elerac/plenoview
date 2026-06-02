@@ -1,0 +1,92 @@
+name: Build Desktop Apps
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform_label }} ${{ matrix.arch }} ${{ matrix.bundle }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform_label: windows
+            arch: x64
+            bundle: nsis
+            tauri_args: --ci --bundles nsis
+            artifact_name: Prismifold-windows-x64-nsis
+            artifact_path: src-tauri/target/release/bundle/nsis/*setup.exe
+            apple_signing_identity: ''
+          - os: macos-latest
+            platform_label: macos
+            arch: arm64
+            bundle: dmg
+            tauri_args: --ci --target aarch64-apple-darwin --bundles dmg
+            artifact_name: Prismifold-macos-arm64-dmg
+            artifact_path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            apple_signing_identity: '-'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS Apple Silicon Rust target
+        if: matrix.platform_label == 'macos'
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: desktop-cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            desktop-cargo-${{ runner.os }}-${{ matrix.arch }}-
+            desktop-cargo-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check desktop shell
+        run: npm run desktop:check
+
+      - name: Build desktop app
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
+        with:
+          tauriScript: npm run tauri --
+          args: ${{ matrix.tauri_args }}
+          includeUpdaterJson: false
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove bundle outputs before cache save
+        if: always()
+        shell: bash
+        run: |
+          rm -rf src-tauri/target/release/bundle
+          rm -rf src-tauri/target/*/release/bundle
