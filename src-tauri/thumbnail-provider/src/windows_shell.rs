@@ -46,9 +46,9 @@ impl Drop for ExrThumbnailProvider {
 }
 
 #[allow(non_snake_case)]
-impl IInitializeWithStream_Impl for ExrThumbnailProvider {
+impl IInitializeWithStream_Impl for ExrThumbnailProvider_Impl {
     fn Initialize(&self, pstream: Option<&IStream>, _grfmode: u32) -> Result<()> {
-        let stream = pstream.ok_or_else(|| E_POINTER.into())?;
+        let stream = pstream.ok_or_else(|| Error::from(E_POINTER))?;
         let bytes = read_stream(stream)?;
         let mut stored = self.bytes.lock().map_err(|_| Error::from(E_FAIL))?;
         *stored = Some(bytes);
@@ -57,7 +57,7 @@ impl IInitializeWithStream_Impl for ExrThumbnailProvider {
 }
 
 #[allow(non_snake_case)]
-impl IThumbnailProvider_Impl for ExrThumbnailProvider {
+impl IThumbnailProvider_Impl for ExrThumbnailProvider_Impl {
     fn GetThumbnail(
         &self,
         cx: u32,
@@ -102,7 +102,7 @@ impl Drop for ClassFactory {
 }
 
 #[allow(non_snake_case)]
-impl IClassFactory_Impl for ClassFactory {
+impl IClassFactory_Impl for ClassFactory_Impl {
     fn CreateInstance(
         &self,
         punkouter: Option<&IUnknown>,
@@ -211,7 +211,7 @@ fn create_bitmap(width: u32, height: u32, bgra: &[u8]) -> Result<HBITMAP> {
             biHeight: -(height as i32),
             biPlanes: 1,
             biBitCount: 32,
-            biCompression: BI_RGB,
+            biCompression: BI_RGB.0,
             biSizeImage: expected_len as u32,
             ..Default::default()
         },
