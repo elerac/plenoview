@@ -139,6 +139,16 @@ On macOS, the local unsigned app and DMG are generated under `src-tauri/target/r
 
 On Windows, the installed executable is `Prismifold.exe`. The installer registers Prismifold as an OpenEXR `.exr` handler candidate, but Windows requires the user to choose the default app: open **Settings > Apps > Default apps > Choose defaults by file type > .exr** and select Prismifold, or right-click an `.exr` file and use **Open with**. Older builds may not appear automatically; browse to the installed `Prismifold.exe` if needed.
 
+Stable desktop installers are published from tagged GitHub Releases. Push a tag named `vX.Y.Z` where `X.Y.Z` matches `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`; the desktop workflow builds the Windows x64 NSIS installer and macOS Apple Silicon DMG, attaches checksums, and publishes the release.
+
+Latest desktop download URLs:
+
+```text
+Windows x64: https://github.com/elerac/prismifold/releases/latest/download/Prismifold-windows-x64-setup.exe
+macOS arm64: https://github.com/elerac/prismifold/releases/latest/download/Prismifold-macos-arm64.dmg
+Releases:    https://github.com/elerac/prismifold/releases/latest
+```
+
 ## GitHub Pages
 
 This project is prepared for GitHub Pages with a project page and app route:

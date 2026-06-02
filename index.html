@@ -23,6 +23,7 @@
         </a>
         <nav class="site-nav" aria-label="Project links">
           <a href="app/">App</a>
+          <a href="#downloads">Downloads</a>
           <a href="#features">Features</a>
           <a href="#gallery">Gallery</a>
           <a href="https://github.com/elerac/prismifold">GitHub</a>
@@ -49,14 +50,14 @@
                 </svg>
                 <span>Open Web App</span>
               </a>
-              <button class="button button-disabled" type="button" disabled>
+              <a class="button button-secondary" href="#downloads">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 5h16v10H4z" />
                   <path d="M9 20h6" />
                   <path d="M12 15v5" />
                 </svg>
-                <span>Desktop App Coming Later</span>
-              </button>
+                <span>Download Desktop</span>
+              </a>
             </div>
           </div>
 
@@ -77,6 +78,53 @@
           <li><code>exrs</code> WASM</li>
           <li>local files stay local</li>
         </ul>
+      </section>
+
+      <section id="downloads" class="downloads-section" aria-labelledby="downloads-title">
+        <div class="section-inner downloads-layout">
+          <div class="section-heading downloads-heading">
+            <h2 id="downloads-title">Downloads</h2>
+            <p>
+              Desktop installers are published from the latest GitHub Release. These unsigned
+              builds may show Windows or macOS security prompts.
+            </p>
+          </div>
+
+          <div class="download-actions" aria-label="Desktop downloads">
+            <a
+              class="download-option"
+              href="https://github.com/elerac/prismifold/releases/latest/download/Prismifold-windows-x64-setup.exe"
+              aria-label="Download Prismifold for Windows x64">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16v14H4z" />
+                <path d="M12 5v14" />
+                <path d="M4 12h16" />
+              </svg>
+              <span class="download-platform">Windows</span>
+              <span class="download-format">x64 NSIS installer</span>
+              <span class="download-action">Download .exe</span>
+            </a>
+
+            <a
+              class="download-option"
+              href="https://github.com/elerac/prismifold/releases/latest/download/Prismifold-macos-arm64.dmg"
+              aria-label="Download Prismifold for macOS ARM64">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 6.5c1.1-1.8 2.5-2.6 4.3-2.4" />
+                <path d="M17.7 13.2c0 2.8-2.3 6.2-4.1 6.2-.8 0-1.1-.4-1.9-.4s-1.2.4-1.9.4c-1.8 0-4.3-3.5-4.3-6.5 0-2.6 1.6-4.6 3.8-4.6.9 0 1.7.5 2.3.5.5 0 1.4-.6 2.5-.6 1.4 0 2.5.7 3.3 1.7" />
+              </svg>
+              <span class="download-platform">macOS</span>
+              <span class="download-format">Apple Silicon DMG</span>
+              <span class="download-action">Download .dmg</span>
+            </a>
+
+            <a
+              class="download-release-link"
+              href="https://github.com/elerac/prismifold/releases/latest">
+              Release notes and checksums
+            </a>
+          </div>
+        </div>
       </section>
 
       <section id="features" class="features-section" aria-labelledby="features-title">
@@ -200,6 +248,7 @@
       </div>
       <nav aria-label="Footer links">
         <a href="app/">App</a>
+        <a href="#downloads">Downloads</a>
         <a href="https://github.com/elerac/prismifold">GitHub</a>
         <a href="https://github.com/elerac/prismifold#readme">README</a>
         <a href="https://github.com/elerac/prismifold/blob/main/LICENSE">License</a>

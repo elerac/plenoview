@@ -4,6 +4,11 @@ import { expectViewerAppReady } from './helpers/app';
 const CBOX_RGB_URL = 'cbox_rgb.exr';
 const OWL_SPHERES_LINEAR_STOKES_URL =
   'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr';
+const RELEASES_URL = 'https://github.com/elerac/prismifold/releases/latest';
+const WINDOWS_DESKTOP_URL =
+  'https://github.com/elerac/prismifold/releases/latest/download/Prismifold-windows-x64-setup.exe';
+const MACOS_DESKTOP_URL =
+  'https://github.com/elerac/prismifold/releases/latest/download/Prismifold-macos-arm64.dmg';
 const EXPECTED_BOOTSTRAP_ABORT = 'Viewer application has not finished initializing.';
 
 function watchUnexpectedErrors(page: Page): string[] {
@@ -43,10 +48,14 @@ test('serves the project page with app and desktop download calls to action @smo
   const heroAppLink = page.getByRole('link', { name: 'Open Web App', exact: true }).first();
   await expect(heroAppLink).toBeVisible();
   await expect(heroAppLink).toHaveAttribute('href', 'app/');
+  const heroDownloadLink = page.getByRole('link', { name: 'Download Desktop', exact: true }).first();
+  await expect(heroDownloadLink).toBeVisible();
+  await expect(heroDownloadLink).toHaveAttribute('href', '#downloads');
+  await expect(page.getByRole('link', { name: 'Downloads', exact: true }).first()).toHaveAttribute(
+    'href',
+    '#downloads'
+  );
   await expect(page.getByRole('link', { name: 'Gallery', exact: true })).toHaveAttribute('href', '#gallery');
-
-  const desktopButton = page.getByRole('button', { name: 'Desktop App Coming Later', exact: true }).first();
-  await expect(desktopButton).toBeDisabled();
 
   const preview = page.getByRole('img', { name: /Prismifold interface/ });
   await expect(preview).toBeVisible();
@@ -55,6 +64,23 @@ test('serves the project page with app and desktop download calls to action @smo
   )).toBe(true);
   await expectNoHorizontalOverflow(page);
 
+  await expect(page.getByRole('heading', { name: 'Downloads', level: 2 })).toBeVisible();
+  await expect(page.getByText(
+    'Desktop installers are published from the latest GitHub Release. These unsigned builds may show Windows or macOS security prompts.',
+    { exact: true }
+  )).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download Prismifold for Windows x64', exact: true })).toHaveAttribute(
+    'href',
+    WINDOWS_DESKTOP_URL
+  );
+  await expect(page.getByRole('link', { name: 'Download Prismifold for macOS ARM64', exact: true })).toHaveAttribute(
+    'href',
+    MACOS_DESKTOP_URL
+  );
+  await expect(page.getByRole('link', { name: 'Release notes and checksums', exact: true })).toHaveAttribute(
+    'href',
+    RELEASES_URL
+  );
   await expect(page.getByRole('heading', { name: 'Features', level: 2 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Inspect', level: 3 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Visualize', level: 3 })).toBeVisible();
@@ -77,12 +103,16 @@ test('serves the project page with app and desktop download calls to action @smo
   );
 
   const sectionOrder = await page.evaluate(() => {
+    const downloads = document.querySelector('#downloads');
     const features = document.querySelector('#features');
     const gallery = document.querySelector('#gallery');
-    if (!features || !gallery) {
+    if (!downloads || !features || !gallery) {
       return false;
     }
-    return Boolean(features.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return (
+      Boolean(downloads.compareDocumentPosition(features) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+      Boolean(features.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING)
+    );
   });
   expect(sectionOrder).toBe(true);
 
