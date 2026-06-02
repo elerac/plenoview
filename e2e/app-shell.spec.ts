@@ -232,7 +232,7 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   );
 
   await expect(page.getByRole('heading', { name: 'Inspector' })).toHaveCount(0);
-  await expect(appMenuTitle).toHaveText('OpenEXR Viewer');
+  await expect(appMenuTitle).toHaveText('Prismifold');
   await expect(fileMenuButton).toBeVisible();
   await expect(fileMenu).toBeHidden();
   await expect(galleryMenuButton).toBeVisible();

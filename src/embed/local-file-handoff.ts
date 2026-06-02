@@ -1,12 +1,12 @@
 import type { EmbedViewerStateSnapshot } from './embed-state';
 
-export const EMBED_READY_MESSAGE = 'openexr-viewer:embed-ready';
-export const EMBED_LOAD_FILE_MESSAGE = 'openexr-viewer:load-file';
-export const EMBED_DEFERRED_LOAD_MESSAGE = 'openexr-viewer:deferred-load';
-export const LOCAL_HANDOFF_READY_MESSAGE = 'openexr-viewer:local-handoff-ready';
-export const LOCAL_HANDOFF_FILE_MESSAGE = 'openexr-viewer:local-handoff-file';
+export const EMBED_READY_MESSAGE = 'prismifold:embed-ready';
+export const EMBED_LOAD_FILE_MESSAGE = 'prismifold:load-file';
+export const EMBED_DEFERRED_LOAD_MESSAGE = 'prismifold:deferred-load';
+export const LOCAL_HANDOFF_READY_MESSAGE = 'prismifold:local-handoff-ready';
+export const LOCAL_HANDOFF_FILE_MESSAGE = 'prismifold:local-handoff-file';
 
-const DB_NAME = 'openexr-viewer-local-handoffs';
+const DB_NAME = 'prismifold-local-handoffs';
 const STORE_NAME = 'handoffs';
 const DB_VERSION = 1;
 const HANDOFF_TTL_MS = 60 * 60 * 1000;

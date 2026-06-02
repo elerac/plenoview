@@ -1,6 +1,6 @@
 import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from './stokes';
 
-export const STOKES_INVALID_VECTOR_MASK_STORAGE_KEY = 'openexr-viewer:stokes-invalid-vector-mask:v1';
+export const STOKES_INVALID_VECTOR_MASK_STORAGE_KEY = 'prismifold:stokes-invalid-vector-mask:v1';
 
 export function normalizeStokesInvalidVectorMaskSetting(input: unknown): boolean {
   return typeof input === 'boolean' ? input : DEFAULT_MASK_INVALID_STOKES_VECTORS;

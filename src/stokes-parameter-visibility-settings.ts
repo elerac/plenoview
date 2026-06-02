@@ -5,7 +5,7 @@ import {
   type StokesParameterVisibilitySettings
 } from './stokes';
 
-export const STOKES_PARAMETER_VISIBILITY_STORAGE_KEY = 'openexr-viewer:stokes-parameter-visibility:v1';
+export const STOKES_PARAMETER_VISIBILITY_STORAGE_KEY = 'prismifold:stokes-parameter-visibility:v1';
 
 export function normalizeStokesParameterVisibilitySettings(input: unknown): StokesParameterVisibilitySettings {
   const settings = createDefaultStokesParameterVisibilitySettings();

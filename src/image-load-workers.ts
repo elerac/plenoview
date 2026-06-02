@@ -1,4 +1,4 @@
-export const IMAGE_LOAD_WORKERS_STORAGE_KEY = 'openexr-viewer:image-load-workers:v1';
+export const IMAGE_LOAD_WORKERS_STORAGE_KEY = 'prismifold:image-load-workers:v1';
 export const MIN_IMAGE_LOAD_WORKERS = 1;
 export const SYSTEM_MAX_IMAGE_LOAD_WORKERS_FALLBACK = 2;
 

@@ -74,7 +74,7 @@ interface OpenedFileRowCallbacks {
 }
 
 const openedFileRowRefs = new WeakMap<HTMLElement, OpenedFileRowRefs>();
-const OPENED_FILE_DRAG_MIME = 'application/x-openexr-viewer-opened-file';
+const OPENED_FILE_DRAG_MIME = 'application/x-prismifold-opened-file';
 const OPENED_FILE_DRAG_IMAGE_OFFSET_X = 16;
 const OPENED_FILE_DRAG_IMAGE_OFFSET_Y = 16;
 

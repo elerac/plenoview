@@ -1,4 +1,4 @@
-export const SPECTRUM_LATTICE_MOTION_STORAGE_KEY = 'openexr-viewer:spectrum-lattice-motion:v1';
+export const SPECTRUM_LATTICE_MOTION_STORAGE_KEY = 'prismifold:spectrum-lattice-motion:v1';
 export const SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM = 'system';
 export const SPECTRUM_LATTICE_MOTION_ANIMATE = 'animate';
 export const DEFAULT_SPECTRUM_LATTICE_MOTION_PREFERENCE = SPECTRUM_LATTICE_MOTION_ANIMATE;

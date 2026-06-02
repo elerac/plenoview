@@ -1,4 +1,4 @@
-export const THEME_STORAGE_KEY = 'openexr-viewer:theme:v1';
+export const THEME_STORAGE_KEY = 'prismifold:theme:v1';
 export const DEFAULT_THEME_ID = 'default';
 export const SPECTRUM_LATTICE_THEME_ID = 'spectrum-lattice';
 

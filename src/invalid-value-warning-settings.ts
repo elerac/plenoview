@@ -1,4 +1,4 @@
-export const INVALID_VALUE_WARNING_STORAGE_KEY = 'openexr-viewer:invalid-value-warning:v1';
+export const INVALID_VALUE_WARNING_STORAGE_KEY = 'prismifold:invalid-value-warning:v1';
 export const DEFAULT_INVALID_VALUE_WARNING_ENABLED = true;
 
 export function normalizeInvalidValueWarningSetting(input: unknown): boolean {

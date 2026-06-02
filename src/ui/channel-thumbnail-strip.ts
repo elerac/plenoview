@@ -38,7 +38,7 @@ interface ChannelThumbnailPointerSelectionState {
 
 const tileRefs = new WeakMap<HTMLElement, ChannelThumbnailTileRefs>();
 const tileWrapperRefs = new WeakMap<HTMLElement, ChannelThumbnailTileRefs>();
-const CHANNEL_THUMBNAIL_DRAG_MIME = 'application/x-openexr-viewer-channel-thumbnail';
+const CHANNEL_THUMBNAIL_DRAG_MIME = 'application/x-prismifold-channel-thumbnail';
 const HOVER_PREVIEW_DELAY_MS = 500;
 const HOVER_PREVIEW_GAP_PX = 8;
 const HOVER_PREVIEW_VIEWPORT_MARGIN_PX = 8;

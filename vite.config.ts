@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const githubPagesBase = '/openexr_viewer/';
+const githubPagesBase = '/prismifold/';
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 const appHtml = resolve(rootDir, 'app/index.html');
 const projectHtml = resolve(rootDir, 'index.html');

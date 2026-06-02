@@ -8,7 +8,7 @@ import { syncSelectOptions } from './render-helpers';
 
 const COLORMAP_ZERO_CENTER_SLIDER_MIN_MAGNITUDE = 1e-16;
 const COLORMAP_GRADIENT_STOP_COUNT = 16;
-const NONE_COLORMAP_OPTION_VALUE = '__openexr-viewer-none__';
+const NONE_COLORMAP_OPTION_VALUE = '__prismifold-none__';
 const DEFAULT_COLORMAP_GRADIENT = 'linear-gradient(90deg, #d95656 0%, #05070a 50%, #59d884 100%)';
 const DEFAULT_COLORMAP_GRADIENT_REVERSED = 'linear-gradient(90deg, #59d884 0%, #05070a 50%, #d95656 100%)';
 const DISPLAY_GAMMA_MAGNET_TARGET = DEFAULT_DISPLAY_GAMMA;

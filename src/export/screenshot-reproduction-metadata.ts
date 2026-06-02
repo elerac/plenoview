@@ -13,7 +13,7 @@ import type {
 } from '../types';
 
 const SCREENSHOT_REPRODUCTION_METADATA_SCHEMA_VERSION = 2;
-const APP_NAME = 'openexr-viewer';
+const APP_NAME = 'prismifold';
 
 export interface ScreenshotReproductionMetadataBatchContext {
   archiveFilename: string;

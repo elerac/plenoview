@@ -53,8 +53,8 @@ import {
 } from '../src/image-load-workers';
 import { SPECTRAL_RGB_GROUPING_STORAGE_KEY } from '../src/spectral-default-settings';
 
-const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'openexr-viewer:auto-exposure-percentile:v1';
-const RULERS_VISIBLE_STORAGE_KEY = 'openexr-viewer:rulers-visible:v1';
+const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'prismifold:auto-exposure-percentile:v1';
+const RULERS_VISIBLE_STORAGE_KEY = 'prismifold:rulers-visible:v1';
 
 function getRecognitionCheckbox(id: ChannelRecognitionSettingId): HTMLInputElement {
   return document.querySelector<HTMLInputElement>(`input[data-channel-recognition-setting="${id}"]`)!;
@@ -831,7 +831,7 @@ describe('top bar and display controls', () => {
     button.click();
 
     expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(window.localStorage.getItem('openexr-viewer:auto-fit-image-on-select:v1')).toBe('true');
+    expect(window.localStorage.getItem('prismifold:auto-fit-image-on-select:v1')).toBe('true');
     expect(onAutoFitImageOnSelectChange).toHaveBeenLastCalledWith(true);
     expect(onAutoFitImage).toHaveBeenCalledTimes(1);
 
@@ -851,7 +851,7 @@ describe('top bar and display controls', () => {
     restoredButton.click();
 
     expect(restoredButton.getAttribute('aria-pressed')).toBe('false');
-    expect(window.localStorage.getItem('openexr-viewer:auto-fit-image-on-select:v1')).toBe('false');
+    expect(window.localStorage.getItem('prismifold:auto-fit-image-on-select:v1')).toBe('false');
     expect(restoredCallback).toHaveBeenLastCalledWith(false);
     expect(restoredAutoFitImage).not.toHaveBeenCalled();
   });
@@ -868,7 +868,7 @@ describe('top bar and display controls', () => {
     button.click();
 
     expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(window.localStorage.getItem('openexr-viewer:auto-fit-image-on-select:v1')).toBe('true');
+    expect(window.localStorage.getItem('prismifold:auto-fit-image-on-select:v1')).toBe('true');
     expect(onAutoFitImageOnSelectChange).toHaveBeenLastCalledWith(true);
     expect(onAutoFitImage).toHaveBeenCalledTimes(1);
 
@@ -883,7 +883,7 @@ describe('top bar and display controls', () => {
     button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(window.localStorage.getItem('openexr-viewer:auto-fit-image-on-select:v1')).toBe('true');
+    expect(window.localStorage.getItem('prismifold:auto-fit-image-on-select:v1')).toBe('true');
     expect(onAutoFitImageOnSelectChange).not.toHaveBeenCalled();
     expect(onAutoFitImage).not.toHaveBeenCalled();
 
@@ -906,7 +906,7 @@ describe('top bar and display controls', () => {
     button.click();
 
     expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(window.localStorage.getItem('openexr-viewer:auto-exposure:v1')).toBe('true');
+    expect(window.localStorage.getItem('prismifold:auto-exposure:v1')).toBe('true');
     expect(onAutoExposureChange).toHaveBeenLastCalledWith(true);
 
     installUiFixture();
@@ -920,7 +920,7 @@ describe('top bar and display controls', () => {
     restoredButton.click();
 
     expect(restoredButton.getAttribute('aria-pressed')).toBe('false');
-    expect(window.localStorage.getItem('openexr-viewer:auto-exposure:v1')).toBe('false');
+    expect(window.localStorage.getItem('prismifold:auto-exposure:v1')).toBe('false');
     expect(restoredCallback).toHaveBeenLastCalledWith(false);
   });
 
@@ -2122,7 +2122,7 @@ describe('panel split sizing', () => {
     installUiFixture();
     mockDesktopLayoutGeometry();
     window.localStorage.setItem(
-      'openexr-viewer:panel-splits:v1',
+      'prismifold:panel-splits:v1',
       JSON.stringify({
         imagePanelWidth: 260,
         rightPanelWidth: 340
@@ -2161,7 +2161,7 @@ describe('panel split sizing', () => {
     expect(mainLayout.style.getPropertyValue('--image-panel-width')).toBe('0px');
     expect(mainLayout.style.getPropertyValue('--image-panel-tab-width')).toBe('18px');
     expect(mainLayout.style.getPropertyValue('--image-panel-resizer-width')).toBe('0px');
-    expect(JSON.parse(window.localStorage.getItem('openexr-viewer:panel-splits:v1') ?? '{}')).toMatchObject({
+    expect(JSON.parse(window.localStorage.getItem('prismifold:panel-splits:v1') ?? '{}')).toMatchObject({
       imagePanelWidth: 280,
       imagePanelCollapsed: true
     });
@@ -2199,7 +2199,7 @@ describe('panel split sizing', () => {
     expect(imageResizer.getAttribute('aria-disabled')).toBe('true');
     expect(imageResizer.tabIndex).toBe(-1);
     expect(mainLayout.style.getPropertyValue('--image-panel-width')).toBe('0px');
-    expect(JSON.parse(window.localStorage.getItem('openexr-viewer:panel-splits:v1') ?? '{}')).toMatchObject({
+    expect(JSON.parse(window.localStorage.getItem('prismifold:panel-splits:v1') ?? '{}')).toMatchObject({
       imagePanelWidth: 280,
       imagePanelCollapsed: true
     });
@@ -2233,7 +2233,7 @@ describe('panel split sizing', () => {
     expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('210px');
     expect(mainLayout.style.getPropertyValue('--bottom-panel-tab-height')).toBe('18px');
     expect(mainLayout.style.getPropertyValue('--bottom-panel-resizer-height')).toBe('0.5rem');
-    expect(JSON.parse(window.localStorage.getItem('openexr-viewer:panel-splits:v1') ?? '{}')).toMatchObject({
+    expect(JSON.parse(window.localStorage.getItem('prismifold:panel-splits:v1') ?? '{}')).toMatchObject({
       bottomPanelHeight: 210,
       bottomPanelCollapsed: false
     });
@@ -2287,7 +2287,7 @@ describe('panel split sizing', () => {
     expect(bottomResizer.getAttribute('aria-disabled')).toBe('true');
     expect(bottomResizer.tabIndex).toBe(-1);
     expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('0px');
-    expect(JSON.parse(window.localStorage.getItem('openexr-viewer:panel-splits:v1') ?? '{}')).toMatchObject({
+    expect(JSON.parse(window.localStorage.getItem('prismifold:panel-splits:v1') ?? '{}')).toMatchObject({
       bottomPanelHeight: 210,
       bottomPanelCollapsed: true
     });
@@ -2310,7 +2310,7 @@ describe('panel split sizing', () => {
     installUiFixture();
     mockDesktopLayoutGeometry({ imageWidth: 280, rightWidth: 340, bottomHeight: 210 });
     window.localStorage.setItem(
-      'openexr-viewer:panel-splits:v1',
+      'prismifold:panel-splits:v1',
       JSON.stringify({
         imagePanelWidth: 280,
         rightPanelWidth: 340,
@@ -2419,7 +2419,7 @@ describe('panel split sizing', () => {
     expect(mainLayout.style.getPropertyValue('--image-panel-width')).toBe('220px');
     expect(mainLayout.style.getPropertyValue('--right-panel-width')).toBe('280px');
     expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('120px');
-    expect(JSON.parse(window.localStorage.getItem('openexr-viewer:panel-splits:v1') ?? '{}')).toEqual({
+    expect(JSON.parse(window.localStorage.getItem('prismifold:panel-splits:v1') ?? '{}')).toEqual({
       imagePanelWidth: 220,
       rightPanelWidth: 280,
       bottomPanelHeight: 120,
@@ -3360,7 +3360,7 @@ describe('view menu', () => {
     const spectrumTokenRule = readStyleRule(":root[data-theme='spectrum-lattice']");
     const stylesheet = readStyleSheet();
     const indexMarkup = readIndexMarkup();
-    const bootstrapIndex = indexMarkup.indexOf("openexr-viewer:theme:v1");
+    const bootstrapIndex = indexMarkup.indexOf("prismifold:theme:v1");
     const stylesheetIndex = indexMarkup.indexOf('<link rel="stylesheet" href="/src/style.css"');
 
     expect(viewerRule).toContain('background-image: none');
@@ -3612,7 +3612,7 @@ describe('view menu', () => {
     installUiFixture();
     mockDesktopLayoutGeometry({ imageWidth: 280, rightWidth: 340, bottomHeight: 210 });
     window.localStorage.setItem(
-      'openexr-viewer:panel-splits:v1',
+      'prismifold:panel-splits:v1',
       JSON.stringify({
         imagePanelWidth: 280,
         rightPanelWidth: 340,
@@ -3630,7 +3630,7 @@ describe('view menu', () => {
     const normalItem = document.getElementById('window-normal-menu-item') as HTMLButtonElement;
     const previewItem = document.getElementById('window-full-screen-preview-menu-item') as HTMLButtonElement;
     const mainLayout = document.getElementById('main-layout') as HTMLElement;
-    const beforeStorage = window.localStorage.getItem('openexr-viewer:panel-splits:v1');
+    const beforeStorage = window.localStorage.getItem('prismifold:panel-splits:v1');
 
     expect(mainLayout.style.getPropertyValue('--image-panel-width')).toBe('280px');
     expect(mainLayout.style.getPropertyValue('--right-panel-width')).toBe('340px');
@@ -3644,7 +3644,7 @@ describe('view menu', () => {
     expect(mainLayout.style.getPropertyValue('--image-panel-width')).toBe('280px');
     expect(mainLayout.style.getPropertyValue('--right-panel-width')).toBe('340px');
     expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('210px');
-    expect(window.localStorage.getItem('openexr-viewer:panel-splits:v1')).toBe(beforeStorage);
+    expect(window.localStorage.getItem('prismifold:panel-splits:v1')).toBe(beforeStorage);
   });
 
   it('falls back to an immersive in-window preview when the fullscreen API is unavailable', async () => {
@@ -8672,7 +8672,7 @@ describe('opened files reordering', () => {
 
     const dragImage = document.querySelector('.opened-file-drag-image') as HTMLDivElement;
     expect(dataTransfer.effectAllowed).toBe('copyMove');
-    expect(dataTransfer.getData('application/x-openexr-viewer-opened-file')).toBe('session-2');
+    expect(dataTransfer.getData('application/x-prismifold-opened-file')).toBe('session-2');
     expect(dataTransfer.getData('text/plain')).toBe('second.exr');
     expect(dataTransfer.setDragImage).toHaveBeenCalledWith(dragImage, 16, 16);
     expect(dragImage).toBeInstanceOf(HTMLDivElement);

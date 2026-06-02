@@ -5,32 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="OpenEXR Viewer is a browser-based OpenEXR viewer for local file loading, raw pixel probes, channel views, ROI statistics, panoramas, metadata, and PNG export."
+      content="Prismifold is a multichannel image viewer for computational imaging, rendering, and vision workflows."
     />
-    <title>OpenEXR Viewer</title>
-    <script src="embed/openexr-viewer.js"></script>
+    <title>Prismifold</title>
+    <script src="embed/prismifold.js"></script>
     <script type="module" src="/src/project-page.ts"></script>
   </head>
   <body>
     <header class="site-header" aria-label="Project navigation">
-      <a class="brand-link" href="./" aria-label="OpenEXR Viewer project page">
+      <a class="brand-link" href="./" aria-label="Prismifold project page">
         <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M6 2.75h8.25L19 7.5v13.75H6z" />
           <path d="M14 2.75V8h5" />
         </svg>
-        <span>OpenEXR Viewer</span>
+        <span>Prismifold</span>
       </a>
       <nav class="site-nav" aria-label="Project links">
         <a href="app/">App</a>
         <a href="#features">Features</a>
         <a href="#gallery">Gallery</a>
-        <a href="https://github.com/elerac/openexr_viewer">GitHub</a>
+        <a href="https://github.com/elerac/prismifold">GitHub</a>
       </nav>
     </header>
 
     <main>
       <section class="hero-section" aria-labelledby="hero-title">
-        <h1 id="hero-title">OpenEXR Viewer</h1>
+        <h1 id="hero-title">Prismifold</h1>
         <p class="hero-lede">
           Inspect OpenEXR images in the browser with local file loading, raw pixel probes,
           channel views, ROI statistics, panoramas, and PNG export.
@@ -56,11 +56,11 @@
         </div>
       </section>
 
-      <section class="preview-section" aria-label="OpenEXR Viewer app preview">
+      <section class="preview-section" aria-label="Prismifold app preview">
         <figure class="app-preview">
           <img
             src="project-page/app-preview.jpg"
-            alt="OpenEXR Viewer interface showing an EXR image, opened files, inspector panels, and channel thumbnails"
+            alt="Prismifold interface showing an EXR image, opened files, inspector panels, and channel thumbnails"
             width="1440"
             height="900"
           />
@@ -120,16 +120,16 @@
           <figure class="gallery-item">
             <figcaption>
               <strong>Cornell Box</strong>
-              <a href="https://elerac.github.io/openexr_viewer/cbox_rgb.exr">cbox_rgb.exr</a>
+              <a href="cbox_rgb.exr">cbox_rgb.exr</a>
             </figcaption>
             <div class="exr-embed-frame">
-              <openexr-viewer
+              <prismifold-viewer
                 data-responsive-height
-                src="https://elerac.github.io/openexr_viewer/cbox_rgb.exr"
+                src="cbox_rgb.exr"
                 name="Cornell Box"
                 width="100%"
                 height="420">
-              </openexr-viewer>
+              </prismifold-viewer>
             </div>
           </figure>
           <figure class="gallery-item">
@@ -141,7 +141,7 @@
               <a href="https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr">owl_spheres.exr</a>
             </figcaption>
             <div class="exr-embed-frame">
-              <openexr-viewer
+              <prismifold-viewer
                 data-responsive-height
                 src="https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr"
                 name="Owl Spheres Linear Stokes"
@@ -149,7 +149,7 @@
                 height="420"
                 bottom-panel="channels"
                 auto-load="false">
-              </openexr-viewer>
+              </prismifold-viewer>
             </div>
           </figure>
         </div>
@@ -158,7 +158,7 @@
 
     <footer class="site-footer">
       <div>
-        <strong>OpenEXR Viewer</strong>
+        <strong>Prismifold</strong>
         <span>MIT License</span>
       </div>
     </footer>

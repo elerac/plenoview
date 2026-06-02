@@ -4,17 +4,17 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-const EMBED_LOAD_FILE_MESSAGE = 'openexr-viewer:load-file';
-const EMBED_READY_MESSAGE = 'openexr-viewer:embed-ready';
-const EMBED_DEFERRED_LOAD_MESSAGE = 'openexr-viewer:deferred-load';
-const embedScript = readFileSync(resolve(process.cwd(), 'public/embed/openexr-viewer.js'), 'utf8');
+const EMBED_LOAD_FILE_MESSAGE = 'prismifold:load-file';
+const EMBED_READY_MESSAGE = 'prismifold:embed-ready';
+const EMBED_DEFERRED_LOAD_MESSAGE = 'prismifold:deferred-load';
+const embedScript = readFileSync(resolve(process.cwd(), 'public/embed/prismifold.js'), 'utf8');
 const originalFetch = window.fetch;
 const originalIframeContentWindow = Object.getOwnPropertyDescriptor(
   HTMLIFrameElement.prototype,
   'contentWindow'
 );
 
-interface OpenExrViewerElementForTest extends HTMLElement {
+interface PrismifoldViewerElementForTest extends HTMLElement {
   viewerOrigin: string;
   viewerTargetOrigin: string;
   loadFile(file: File, options?: { name?: string }): Promise<void>;
@@ -22,15 +22,15 @@ interface OpenExrViewerElementForTest extends HTMLElement {
   setView(view: string): void;
 }
 
-interface OpenExrViewerControllerForTest {
-  element: OpenExrViewerElementForTest;
+interface PrismifoldControllerForTest {
+  element: PrismifoldViewerElementForTest;
   loadFile(file: File, options?: { name?: string }): Promise<void>;
   loadUrl(src: string, options?: { name?: string; sourceOrigin?: string; view?: string }): Promise<void>;
-  setView(view: string): OpenExrViewerControllerForTest;
+  setView(view: string): PrismifoldControllerForTest;
   destroy(): void;
 }
 
-interface OpenExrViewerApiForTest {
+interface PrismifoldApiForTest {
   create(target: string | HTMLElement, options?: {
     src?: string;
     file?: File;
@@ -42,11 +42,11 @@ interface OpenExrViewerApiForTest {
     sourceOrigin?: string;
     bottomPanel?: string;
     autoLoad?: boolean | string;
-  }): OpenExrViewerControllerForTest;
+  }): PrismifoldControllerForTest;
 }
 
-interface OpenExrViewerWindowForTest extends Window {
-  OpenExrViewer: OpenExrViewerApiForTest;
+interface PrismifoldWindowForTest extends Window {
+  Prismifold: PrismifoldApiForTest;
 }
 
 beforeAll(() => {
@@ -81,14 +81,18 @@ afterEach(() => {
 
 describe('embed wrapper public script', () => {
   it('registers the custom element and global JS API', () => {
-    expect(customElements.get('openexr-viewer')).toEqual(expect.any(Function));
-    expect(getOpenExrViewer().create).toEqual(expect.any(Function));
+    expect(customElements.get('prismifold-viewer')).toEqual(expect.any(Function));
+    expect(getPrismifold().create).toEqual(expect.any(Function));
+    const legacyElementName = ['openexr', 'viewer'].join('-');
+    const legacyGlobalName = ['Open', 'Exr', 'Viewer'].join('');
+    expect(customElements.get(legacyElementName)).toBeUndefined();
+    expect((window as unknown as Record<string, unknown>)[legacyGlobalName]).toBeUndefined();
   });
 
   it('creates iframe-backed viewers with expected attributes', () => {
     document.body.innerHTML = '<div id="target"></div>';
 
-    const controller = getOpenExrViewer().create('#target', {
+    const controller = getPrismifold().create('#target', {
       src: 'https://example.com/render.exr',
       name: 'Beauty pass',
       width: 300,
@@ -115,13 +119,13 @@ describe('embed wrapper public script', () => {
   });
 
   it('passes bottom-panel markup through and omits the default probe query param', () => {
-    const defaultElement = document.createElement('openexr-viewer');
+    const defaultElement = document.createElement('prismifold-viewer');
     defaultElement.setAttribute('src', 'https://example.com/default.exr');
     document.body.append(defaultElement);
 
     expect(new URL(getViewerIframe(defaultElement).src).searchParams.get('bottomPanel')).toBeNull();
 
-    const noneElement = document.createElement('openexr-viewer');
+    const noneElement = document.createElement('prismifold-viewer');
     noneElement.setAttribute('src', 'https://example.com/hidden.exr');
     noneElement.setAttribute('bottom-panel', 'none');
     document.body.append(noneElement);
@@ -133,7 +137,7 @@ describe('embed wrapper public script', () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
 
-    const controller = getOpenExrViewer().create('#target', {
+    const controller = getPrismifold().create('#target', {
       src: './public/cbox_rgb.exr',
       name: 'Cornell Box',
       width: 300,
@@ -161,7 +165,7 @@ describe('embed wrapper public script', () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
 
-    const controller = getOpenExrViewer().create('#target', {
+    const controller = getPrismifold().create('#target', {
       src: './public/cbox_rgb.exr',
       name: 'Deferred Cornell Box',
       autoLoad: false
@@ -196,7 +200,7 @@ describe('embed wrapper public script', () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
 
-    const controller = getOpenExrViewer().create('#target', {
+    const controller = getPrismifold().create('#target', {
       src: 'https://example.com/render.exr',
       name: 'Remote render'
     });
@@ -211,7 +215,7 @@ describe('embed wrapper public script', () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
 
-    const controller = getOpenExrViewer().create('#target', {
+    const controller = getPrismifold().create('#target', {
       src: 'https://example.com/render.exr',
       name: 'Deferred remote render',
       autoLoad: false
@@ -225,7 +229,7 @@ describe('embed wrapper public script', () => {
   });
 
   it('accepts autoload as a markup alias for auto-load', () => {
-    const element = document.createElement('openexr-viewer');
+    const element = document.createElement('prismifold-viewer');
     element.setAttribute('src', 'https://example.com/render.exr');
     element.setAttribute('autoload', 'false');
     document.body.append(element);
@@ -237,7 +241,7 @@ describe('embed wrapper public script', () => {
   it('forces parent fetch when sourceOrigin is parent', async () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
-    const controller = getOpenExrViewer().create('#target');
+    const controller = getPrismifold().create('#target');
 
     const loadPromise = controller.loadUrl('https://example.com/render.exr', {
       name: 'Parent fetched',
@@ -258,7 +262,7 @@ describe('embed wrapper public script', () => {
 
   it('supports controller loadFile, loadUrl, setView, and destroy', async () => {
     document.body.innerHTML = '<div id="target"></div>';
-    const controller = getOpenExrViewer().create('#target', {
+    const controller = getPrismifold().create('#target', {
       height: 200
     });
     const initialIframe = getViewerIframe(controller.element);
@@ -293,12 +297,12 @@ describe('embed wrapper public script', () => {
     expect(panoramaUrl.searchParams.get('view')).toBe('panorama');
 
     controller.destroy();
-    expect(document.querySelector('openexr-viewer')).toBeNull();
+    expect(document.querySelector('prismifold-viewer')).toBeNull();
   });
 });
 
-function getOpenExrViewer(): OpenExrViewerApiForTest {
-  return (window as unknown as OpenExrViewerWindowForTest).OpenExrViewer;
+function getPrismifold(): PrismifoldApiForTest {
+  return (window as unknown as PrismifoldWindowForTest).Prismifold;
 }
 
 function getViewerIframe(element: HTMLElement): HTMLIFrameElement {
@@ -307,7 +311,7 @@ function getViewerIframe(element: HTMLElement): HTMLIFrameElement {
   return iframe as HTMLIFrameElement;
 }
 
-function dispatchEmbedReady(element: OpenExrViewerElementForTest, iframe: HTMLIFrameElement): void {
+function dispatchEmbedReady(element: PrismifoldViewerElementForTest, iframe: HTMLIFrameElement): void {
   window.dispatchEvent(new MessageEvent('message', {
     source: iframe.contentWindow,
     origin: element.viewerOrigin,
@@ -317,7 +321,7 @@ function dispatchEmbedReady(element: OpenExrViewerElementForTest, iframe: HTMLIF
   }));
 }
 
-function dispatchEmbedDeferredLoad(element: OpenExrViewerElementForTest, iframe: HTMLIFrameElement): void {
+function dispatchEmbedDeferredLoad(element: PrismifoldViewerElementForTest, iframe: HTMLIFrameElement): void {
   window.dispatchEvent(new MessageEvent('message', {
     source: iframe.contentWindow,
     origin: element.viewerOrigin,

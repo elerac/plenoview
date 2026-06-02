@@ -22,7 +22,7 @@ export interface ChannelRecognitionSettingDescriptor {
   mutable: boolean;
 }
 
-export const CHANNEL_RECOGNITION_SETTINGS_STORAGE_KEY = 'openexr-viewer:channel-recognition-settings:v1';
+export const CHANNEL_RECOGNITION_SETTINGS_STORAGE_KEY = 'prismifold:channel-recognition-settings:v1';
 
 export const CHANNEL_RECOGNITION_SETTING_DESCRIPTORS: readonly ChannelRecognitionSettingDescriptor[] = [
   { id: 'component.rgb', label: 'RGB component groups', defaultEnabled: true, mutable: true },

@@ -100,7 +100,7 @@ export class AppFullscreenController implements Disposable {
     this.elements.appFullscreenButton.setAttribute('aria-label', label);
     this.elements.appFullscreenButton.dataset.tooltip = tooltip;
     this.elements.appFullscreenButton.title = label;
-    window.dispatchEvent(new Event('openexr-viewer:desktop-command-state-changed'));
+    window.dispatchEvent(new Event('prismifold:desktop-command-state-changed'));
   }
 
   private isSupported(): boolean {

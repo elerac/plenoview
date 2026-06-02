@@ -102,7 +102,7 @@ export interface ParsedRgbMuellerMatrixChannelName {
   rgb: RgbNameRuleComponent;
 }
 
-export const CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY = 'openexr-viewer:channel-recognition-name-rules:v2';
+export const CHANNEL_RECOGNITION_NAME_RULES_STORAGE_KEY = 'prismifold:channel-recognition-name-rules:v2';
 
 export const CHANNEL_RECOGNITION_NAME_RULE_DESCRIPTORS: readonly ChannelRecognitionNameRuleDescriptor[] = [
   {

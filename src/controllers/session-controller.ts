@@ -38,7 +38,7 @@ interface GalleryImage {
   url?: string;
 }
 
-const DESKTOP_CBOX_RGB_URL = 'https://raw.githubusercontent.com/elerac/openexr_viewer/main/public/cbox_rgb.exr';
+const DESKTOP_CBOX_RGB_URL = 'https://raw.githubusercontent.com/elerac/prismifold/main/public/cbox_rgb.exr';
 const POLANALYSER_STOKES_BASE_URL =
   'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/';
 const KAIST_HYPERSPECTRAL_BASE_URL =

@@ -1013,7 +1013,7 @@ describe('render cache service', () => {
     service.setBudgetMb(128);
 
     expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(96, 128 * MB);
-    expect(localStorage.setItem).toHaveBeenCalledWith('openexr-viewer:display-cache-budget-mb:v1', '128');
+    expect(localStorage.setItem).toHaveBeenCalledWith('prismifold:display-cache-budget-mb:v1', '128');
 
     service.discard(first.id);
     service.clear();

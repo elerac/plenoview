@@ -1,5 +1,5 @@
 export const DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED = true;
-export const SPECTRAL_RGB_GROUPING_STORAGE_KEY = 'openexr-viewer:spectral-rgb-grouping:v1';
+export const SPECTRAL_RGB_GROUPING_STORAGE_KEY = 'prismifold:spectral-rgb-grouping:v1';
 
 export function normalizeSpectralRgbGroupingSetting(input: unknown): boolean {
   return typeof input === 'boolean' ? input : DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED;

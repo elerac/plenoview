@@ -155,7 +155,7 @@ describe('tauri host', () => {
 
   it('uses Rust-owned recent files and records successful grant loads', async () => {
     const recentChanged = vi.fn();
-    window.addEventListener('openexr-viewer:desktop-recent-files-changed', recentChanged);
+    window.addEventListener('prismifold:desktop-recent-files-changed', recentChanged);
     invokeMock
       .mockResolvedValueOnce([
         {
@@ -189,7 +189,7 @@ describe('tauri host', () => {
       expect(invokeMock).toHaveBeenNthCalledWith(2, 'record_recent_file', { grantId: 'grant-1' });
       expect(recentChanged).toHaveBeenCalledTimes(1);
     } finally {
-      window.removeEventListener('openexr-viewer:desktop-recent-files-changed', recentChanged);
+      window.removeEventListener('prismifold:desktop-recent-files-changed', recentChanged);
     }
   });
 
@@ -277,14 +277,14 @@ describe('tauri host', () => {
     });
     expect(setAsAppMenuMock).toHaveBeenCalledTimes(1);
 
-    window.dispatchEvent(new Event('openexr-viewer:desktop-command-state-changed'));
-    window.dispatchEvent(new Event('openexr-viewer:desktop-command-state-changed'));
+    window.dispatchEvent(new Event('prismifold:desktop-command-state-changed'));
+    window.dispatchEvent(new Event('prismifold:desktop-command-state-changed'));
     await vi.advanceTimersByTimeAsync(100);
     await Promise.resolve();
     expect(setAsAppMenuMock).toHaveBeenCalledTimes(1);
 
     exportEnabled = true;
-    window.dispatchEvent(new Event('openexr-viewer:desktop-command-state-changed'));
+    window.dispatchEvent(new Event('prismifold:desktop-command-state-changed'));
     await vi.advanceTimersByTimeAsync(100);
     await Promise.resolve();
     expect(setAsAppMenuMock).toHaveBeenCalledTimes(2);

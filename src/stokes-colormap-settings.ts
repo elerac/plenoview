@@ -9,7 +9,7 @@ import {
   type StokesColormapDefaultSettings
 } from './stokes';
 
-export const STOKES_COLORMAP_DEFAULTS_STORAGE_KEY = 'openexr-viewer:stokes-colormap-defaults:v1';
+export const STOKES_COLORMAP_DEFAULTS_STORAGE_KEY = 'prismifold:stokes-colormap-defaults:v1';
 
 export function normalizeStokesColormapDefaultSettings(
   input: unknown,

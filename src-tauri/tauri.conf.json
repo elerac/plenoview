@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "OpenEXR Viewer",
+  "productName": "Prismifold",
   "version": "0.1.0",
-  "identifier": "com.elerac.openexrviewer",
+  "identifier": "com.elerac.prismifold",
   "build": {
     "frontendDist": "../dist-desktop",
     "devUrl": "http://localhost:5173/app/",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "OpenEXR Viewer",
+        "title": "Prismifold",
         "url": "app/index.html",
         "width": 1440,
         "height": 960,

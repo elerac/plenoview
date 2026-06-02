@@ -116,7 +116,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.viewerContainer = document.createElement('section');
     this.viewerContainer.id = 'viewer-container';
     this.viewerContainer.className = 'viewer-container embed-viewer-container';
-    this.viewerContainer.setAttribute('aria-label', 'OpenEXR image viewer');
+    this.viewerContainer.setAttribute('aria-label', 'Prismifold image viewer');
     this.viewerContainer.tabIndex = 0;
 
     this.glCanvas = document.createElement('canvas');

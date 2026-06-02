@@ -1,6 +1,6 @@
 import './project-page.css';
 
-const embedViewers = document.querySelectorAll('openexr-viewer[data-responsive-height]');
+const embedViewers = document.querySelectorAll('prismifold-viewer[data-responsive-height]');
 const mobileEmbedHeightQuery = window.matchMedia('(max-width: 620px)');
 
 function syncEmbedViewerHeight(): void {

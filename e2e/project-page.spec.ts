@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-const CBOX_RGB_URL = 'https://elerac.github.io/openexr_viewer/cbox_rgb.exr';
+const CBOX_RGB_URL = 'cbox_rgb.exr';
 const OWL_SPHERES_LINEAR_STOKES_URL =
   'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr';
 
 test('serves the project page with app and desktop download calls to action @smoke', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'OpenEXR Viewer', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prismifold', level: 1 })).toBeVisible();
 
   const heroAppLink = page.getByRole('link', { name: 'Open Web App', exact: true }).first();
   await expect(heroAppLink).toBeVisible();
@@ -17,7 +17,7 @@ test('serves the project page with app and desktop download calls to action @smo
   const desktopButton = page.getByRole('button', { name: 'Desktop App Coming Later', exact: true }).first();
   await expect(desktopButton).toBeDisabled();
 
-  const preview = page.getByRole('img', { name: /OpenEXR Viewer interface/ });
+  const preview = page.getByRole('img', { name: /Prismifold interface/ });
   await expect(preview).toBeVisible();
   await expect.poll(async () => (
     await preview.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)
@@ -46,7 +46,7 @@ test('serves the project page with app and desktop download calls to action @smo
   expect(sectionOrder).toBe(true);
 
   await page.locator('#gallery').scrollIntoViewIfNeeded();
-  const embeds = page.locator('openexr-viewer');
+  const embeds = page.locator('prismifold-viewer');
   await expect(embeds).toHaveCount(2);
 
   const cornellEmbed = embeds.first();
@@ -68,7 +68,7 @@ test('serves the project page with app and desktop download calls to action @smo
     return iframe instanceof HTMLIFrameElement ? iframe.src : '';
   });
   expect(iframeSrc).toContain('/app/?ui=embed');
-  expect(iframeSrc).toContain(`src=${encodeURIComponent(CBOX_RGB_URL)}`);
+  expect(iframeSrc).not.toContain('src=');
   expect(iframeSrc).toContain('name=Cornell+Box');
 
   const stokesIframeSrc = await stokesEmbed.evaluate((element) => {

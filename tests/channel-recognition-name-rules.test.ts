@@ -189,7 +189,7 @@ describe('channel recognition name rules', () => {
       pattern: '^(?<element>[mM][0-3][0-3])(?:_(?<suffix>.+))?$'
     };
 
-    store.set('openexr-viewer:channel-recognition-name-rules:v1', JSON.stringify(rules));
+    store.set('prismifold:channel-recognition-name-rules:v1', JSON.stringify(rules));
     expect(readStoredChannelRecognitionNameRules()).toEqual(createDefaultChannelRecognitionNameRules());
 
     saveStoredChannelRecognitionNameRules(rules);

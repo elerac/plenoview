@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenEXR Viewer</title>
+    <title>Prismifold</title>
     <script>
       (() => {
         const panelSplitRanges = {
@@ -25,7 +25,7 @@
         };
 
         try {
-          if (window.localStorage.getItem('openexr-viewer:theme:v1') === 'spectrum-lattice') {
+          if (window.localStorage.getItem('prismifold:theme:v1') === 'spectrum-lattice') {
             document.documentElement.dataset.theme = 'spectrum-lattice';
           }
         } catch {
@@ -33,7 +33,7 @@
         }
 
         try {
-          const storedPanelSplits = window.localStorage.getItem('openexr-viewer:panel-splits:v1');
+          const storedPanelSplits = window.localStorage.getItem('prismifold:panel-splits:v1');
           if (!storedPanelSplits) {
             return;
           }
@@ -85,7 +85,7 @@
     <div id="app" class="app-shell">
       <canvas id="spectrum-lattice-canvas" class="spectrum-lattice-canvas hidden" aria-hidden="true"></canvas>
       <header id="app-menu-bar" class="app-menu-bar" aria-label="Application menu">
-        <div class="app-menu-title">OpenEXR Viewer</div>
+        <div class="app-menu-title">Prismifold</div>
         <nav class="app-menu-nav" aria-label="Main menu">
           <div class="app-menu">
             <button id="file-menu-button" class="app-menu-tab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">

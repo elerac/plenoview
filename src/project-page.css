@@ -218,7 +218,7 @@ main {
   box-shadow: var(--shadow);
 }
 
-.exr-embed-frame openexr-viewer {
+.exr-embed-frame prismifold-viewer {
   display: block;
   width: 100%;
 }

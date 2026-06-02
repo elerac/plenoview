@@ -1,4 +1,4 @@
-export const VIEWER_BACKGROUND_STORAGE_KEY = 'openexr-viewer:viewer-background:v1';
+export const VIEWER_BACKGROUND_STORAGE_KEY = 'prismifold:viewer-background:v1';
 export const DEFAULT_VIEWER_BACKGROUND_ID = 'checker';
 
 interface ViewerBackgroundDefinitionBase {

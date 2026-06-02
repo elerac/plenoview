@@ -1,7 +1,7 @@
 (() => {
-  const EMBED_READY_MESSAGE = 'openexr-viewer:embed-ready';
-  const EMBED_LOAD_FILE_MESSAGE = 'openexr-viewer:load-file';
-  const EMBED_DEFERRED_LOAD_MESSAGE = 'openexr-viewer:deferred-load';
+  const EMBED_READY_MESSAGE = 'prismifold:embed-ready';
+  const EMBED_LOAD_FILE_MESSAGE = 'prismifold:load-file';
+  const EMBED_DEFERRED_LOAD_MESSAGE = 'prismifold:deferred-load';
   const SOURCE_ORIGIN_AUTO = 'auto';
   const SOURCE_ORIGIN_PARENT = 'parent';
   const SOURCE_ORIGIN_VIEWER = 'viewer';
@@ -21,7 +21,7 @@
     ? document.currentScript.src
     : '';
 
-  class OpenExrViewerElement extends HTMLElement {
+  class PrismifoldViewerElement extends HTMLElement {
     static get observedAttributes() {
       return observedAttributes;
     }
@@ -63,7 +63,7 @@
     loadUrl(src, options = {}) {
       const sourceUrl = normalizeNonEmpty(src);
       if (!sourceUrl) {
-        return Promise.reject(new TypeError('openexr-viewer.loadUrl(src) expects a non-empty string.'));
+        return Promise.reject(new TypeError('prismifold-viewer.loadUrl(src) expects a non-empty string.'));
       }
 
       const nextSourceOrigin = hasOwn(options, 'sourceOrigin')
@@ -90,7 +90,7 @@
 
     loadFile(file, options = {}) {
       if (!(file instanceof File)) {
-        return Promise.reject(new TypeError('openexr-viewer.loadFile(file) expects a File.'));
+        return Promise.reject(new TypeError('prismifold-viewer.loadFile(file) expects a File.'));
       }
       this.deferredFileLoad = null;
       this.sourceLoadId += 1;
@@ -112,7 +112,7 @@
 
       const iframe = document.createElement('iframe');
       iframe.src = this.buildIframeUrl();
-      iframe.title = this.getAttribute('name') || 'OpenEXR viewer';
+      iframe.title = this.getAttribute('name') || 'Prismifold viewer';
       iframe.loading = 'lazy';
       iframe.allow = 'clipboard-write';
       this.style.width = normalizeCssSize(this.getAttribute('width') || '100%');
@@ -327,9 +327,9 @@
     }
   }
 
-  function createOpenExrViewer(target, options = {}) {
+  function createPrismifoldViewer(target, options = {}) {
     const container = resolveTargetElement(target);
-    const element = document.createElement('openexr-viewer');
+    const element = document.createElement('prismifold-viewer');
     const autoLoad = hasOwn(options, 'autoLoad') ? parseAutoLoad(options.autoLoad) : true;
 
     applyCreateOptions(element, options);
@@ -361,7 +361,7 @@
 
     if (autoLoad && options.file) {
       void controller.loadFile(options.file, { name: options.name }).catch((error) => {
-        logEmbedError('Failed to load the provided OpenEXR file.', error);
+        logEmbedError('Failed to load the provided Prismifold file.', error);
       });
     } else if (autoLoad && options.src) {
       void controller.loadUrl(options.src, {
@@ -401,7 +401,7 @@
       ? document.querySelector(target)
       : target;
     if (!(element instanceof HTMLElement)) {
-      throw new TypeError('OpenExrViewer.create(target, options) expects a selector or HTMLElement target.');
+      throw new TypeError('Prismifold.create(target, options) expects a selector or HTMLElement target.');
     }
     return element;
   }
@@ -499,14 +499,14 @@
   }
 
   function logEmbedError(message, error) {
-    console.error(`[openexr-viewer] ${message}`, error);
+    console.error(`[prismifold] ${message}`, error);
   }
 
-  if (!customElements.get('openexr-viewer')) {
-    customElements.define('openexr-viewer', OpenExrViewerElement);
+  if (!customElements.get('prismifold-viewer')) {
+    customElements.define('prismifold-viewer', PrismifoldViewerElement);
   }
 
-  window.OpenExrViewer = {
-    create: createOpenExrViewer
+  window.Prismifold = {
+    create: createPrismifoldViewer
   };
 })();

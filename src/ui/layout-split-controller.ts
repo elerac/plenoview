@@ -9,7 +9,7 @@ import type {
 import { DisposableBag, type Disposable } from '../lifecycle';
 import type { LayoutSplitElements } from './elements';
 
-const PANEL_SPLIT_STORAGE_KEY = 'openexr-viewer:panel-splits:v1';
+const PANEL_SPLIT_STORAGE_KEY = 'prismifold:panel-splits:v1';
 const PANEL_SPLIT_KEYBOARD_STEP = 16;
 const PANEL_SPLIT_KEYBOARD_LARGE_STEP = 64;
 const PANEL_COLLAPSE_TAB_WIDTH = 18;
