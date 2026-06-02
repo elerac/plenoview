@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from './helpers/test';
 import { expectViewerAppReady } from './helpers/app';
 
 const CBOX_RGB_URL = 'cbox_rgb.exr';
-const BROWN_PHOTOSTUDIO_PANORAMA_URL = 'brown_photostudio_02_4k.exr';
+const BROWN_PHOTOSTUDIO_PANORAMA_URL =
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/brown_photostudio_02_1k.exr';
+const BROWN_PHOTOSTUDIO_PANORAMA_FILENAME = 'brown_photostudio_02_1k.exr';
 const OWL_SPHERES_LINEAR_STOKES_URL =
   'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr';
 const RELEASES_URL = 'https://github.com/elerac/prismifold/releases/latest';
@@ -123,7 +126,7 @@ test('serves the project page with app and desktop download calls to action @smo
   await expect(page.getByText('Panorama environment viewing', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'cbox_rgb.exr', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'owl_spheres.exr', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'brown_photostudio_02_4k.exr', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: BROWN_PHOTOSTUDIO_PANORAMA_FILENAME, exact: true })).toHaveCount(0);
 
   const sectionOrder = await page.evaluate(() => {
     const downloads = document.querySelector('#downloads');
@@ -201,7 +204,7 @@ test('serves the project page with app and desktop download calls to action @smo
     return iframe instanceof HTMLIFrameElement ? iframe.src : '';
   });
   expect(panoramaIframeSrc).toContain('/app/?ui=embed');
-  expect(panoramaIframeSrc).not.toContain('src=');
+  expect(panoramaIframeSrc).toContain(`src=${encodeURIComponent(BROWN_PHOTOSTUDIO_PANORAMA_URL)}`);
   expect(panoramaIframeSrc).toContain('view=panorama');
   expect(panoramaIframeSrc).not.toContain('name=');
   expect(panoramaIframeSrc).toContain('autoLoad=false');
@@ -240,6 +243,35 @@ test('serves the project page with app and desktop download calls to action @smo
       return iframe instanceof HTMLIFrameElement ? iframe.style.height : '';
     })
   )).toBe('280px');
+  expect(unexpectedErrors).toEqual([]);
+});
+
+test('loads the deferred panorama embed from its remote source when clicked', async ({ page }) => {
+  const unexpectedErrors = watchUnexpectedErrors(page);
+  const fixtureBytes = readFileSync(new URL('../public/cbox_rgb.exr', import.meta.url));
+  await page.route(BROWN_PHOTOSTUDIO_PANORAMA_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/aces',
+      body: fixtureBytes
+    });
+  });
+
+  await page.goto('/');
+  const panoramaEmbed = page.locator('prismifold-viewer').nth(2);
+  await panoramaEmbed.scrollIntoViewIfNeeded();
+
+  const embeddedViewer = panoramaEmbed.frameLocator('iframe');
+  const loadButton = embeddedViewer.getByRole('button', { name: 'Load image', exact: true });
+  const openFullButton = embeddedViewer.getByRole('button', { name: 'Open full viewer', exact: true });
+
+  await expect(loadButton).toBeVisible();
+  await expect(openFullButton).toBeDisabled();
+  await loadButton.click();
+
+  await expect(loadButton).toBeHidden();
+  await expect(openFullButton).toBeEnabled({ timeout: 30000 });
+  await expect(embeddedViewer.locator('.embed-status')).toBeHidden();
   expect(unexpectedErrors).toEqual([]);
 });
 

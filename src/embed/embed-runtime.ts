@@ -5,6 +5,7 @@ import {
   EMBED_READY_MESSAGE,
   LOCAL_HANDOFF_READY_MESSAGE,
   deleteExpiredLocalFileHandoffs,
+  isEmbedLoadErrorMessage,
   isEmbedLoadFileMessage,
   isLocalFileHandoffFileMessage,
   loadStoredLocalFileHandoff,
@@ -15,13 +16,19 @@ import type { ViewerSessionState } from '../types';
 
 export function registerEmbedMessageBridge(app: AppHandle): () => void {
   const onMessage = (event: MessageEvent): void => {
-    if (event.source !== window.parent || !isEmbedLoadFileMessage(event.data)) {
+    if (event.source !== window.parent) {
       return;
     }
-    void app.loadFile(event.data.file, {
-      name: event.data.name,
-      state: event.data.state ?? null
-    });
+    if (isEmbedLoadFileMessage(event.data)) {
+      void app.loadFile(event.data.file, {
+        name: event.data.name,
+        state: event.data.state ?? null
+      });
+      return;
+    }
+    if (isEmbedLoadErrorMessage(event.data)) {
+      app.setError(event.data.message);
+    }
   };
 
   window.addEventListener('message', onMessage);

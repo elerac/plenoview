@@ -2,6 +2,7 @@
   const EMBED_READY_MESSAGE = 'prismifold:embed-ready';
   const EMBED_LOAD_FILE_MESSAGE = 'prismifold:load-file';
   const EMBED_DEFERRED_LOAD_MESSAGE = 'prismifold:deferred-load';
+  const EMBED_LOAD_ERROR_MESSAGE = 'prismifold:load-error';
   const SOURCE_ORIGIN_AUTO = 'auto';
   const SOURCE_ORIGIN_PARENT = 'parent';
   const SOURCE_ORIGIN_VIEWER = 'viewer';
@@ -32,6 +33,7 @@
       this.iframe = null;
       this.ready = false;
       this.pendingFileLoads = [];
+      this.pendingLoadErrors = [];
       this.defaultViewerBaseUrl = resolveViewerBaseUrl(currentScriptUrl);
       this.viewerBaseUrl = this.defaultViewerBaseUrl;
       this.viewerOrigin = new URL(this.viewerBaseUrl).origin;
@@ -180,6 +182,7 @@
       if (event.data?.type === EMBED_READY_MESSAGE) {
         this.ready = true;
         this.postPendingFiles();
+        this.postPendingLoadErrors();
         return;
       }
       if (event.data?.type === EMBED_DEFERRED_LOAD_MESSAGE) {
@@ -278,25 +281,32 @@
     async loadParentFetchedUrl(src, options = {}) {
       const loadId = this.sourceLoadId + 1;
       this.sourceLoadId = loadId;
-      const url = new URL(src, document.baseURI).toString();
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to load ${url} (${response.status})`);
-      }
+      try {
+        const url = new URL(src, document.baseURI).toString();
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to load ${url} (${response.status})`);
+        }
 
-      const blob = await response.blob();
-      if (loadId !== this.sourceLoadId) {
-        return;
-      }
+        const blob = await response.blob();
+        if (loadId !== this.sourceLoadId) {
+          return;
+        }
 
-      const fileName = normalizeNonEmpty(options.name) || inferFilenameFromUrl(url);
-      const file = new File([blob], fileName, {
-        type: blob.type || 'application/octet-stream'
-      });
-      await this.enqueueFileLoad(file, {
-        name: normalizeNonEmpty(options.name),
-        state: normalizeViewerState(options.state)
-      });
+        const fileName = normalizeNonEmpty(options.name) || inferFilenameFromUrl(url);
+        const file = new File([blob], fileName, {
+          type: blob.type || 'application/octet-stream'
+        });
+        await this.enqueueFileLoad(file, {
+          name: normalizeNonEmpty(options.name),
+          state: normalizeViewerState(options.state)
+        });
+      } catch (error) {
+        if (loadId === this.sourceLoadId) {
+          this.enqueueLoadError(formatLoadErrorMessage(error, src));
+        }
+        throw error;
+      }
     }
 
     setDeferredFileLoad(file, options = {}) {
@@ -340,6 +350,25 @@
         } catch (error) {
           pending.reject(error);
         }
+      }
+    }
+
+    enqueueLoadError(message) {
+      this.pendingLoadErrors.push(message);
+      this.postPendingLoadErrors();
+    }
+
+    postPendingLoadErrors() {
+      if (!this.ready || !this.iframe?.contentWindow) {
+        return;
+      }
+
+      while (this.pendingLoadErrors.length > 0) {
+        const message = this.pendingLoadErrors.shift();
+        this.iframe.contentWindow.postMessage({
+          type: EMBED_LOAD_ERROR_MESSAGE,
+          message
+        }, this.viewerTargetOrigin);
       }
     }
   }
@@ -527,6 +556,12 @@
       const filename = String(url).split(/[?#]/, 1)[0].split('/').filter(Boolean).pop();
       return filename || 'image.exr';
     }
+  }
+
+  function formatLoadErrorMessage(error, fallbackSrc) {
+    return error instanceof Error && error.message
+      ? error.message
+      : `Failed to load ${fallbackSrc}.`;
   }
 
   function hasOwn(value, key) {

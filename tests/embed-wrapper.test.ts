@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const EMBED_LOAD_FILE_MESSAGE = 'prismifold:load-file';
+const EMBED_LOAD_ERROR_MESSAGE = 'prismifold:load-error';
 const EMBED_READY_MESSAGE = 'prismifold:embed-ready';
 const EMBED_DEFERRED_LOAD_MESSAGE = 'prismifold:deferred-load';
 const embedScript = readFileSync(resolve(process.cwd(), 'public/embed/prismifold.js'), 'utf8');
@@ -215,6 +216,33 @@ describe('embed wrapper public script', () => {
     expect(posted.file.name).toBe('Deferred Cornell Box');
   });
 
+  it('posts load errors for failed deferred parent-fetched sources', async () => {
+    document.body.innerHTML = '<div id="target"></div>';
+    const fetchMock = stubFetchNotFound();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const controller = getPrismifold().create('#target', {
+      src: './public/missing.exr',
+      autoLoad: false
+    });
+    const iframe = getViewerIframe(controller.element);
+    const postMessage = spyOnIframePostMessage(iframe);
+
+    dispatchEmbedReady(controller.element, iframe);
+    dispatchEmbedDeferredLoad(controller.element, iframe);
+    await flushPromises();
+
+    const posted = postMessage.mock.calls[0]?.[0] as {
+      type: string;
+      message?: string;
+    };
+    expect(fetchMock).toHaveBeenCalledWith(new URL('./public/missing.exr', document.baseURI).toString());
+    expect(posted).toMatchObject({
+      type: EMBED_LOAD_ERROR_MESSAGE,
+      message: expect.stringContaining('(404)')
+    });
+  });
+
   it('keeps absolute HTTPS sources in the iframe URL by default', () => {
     document.body.innerHTML = '<div id="target"></div>';
     const fetchMock = stubFetchOk();
@@ -383,6 +411,21 @@ function stubFetchOk() {
       blob: async () => new Blob([new Uint8Array([1, 2, 3])], {
         type: 'image/x-exr'
       })
+    } as Response;
+  });
+  Object.defineProperty(window, 'fetch', {
+    configurable: true,
+    writable: true,
+    value: fetchMock
+  });
+  return fetchMock;
+}
+
+function stubFetchNotFound() {
+  const fetchMock = vi.fn<typeof fetch>(async () => {
+    return {
+      ok: false,
+      status: 404
     } as Response;
   });
   Object.defineProperty(window, 'fetch', {

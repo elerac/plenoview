@@ -42,6 +42,7 @@ export interface AppHandle {
   loadGallery(galleryId: string, options?: { name?: string; state?: EmbedViewerStateSnapshot | null }): Promise<void>;
   loadFile(file: File, options?: { name?: string; state?: EmbedViewerStateSnapshot | null }): Promise<void>;
   applyState(state: EmbedViewerStateSnapshot | null | undefined): void;
+  setError(message: string | null): void;
   deferInitialLoad(load: () => void | Promise<void>): void;
   openFullViewer(): void;
   dispose(): void;
@@ -153,6 +154,9 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
     },
     applyState: (state) => {
       applyEmbedViewerStateSnapshot(core, state);
+    },
+    setError: (message) => {
+      core.dispatch({ type: 'errorSet', message });
     },
     deferInitialLoad: (load) => {
       if (!ui.setDeferredLoad) {

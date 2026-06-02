@@ -5,7 +5,7 @@ import {
   registerEmbedMessageBridge,
   runInitialBootstrapLoad
 } from '../src/embed/embed-runtime';
-import { EMBED_LOAD_FILE_MESSAGE } from '../src/embed/local-file-handoff';
+import { EMBED_LOAD_ERROR_MESSAGE, EMBED_LOAD_FILE_MESSAGE } from '../src/embed/local-file-handoff';
 import type { AppHandle } from '../src/app/bootstrap';
 
 function createAppHandle(): AppHandle {
@@ -14,6 +14,7 @@ function createAppHandle(): AppHandle {
     loadGallery: vi.fn(async () => undefined),
     loadFile: vi.fn(async () => undefined),
     applyState: vi.fn(),
+    setError: vi.fn(),
     deferInitialLoad: vi.fn(),
     openFullViewer: vi.fn(),
     dispose: vi.fn()
@@ -98,6 +99,22 @@ describe('embed runtime', () => {
         viewerMode: 'panorama'
       }
     });
+    cleanup();
+  });
+
+  it('passes wrapper-provided load errors to the app error state', () => {
+    const app = createAppHandle();
+    const cleanup = registerEmbedMessageBridge(app);
+
+    window.dispatchEvent(new MessageEvent('message', {
+      source: window,
+      data: {
+        type: EMBED_LOAD_ERROR_MESSAGE,
+        message: 'Failed to load image.exr (404)'
+      }
+    }));
+
+    expect(app.setError).toHaveBeenCalledWith('Failed to load image.exr (404)');
     cleanup();
   });
 });
