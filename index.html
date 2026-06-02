@@ -7,6 +7,7 @@
       name="description"
       content="Prismifold is a multichannel image viewer for computational imaging, rendering, and vision workflows."
     />
+    <link rel="icon" type="image/png" href="project-page/app-icon.png" />
     <title>Prismifold</title>
     <script src="embed/prismifold.js"></script>
     <script type="module" src="/src/project-page.ts"></script>
@@ -15,14 +16,17 @@
     <div class="intro-shell">
       <header class="site-header" aria-label="Project navigation">
         <a class="brand-link" href="./" aria-label="Prismifold project page">
-          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 2.75h8.25L19 7.5v13.75H6z" />
-            <path d="M14 2.75V8h5" />
-          </svg>
+          <img
+            class="brand-mark"
+            src="project-page/app-icon.png"
+            width="28"
+            height="28"
+            alt=""
+            aria-hidden="true"
+          />
           <span>Prismifold</span>
         </a>
         <nav class="site-nav" aria-label="Project links">
-          <a href="app/">App</a>
           <a href="#downloads">Downloads</a>
           <a href="#features">Features</a>
           <a href="#gallery">Gallery</a>
@@ -37,12 +41,16 @@
           <div class="hero-copy">
             <h1 id="hero-title">Prismifold</h1>
             <p class="hero-lede">
-              OpenEXR viewer for channel-heavy computational images. Inspect local files with
-              raw probes, channel views, ROI statistics, panoramas, and PNG export.
+              Prismifold is an OpenEXR image viewer for computational imaging, rendering, and
+              vision workflows. It unfolds polarization, spectral, panoramas, depth, AoVs and exact
+              pixel values from images with more than color.
             </p>
-            <p class="hero-note">WebGL2 + exrs WASM. Local files stay in your browser.</p>
+            <p class="hero-origin">
+              The name evokes a prism not merely as a symbol of color, but as a way of unfolding
+              the manifold structure hidden inside high-dimensional image data.
+            </p>
             <div class="hero-actions" aria-label="Primary actions">
-              <a class="button button-primary" href="app/">
+              <a class="button button-primary" href="app/" target="_blank" rel="noopener">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M14 5h5v5" />
                   <path d="M10 14 19 5" />
@@ -70,14 +78,6 @@
             />
           </figure>
         </div>
-
-        <ul class="technical-strip" aria-label="Technical support">
-          <li>OpenEXR 2.x scanline</li>
-          <li>half / float / uint</li>
-          <li>WebGL2</li>
-          <li><code>exrs</code> WASM</li>
-          <li>local files stay local</li>
-        </ul>
       </section>
 
       <section id="downloads" class="downloads-section" aria-labelledby="downloads-title">
@@ -201,37 +201,59 @@
             <figure class="gallery-item">
               <figcaption>
                 <div class="gallery-caption-copy">
-                  <strong>Cornell Box</strong>
-                  <span>Classic local RGB sample.</span>
+                  <strong>RGB image inspection</strong>
+                  <span>
+                    Inspect a simple RGB OpenEXR image with pixel probes for exact source values.
+                  </span>
                 </div>
-                <a href="cbox_rgb.exr">cbox_rgb.exr</a>
               </figcaption>
               <div class="exr-embed-frame">
                 <prismifold-viewer
                   data-responsive-height
                   src="cbox_rgb.exr"
-                  name="Cornell Box"
                   width="100%"
-                  height="420">
+                  height="360">
                 </prismifold-viewer>
               </div>
             </figure>
             <figure class="gallery-item">
               <figcaption>
                 <div class="gallery-caption-copy">
-                  <strong>Owl Spheres Linear Stokes</strong>
-                  <span>Linear Stokes vector image</span>
+                  <strong>Stokes vector visualization</strong>
+                  <span>
+                    Visualize linear polarization data by deriving AoLP and DoLP views from S0, S1,
+                    and S2 Stokes channels.
+                  </span>
                 </div>
-                <a href="https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr">owl_spheres.exr</a>
               </figcaption>
               <div class="exr-embed-frame">
                 <prismifold-viewer
                   data-responsive-height
                   src="https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr"
-                  name="Owl Spheres Linear Stokes"
                   width="100%"
-                  height="420"
+                  height="360"
                   bottom-panel="channels"
+                  auto-load="false">
+                </prismifold-viewer>
+              </div>
+            </figure>
+            <figure class="gallery-item">
+              <figcaption>
+                <div class="gallery-caption-copy">
+                  <strong>Panorama environment viewing</strong>
+                  <span>
+                    Explore equirectangular HDRI data in panorama mode, orbiting the view while
+                    probes map screen rays back to source pixels.
+                  </span>
+                </div>
+              </figcaption>
+              <div class="exr-embed-frame">
+                <prismifold-viewer
+                  data-responsive-height
+                  src="brown_photostudio_02_4k.exr"
+                  view="panorama"
+                  width="100%"
+                  height="360"
                   auto-load="false">
                 </prismifold-viewer>
               </div>

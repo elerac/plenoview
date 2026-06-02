@@ -5,7 +5,7 @@ const mobileEmbedHeightQuery = window.matchMedia('(max-width: 620px)');
 
 function syncEmbedViewerHeight(): void {
   for (const embedViewer of embedViewers) {
-    embedViewer.setAttribute('height', mobileEmbedHeightQuery.matches ? '320' : '420');
+    embedViewer.setAttribute('height', mobileEmbedHeightQuery.matches ? '280' : '360');
   }
 }
 

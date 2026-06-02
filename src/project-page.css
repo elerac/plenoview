@@ -101,13 +101,10 @@ code {
 }
 
 .brand-mark {
-  width: 22px;
-  height: 22px;
-  color: var(--accent);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linejoin: round;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
 }
 
 .site-nav {
@@ -118,8 +115,7 @@ code {
 }
 
 .site-nav a,
-.site-footer a,
-.gallery-item a {
+.site-footer a {
   transition:
     color 160ms ease,
     border-color 160ms ease,
@@ -142,7 +138,6 @@ main {
 }
 
 .hero-content,
-.technical-strip,
 .section-inner,
 .site-footer {
   width: min(1180px, calc(100% - 48px));
@@ -171,16 +166,18 @@ main {
 
 .hero-lede {
   max-width: 560px;
-  margin: 22px 0 0;
+  margin: 16px 0 0;
   color: #d3deeb;
   font-size: 18px;
   line-height: 1.58;
 }
 
-.hero-note {
-  margin: 13px 0 0;
+.hero-origin {
+  max-width: 560px;
+  margin: 14px 0 0;
   color: var(--intro-muted);
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 .hero-actions {
@@ -256,38 +253,6 @@ main {
   height: auto;
   aspect-ratio: 16 / 10;
   object-fit: cover;
-}
-
-.technical-strip {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  padding: 0;
-  margin-top: 32px;
-  overflow: hidden;
-  list-style: none;
-  background: rgba(18, 27, 39, 0.84);
-  border: 1px solid var(--intro-border);
-  border-radius: 8px;
-}
-
-.technical-strip li {
-  display: flex;
-  align-items: center;
-  min-height: 58px;
-  padding: 12px 18px;
-  color: #d8e4f1;
-  font-size: 13px;
-  font-weight: 680;
-  line-height: 1.35;
-}
-
-.technical-strip li + li {
-  border-left: 1px solid var(--intro-border);
-}
-
-.technical-strip code {
-  font-size: 12px;
-  margin-right: 4px;
 }
 
 .downloads-section {
@@ -494,20 +459,22 @@ main {
 .gallery-grid {
   display: grid;
   gap: 28px;
+  max-width: 1040px;
 }
 
 .gallery-item {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
   min-width: 0;
   margin: 0;
 }
 
 .gallery-item figcaption {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 0 0 12px;
+  display: block;
+  margin: 0;
+  padding-top: 4px;
 }
 
 .gallery-caption-copy {
@@ -525,21 +492,10 @@ main {
 
 .gallery-caption-copy span {
   color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
-.gallery-item a {
-  color: var(--accent-dark);
-  font-size: 13px;
-  font-weight: 720;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-}
-
-.gallery-item a:hover,
-.gallery-item a:focus-visible,
 .site-footer a:hover,
 .site-footer a:focus-visible {
   color: var(--accent-blue);
@@ -592,7 +548,6 @@ main {
 @media (max-width: 980px) {
   .site-header,
   .hero-content,
-  .technical-strip,
   .section-inner,
   .site-footer {
     width: min(100% - 36px, 1180px);
@@ -616,27 +571,23 @@ main {
     gap: 22px;
   }
 
-  .technical-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .technical-strip li:nth-child(4) {
-    border-left: 0;
-  }
-
-  .technical-strip li:nth-child(n + 4) {
-    border-top: 1px solid var(--intro-border);
-  }
-
   .feature-catalog {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gallery-item {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .gallery-item figcaption {
+    padding-top: 0;
   }
 }
 
 @media (max-width: 620px) {
   .site-header,
   .hero-content,
-  .technical-strip,
   .section-inner,
   .site-footer {
     width: min(100% - 28px, 1180px);
@@ -669,6 +620,10 @@ main {
     font-size: 16px;
   }
 
+  .hero-origin {
+    font-size: 15px;
+  }
+
   .hero-actions {
     width: 100%;
   }
@@ -679,21 +634,6 @@ main {
 
   .app-preview img {
     aspect-ratio: 4 / 3;
-  }
-
-  .technical-strip {
-    grid-template-columns: 1fr;
-    margin-top: 22px;
-  }
-
-  .technical-strip li,
-  .technical-strip li:nth-child(4) {
-    border-left: 0;
-  }
-
-  .technical-strip li + li,
-  .technical-strip li:nth-child(n + 4) {
-    border-top: 1px solid var(--intro-border);
   }
 
   .features-section,
@@ -719,6 +659,10 @@ main {
   }
 
   .section-heading p {
+    font-size: 15px;
+  }
+
+  .gallery-caption-copy span {
     font-size: 15px;
   }
 
