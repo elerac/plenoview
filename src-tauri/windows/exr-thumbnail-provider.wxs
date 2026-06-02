@@ -2,6 +2,7 @@
 <?define ExrThumbnailProviderClsid = "{4D64B0F7-4E7E-49E2-8F8C-1DB4B1EF6C15}" ?>
 <?define ThumbnailProviderHandler = "{e357fccd-a995-4576-b01f-234630154e96}" ?>
 <?define ExrProgId = "Prismifold.OpenEXR" ?>
+<?define ExrGenericImageIcon = "%SystemRoot%\System32\imageres.dll,-72" ?>
 
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
@@ -13,11 +14,17 @@
         <RegistryKey Root="HKLM" Key="Software\Classes\.exr">
           <RegistryValue Name="PerceivedType" Type="string" Value="image" />
           <RegistryValue Name="TypeOverlay" Type="string" Value="" />
+          <RegistryKey Key="DefaultIcon">
+            <RegistryValue Type="string" Value="$(var.ExrGenericImageIcon)" />
+          </RegistryKey>
         </RegistryKey>
         <RegistryKey Root="HKLM" Key="Software\Classes\$(var.ExrProgId)">
           <RegistryValue Type="string" Value="OpenEXR Image" />
           <RegistryValue Name="Treatment" Type="integer" Value="2" />
           <RegistryValue Name="TypeOverlay" Type="string" Value="" />
+          <RegistryKey Key="DefaultIcon">
+            <RegistryValue Type="string" Value="$(var.ExrGenericImageIcon)" />
+          </RegistryKey>
           <RegistryKey Key="shell">
             <RegistryValue Type="string" Value="open" />
             <RegistryKey Key="open">
@@ -64,7 +71,6 @@
         <RegistryKey Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved">
           <RegistryValue Name="$(var.ExrThumbnailProviderClsid)" Type="string" Value="Prismifold EXR Thumbnail Provider" />
         </RegistryKey>
-        <RemoveRegistryKey Root="HKLM" Key="Software\Classes\$(var.ExrProgId)\DefaultIcon" Action="removeOnInstall" />
         <RemoveRegistryKey Root="HKLM" Key="Software\Classes\Applications\Prismifold.exe\DefaultIcon" Action="removeOnInstall" />
         <RemoveRegistryKey Root="HKLM" Key="Software\Classes\Prismifold.exr" Action="removeOnInstall" />
       </Component>

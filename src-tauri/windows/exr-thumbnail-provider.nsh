@@ -3,6 +3,7 @@
 !define PRISMIFOLD_EXR_PROGID "Prismifold.OpenEXR"
 !define PRISMIFOLD_EXR_FILE_TYPE_NAME "OpenEXR Image"
 !define PRISMIFOLD_EXR_CAPABILITIES_PATH "Software\Prismifold\Capabilities"
+!define PRISMIFOLD_EXR_GENERIC_IMAGE_ICON "%SystemRoot%\System32\imageres.dll,-72"
 
 !macro PRISMIFOLD_EXR_THUMBNAIL_SET_REGVIEW
   !if "${ARCH}" == "x64"
@@ -29,8 +30,9 @@
   WriteRegStr SHCTX "Software\Classes\.exr\OpenWithProgids" "${PRISMIFOLD_EXR_PROGID}" ""
   WriteRegStr SHCTX "Software\Classes\.exr" "PerceivedType" "image"
   WriteRegStr SHCTX "Software\Classes\.exr" "TypeOverlay" ""
+  WriteRegStr SHCTX "Software\Classes\.exr\DefaultIcon" "" "${PRISMIFOLD_EXR_GENERIC_IMAGE_ICON}"
   WriteRegStr SHCTX "Software\Classes\${PRISMIFOLD_EXR_PROGID}" "" "${PRISMIFOLD_EXR_FILE_TYPE_NAME}"
-  DeleteRegKey SHCTX "Software\Classes\${PRISMIFOLD_EXR_PROGID}\DefaultIcon"
+  WriteRegStr SHCTX "Software\Classes\${PRISMIFOLD_EXR_PROGID}\DefaultIcon" "" "${PRISMIFOLD_EXR_GENERIC_IMAGE_ICON}"
   WriteRegDWORD SHCTX "Software\Classes\${PRISMIFOLD_EXR_PROGID}" "Treatment" 0x00000002
   WriteRegStr SHCTX "Software\Classes\${PRISMIFOLD_EXR_PROGID}" "TypeOverlay" ""
   WriteRegStr SHCTX "Software\Classes\${PRISMIFOLD_EXR_PROGID}\shell" "" "open"
@@ -51,6 +53,10 @@
 !macroend
 
 !macro PRISMIFOLD_EXR_UNREGISTER_APP_HANDLER
+  ReadRegStr $R0 SHCTX "Software\Classes\.exr\DefaultIcon" ""
+  ${If} $R0 == "${PRISMIFOLD_EXR_GENERIC_IMAGE_ICON}"
+    DeleteRegKey SHCTX "Software\Classes\.exr\DefaultIcon"
+  ${EndIf}
   DeleteRegValue SHCTX "Software\Classes\.exr\OpenWithProgids" "${PRISMIFOLD_EXR_PROGID}"
   DeleteRegValue SHCTX "Software\Classes\.exr" "PerceivedType"
   DeleteRegValue SHCTX "Software\Classes\.exr" "TypeOverlay"
