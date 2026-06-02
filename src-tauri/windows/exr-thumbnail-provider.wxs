@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?define ExrThumbnailProviderClsid = "{4D64B0F7-4E7E-49E2-8F8C-1DB4B1EF6C15}" ?>
+<?define ThumbnailProviderHandler = "{e357fccd-a995-4576-b01f-234630154e96}" ?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="ExrThumbnailProviderRegistry" Guid="{A8E26068-4E77-4435-9BA8-FF9D3E80C724}" Win64="$(var.Win64)">
+        <RegistryKey Root="HKLM" Key="Software\Classes\.exr\ShellEx\$(var.ThumbnailProviderHandler)">
+          <RegistryValue Type="string" Value="$(var.ExrThumbnailProviderClsid)" KeyPath="yes" />
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Classes\CLSID\$(var.ExrThumbnailProviderClsid)">
+          <RegistryValue Type="string" Value="Prismifold EXR Thumbnail Provider" />
+          <RegistryKey Key="InprocServer32">
+            <RegistryValue Type="string" Value="[INSTALLDIR]prismifold_exr_thumbnail.dll" />
+            <RegistryValue Name="ThreadingModel" Type="string" Value="Apartment" />
+          </RegistryKey>
+        </RegistryKey>
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved">
+          <RegistryValue Name="$(var.ExrThumbnailProviderClsid)" Type="string" Value="Prismifold EXR Thumbnail Provider" />
+        </RegistryKey>
+        <RemoveRegistryKey Root="HKLM" Key="Software\Classes\OpenEXR Image" Action="removeOnInstall" />
+        <RemoveRegistryKey Root="HKLM" Key="Software\Classes\Prismifold.exr" Action="removeOnInstall" />
+      </Component>
+    </DirectoryRef>
+
+    <ComponentGroup Id="ExrThumbnailProviderComponents">
+      <ComponentRef Id="ExrThumbnailProviderRegistry" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

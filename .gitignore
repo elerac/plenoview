@@ -12,6 +12,7 @@ test-results
 
 # Tauri desktop build outputs
 src-tauri/target/
+src-tauri/thumbnail-provider/target/
 src-tauri/gen/
 src-tauri/**/*.app
 src-tauri/**/*.dmg

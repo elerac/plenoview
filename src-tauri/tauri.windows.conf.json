@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "resources": {
+      "target/thumbnail-provider/prismifold_exr_thumbnail.dll": "prismifold_exr_thumbnail.dll"
+    },
+    "windows": {
+      "wix": {
+        "fragmentPaths": ["windows/exr-thumbnail-provider.wxs"],
+        "componentGroupRefs": ["ExrThumbnailProviderComponents"]
+      },
+      "nsis": {
+        "installerHooks": "windows/exr-thumbnail-provider.nsh"
+      }
+    }
+  }
+}

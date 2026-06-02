@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:desktop-web": "vite build --mode desktop && node scripts/stage-desktop-assets.mjs && node scripts/verify-desktop-assets.mjs",
+    "build:desktop-web": "vite build --mode desktop && node scripts/stage-desktop-assets.mjs && node scripts/verify-desktop-assets.mjs && node scripts/build-windows-thumbnail-provider.mjs",
     "build:e2e": "VITE_E2E=true vite build",
     "capture:thumbnail": "node scripts/capture-thumbnail.mjs",
     "lint": "eslint src tests e2e playwright.config.ts vite.config.ts vitest.config.ts --max-warnings=0",
@@ -24,7 +24,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:check": "cd src-tauri && cargo fmt --check && cargo check --locked && cargo test --locked",
+    "desktop:check": "cd src-tauri && cargo fmt --check && cargo check --locked && cargo test --locked && cargo fmt --manifest-path thumbnail-provider/Cargo.toml --check && cargo test --manifest-path thumbnail-provider/Cargo.toml --locked",
     "desktop:build": "tauri build"
   },
   "dependencies": {

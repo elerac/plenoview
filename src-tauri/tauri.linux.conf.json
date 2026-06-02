@@ -1,0 +1,12 @@
+{
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": ["exr"],
+        "mimeType": "image/x-exr",
+        "name": "OpenEXR Image",
+        "role": "Viewer"
+      }
+    ]
+  }
+}
