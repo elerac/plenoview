@@ -1,13 +1,44 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { expectViewerAppReady } from './helpers/app';
 
 const CBOX_RGB_URL = 'cbox_rgb.exr';
 const OWL_SPHERES_LINEAR_STOKES_URL =
   'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr';
+const EXPECTED_BOOTSTRAP_ABORT = 'Viewer application has not finished initializing.';
+
+function watchUnexpectedErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(`console: ${message.text()}`);
+    }
+  });
+  page.on('pageerror', (error) => {
+    if (!error.message.includes(EXPECTED_BOOTSTRAP_ABORT)) {
+      errors.push(`pageerror: ${error.message}`);
+    }
+  });
+  return errors;
+}
+
+async function expectNoHorizontalOverflow(page: Page): Promise<void> {
+  await expect.poll(async () => (
+    await page.evaluate(() => {
+      const width = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+      return width <= document.documentElement.clientWidth + 1;
+    })
+  )).toBe(true);
+}
 
 test('serves the project page with app and desktop download calls to action @smoke', async ({ page }) => {
+  const unexpectedErrors = watchUnexpectedErrors(page);
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Prismifold', level: 1 })).toBeVisible();
+  await expect(page.getByText(
+    'OpenEXR viewer for channel-heavy computational images. Inspect local files with raw probes, channel views, ROI statistics, panoramas, and PNG export.',
+    { exact: true }
+  )).toBeVisible();
 
   const heroAppLink = page.getByRole('link', { name: 'Open Web App', exact: true }).first();
   await expect(heroAppLink).toBeVisible();
@@ -22,8 +53,18 @@ test('serves the project page with app and desktop download calls to action @smo
   await expect.poll(async () => (
     await preview.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)
   )).toBe(true);
+  await expectNoHorizontalOverflow(page);
 
   await expect(page.getByRole('heading', { name: 'Features', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspect', level: 3 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Visualize', level: 3 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Measure', level: 3 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Export', level: 3 })).toBeVisible();
+  await expect(page.getByText('OpenEXR 2.x scanline', { exact: true })).toBeVisible();
+  await expect(page.getByText('half / float / uint', { exact: true })).toBeVisible();
+  await expect(page.getByText('WebGL2', { exact: true })).toBeVisible();
+  await expect(page.getByText('exrs WASM', { exact: true })).toBeVisible();
+  await expect(page.getByText('local files stay local', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Gallery', level: 2 })).toBeVisible();
   await expect(page.getByRole('link', { name: 'cbox_rgb.exr', exact: true })).toHaveAttribute(
     'href',
@@ -46,6 +87,7 @@ test('serves the project page with app and desktop download calls to action @smo
   expect(sectionOrder).toBe(true);
 
   await page.locator('#gallery').scrollIntoViewIfNeeded();
+  await expectNoHorizontalOverflow(page);
   const embeds = page.locator('prismifold-viewer');
   await expect(embeds).toHaveCount(2);
 
@@ -87,7 +129,11 @@ test('serves the project page with app and desktop download calls to action @smo
   });
   await expect(embeddedViewer.getByRole('button', { name: 'Open full viewer', exact: true })).toBeEnabled();
 
+  const deferredStokesViewer = stokesEmbed.frameLocator('iframe');
+  await expect(deferredStokesViewer.getByRole('button', { name: 'Load image', exact: true })).toBeVisible();
+
   await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
   await expect(cornellEmbed).toHaveAttribute('height', '320');
   await expect(stokesEmbed).toHaveAttribute('height', '320');
   await expect.poll(async () => (
@@ -102,4 +148,17 @@ test('serves the project page with app and desktop download calls to action @smo
       return iframe instanceof HTMLIFrameElement ? iframe.style.height : '';
     })
   )).toBe('320px');
+  expect(unexpectedErrors).toEqual([]);
+});
+
+test('opens the viewer app from the project page hero @smoke', async ({ page }) => {
+  const unexpectedErrors = watchUnexpectedErrors(page);
+  await page.goto('/');
+
+  const heroAppLink = page.getByRole('link', { name: 'Open Web App', exact: true }).first();
+  await heroAppLink.click();
+
+  await expect(page).toHaveURL(/\/app\/$/);
+  await expectViewerAppReady(page);
+  expect(unexpectedErrors).toEqual([]);
 });
