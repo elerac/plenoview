@@ -199,7 +199,8 @@ export class OverlayRenderer implements Disposable {
   }
 
   private clearCanvas(): void {
-    this.overlayContext.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    const width = this.overlayCanvas.width;
+    this.overlayCanvas.width = width;
   }
 }
 

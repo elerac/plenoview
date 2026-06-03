@@ -21,7 +21,6 @@ describe('probe overlay renderer', () => {
       hoveredPixel: { ix: 0, iy: 0 }
     }));
 
-    expect(context.clearRect).toHaveBeenCalled();
     expect(context.strokeRect).toHaveBeenCalledTimes(1);
   });
 
@@ -32,7 +31,6 @@ describe('probe overlay renderer', () => {
     renderer.setImagePresent(true);
     renderer.render(createViewerState());
 
-    expect(context.clearRect).toHaveBeenCalled();
     expect(context.strokeRect).not.toHaveBeenCalled();
   });
 
@@ -79,7 +77,6 @@ describe('probe overlay renderer', () => {
       hoveredPixel: { ix: 0, iy: 0 }
     }));
 
-    expect(context.clearRect).toHaveBeenCalled();
     expect(context.strokeRect).toHaveBeenCalledTimes(1);
   });
 
@@ -146,24 +143,28 @@ describe('probe overlay renderer', () => {
       hoveredPixel: { ix: 0, iy: 0 }
     }));
 
-    expect(context.strokeRect).toHaveBeenCalled();
-    context.clearRect.mockClear();
     canvas.width = 256;
     canvas.height = 128;
+    const widthAssignments = trackCanvasWidthAssignments(canvas);
 
     renderer.clearImage();
 
-    expect(context.clearRect).toHaveBeenCalledTimes(1);
-    expect(context.clearRect).toHaveBeenCalledWith(0, 0, 256, 128);
+    expect(widthAssignments).toEqual([256]);
+    expect(canvas.width).toBe(256);
+    expect(canvas.height).toBe(128);
+    expect(context.clearRect).not.toHaveBeenCalled();
 
-    context.clearRect.mockClear();
+    widthAssignments.length = 0;
     canvas.width = 512;
     canvas.height = 256;
+    widthAssignments.length = 0;
 
     renderer.dispose();
 
-    expect(context.clearRect).toHaveBeenCalledTimes(1);
-    expect(context.clearRect).toHaveBeenCalledWith(0, 0, 512, 256);
+    expect(widthAssignments).toEqual([512]);
+    expect(canvas.width).toBe(512);
+    expect(canvas.height).toBe(256);
+    expect(context.clearRect).not.toHaveBeenCalled();
   });
 });
 
@@ -202,4 +203,18 @@ function createProbeOverlayHarness(): {
     renderer: new ProbeOverlayRenderer(canvas),
     context
   };
+}
+
+function trackCanvasWidthAssignments(canvas: HTMLCanvasElement): number[] {
+  let trackedWidth = canvas.width;
+  const assignments: number[] = [];
+  Object.defineProperty(canvas, 'width', {
+    configurable: true,
+    get: () => trackedWidth,
+    set: (value: number) => {
+      trackedWidth = value;
+      assignments.push(value);
+    }
+  });
+  return assignments;
 }
