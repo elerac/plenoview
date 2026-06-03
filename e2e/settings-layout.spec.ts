@@ -1,5 +1,5 @@
 import { expect, test, type Page } from './helpers/test';
-import { expectViewerAppReady, gotoViewerApp, openGalleryCbox } from './helpers/app';
+import { expectViewerAppReady, gotoViewerApp, openGalleryCbox, waitForE2ERenderIdle } from './helpers/app';
 import { dragBy } from './helpers/viewer';
 
 async function readPanelShellVisualState(page: Page): Promise<Array<{
@@ -942,6 +942,7 @@ test('persists Spectrum lattice as animated idle and frozen active chrome @smoke
 
   await page.getByRole('button', { name: 'Close cbox_rgb.exr', exact: true }).click();
   await expect(page.locator('#opened-images-select option')).toHaveCount(0);
+  await waitForE2ERenderIdle(page);
   await expect(appShell).toHaveClass(/is-spectrum-lattice-idle/);
   await expect(mainLayout).toHaveClass(/is-spectrum-lattice-idle/);
   await expect(viewer).toHaveClass(/is-spectrum-lattice-idle/);
