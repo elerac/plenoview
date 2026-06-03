@@ -172,6 +172,8 @@ export class LayoutSplitController implements Disposable {
 
   private reclampPanelSplits(): void {
     if (!this.isDesktopPanelLayout()) {
+      this.finishPanelResize();
+      this.renderPanelLayoutState();
       return;
     }
 
@@ -331,9 +333,10 @@ export class LayoutSplitController implements Disposable {
   }
 
   private renderPanelLayoutState(): void {
-    const imagePanelWidth = this.panelLayoutState.imagePanelCollapsed ? 0 : this.panelLayoutState.imagePanelWidth;
-    const rightPanelWidth = this.panelLayoutState.rightPanelCollapsed ? 0 : this.panelLayoutState.rightPanelWidth;
-    const bottomPanelHeight = this.panelLayoutState.bottomPanelCollapsed
+    const renderedCollapseState = this.getRenderedPanelCollapseState();
+    const imagePanelWidth = renderedCollapseState.imagePanelCollapsed ? 0 : this.panelLayoutState.imagePanelWidth;
+    const rightPanelWidth = renderedCollapseState.rightPanelCollapsed ? 0 : this.panelLayoutState.rightPanelWidth;
+    const bottomPanelHeight = renderedCollapseState.bottomPanelCollapsed
       ? (this.bottomCollapsedContentAvailable ? BOTTOM_PANEL_COLLAPSED_CONTENT_HEIGHT : 0)
       : this.panelLayoutState.bottomPanelHeight;
 
@@ -345,24 +348,32 @@ export class LayoutSplitController implements Disposable {
     this.elements.mainLayout.style.setProperty('--bottom-panel-height', `${Math.round(bottomPanelHeight)}px`);
     this.elements.mainLayout.style.setProperty(
       '--image-panel-resizer-width',
-      this.panelLayoutState.imagePanelCollapsed ? '0px' : PANEL_RESIZER_WIDTH_CSS
+      renderedCollapseState.imagePanelCollapsed ? '0px' : PANEL_RESIZER_WIDTH_CSS
     );
     this.elements.mainLayout.style.setProperty(
       '--right-panel-resizer-width',
-      this.panelLayoutState.rightPanelCollapsed ? '0px' : PANEL_RESIZER_WIDTH_CSS
+      renderedCollapseState.rightPanelCollapsed ? '0px' : PANEL_RESIZER_WIDTH_CSS
     );
     this.elements.mainLayout.style.setProperty(
       '--bottom-panel-resizer-height',
-      this.panelLayoutState.bottomPanelCollapsed ? '0px' : PANEL_RESIZER_HEIGHT_CSS
+      renderedCollapseState.bottomPanelCollapsed ? '0px' : PANEL_RESIZER_HEIGHT_CSS
     );
-    this.elements.imagePanel.classList.toggle('is-collapsed', this.panelLayoutState.imagePanelCollapsed);
-    this.elements.rightStack.classList.toggle('is-collapsed', this.panelLayoutState.rightPanelCollapsed);
-    this.elements.bottomPanel.classList.toggle('is-collapsed', this.panelLayoutState.bottomPanelCollapsed);
-    this.elements.imagePanelContent.classList.toggle('is-collapsed', this.panelLayoutState.imagePanelCollapsed);
-    this.elements.sidePanel.classList.toggle('is-collapsed', this.panelLayoutState.rightPanelCollapsed);
-    this.elements.bottomPanelContent.classList.toggle('is-collapsed', this.panelLayoutState.bottomPanelCollapsed);
-    this.updatePanelSplitAria();
-    this.updateCollapseButtons();
+    this.elements.imagePanel.classList.toggle('is-collapsed', renderedCollapseState.imagePanelCollapsed);
+    this.elements.rightStack.classList.toggle('is-collapsed', renderedCollapseState.rightPanelCollapsed);
+    this.elements.bottomPanel.classList.toggle('is-collapsed', renderedCollapseState.bottomPanelCollapsed);
+    this.elements.imagePanelContent.classList.toggle('is-collapsed', renderedCollapseState.imagePanelCollapsed);
+    this.elements.sidePanel.classList.toggle('is-collapsed', renderedCollapseState.rightPanelCollapsed);
+    this.elements.bottomPanelContent.classList.toggle('is-collapsed', renderedCollapseState.bottomPanelCollapsed);
+    this.updatePanelSplitAria(renderedCollapseState);
+    this.updateCollapseButtons(renderedCollapseState);
+  }
+
+  private getRenderedPanelCollapseState(): PanelCollapseState {
+    if (this.isDesktopPanelLayout()) {
+      return this.panelLayoutState;
+    }
+
+    return DEFAULT_PANEL_COLLAPSE_STATE;
   }
 
   private getExpandedPanelSplitSizes(): PanelSplitSizes {
@@ -399,19 +410,20 @@ export class LayoutSplitController implements Disposable {
     };
   }
 
-  private updatePanelSplitAria(): void {
-    const metrics = this.getPanelSplitMetrics(this.panelLayoutState);
-    this.updatePanelResizerAria(this.elements.imagePanelResizer, 'imagePanelWidth', metrics);
-    this.updatePanelResizerAria(this.elements.rightPanelResizer, 'rightPanelWidth', metrics);
-    this.updatePanelResizerAria(this.elements.bottomPanelResizer, 'bottomPanelHeight', metrics);
+  private updatePanelSplitAria(renderedCollapseState: PanelCollapseState): void {
+    const metrics = this.getPanelSplitMetrics(renderedCollapseState);
+    this.updatePanelResizerAria(this.elements.imagePanelResizer, 'imagePanelWidth', metrics, renderedCollapseState);
+    this.updatePanelResizerAria(this.elements.rightPanelResizer, 'rightPanelWidth', metrics, renderedCollapseState);
+    this.updatePanelResizerAria(this.elements.bottomPanelResizer, 'bottomPanelHeight', metrics, renderedCollapseState);
   }
 
   private updatePanelResizerAria(
     resizer: HTMLElement,
     key: PanelSplitSizeKey,
-    metrics: PanelSplitMetrics
+    metrics: PanelSplitMetrics,
+    renderedCollapseState: PanelCollapseState
   ): void {
-    const collapsed = this.isPanelCollapsed(key);
+    const collapsed = getPanelCollapseStateForSplitKey(renderedCollapseState, key);
     const range = getPanelSplitSizeRange(key, this.getExpandedPanelSplitSizes(), metrics);
     resizer.classList.toggle('is-collapsed', collapsed);
     resizer.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
@@ -422,21 +434,21 @@ export class LayoutSplitController implements Disposable {
     resizer.setAttribute('aria-valuenow', String(Math.round(this.panelLayoutState[key])));
   }
 
-  private updateCollapseButtons(): void {
+  private updateCollapseButtons(renderedCollapseState: PanelCollapseState): void {
     updateCollapseButton(
       this.elements.imagePanelCollapseButton,
       'left',
-      this.panelLayoutState.imagePanelCollapsed
+      renderedCollapseState.imagePanelCollapsed
     );
     updateCollapseButton(
       this.elements.rightPanelCollapseButton,
       'right',
-      this.panelLayoutState.rightPanelCollapsed
+      renderedCollapseState.rightPanelCollapsed
     );
     updateCollapseButton(
       this.elements.bottomPanelCollapseButton,
       'bottom',
-      this.panelLayoutState.bottomPanelCollapsed
+      renderedCollapseState.bottomPanelCollapsed
     );
   }
 }
@@ -660,6 +672,19 @@ function updateCollapseButton(
   button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   button.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} ${side} panel`);
   button.classList.toggle('is-collapsed', collapsed);
+}
+
+function getPanelCollapseStateForSplitKey(state: PanelCollapseState, key: PanelSplitSizeKey): boolean {
+  switch (key) {
+    case 'imagePanelWidth':
+      return state.imagePanelCollapsed;
+    case 'rightPanelWidth':
+      return state.rightPanelCollapsed;
+    case 'bottomPanelHeight':
+      return state.bottomPanelCollapsed;
+    default:
+      throw new Error(`Unknown panel split size key: ${key satisfies never}`);
+  }
 }
 
 function readElementSize(element: HTMLElement, axis: 'width' | 'height', fallback: number): number {

@@ -1,5 +1,5 @@
 import { expect, test } from './helpers/test';
-import { gotoViewerApp, openGalleryCbox } from './helpers/app';
+import { gotoViewerApp, openGalleryCbox, waitForE2EThumbnailIdle } from './helpers/app';
 import {
   flushAllIdleCallbacks,
   getPendingIdleCallbackCount,
@@ -150,6 +150,59 @@ test('keeps bottom-panel channel thumbnail frames stable across image selection 
   await thumbnailTiles.nth(2).click();
   await expect(thumbnailTiles.nth(2)).toHaveAttribute('aria-selected', 'true');
   expectPreviewRectsStable(await readPreviewRects(), expandedPreviewRects);
+});
+
+test('shows readable channel thumbnail previews on mobile with saved desktop bottom collapse', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'prismifold:panel-splits:v1',
+      JSON.stringify({
+        imagePanelWidth: 220,
+        rightPanelWidth: 280,
+        bottomPanelHeight: 120,
+        imagePanelCollapsed: true,
+        rightPanelCollapsed: true,
+        bottomPanelCollapsed: true
+      })
+    );
+  });
+  await gotoViewerApp(page);
+
+  const bottomPanelButton = page.locator('#bottom-panel-collapse-button');
+  const thumbnailTiles = page.locator('#channel-thumbnail-strip .channel-thumbnail-tile');
+  const thumbnailPreviews = page.locator('#channel-thumbnail-strip .channel-thumbnail-tile-preview');
+  const thumbnailImages = page.locator('#channel-thumbnail-strip .channel-thumbnail-image');
+
+  await openGalleryCbox(page);
+  await expect(bottomPanelButton).toHaveAttribute('aria-expanded', 'true');
+  await clickChannelStackToggle(page, 'group:');
+  await waitForE2EThumbnailIdle(page);
+
+  await expect(thumbnailTiles).toHaveCount(3);
+  await expect(thumbnailPreviews.first()).toBeVisible();
+  await expect(thumbnailImages.first()).toHaveAttribute('src', /^data:image\/png;base64,/, { timeout: 10000 });
+
+  const previewRects = await thumbnailPreviews.evaluateAll((elements) => (
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return {
+        display: style.display,
+        height: rect.height,
+        visibility: style.visibility,
+        width: rect.width
+      };
+    })
+  ));
+
+  expect(previewRects).toHaveLength(3);
+  for (const rect of previewRects) {
+    expect(rect.display).not.toBe('none');
+    expect(rect.visibility).not.toBe('hidden');
+    expect(rect.width).toBeGreaterThanOrEqual(48);
+    expect(rect.height).toBeGreaterThanOrEqual(48);
+  }
 });
 
 test('defers channel thumbnail exposure refresh until slider changes are committed', async ({ page }) => {

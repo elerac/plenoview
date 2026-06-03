@@ -4040,6 +4040,12 @@ body.is-resizing-panel-rows * {
     display: block;
   }
 
+  .bottom-panel-shell {
+    height: clamp(104px, var(--bottom-panel-height), 132px);
+    display: flex;
+    flex-direction: column;
+  }
+
   .side-panel,
   .image-panel {
     width: 100% !important;

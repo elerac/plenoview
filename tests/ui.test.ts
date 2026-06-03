@@ -2239,6 +2239,87 @@ describe('panel split sizing', () => {
     });
   });
 
+  it('renders saved collapsed panels expanded on initial mobile layout', () => {
+    installUiFixture();
+    mockDesktopLayoutGeometry({ imageWidth: 280, rightWidth: 340, bottomHeight: 210 });
+    mockPanelLayoutMode('mobile');
+    window.localStorage.setItem(
+      'prismifold:panel-splits:v1',
+      JSON.stringify({
+        imagePanelWidth: 280,
+        rightPanelWidth: 340,
+        bottomPanelHeight: 210,
+        imagePanelCollapsed: true,
+        rightPanelCollapsed: true,
+        bottomPanelCollapsed: true
+      })
+    );
+
+    new ViewerUi(createUiCallbacks());
+
+    const imageButton = document.getElementById('image-panel-collapse-button') as HTMLButtonElement;
+    const rightButton = document.getElementById('right-panel-collapse-button') as HTMLButtonElement;
+    const bottomButton = document.getElementById('bottom-panel-collapse-button') as HTMLButtonElement;
+    const mainLayout = document.getElementById('main-layout') as HTMLElement;
+    const bottomPanel = document.getElementById('bottom-panel') as HTMLElement;
+    const bottomPanelContent = document.getElementById('bottom-panel-content') as HTMLElement;
+
+    expect(imageButton.getAttribute('aria-expanded')).toBe('true');
+    expect(rightButton.getAttribute('aria-expanded')).toBe('true');
+    expect(bottomButton.getAttribute('aria-expanded')).toBe('true');
+    expect(mainLayout.style.getPropertyValue('--image-panel-width')).toBe('280px');
+    expect(mainLayout.style.getPropertyValue('--right-panel-width')).toBe('340px');
+    expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('210px');
+    expect(bottomPanel.classList.contains('is-collapsed')).toBe(false);
+    expect(bottomPanelContent.classList.contains('is-collapsed')).toBe(false);
+    expect(JSON.parse(window.localStorage.getItem('prismifold:panel-splits:v1') ?? '{}')).toMatchObject({
+      imagePanelCollapsed: true,
+      rightPanelCollapsed: true,
+      bottomPanelCollapsed: true
+    });
+  });
+
+  it('restores saved desktop collapsed state after rendering expanded on mobile resize', () => {
+    installUiFixture();
+    mockDesktopLayoutGeometry({ imageWidth: 280, rightWidth: 340, bottomHeight: 210 });
+    const layoutMode = mockPanelLayoutMode('desktop');
+    window.localStorage.setItem(
+      'prismifold:panel-splits:v1',
+      JSON.stringify({
+        imagePanelWidth: 280,
+        rightPanelWidth: 340,
+        bottomPanelHeight: 210,
+        imagePanelCollapsed: true,
+        rightPanelCollapsed: true,
+        bottomPanelCollapsed: true
+      })
+    );
+
+    new ViewerUi(createUiCallbacks());
+
+    const mainLayout = document.getElementById('main-layout') as HTMLElement;
+    const bottomButton = document.getElementById('bottom-panel-collapse-button') as HTMLButtonElement;
+    const bottomPanelContent = document.getElementById('bottom-panel-content') as HTMLElement;
+
+    expect(bottomButton.getAttribute('aria-expanded')).toBe('false');
+    expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('0px');
+    expect(bottomPanelContent.classList.contains('is-collapsed')).toBe(true);
+
+    layoutMode.setMode('mobile');
+    triggerResizeObserversForElement(mainLayout);
+
+    expect(bottomButton.getAttribute('aria-expanded')).toBe('true');
+    expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('210px');
+    expect(bottomPanelContent.classList.contains('is-collapsed')).toBe(false);
+
+    layoutMode.setMode('desktop');
+    triggerResizeObserversForElement(mainLayout);
+
+    expect(bottomButton.getAttribute('aria-expanded')).toBe('false');
+    expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('0px');
+    expect(bottomPanelContent.classList.contains('is-collapsed')).toBe(true);
+  });
+
   it('reserves collapsed bottom strip content only while channel labels are available', () => {
     installUiFixture();
     mockDesktopLayoutGeometry({ bottomHeight: 210 });
@@ -11294,6 +11375,35 @@ function mockDesktopLayoutGeometry(
     height: args.bottomHeight ?? 120,
     width: args.mainWidth ?? 1200
   });
+}
+
+function mockPanelLayoutMode(initialMode: 'desktop' | 'mobile'): { setMode: (mode: 'desktop' | 'mobile') => void } {
+  const imagePanelResizer = document.getElementById('image-panel-resizer');
+  const originalGetComputedStyle = window.getComputedStyle.bind(window);
+  let mode = initialMode;
+
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudoElt) => {
+    const style = originalGetComputedStyle(element, pseudoElt);
+    if (element !== imagePanelResizer) {
+      return style;
+    }
+
+    return new Proxy(style, {
+      get(target, property, receiver) {
+        if (property === 'display') {
+          return mode === 'mobile' ? 'none' : 'block';
+        }
+
+        return Reflect.get(target, property, receiver);
+      }
+    });
+  });
+
+  return {
+    setMode(nextMode: 'desktop' | 'mobile') {
+      mode = nextMode;
+    }
+  };
 }
 
 function mockOpenedFilesListGeometry(rowHeight = 20): Element[] {
