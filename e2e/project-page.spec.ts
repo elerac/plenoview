@@ -216,9 +216,9 @@ test('serves the project page with app and desktop download calls to action @smo
   await expect(embeddedViewer.getByRole('button', { name: 'Open full viewer', exact: true })).toBeEnabled();
 
   const deferredStokesViewer = stokesEmbed.frameLocator('iframe');
-  await expect(deferredStokesViewer.getByRole('button', { name: 'Load image', exact: true })).toBeVisible();
+  await expect(deferredStokesViewer.getByRole('button', { name: 'Click to load image', exact: true })).toBeVisible();
   const deferredPanoramaViewer = panoramaEmbed.frameLocator('iframe');
-  await expect(deferredPanoramaViewer.getByRole('button', { name: 'Load image', exact: true })).toBeVisible();
+  await expect(deferredPanoramaViewer.getByRole('button', { name: 'Click to load image', exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(page);
@@ -262,7 +262,7 @@ test('loads the deferred panorama embed from its remote source when clicked', as
   await panoramaEmbed.scrollIntoViewIfNeeded();
 
   const embeddedViewer = panoramaEmbed.frameLocator('iframe');
-  const loadButton = embeddedViewer.getByRole('button', { name: 'Load image', exact: true });
+  const loadButton = embeddedViewer.getByRole('button', { name: 'Click to load image', exact: true });
   const openFullButton = embeddedViewer.getByRole('button', { name: 'Open full viewer', exact: true });
 
   await expect(loadButton).toBeVisible();

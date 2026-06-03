@@ -58,6 +58,7 @@ describe('EmbedViewerUi', () => {
     const button = document.querySelector<HTMLButtonElement>('.embed-deferred-load-button');
 
     expect(button).toBeInstanceOf(HTMLButtonElement);
+    expect(button?.textContent).toBe('Click to load image');
     expect(button?.classList.contains('hidden')).toBe(true);
 
     ui.setDeferredLoad(onDeferredLoad);

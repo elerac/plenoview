@@ -139,7 +139,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.deferredLoadButton = document.createElement('button');
     this.deferredLoadButton.className = 'embed-deferred-load-button hidden';
     this.deferredLoadButton.type = 'button';
-    this.deferredLoadButton.textContent = 'Load image';
+    this.deferredLoadButton.textContent = 'Click to load image';
     this.deferredLoadButton.addEventListener('pointerdown', stopViewerInteractionEvent);
     this.deferredLoadButton.addEventListener('click', this.handleDeferredLoadClick);
 

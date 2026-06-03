@@ -35,7 +35,7 @@ test('defers embed URL loads when autoLoad is false', async ({ page }) => {
 
   await expect(page.locator('#gl-canvas')).toBeVisible();
   const openFullButton = page.getByRole('button', { name: 'Open full viewer', exact: true });
-  const loadButton = page.getByRole('button', { name: 'Load image', exact: true });
+  const loadButton = page.getByRole('button', { name: 'Click to load image', exact: true });
 
   await expect(openFullButton).toBeDisabled();
   await expect(loadButton).toBeVisible();
