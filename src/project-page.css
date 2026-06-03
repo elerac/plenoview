@@ -87,8 +87,7 @@ code {
 }
 
 .brand-link,
-.site-nav,
-.site-footer nav {
+.site-nav {
   display: flex;
   align-items: center;
 }
@@ -114,8 +113,7 @@ code {
   font-weight: 700;
 }
 
-.site-nav a,
-.site-footer a {
+.site-nav a {
   transition:
     color 160ms ease,
     border-color 160ms ease,
@@ -496,11 +494,6 @@ main {
   line-height: 1.55;
 }
 
-.site-footer a:hover,
-.site-footer a:focus-visible {
-  color: var(--accent-blue);
-}
-
 .exr-embed-frame {
   overflow: hidden;
   background: #05070a;
@@ -517,7 +510,7 @@ main {
 .site-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-height: 92px;
   color: var(--text-muted);
   border-top: 1px solid var(--border);
@@ -535,14 +528,6 @@ main {
 
 .site-footer span {
   font-size: 13px;
-}
-
-.site-footer nav {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 24px;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 @media (max-width: 980px) {
@@ -681,13 +666,7 @@ main {
 
   .site-footer {
     display: grid;
-    gap: 18px;
     justify-items: start;
     padding: 22px 0;
-  }
-
-  .site-footer nav {
-    justify-content: flex-start;
-    gap: 18px;
   }
 }
