@@ -26,7 +26,9 @@ const PROJECT_PAGE_TITLE = 'Prismifold | OpenEXR Image Viewer';
 const PROJECT_PAGE_DESCRIPTION =
   'Prismifold is an OpenEXR image viewer for computational imaging, rendering, and vision workflows, with spectral, polarization, panorama, depth, and AOV inspection.';
 const PROJECT_PAGE_URL = 'https://elerac.github.io/prismifold/';
-const PROJECT_PAGE_IMAGE_URL = 'https://elerac.github.io/prismifold/project-page/app-preview.jpg';
+const PROJECT_PAGE_IMAGE_URL = 'https://elerac.github.io/prismifold/project-page/social-preview.jpg';
+const PROJECT_PAGE_IMAGE_ALT =
+  'Luminous glass prism splitting RGB light beams on a dark technical viewer backdrop';
 
 function watchUnexpectedErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -130,11 +132,11 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   );
   await expect(page.locator('head meta[property="og:url"]')).toHaveAttribute('content', PROJECT_PAGE_URL);
   await expect(page.locator('head meta[property="og:image"]')).toHaveAttribute('content', PROJECT_PAGE_IMAGE_URL);
-  await expect(page.locator('head meta[property="og:image:width"]')).toHaveAttribute('content', '1440');
-  await expect(page.locator('head meta[property="og:image:height"]')).toHaveAttribute('content', '900');
+  await expect(page.locator('head meta[property="og:image:width"]')).toHaveAttribute('content', '1200');
+  await expect(page.locator('head meta[property="og:image:height"]')).toHaveAttribute('content', '630');
   await expect(page.locator('head meta[property="og:image:alt"]')).toHaveAttribute(
     'content',
-    'Prismifold interface showing an EXR image, inspector panels, and channel thumbnails'
+    PROJECT_PAGE_IMAGE_ALT
   );
   await expect(page.locator('head meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
   await expect(page.locator('head meta[name="twitter:title"]')).toHaveAttribute('content', PROJECT_PAGE_TITLE);
@@ -145,7 +147,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   await expect(page.locator('head meta[name="twitter:image"]')).toHaveAttribute('content', PROJECT_PAGE_IMAGE_URL);
   await expect(page.locator('head meta[name="twitter:image:alt"]')).toHaveAttribute(
     'content',
-    'Prismifold interface showing an EXR image, inspector panels, and channel thumbnails'
+    PROJECT_PAGE_IMAGE_ALT
   );
   const structuredDataText = await page.locator('head script[type="application/ld+json"]').textContent();
   expect(JSON.parse(structuredDataText ?? '{}')).toMatchObject({
@@ -170,6 +172,16 @@ test('serves the project page with app, desktop, and VS Code download calls to a
       priceCurrency: 'USD'
     }
   });
+  const socialPreviewDimensions = await page.evaluate(async () => {
+    const image = new Image();
+    image.src = new URL('project-page/social-preview.jpg', window.location.href).href;
+    await image.decode();
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight
+    };
+  });
+  expect(socialPreviewDimensions).toEqual({ width: 1200, height: 630 });
   const sitemapResponse = await page.request.get('/sitemap.xml');
   expect(sitemapResponse.ok()).toBe(true);
   const sitemapXml = await sitemapResponse.text();
