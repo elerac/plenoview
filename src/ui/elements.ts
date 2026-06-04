@@ -49,7 +49,6 @@ export interface Elements {
   channelRecognitionRuleErrorSummary: HTMLElement;
   channelRecognitionApplyRulesButton: HTMLButtonElement;
   channelRecognitionCancelRulesButton: HTMLButtonElement;
-  channelRecognitionResetRulesButton: HTMLButtonElement;
   imageLoadWorkersInput: HTMLInputElement;
   autoExposurePercentileInput: HTMLInputElement;
   stokesInvalidVectorMaskCheckbox: HTMLInputElement;
@@ -603,7 +602,6 @@ export function resolveElements(): Elements {
     channelRecognitionRuleErrorSummary: requireElement('channel-recognition-rule-error-summary', HTMLElement),
     channelRecognitionApplyRulesButton: requireElement('channel-recognition-apply-rules-button', HTMLButtonElement),
     channelRecognitionCancelRulesButton: requireElement('channel-recognition-cancel-rules-button', HTMLButtonElement),
-    channelRecognitionResetRulesButton: requireElement('channel-recognition-reset-rules-button', HTMLButtonElement),
     imageLoadWorkersInput: requireElement('image-load-workers-input', HTMLInputElement),
     autoExposurePercentileInput: requireElement('auto-exposure-percentile-input', HTMLInputElement),
     stokesInvalidVectorMaskCheckbox: requireElement('stokes-invalid-vector-mask-checkbox', HTMLInputElement),

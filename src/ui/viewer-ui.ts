@@ -3107,9 +3107,6 @@ export class ViewerUi implements Disposable {
     this.disposables.addEventListener(this.elements.channelRecognitionCancelRulesButton, 'click', () => {
       this.cancelChannelRecognitionRuleDraft();
     });
-    this.disposables.addEventListener(this.elements.channelRecognitionResetRulesButton, 'click', () => {
-      this.resetChannelRecognitionRuleDraft();
-    });
 
     this.disposables.addEventListener(this.elements.viewerBackgroundSelect, 'change', () => {
       const background = parseStoredViewerBackground(this.elements.viewerBackgroundSelect.value);
@@ -3689,12 +3686,6 @@ export class ViewerUi implements Disposable {
 
   private cancelChannelRecognitionRuleDraft(): void {
     this.channelRecognitionNameRuleDraft = cloneChannelRecognitionNameRules(this.channelRecognitionNameRules);
-    this.clearChannelRecognitionRuleSummary();
-    this.renderChannelRecognitionRuleRows(true);
-  }
-
-  private resetChannelRecognitionRuleDraft(): void {
-    this.channelRecognitionNameRuleDraft = createDefaultChannelRecognitionNameRules();
     this.clearChannelRecognitionRuleSummary();
     this.renderChannelRecognitionRuleRows(true);
   }

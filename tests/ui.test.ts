@@ -3288,6 +3288,8 @@ describe('view menu', () => {
     expect(editor.textContent).not.toContain('Ignore case');
     expect(editor.querySelector('aside')).toBeNull();
     expect(editor.textContent).not.toContain('Preview');
+    expect(document.getElementById('channel-recognition-reset-rules-button')).toBeNull();
+    expect(editor.textContent).not.toContain('Reset Draft to Defaults');
 
     patternInput.value = '(?<r>R';
     patternInput.dispatchEvent(new Event('input', { bubbles: true }));
