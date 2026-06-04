@@ -1,9 +1,4 @@
 import { DisposableBag, type Disposable } from '../lifecycle';
-import {
-  SPECTRUM_LATTICE_MOTION_ANIMATE,
-  SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM,
-  type SpectrumLatticeMotionPreference
-} from '../spectrum-lattice-motion';
 
 export type SpectrumLatticeMode = 'disabled' | 'idle' | 'active';
 
@@ -166,7 +161,6 @@ export class SpectrumLatticeRenderer implements Disposable {
   private transitionCompletionTimeoutId: number | null = null;
   private pointerTrackingActive = false;
   private reducedMotion = false;
-  private motionPreference: SpectrumLatticeMotionPreference = SPECTRUM_LATTICE_MOTION_ANIMATE;
 
   constructor(private readonly args: SpectrumLatticeRendererArgs) {
     this.hideCanvas();
@@ -207,29 +201,6 @@ export class SpectrumLatticeRenderer implements Disposable {
 
     this.setCanvasVisible(false);
     this.emitBlend(null);
-  }
-
-  setMotionPreference(preference: SpectrumLatticeMotionPreference): void {
-    if (this.disposed || this.motionPreference === preference) {
-      return;
-    }
-
-    this.motionPreference = preference;
-    if (this.mode !== 'idle' || !this.canvasVisible) {
-      return;
-    }
-
-    if (!this.gl || !this.program || !this.uniforms) {
-      return;
-    }
-
-    if (this.shouldAnimateIdle()) {
-      this.startAnimation(performance.now());
-      return;
-    }
-
-    this.stopAnimation();
-    this.renderStaticFrame(this.lastTimeSeconds);
   }
 
   resize(): void {
@@ -688,7 +659,7 @@ export class SpectrumLatticeRenderer implements Disposable {
   };
 
   private shouldAnimateIdle(): boolean {
-    return this.motionPreference !== SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM || !this.reducedMotion;
+    return !this.reducedMotion;
   }
 }
 

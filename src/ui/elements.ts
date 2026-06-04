@@ -39,7 +39,6 @@ export interface Elements {
   metadataDialogCloseButton: HTMLButtonElement;
   themeSelect: HTMLSelectElement;
   viewerBackgroundSelect: HTMLSelectElement;
-  spectrumLatticeMotionSelect: HTMLSelectElement;
   channelRecognitionSettingsControl: HTMLElement;
   spectralRgbGroupingCheckbox: HTMLInputElement;
   channelRecognitionSummary: HTMLElement;
@@ -589,7 +588,6 @@ export function resolveElements(): Elements {
     metadataDialogCloseButton: requireElement('metadata-dialog-close-button', HTMLButtonElement),
     themeSelect: requireElement('theme-select', HTMLSelectElement),
     viewerBackgroundSelect: requireElement('viewer-background-select', HTMLSelectElement),
-    spectrumLatticeMotionSelect: requireElement('spectrum-lattice-motion-select', HTMLSelectElement),
     channelRecognitionSettingsControl: requireElement('channel-recognition-settings-control', HTMLElement),
     spectralRgbGroupingCheckbox: requireElement('spectral-rgb-grouping-checkbox', HTMLInputElement),
     channelRecognitionSummary: requireElement('channel-recognition-summary', HTMLElement),

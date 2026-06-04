@@ -31,11 +31,6 @@ import {
 } from '../src/viewer-background-settings';
 import type { ExportImagePreviewRequest, ViewerMode, ViewportRect } from '../src/types';
 import {
-  SPECTRUM_LATTICE_MOTION_ANIMATE,
-  SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM,
-  SPECTRUM_LATTICE_MOTION_STORAGE_KEY
-} from '../src/spectrum-lattice-motion';
-import {
   createDefaultStokesColormapDefaultSettings,
   createDefaultStokesParameterVisibilitySettings
 } from '../src/stokes';
@@ -54,6 +49,7 @@ import {
 import { SPECTRAL_RGB_GROUPING_STORAGE_KEY } from '../src/spectral-default-settings';
 
 const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'prismifold:auto-exposure-percentile:v1';
+const SPECTRUM_LATTICE_MOTION_STORAGE_KEY = 'prismifold:spectrum-lattice-motion:v1';
 const RULERS_VISIBLE_STORAGE_KEY = 'prismifold:rulers-visible:v1';
 
 function getRecognitionCheckbox(id: ChannelRecognitionSettingId): HTMLInputElement {
@@ -2403,7 +2399,7 @@ describe('panel split sizing', () => {
     );
     window.localStorage.setItem(THEME_STORAGE_KEY, SPECTRUM_LATTICE_THEME_ID);
     window.localStorage.setItem(VIEWER_BACKGROUND_STORAGE_KEY, 'black');
-    window.localStorage.setItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY, SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
+    window.localStorage.setItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY, 'system');
     window.localStorage.setItem(IMAGE_LOAD_WORKERS_STORAGE_KEY, '1');
     window.localStorage.setItem(SPECTRAL_RGB_GROUPING_STORAGE_KEY, 'false');
 
@@ -2435,7 +2431,6 @@ describe('panel split sizing', () => {
     const resetSettingsButton = document.getElementById('reset-settings-button') as HTMLButtonElement;
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
     const viewerBackgroundSelect = document.getElementById('viewer-background-select') as HTMLSelectElement;
-    const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
     const autoExposurePercentileInput = document.getElementById(
       'auto-exposure-percentile-input'
     ) as HTMLInputElement;
@@ -2459,7 +2454,8 @@ describe('panel split sizing', () => {
     expect(mainLayout.style.getPropertyValue('--bottom-panel-height')).toBe('0px');
     expect(themeSelect.value).toBe(SPECTRUM_LATTICE_THEME_ID);
     expect(viewerBackgroundSelect.value).toBe('black');
-    expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
+    expect(document.getElementById('spectrum-lattice-motion-select')).toBeNull();
+    expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBeNull();
     expect(imageLoadWorkersInput.value).toBe('1');
     expect(stokesAolpSelect.value).toBe('0');
     stokesMaskCheckbox.checked = true;
@@ -2479,7 +2475,6 @@ describe('panel split sizing', () => {
     expect(onInvalidValueWarningChange).toHaveBeenCalledWith(false);
     expect(themeSelect.value).toBe('default');
     expect(viewerBackgroundSelect.value).toBe('checker');
-    expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_ANIMATE);
     expect(autoExposurePercentileInput.value).toBe('99.5');
     expect(imageLoadWorkersInput.value).toBe(String(getDefaultImageLoadWorkers()));
     expect(stokesAolpSelect.value).toBe('1');
@@ -3020,7 +3015,6 @@ describe('view menu', () => {
       .map((item) => item.textContent?.trim());
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
     const viewerBackgroundSelect = document.getElementById('viewer-background-select') as HTMLSelectElement;
-    const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
     const autoExposurePercentileInput = document.getElementById(
       'auto-exposure-percentile-input'
     ) as HTMLInputElement;
@@ -3029,7 +3023,6 @@ describe('view menu', () => {
     expect(labels).toEqual([
       'Theme',
       'Background',
-      'Spectrum lattice motion',
       'Channel Recognition',
       'Stokes Defaults',
       'Auto Exposure Percentile',
@@ -3079,14 +3072,7 @@ describe('view menu', () => {
     expect(Array.from(viewerBackgroundSelect.options).map((option) => option.value)).toEqual(
       VIEWER_BACKGROUNDS.map((background) => background.id)
     );
-    expect(Array.from(spectrumMotionSelect.options).map((option) => option.textContent)).toEqual([
-      'Animate',
-      'Follow system'
-    ]);
-    expect(Array.from(spectrumMotionSelect.options).map((option) => option.value)).toEqual([
-      SPECTRUM_LATTICE_MOTION_ANIMATE,
-      SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM
-    ]);
+    expect(document.getElementById('spectrum-lattice-motion-select')).toBeNull();
   });
 
   it('renders and dispatches Stokes default table settings from Settings', () => {
@@ -3427,39 +3413,14 @@ describe('view menu', () => {
     expect((document.getElementById('viewer-container') as HTMLElement).dataset.viewerBackground).toBe('white');
   });
 
-  it('applies, persists, and reads the Spectrum lattice motion preference from Settings', () => {
+  it('clears the legacy Spectrum lattice motion preference during UI initialization', () => {
     installUiFixture();
-
-    new ViewerUi(createUiCallbacks());
-    const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
-
-    expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_ANIMATE);
-    expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBeNull();
-
-    spectrumMotionSelect.value = SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM;
-    spectrumMotionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-
-    expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
-    expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBe(
-      SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM
-    );
-
-    spectrumMotionSelect.value = SPECTRUM_LATTICE_MOTION_ANIMATE;
-    spectrumMotionSelect.dispatchEvent(new Event('change', { bubbles: true }));
-
-    expect(spectrumMotionSelect.value).toBe(SPECTRUM_LATTICE_MOTION_ANIMATE);
-    expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBeNull();
-  });
-
-  it('reads the stored Spectrum lattice motion preference during UI initialization', () => {
-    installUiFixture();
-    window.localStorage.setItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY, SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
+    window.localStorage.setItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY, 'system');
 
     new ViewerUi(createUiCallbacks());
 
-    expect((document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement).value).toBe(
-      SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM
-    );
+    expect(document.getElementById('spectrum-lattice-motion-select')).toBeNull();
+    expect(window.localStorage.getItem(SPECTRUM_LATTICE_MOTION_STORAGE_KEY)).toBeNull();
   });
 
   it('defines controller-driven viewer background blend layers for Spectrum lattice', () => {
@@ -3984,7 +3945,6 @@ describe('view menu', () => {
     const settingsDialog = document.getElementById('settings-dialog') as HTMLElement;
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
     const viewerBackgroundSelect = document.getElementById('viewer-background-select') as HTMLSelectElement;
-    const spectrumMotionSelect = document.getElementById('spectrum-lattice-motion-select') as HTMLSelectElement;
     const editNameRulesButton = document.getElementById('channel-recognition-edit-name-rules-button') as HTMLButtonElement;
     const rgbRecognition = getRecognitionCheckbox('component.rgb');
     const xyzRecognition = getRecognitionCheckbox('component.xyz');
@@ -4039,7 +3999,6 @@ describe('view menu', () => {
     expect(focusableSettingsControls).toEqual([
       themeSelect,
       viewerBackgroundSelect,
-      spectrumMotionSelect,
       editNameRulesButton,
       rgbRecognition,
       xyzRecognition,

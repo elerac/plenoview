@@ -2,10 +2,6 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SpectrumLatticeRenderer, type SpectrumLatticeBlend } from '../src/ui/spectrum-lattice-renderer';
-import {
-  SPECTRUM_LATTICE_MOTION_ANIMATE,
-  SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM
-} from '../src/spectrum-lattice-motion';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -131,12 +127,11 @@ describe('SpectrumLatticeRenderer', () => {
     expect(blends.at(-1)).toBeNull();
   });
 
-  it('honors explicit follow-system reduced motion by drawing idle once without scheduling animation', () => {
+  it('honors reduced motion by drawing idle once without scheduling animation', () => {
     const animation = installAnimationFrameMock();
     installReducedMotionPreference(true);
     const { gl, renderer, blends } = createHarness();
 
-    renderer.setMotionPreference(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
     renderer.setMode('idle');
 
     expect(animation.queuedFrameCount()).toBe(0);
@@ -145,9 +140,9 @@ describe('SpectrumLatticeRenderer', () => {
     expect(blends.at(-1)).toEqual({ checkerOpacity: 0, gridOpacity: 1 });
   });
 
-  it('animates idle under reduced motion by default', () => {
+  it('animates idle when reduced motion is not requested', () => {
     const animation = installAnimationFrameMock();
-    installReducedMotionPreference(true);
+    installReducedMotionPreference(false);
     const { gl, renderer } = createHarness();
 
     renderer.setMode('idle');
@@ -160,29 +155,6 @@ describe('SpectrumLatticeRenderer', () => {
 
     const times = readTimeUniforms(gl);
     expect(times.at(-1)! - times.at(-2)!).toBeGreaterThan(0);
-  });
-
-  it('starts and stops idle animation when the motion preference changes under reduced motion', () => {
-    const animation = installAnimationFrameMock();
-    installReducedMotionPreference(true);
-    const { gl, renderer } = createHarness();
-
-    renderer.setMotionPreference(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
-    renderer.setMode('idle');
-    expect(animation.queuedFrameCount()).toBe(0);
-    expect(gl.drawArrays).toHaveBeenCalledTimes(1);
-
-    renderer.setMotionPreference(SPECTRUM_LATTICE_MOTION_ANIMATE);
-    expect(animation.queuedFrameCount()).toBe(1);
-    expect(gl.drawArrays).toHaveBeenCalledTimes(2);
-
-    animation.flushNext(100);
-    expect(animation.queuedFrameCount()).toBe(1);
-
-    renderer.setMotionPreference(SPECTRUM_LATTICE_MOTION_FOLLOW_SYSTEM);
-    expect(animation.queuedFrameCount()).toBe(0);
-    expect(animation.cancelAnimationFrame).toHaveBeenCalledTimes(1);
-    expect(gl.drawArrays).toHaveBeenCalledTimes(4);
   });
 
   it('falls back on context loss and reinitializes on restore', () => {

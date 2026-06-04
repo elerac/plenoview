@@ -226,7 +226,6 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   const autoExposureButton = page.locator('#app-auto-exposure-button');
   const invalidValueWarningButton = page.locator('#app-invalid-value-warning-button');
   const themeInput = page.locator('#theme-select');
-  const spectrumMotionInput = page.locator('#spectrum-lattice-motion-select');
   const imageLoadWorkersInput = page.locator('#image-load-workers-input');
   const budgetInput = page.locator('#display-cache-budget-input');
   const usageReadout = page.locator('#display-cache-usage');
@@ -366,9 +365,8 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   await expect(themeInput).toBeVisible();
   await expect(themeInput).toHaveValue('default');
   await expect(themeInput.locator('option')).toHaveText(['Default', 'Spectrum lattice']);
-  await expect(spectrumMotionInput).toBeVisible();
-  await expect(spectrumMotionInput).toHaveValue('animate');
-  await expect(spectrumMotionInput.locator('option')).toHaveText(['Animate', 'Follow system']);
+  await expect(page.locator('#spectrum-lattice-motion-select')).toHaveCount(0);
+  await expect(page.getByText('Spectrum lattice motion', { exact: true })).toHaveCount(0);
   const defaultImageLoadWorkers = String(await page.evaluate(() => {
     return Math.max(1, Math.floor(navigator.hardwareConcurrency || 2));
   }));

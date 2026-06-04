@@ -117,13 +117,6 @@ import {
   type ViewerBackgroundId
 } from '../viewer-background-settings';
 import {
-  DEFAULT_SPECTRUM_LATTICE_MOTION_PREFERENCE,
-  parseSpectrumLatticeMotionPreference,
-  readStoredSpectrumLatticeMotionPreference,
-  saveStoredSpectrumLatticeMotionPreference,
-  type SpectrumLatticeMotionPreference
-} from '../spectrum-lattice-motion';
-import {
   DEFAULT_FOLDER_LOAD_LIMITS,
   createFolderLoadAdmission,
   getFolderLoadStats
@@ -181,6 +174,7 @@ import type { AppFullscreenHost, DesktopCommandId, ExportSaveResult } from '../p
 const AUTO_FIT_IMAGE_ON_SELECT_STORAGE_KEY = 'prismifold:auto-fit-image-on-select:v1';
 const AUTO_EXPOSURE_STORAGE_KEY = 'prismifold:auto-exposure:v1';
 const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'prismifold:auto-exposure-percentile:v1';
+const LEGACY_SPECTRUM_LATTICE_MOTION_STORAGE_KEY = 'prismifold:spectrum-lattice-motion:v1';
 const RULERS_VISIBLE_STORAGE_KEY = 'prismifold:rulers-visible:v1';
 const SCREENSHOT_SELECTION_DUPLICATE_OFFSET = 24;
 
@@ -749,7 +743,7 @@ export class ViewerUi implements Disposable {
       viewerContainer: this.elements.viewerContainer,
       spectrumLatticeCanvas: this.elements.spectrumLatticeCanvas
     });
-    this.setSpectrumLatticeMotionPreference(readStoredSpectrumLatticeMotionPreference(), false);
+    clearLegacySpectrumLatticeMotionPreference();
     this.themeController = new ThemeController(this.elements, {
       onThemeChange: (theme) => {
         this.viewerBackgroundController.setTheme(theme);
@@ -1051,21 +1045,6 @@ export class ViewerUi implements Disposable {
     this.viewerBackgroundController.setViewerBackground(background);
     if (persist) {
       saveStoredViewerBackground(background);
-    }
-  }
-
-  setSpectrumLatticeMotionPreference(
-    preference: SpectrumLatticeMotionPreference,
-    persist = true
-  ): void {
-    if (this.disposed) {
-      return;
-    }
-
-    this.elements.spectrumLatticeMotionSelect.value = preference;
-    this.viewerBackgroundController.setSpectrumLatticeMotionPreference(preference);
-    if (persist) {
-      saveStoredSpectrumLatticeMotionPreference(preference);
     }
   }
 
@@ -3114,12 +3093,6 @@ export class ViewerUi implements Disposable {
       this.callbacks.onViewerBackgroundChange(this.viewerBackground);
     });
 
-    this.disposables.addEventListener(this.elements.spectrumLatticeMotionSelect, 'change', () => {
-      this.setSpectrumLatticeMotionPreference(
-        parseSpectrumLatticeMotionPreference(this.elements.spectrumLatticeMotionSelect.value)
-      );
-    });
-
     this.disposables.addEventListener(this.elements.autoExposurePercentileInput, 'change', () => {
       const percentile = parseAutoExposurePercentile(this.elements.autoExposurePercentileInput.value);
       this.setAutoExposurePercentile(percentile, true);
@@ -3137,7 +3110,7 @@ export class ViewerUi implements Disposable {
       this.themeController.reset();
       this.setViewerBackground(DEFAULT_VIEWER_BACKGROUND_ID);
       this.callbacks.onViewerBackgroundChange(this.viewerBackground);
-      this.setSpectrumLatticeMotionPreference(DEFAULT_SPECTRUM_LATTICE_MOTION_PREFERENCE);
+      clearLegacySpectrumLatticeMotionPreference();
       this.setAutoExposurePercentile(AUTO_EXPOSURE_PERCENTILE, true);
       this.callbacks.onAutoExposurePercentileChange(this.autoExposurePercentile);
       this.setImageLoadWorkers(getDefaultImageLoadWorkers(), true);
@@ -3930,6 +3903,14 @@ function saveStoredAutoExposurePercentile(percentile: number): void {
     window.localStorage.setItem(AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY, formatAutoExposurePercentile(value));
   } catch {
     // Storage can be unavailable in private contexts; keep the runtime state anyway.
+  }
+}
+
+function clearLegacySpectrumLatticeMotionPreference(): void {
+  try {
+    window.localStorage.removeItem(LEGACY_SPECTRUM_LATTICE_MOTION_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in private contexts; the setting is obsolete.
   }
 }
 
