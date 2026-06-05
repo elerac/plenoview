@@ -8359,15 +8359,8 @@ describe('opened files actions', () => {
     expect(tooltip.getAttribute('role')).toBe('tooltip');
     expect(tooltip.querySelector('.opened-file-info-tooltip-filename')?.textContent).toBe('beauty.exr');
     expect(tooltip.querySelector('.opened-file-info-tooltip-size')?.textContent).toBe('3.0 MB');
-    expect(
-      Array.from(tooltip.querySelectorAll('.opened-file-info-tooltip-metadata .metadata-row')).map((metadataRow) => ({
-        key: metadataRow.querySelector('.metadata-key')?.textContent,
-        value: metadataRow.querySelector('.metadata-value')?.textContent
-      }))
-    ).toEqual([
-      { key: 'Compression', value: 'PIZ' },
-      { key: 'Channels', value: '3 (R, G, B)' }
-    ]);
+    expect(tooltip.querySelector('.opened-file-info-tooltip-metadata')).toBeNull();
+    expect(tooltip.querySelector('.metadata-row')).toBeNull();
     expect(row.getAttribute('aria-describedby')).toBe('opened-file-info-tooltip');
 
     thumbnailSlot.dispatchEvent(new MouseEvent('pointerout', {

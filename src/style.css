@@ -3235,22 +3235,6 @@ body.is-resizing-panel-rows * {
   line-height: var(--type-caption-line-height);
 }
 
-.opened-file-info-tooltip-metadata {
-  max-height: min(16rem, calc(100vh - 8rem));
-  margin-top: 4px;
-  overflow: auto;
-}
-
-.opened-file-info-tooltip-metadata .metadata-row {
-  grid-template-columns: minmax(6.4rem, 0.85fr) minmax(0, 1.5fr);
-  min-height: 26px;
-}
-
-.opened-file-info-tooltip-metadata .metadata-key,
-.opened-file-info-tooltip-metadata .metadata-value {
-  padding: 4px 7px;
-}
-
 .channel-thumbnail-strip {
   flex: 1 1 auto;
   min-width: 0;
