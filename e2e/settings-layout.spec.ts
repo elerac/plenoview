@@ -58,6 +58,53 @@ async function readTopBarVisualState(page: Page): Promise<{
   });
 }
 
+async function readSpectrumThemeState(page: Page): Promise<{
+  theme: string | undefined;
+  storedTheme: string | null;
+  themeSelectValue: string;
+  settingsDialogHidden: boolean;
+  settingsDialogBackdropHidden: boolean;
+  openSessionCount: number;
+  appIdle: boolean;
+  mainIdle: boolean;
+  viewerIdle: boolean;
+}> {
+  return await page.evaluate(() => {
+    const themeSelect = document.getElementById('theme-select');
+    const settingsDialog = document.getElementById('settings-dialog');
+    const settingsDialogBackdrop = document.getElementById('settings-dialog-backdrop');
+    const openedImagesSelect = document.getElementById('opened-images-select');
+    const appShell = document.getElementById('app');
+    const mainLayout = document.getElementById('main-layout');
+    const viewer = document.getElementById('viewer-container');
+    if (
+      !(themeSelect instanceof HTMLSelectElement) ||
+      !(settingsDialog instanceof HTMLElement) ||
+      !(settingsDialogBackdrop instanceof HTMLElement) ||
+      !(openedImagesSelect instanceof HTMLSelectElement) ||
+      !(appShell instanceof HTMLElement) ||
+      !(mainLayout instanceof HTMLElement) ||
+      !(viewer instanceof HTMLElement)
+    ) {
+      throw new Error('Missing Spectrum theme state elements.');
+    }
+
+    return {
+      theme: document.documentElement.dataset.theme,
+      storedTheme: window.localStorage.getItem('prismifold:theme:v1'),
+      themeSelectValue: themeSelect.value,
+      settingsDialogHidden: settingsDialog.getClientRects().length === 0,
+      settingsDialogBackdropHidden:
+        settingsDialogBackdrop.classList.contains('hidden') &&
+        settingsDialogBackdrop.getClientRects().length === 0,
+      openSessionCount: openedImagesSelect.options.length,
+      appIdle: appShell.classList.contains('is-spectrum-lattice-idle'),
+      mainIdle: mainLayout.classList.contains('is-spectrum-lattice-idle'),
+      viewerIdle: viewer.classList.contains('is-spectrum-lattice-idle')
+    };
+  });
+}
+
 async function readViewerBackgroundState(page: Page): Promise<{
   backgroundColor: string;
   backgroundImage: string;
@@ -838,11 +885,12 @@ test('stacks Stokes Defaults settings on narrow viewports without horizontal cli
   expect(layout.responsiveLabels).toEqual(expect.arrayContaining(['vmax', 'Zero Center', 'Modulation']));
 });
 
-test('persists Spectrum lattice as animated idle and frozen active chrome @smoke', async ({ page }) => {
+test('persists Spectrum lattice as animated idle and frozen active chrome', async ({ page }) => {
   await installSpectrumLatticeRenderProbe(page);
   await gotoViewerApp(page);
 
   const settingsDialogButton = page.getByRole('button', { name: 'Settings', exact: true });
+  const settingsDialogBackdrop = page.locator('#settings-dialog-backdrop');
   const settingsDialog = page.locator('#settings-dialog');
   const themeInput = page.locator('#theme-select');
   const appShell = page.locator('#app');
@@ -945,6 +993,8 @@ test('persists Spectrum lattice as animated idle and frozen active chrome @smoke
   await expect(settingsDialog).toBeVisible();
   await expect(themeInput).toHaveValue('spectrum-lattice');
   await page.keyboard.press('Escape');
+  await expect(settingsDialogBackdrop).toBeHidden();
+  await expect(settingsDialog).toBeHidden();
 
   await openGalleryCbox(page);
   await expect(idleCanvas).toBeVisible();
@@ -964,8 +1014,18 @@ test('persists Spectrum lattice as animated idle and frozen active chrome @smoke
   expect(activeTopBarState.backgroundImage.includes('linear-gradient')).toBe(true);
   expect(activeTopBarState.backdropFilter.includes('blur')).toBe(true);
   await expect.poll(async () => {
-    return await page.evaluate(() => document.documentElement.dataset.theme);
-  }).toBe('spectrum-lattice');
+    return await readSpectrumThemeState(page);
+  }, { timeout: 30000 }).toEqual({
+    theme: 'spectrum-lattice',
+    storedTheme: 'spectrum-lattice',
+    themeSelectValue: 'spectrum-lattice',
+    settingsDialogHidden: true,
+    settingsDialogBackdropHidden: true,
+    openSessionCount: 1,
+    appIdle: false,
+    mainIdle: false,
+    viewerIdle: false
+  });
 
   await page.getByRole('button', { name: 'Close cbox_rgb.exr', exact: true }).click();
   await waitForE2ESessionCount(page, 0);
