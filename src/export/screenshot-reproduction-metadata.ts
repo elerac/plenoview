@@ -12,7 +12,7 @@ import type {
   ViewerState,
 } from '../types';
 
-const SCREENSHOT_REPRODUCTION_METADATA_SCHEMA_VERSION = 2;
+const SCREENSHOT_REPRODUCTION_METADATA_SCHEMA_VERSION = 3;
 const APP_NAME = 'prismifold';
 
 export interface ScreenshotReproductionMetadataBatchContext {
@@ -37,7 +37,7 @@ export interface BuildScreenshotReproductionMetadataArgs {
 }
 
 export interface ScreenshotReproductionMetadataV2 {
-  schemaVersion: 2;
+  schemaVersion: 3;
   app: {
     name: string;
   };
@@ -67,6 +67,12 @@ export interface ScreenshotReproductionMetadataV2 {
     panoramaYawDeg: number;
     panoramaPitchDeg: number;
     panoramaHfovDeg: number;
+    depthYawDeg: number;
+    depthPitchDeg: number;
+    depthZoom: number;
+    depthTargetX: number;
+    depthTargetY: number;
+    depthTargetZ: number;
   };
   sourceImage: {
     sessionId: string;
@@ -140,7 +146,13 @@ export function buildScreenshotReproductionMetadata({
       panY: renderState.panY,
       panoramaYawDeg: renderState.panoramaYawDeg,
       panoramaPitchDeg: renderState.panoramaPitchDeg,
-      panoramaHfovDeg: renderState.panoramaHfovDeg
+      panoramaHfovDeg: renderState.panoramaHfovDeg,
+      depthYawDeg: renderState.depthYawDeg,
+      depthPitchDeg: renderState.depthPitchDeg,
+      depthZoom: renderState.depthZoom,
+      depthTargetX: renderState.depthTargetX,
+      depthTargetY: renderState.depthTargetY,
+      depthTargetZ: renderState.depthTargetZ
     },
     sourceImage: {
       sessionId: session.id,

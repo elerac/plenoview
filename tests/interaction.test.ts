@@ -12,6 +12,7 @@ import {
 } from '../src/interaction/image-geometry';
 import {
   orbitThreeDFromDrag,
+  panThreeDFromDrag,
   zoomThreeDFromWheel
 } from '../src/interaction/three-d-mode';
 import {
@@ -54,6 +55,9 @@ const state: ViewerState = {
   depthYawDeg: 0,
   depthPitchDeg: 0,
   depthZoom: 1,
+  depthTargetX: 0,
+  depthTargetY: 0,
+  depthTargetZ: 0,
   activeLayer: 0,
   displaySelection: createChannelRgbSelection('R', 'G', 'B'),
   depthChannel: null,
@@ -493,6 +497,75 @@ describe('interaction math', () => {
 
     expect(next.depthYawDeg).toBe(18);
     expect(next.depthPitchDeg).toBe(-36);
+  });
+
+  it('pans 3D target so the point cloud follows the drag direction', () => {
+    const viewport = { width: 200, height: 100 };
+    const next = panThreeDFromDrag(
+      {
+        ...state,
+        viewerMode: '3d',
+        depthYawDeg: 0,
+        depthPitchDeg: 0,
+        depthZoom: 1,
+        depthTargetX: 0,
+        depthTargetY: 0,
+        depthTargetZ: 0
+      },
+      viewport,
+      20,
+      10
+    );
+
+    expect(next.depthYawDeg).toBe(0);
+    expect(next.depthPitchDeg).toBe(0);
+    expect(next.depthZoom).toBe(1);
+    expect(next.depthTargetX).toBeCloseTo(-0.2);
+    expect(next.depthTargetY).toBeCloseTo(0.1);
+    expect(next.depthTargetZ).toBeCloseTo(0);
+  });
+
+  it('pans 3D target through the current camera rotation', () => {
+    const viewport = { width: 100, height: 100 };
+    const next = panThreeDFromDrag(
+      {
+        ...state,
+        viewerMode: '3d',
+        depthChannel: '__position:P',
+        depthYawDeg: 90,
+        depthPitchDeg: 0,
+        depthZoom: 1,
+        depthTargetX: 0,
+        depthTargetY: 0,
+        depthTargetZ: 0
+      },
+      viewport,
+      10,
+      0
+    );
+
+    expect(next.depthTargetX).toBeCloseTo(0);
+    expect(next.depthTargetY).toBeCloseTo(0);
+    expect(next.depthTargetZ).toBeCloseTo(0.1);
+  });
+
+  it('keeps 3D pan stable for invalid viewports', () => {
+    const next = panThreeDFromDrag(
+      {
+        ...state,
+        viewerMode: '3d',
+        depthTargetX: 1,
+        depthTargetY: 2,
+        depthTargetZ: 3
+      },
+      { width: 0, height: 100 },
+      20,
+      10
+    );
+
+    expect(next.depthTargetX).toBe(1);
+    expect(next.depthTargetY).toBe(2);
+    expect(next.depthTargetZ).toBe(3);
   });
 
   it('prevents depth orbit from crossing to the backside', () => {

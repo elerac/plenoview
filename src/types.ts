@@ -156,6 +156,9 @@ export interface ViewerViewState {
   depthYawDeg: number;
   depthPitchDeg: number;
   depthZoom: number;
+  depthTargetX: number;
+  depthTargetY: number;
+  depthTargetZ: number;
 }
 
 export interface ViewerSessionState extends ViewerViewState {

@@ -1,6 +1,7 @@
 import { cloneDisplayLuminanceRange } from './colormap-range';
 import {
   clampDepthZoom,
+  normalizeDepthTarget,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource
 } from './depth';
@@ -76,6 +77,9 @@ export function cloneViewerSessionState(state: ViewerSessionState): ViewerSessio
     depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
     depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
     depthZoom: clampDepthZoom(state.depthZoom),
+    depthTargetX: normalizeDepthTarget(state.depthTargetX),
+    depthTargetY: normalizeDepthTarget(state.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(state.depthTargetZ),
     activeLayer: state.activeLayer,
     displaySelection: cloneDisplaySelection(state.displaySelection),
     depthChannel: state.depthChannel,

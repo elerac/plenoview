@@ -1084,7 +1084,10 @@ describe('viewer app core', () => {
       panoramaHfovDeg: 80,
       depthYawDeg: 12,
       depthPitchDeg: -4,
-      depthZoom: 1.5
+      depthZoom: 1.5,
+      depthTargetX: 0.1,
+      depthTargetY: -0.2,
+      depthTargetZ: 0.3
     };
 
     core.dispatch({ type: 'sessionLoaded', session });
@@ -1179,7 +1182,10 @@ describe('viewer app core', () => {
         panoramaHfovDeg: 80,
         depthYawDeg: 12,
         depthPitchDeg: -8,
-        depthZoom: 3
+        depthZoom: 3,
+        depthTargetX: 0.1,
+        depthTargetY: -0.2,
+        depthTargetZ: 0.3
       }
     });
     core.dispatch({
@@ -1212,6 +1218,9 @@ describe('viewer app core', () => {
       depthYawDeg: 0,
       depthPitchDeg: 0,
       depthZoom: DEFAULT_DEPTH_ZOOM,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0,
       exposureEv: 2,
       displaySelection: createChannelMonoSelection('R'),
       lockedPixel: { ix: 1, iy: 0 },
@@ -1226,7 +1235,10 @@ describe('viewer app core', () => {
       panoramaHfovDeg: DEFAULT_PANORAMA_HFOV_DEG,
       depthYawDeg: 0,
       depthPitchDeg: 0,
-      depthZoom: DEFAULT_DEPTH_ZOOM
+      depthZoom: DEFAULT_DEPTH_ZOOM,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
     });
     expect(core.getState().interactionState.view.panX).toBeCloseTo(4 / 7);
     expect(core.getState().interactionState.view.panY).toBeCloseTo(1 / 14);

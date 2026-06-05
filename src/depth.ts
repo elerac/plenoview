@@ -27,6 +27,7 @@ export const MAX_DEPTH_PITCH_DEG = 89.9;
 export const DEFAULT_DEPTH_ZOOM = 1;
 export const MIN_DEPTH_ZOOM = 0.05;
 export const MAX_DEPTH_ZOOM = 50;
+export const DEFAULT_DEPTH_TARGET = 0;
 export const DEFAULT_DEPTH_POINT_SIZE_PX = 2;
 export const MIN_DEPTH_POINT_SIZE_PX = 1;
 export const MAX_DEPTH_POINT_SIZE_PX = 8;
@@ -106,6 +107,9 @@ export interface DepthProjectionView {
   depthYawDeg: number;
   depthPitchDeg: number;
   depthZoom: number;
+  depthTargetX?: number;
+  depthTargetY?: number;
+  depthTargetZ?: number;
   depthPointSizePx: number;
 }
 
@@ -217,6 +221,10 @@ export function normalizeDepthPitchForSource(
 
 export function clampDepthZoom(zoom: number): number {
   return clampFinite(zoom, MIN_DEPTH_ZOOM, MAX_DEPTH_ZOOM, DEFAULT_DEPTH_ZOOM);
+}
+
+export function normalizeDepthTarget(value: number): number {
+  return Number.isFinite(value) ? value : DEFAULT_DEPTH_TARGET;
 }
 
 export function normalizeDepthPointSize(pointSizePx: number): number {
@@ -588,6 +596,9 @@ export function projectDepthPixelToScreen(
     depthYawDeg: options.depthYawDeg,
     depthPitchDeg: options.depthPitchDeg,
     depthZoom: options.depthZoom,
+    depthTargetX: options.depthTargetX,
+    depthTargetY: options.depthTargetY,
+    depthTargetZ: options.depthTargetZ,
     depth
   });
 }
@@ -632,6 +643,9 @@ export function projectPositionPointToScreen(
     depthYawDeg: options.depthYawDeg,
     depthPitchDeg: options.depthPitchDeg,
     depthZoom: options.depthZoom,
+    depthTargetX: options.depthTargetX,
+    depthTargetY: options.depthTargetY,
+    depthTargetZ: options.depthTargetZ,
     depth: point.z
   });
 }
@@ -827,6 +841,9 @@ export class DepthProbeProjectionCache {
     const pitchCos = Math.cos(pitchRad);
     const pitchSin = Math.sin(pitchRad);
     const zoom = clampDepthZoom(args.depthZoom);
+    const depthTargetX = normalizeDepthTarget(args.depthTargetX ?? DEFAULT_DEPTH_TARGET);
+    const depthTargetY = normalizeDepthTarget(args.depthTargetY ?? DEFAULT_DEPTH_TARGET);
+    const depthTargetZ = normalizeDepthTarget(args.depthTargetZ ?? DEFAULT_DEPTH_TARGET);
     const aspect = Math.max(args.viewport.width / Math.max(args.viewport.height, 1), 1.0e-6);
     const screenCenterX = args.viewport.width * 0.5;
     const screenCenterY = args.viewport.height * 0.5;
@@ -872,10 +889,13 @@ export class DepthProbeProjectionCache {
         normalizedY = (args.height / 2 - (y + 0.5)) * depth * scalarProjection.invFocalSceneScale;
         normalizedZ = (depth - scalarProjection.centerDepth) * scalarProjection.invSceneScale;
       }
-      const yawX = yawCos * normalizedX + yawSin * normalizedZ;
-      const yawZ = -yawSin * normalizedX + yawCos * normalizedZ;
-      const cameraY = pitchCos * normalizedY - pitchSin * yawZ;
-      const cameraZ = pitchSin * normalizedY + pitchCos * yawZ;
+      const targetRelativeX = normalizedX - depthTargetX;
+      const targetRelativeY = normalizedY - depthTargetY;
+      const targetRelativeZ = normalizedZ - depthTargetZ;
+      const yawX = yawCos * targetRelativeX + yawSin * targetRelativeZ;
+      const yawZ = -yawSin * targetRelativeX + yawCos * targetRelativeZ;
+      const cameraY = pitchCos * targetRelativeY - pitchSin * yawZ;
+      const cameraZ = pitchSin * targetRelativeY + pitchCos * yawZ;
       const projectedScreenX = screenCenterX + yawX * screenScaleX;
       const projectedScreenY = screenCenterY - cameraY * screenScaleY;
       if (
@@ -1244,7 +1264,10 @@ function computePositionBoundsScale(bounds: DepthPositionBounds): number {
 
 function projectNormalizedDepthPointToScreen(
   point: DepthPoint,
-  options: Pick<DepthProjectionView, 'depthYawDeg' | 'depthPitchDeg' | 'depthZoom'> & {
+  options: Pick<
+    DepthProjectionView,
+    'depthYawDeg' | 'depthPitchDeg' | 'depthZoom' | 'depthTargetX' | 'depthTargetY' | 'depthTargetZ'
+  > & {
     pixel: ImagePixel;
     depthSource: DepthRotationSource;
     viewport: ViewportInfo;
@@ -1257,7 +1280,12 @@ function projectNormalizedDepthPointToScreen(
 
   const yawRad = -normalizeDepthYawForSource(options.depthYawDeg, options.depthSource) * Math.PI / 180;
   const pitchRad = -normalizeDepthPitchForSource(options.depthPitchDeg, options.depthSource) * Math.PI / 180;
-  const yawPoint = rotateYaw(point, yawRad);
+  const targetRelativePoint = {
+    x: point.x - normalizeDepthTarget(options.depthTargetX ?? DEFAULT_DEPTH_TARGET),
+    y: point.y - normalizeDepthTarget(options.depthTargetY ?? DEFAULT_DEPTH_TARGET),
+    z: point.z - normalizeDepthTarget(options.depthTargetZ ?? DEFAULT_DEPTH_TARGET)
+  };
+  const yawPoint = rotateYaw(targetRelativePoint, yawRad);
   const cameraPoint = rotatePitch(yawPoint, pitchRad);
   const zoom = clampDepthZoom(options.depthZoom);
   const aspect = Math.max(options.viewport.width / Math.max(options.viewport.height, 1), 1.0e-6);
@@ -1392,6 +1420,9 @@ function buildDepthProjectionFrameKey(
     normalizeDepthYawForSource(args.depthYawDeg, source),
     normalizeDepthPitchForSource(args.depthPitchDeg, source),
     clampDepthZoom(args.depthZoom),
+    normalizeDepthTarget(args.depthTargetX ?? DEFAULT_DEPTH_TARGET),
+    normalizeDepthTarget(args.depthTargetY ?? DEFAULT_DEPTH_TARGET),
+    normalizeDepthTarget(args.depthTargetZ ?? DEFAULT_DEPTH_TARGET),
     Math.floor(args.viewport.width),
     Math.floor(args.viewport.height),
     sampling.step,

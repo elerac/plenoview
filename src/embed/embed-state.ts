@@ -57,7 +57,10 @@ export function createEmbedViewerStateSnapshot(state: ViewerAppState): EmbedView
       panoramaHfovDeg: view.panoramaHfovDeg,
       depthYawDeg: view.depthYawDeg,
       depthPitchDeg: view.depthPitchDeg,
-      depthZoom: view.depthZoom
+      depthZoom: view.depthZoom,
+      depthTargetX: view.depthTargetX,
+      depthTargetY: view.depthTargetY,
+      depthTargetZ: view.depthTargetZ
     }
   };
 }
@@ -212,7 +215,10 @@ function normalizeViewPatch(value: unknown): Partial<ViewerViewState> {
     'panoramaHfovDeg',
     'depthYawDeg',
     'depthPitchDeg',
-    'depthZoom'
+    'depthZoom',
+    'depthTargetX',
+    'depthTargetY',
+    'depthTargetZ'
   ] as const) {
     if (isFiniteNumber(record[key])) {
       patch[key] = record[key];

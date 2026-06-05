@@ -1832,6 +1832,60 @@ describe('viewer state inspector', () => {
     ]);
   });
 
+  it('renders 3D target fields and commits typed target edits', () => {
+    installUiFixture();
+
+    const onViewerViewStateChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onViewerViewStateChange }));
+    ui.setViewerStateReadout({
+      hasActiveImage: true,
+      viewerMode: '3d',
+      view: {
+        zoom: 2,
+        panX: 10,
+        panY: 12.5,
+        panoramaYawDeg: 30,
+        panoramaPitchDeg: 5,
+        panoramaHfovDeg: 80,
+        depthYawDeg: 30,
+        depthPitchDeg: 5,
+        depthZoom: 1,
+        depthTargetX: 0.123,
+        depthTargetY: -0.25,
+        depthTargetZ: 1.5
+      },
+      depth: {
+        channel: 'Z',
+        channelOptions: [{ value: 'Z', label: 'Z' }],
+        focalLengthPx: null,
+        resolvedFocalLengthPx: 1920,
+        pointSizePx: 2
+      }
+    });
+
+    const targetXInput = document.getElementById('viewer-state-depth-target-x-input') as HTMLInputElement;
+    const targetYInput = document.getElementById('viewer-state-depth-target-y-input') as HTMLInputElement;
+    const targetZInput = document.getElementById('viewer-state-depth-target-z-input') as HTMLInputElement;
+
+    expect(targetXInput.value).toBe('0.12');
+    expect(targetYInput.value).toBe('-0.25');
+    expect(targetZInput.value).toBe('1.5');
+
+    targetXInput.value = '0.333';
+    targetXInput.dispatchEvent(new Event('blur'));
+    targetYInput.value = '-0.5';
+    targetYInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    targetZInput.value = '2';
+    targetZInput.dispatchEvent(new Event('blur'));
+
+    expect(targetXInput.value).toBe('0.33');
+    expect(onViewerViewStateChange.mock.calls).toEqual([
+      [{ depthTargetX: 0.333 }],
+      [{ depthTargetY: -0.5 }],
+      [{ depthTargetZ: 2 }]
+    ]);
+  });
+
   it('allows typed depth orbit values past the front-facing range for position sources', () => {
     installUiFixture();
 

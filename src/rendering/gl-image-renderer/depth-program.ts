@@ -19,6 +19,7 @@ export function createDepthProgram(gl: WebGL2RenderingContext): ProgramBundle<De
       depthYawDeg: getRequiredUniformLocation(gl, program, 'uDepthYawDeg'),
       depthPitchDeg: getRequiredUniformLocation(gl, program, 'uDepthPitchDeg'),
       depthZoom: getRequiredUniformLocation(gl, program, 'uDepthZoom'),
+      depthTarget: getRequiredUniformLocation(gl, program, 'uDepthTarget'),
       depthPointSizePx: getRequiredUniformLocation(gl, program, 'uDepthPointSizePx'),
       depthGridSize: getRequiredUniformLocation(gl, program, 'uDepthGridSize'),
       depthSampleStep: getRequiredUniformLocation(gl, program, 'uDepthSampleStep'),

@@ -1904,12 +1904,20 @@ describe('bootstrap app lifecycle', () => {
         outputHeight: number;
         outputScale: { x: number; y: number };
       };
-      viewer: { viewerMode: string; panX: number; panY: number; panoramaHfovDeg: number };
+      viewer: {
+        viewerMode: string;
+        panX: number;
+        panY: number;
+        panoramaHfovDeg: number;
+        depthTargetX: number;
+        depthTargetY: number;
+        depthTargetZ: number;
+      };
       sourceImage: { filename: string; displayName: string; source: { detail: string }; width: number; height: number };
       display: { activeLayer: number; layerName: string; displaySelection: typeof rgbSelection; exposureEv: number };
     };
 
-    expect(metadata.schemaVersion).toBe(2);
+    expect(metadata.schemaVersion).toBe(3);
     expect(metadata.export).toMatchObject({
       pngFilename: 'image-screenshot.png',
       jsonFilename: 'image-screenshot.json',
@@ -1929,7 +1937,10 @@ describe('bootstrap app lifecycle', () => {
       viewerMode: 'panorama',
       panX: 12,
       panY: 6,
-      panoramaHfovDeg: 80
+      panoramaHfovDeg: 80,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
     });
     expect(metadata.sourceImage).toMatchObject({
       filename: 'image.exr',

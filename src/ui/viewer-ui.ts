@@ -262,7 +262,10 @@ interface ScreenshotSelectionContext {
   view: Pick<
     ViewerViewState,
     'zoom' | 'panX' | 'panY' | 'panoramaYawDeg' | 'panoramaPitchDeg' | 'panoramaHfovDeg'
-  > & Partial<Pick<ViewerViewState, 'depthYawDeg' | 'depthPitchDeg' | 'depthZoom'>>;
+  > & Partial<Pick<
+    ViewerViewState,
+    'depthYawDeg' | 'depthPitchDeg' | 'depthZoom' | 'depthTargetX' | 'depthTargetY' | 'depthTargetZ'
+  >>;
   imageSize: ViewportInfo | null;
 }
 

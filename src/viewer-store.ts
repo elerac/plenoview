@@ -2,7 +2,9 @@ import { DEFAULT_DISPLAY_GAMMA } from './color';
 import {
   clampDepthZoom,
   DEFAULT_DEPTH_POINT_SIZE_PX,
+  DEFAULT_DEPTH_TARGET,
   DEFAULT_DEPTH_ZOOM,
+  normalizeDepthTarget,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource,
   resolveDepthChannelForLayer
@@ -43,6 +45,9 @@ const SESSION_STATE_KEYS = [
   'depthYawDeg',
   'depthPitchDeg',
   'depthZoom',
+  'depthTargetX',
+  'depthTargetY',
+  'depthTargetZ',
   'activeLayer',
   'displaySelection',
   'depthChannel',
@@ -78,6 +83,9 @@ export function createInitialState(): ViewerSessionState {
     depthYawDeg: 0,
     depthPitchDeg: 0,
     depthZoom: DEFAULT_DEPTH_ZOOM,
+    depthTargetX: DEFAULT_DEPTH_TARGET,
+    depthTargetY: DEFAULT_DEPTH_TARGET,
+    depthTargetZ: DEFAULT_DEPTH_TARGET,
     activeLayer: 0,
     displaySelection: null,
     depthChannel: null,
@@ -144,6 +152,9 @@ export function buildViewerStateForLayer(
       depthYawDeg: normalizeDepthYawForSource(currentState.depthYawDeg, null),
       depthPitchDeg: normalizeDepthPitchForSource(currentState.depthPitchDeg, null),
       depthZoom: clampDepthZoom(currentState.depthZoom),
+      depthTargetX: normalizeDepthTarget(currentState.depthTargetX),
+      depthTargetY: normalizeDepthTarget(currentState.depthTargetY),
+      depthTargetZ: normalizeDepthTarget(currentState.depthTargetZ),
       depthChannel: null
     };
   }
@@ -159,6 +170,9 @@ export function buildViewerStateForLayer(
     depthYawDeg: normalizeDepthYawForSource(currentState.depthYawDeg, depthChannel),
     depthPitchDeg: normalizeDepthPitchForSource(currentState.depthPitchDeg, depthChannel),
     depthZoom: clampDepthZoom(currentState.depthZoom),
+    depthTargetX: normalizeDepthTarget(currentState.depthTargetX),
+    depthTargetY: normalizeDepthTarget(currentState.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(currentState.depthTargetZ),
     depthChannel
   };
 }
@@ -190,6 +204,15 @@ function pickSessionStatePatch(
   }
   if (patch.depthZoom !== undefined) {
     nextPatch.depthZoom = clampDepthZoom(patch.depthZoom);
+  }
+  if (patch.depthTargetX !== undefined) {
+    nextPatch.depthTargetX = normalizeDepthTarget(patch.depthTargetX);
+  }
+  if (patch.depthTargetY !== undefined) {
+    nextPatch.depthTargetY = normalizeDepthTarget(patch.depthTargetY);
+  }
+  if (patch.depthTargetZ !== undefined) {
+    nextPatch.depthTargetZ = normalizeDepthTarget(patch.depthTargetZ);
   }
   return nextPatch;
 }

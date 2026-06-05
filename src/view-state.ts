@@ -11,6 +11,7 @@ import type { ChannelRecognitionNameRules } from './channel-recognition-name-rul
 import {
   type DepthRotationSource,
   clampDepthZoom,
+  normalizeDepthTarget,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource
 } from './depth';
@@ -43,7 +44,10 @@ export function pickViewState(
     panoramaHfovDeg: state.panoramaHfovDeg,
     depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, depthSource),
     depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, depthSource),
-    depthZoom: clampDepthZoom(state.depthZoom)
+    depthZoom: clampDepthZoom(state.depthZoom),
+    depthTargetX: normalizeDepthTarget(state.depthTargetX),
+    depthTargetY: normalizeDepthTarget(state.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(state.depthTargetZ)
   };
 }
 
@@ -98,7 +102,10 @@ export function sameViewState(a: ViewerViewState, b: ViewerViewState): boolean {
     a.panoramaHfovDeg === b.panoramaHfovDeg &&
     a.depthYawDeg === b.depthYawDeg &&
     a.depthPitchDeg === b.depthPitchDeg &&
-    a.depthZoom === b.depthZoom
+    a.depthZoom === b.depthZoom &&
+    a.depthTargetX === b.depthTargetX &&
+    a.depthTargetY === b.depthTargetY &&
+    a.depthTargetZ === b.depthTargetZ
   );
 }
 

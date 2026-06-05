@@ -17,6 +17,7 @@ import {
 import { clampPanoramaProjectionPitch } from '../../interaction/panorama-geometry';
 import {
   clampDepthZoom,
+  normalizeDepthTarget,
   normalizeDepthPointSize,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource,
@@ -185,6 +186,12 @@ export function renderDepthPass(
   gl.uniform1f(program.uniforms.depthYawDeg, normalizeDepthYawForSource(viewerState.depthYawDeg, depthSource));
   gl.uniform1f(program.uniforms.depthPitchDeg, normalizeDepthPitchForSource(viewerState.depthPitchDeg, depthSource));
   gl.uniform1f(program.uniforms.depthZoom, clampDepthZoom(viewerState.depthZoom));
+  gl.uniform3f(
+    program.uniforms.depthTarget,
+    normalizeDepthTarget(viewerState.depthTargetX),
+    normalizeDepthTarget(viewerState.depthTargetY),
+    normalizeDepthTarget(viewerState.depthTargetZ)
+  );
   gl.uniform1f(program.uniforms.depthPointSizePx, normalizeDepthPointSize(viewerState.depthPointSizePx));
   gl.uniform2f(
     program.uniforms.depthOutputOrigin,

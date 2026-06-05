@@ -5,6 +5,7 @@ import { clampZoom } from '../../interaction/image-geometry';
 import {
   type DepthRotationSource,
   clampDepthZoom,
+  normalizeDepthTarget,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource
 } from '../../depth';
@@ -59,7 +60,10 @@ const VIEW_KEYS = [
   'panoramaHfovDeg',
   'depthYawDeg',
   'depthPitchDeg',
-  'depthZoom'
+  'depthZoom',
+  'depthTargetX',
+  'depthTargetY',
+  'depthTargetZ'
 ] as const;
 
 type ViewCommitState = Pick<ViewerSessionState, (typeof VIEW_KEYS)[number]>;
@@ -82,6 +86,9 @@ export function patchSessionState(
     nextSessionState.depthChannel
   );
   nextSessionState.depthZoom = clampDepthZoom(nextSessionState.depthZoom);
+  nextSessionState.depthTargetX = normalizeDepthTarget(nextSessionState.depthTargetX);
+  nextSessionState.depthTargetY = normalizeDepthTarget(nextSessionState.depthTargetY);
+  nextSessionState.depthTargetZ = normalizeDepthTarget(nextSessionState.depthTargetZ);
   if (sameViewerSessionState(state.sessionState, nextSessionState)) {
     return state;
   }
@@ -165,6 +172,15 @@ export function normalizeViewerViewPatch(
   }
   if (patch.depthZoom !== undefined && Number.isFinite(patch.depthZoom)) {
     normalized.depthZoom = clampDepthZoom(patch.depthZoom);
+  }
+  if (patch.depthTargetX !== undefined && Number.isFinite(patch.depthTargetX)) {
+    normalized.depthTargetX = normalizeDepthTarget(patch.depthTargetX);
+  }
+  if (patch.depthTargetY !== undefined && Number.isFinite(patch.depthTargetY)) {
+    normalized.depthTargetY = normalizeDepthTarget(patch.depthTargetY);
+  }
+  if (patch.depthTargetZ !== undefined && Number.isFinite(patch.depthTargetZ)) {
+    normalized.depthTargetZ = normalizeDepthTarget(patch.depthTargetZ);
   }
 
   return Object.keys(normalized).length > 0 ? normalized : null;

@@ -852,7 +852,10 @@ function buildViewerStateReadout(
       panoramaHfovDeg: renderState.panoramaHfovDeg,
       depthYawDeg: renderState.depthYawDeg,
       depthPitchDeg: renderState.depthPitchDeg,
-      depthZoom: renderState.depthZoom
+      depthZoom: renderState.depthZoom,
+      depthTargetX: renderState.depthTargetX,
+      depthTargetY: renderState.depthTargetY,
+      depthTargetZ: renderState.depthTargetZ
     },
     depth: {
       channel: depthSource ? serializeDepthSource(depthSource) : null,
@@ -1147,6 +1150,9 @@ function stateLikeSessionState(): ViewerAppState['sessionState'] {
     depthYawDeg: 0,
     depthPitchDeg: 0,
     depthZoom: DEFAULT_DEPTH_ZOOM,
+    depthTargetX: 0,
+    depthTargetY: 0,
+    depthTargetZ: 0,
     activeLayer: 0,
     displaySelection: null,
     depthChannel: null,
@@ -1190,7 +1196,10 @@ function stateLikeInteractionState(): ViewerAppState['interactionState'] {
       panoramaHfovDeg: 100,
       depthYawDeg: 0,
       depthPitchDeg: 0,
-      depthZoom: DEFAULT_DEPTH_ZOOM
+      depthZoom: DEFAULT_DEPTH_ZOOM,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
     },
     hoveredPixel: null,
     draftRoi: null,

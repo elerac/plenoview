@@ -241,6 +241,9 @@ export interface Elements {
   viewerStateDepthYawInput: HTMLInputElement;
   viewerStateDepthPitchInput: HTMLInputElement;
   viewerStateDepthZoomInput: HTMLInputElement;
+  viewerStateDepthTargetXInput: HTMLInputElement;
+  viewerStateDepthTargetYInput: HTMLInputElement;
+  viewerStateDepthTargetZInput: HTMLInputElement;
   viewerStateDepthPointSizeInput: HTMLInputElement;
   spectrumLatticeCanvas: HTMLCanvasElement;
   glCanvas: HTMLCanvasElement;
@@ -531,6 +534,9 @@ export type ViewerStatePanelElements = Pick<
   | 'viewerStateDepthYawInput'
   | 'viewerStateDepthPitchInput'
   | 'viewerStateDepthZoomInput'
+  | 'viewerStateDepthTargetXInput'
+  | 'viewerStateDepthTargetYInput'
+  | 'viewerStateDepthTargetZInput'
   | 'viewerStateDepthPointSizeInput'
 >;
 
@@ -817,6 +823,9 @@ export function resolveElements(): Elements {
     viewerStateDepthYawInput: requireElement('viewer-state-depth-yaw-input', HTMLInputElement),
     viewerStateDepthPitchInput: requireElement('viewer-state-depth-pitch-input', HTMLInputElement),
     viewerStateDepthZoomInput: requireElement('viewer-state-depth-zoom-input', HTMLInputElement),
+    viewerStateDepthTargetXInput: requireElement('viewer-state-depth-target-x-input', HTMLInputElement),
+    viewerStateDepthTargetYInput: requireElement('viewer-state-depth-target-y-input', HTMLInputElement),
+    viewerStateDepthTargetZInput: requireElement('viewer-state-depth-target-z-input', HTMLInputElement),
     viewerStateDepthPointSizeInput: requireElement('viewer-state-depth-point-size-input', HTMLInputElement),
     spectrumLatticeCanvas: requireElement('spectrum-lattice-canvas', HTMLCanvasElement),
     glCanvas: requireElement('gl-canvas', HTMLCanvasElement),

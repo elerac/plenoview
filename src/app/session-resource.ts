@@ -2,6 +2,7 @@ import { computeFitView } from '../interaction/image-geometry';
 import { DEFAULT_DISPLAY_GAMMA } from '../color';
 import {
   DEFAULT_DEPTH_POINT_SIZE_PX,
+  DEFAULT_DEPTH_TARGET,
   DEFAULT_DEPTH_ZOOM,
   resolveDepthChannelForLayer
 } from '../depth';
@@ -173,6 +174,9 @@ export function createClearedViewerState(_defaultColormapId: string): ViewerSess
     depthYawDeg: 0,
     depthPitchDeg: 0,
     depthZoom: DEFAULT_DEPTH_ZOOM,
+    depthTargetX: DEFAULT_DEPTH_TARGET,
+    depthTargetY: DEFAULT_DEPTH_TARGET,
+    depthTargetZ: DEFAULT_DEPTH_TARGET,
     activeLayer: 0,
     displaySelection: null,
     depthChannel: null,
@@ -309,12 +313,18 @@ export function buildSwitchedSessionState(
     ? {
         depthYawDeg: currentState.depthYawDeg,
         depthPitchDeg: currentState.depthPitchDeg,
-        depthZoom: currentState.depthZoom
+        depthZoom: currentState.depthZoom,
+        depthTargetX: currentState.depthTargetX,
+        depthTargetY: currentState.depthTargetY,
+        depthTargetZ: currentState.depthTargetZ
       }
     : {
         depthYawDeg: nextSession.state.depthYawDeg,
         depthPitchDeg: nextSession.state.depthPitchDeg,
-        depthZoom: nextSession.state.depthZoom
+        depthZoom: nextSession.state.depthZoom,
+        depthTargetX: nextSession.state.depthTargetX,
+        depthTargetY: nextSession.state.depthTargetY,
+        depthTargetZ: nextSession.state.depthTargetZ
       };
 
   const nextState = buildViewerStateForLayer(

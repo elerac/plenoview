@@ -1,5 +1,6 @@
 import {
   clampDepthZoom,
+  normalizeDepthTarget,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource
 } from '../depth';
@@ -24,7 +25,7 @@ const THREE_D_KEYBOARD_ZOOM_STEP = 1.25;
 
 type DepthViewChange = Pick<
   ViewerState,
-  'depthYawDeg' | 'depthPitchDeg' | 'depthZoom'
+  'depthYawDeg' | 'depthPitchDeg' | 'depthZoom' | 'depthTargetX' | 'depthTargetY' | 'depthTargetZ'
 >;
 
 type ThreeDKeyboardOrbitCallbacks = Pick<
@@ -42,11 +43,7 @@ export function orbitThreeDFromDrag(
 ): DepthViewChange {
   const depthSource = state.depthChannel;
   if (viewport.width <= 0 || viewport.height <= 0) {
-    return {
-      depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, depthSource),
-      depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, depthSource),
-      depthZoom: clampDepthZoom(state.depthZoom)
-    };
+    return normalizeDepthViewChange(state);
   }
 
   return {
@@ -58,7 +55,46 @@ export function orbitThreeDFromDrag(
       state.depthPitchDeg + (deltaY / viewport.height) * 180,
       depthSource
     ),
-    depthZoom: state.depthZoom
+    depthZoom: clampDepthZoom(state.depthZoom),
+    depthTargetX: normalizeDepthTarget(state.depthTargetX),
+    depthTargetY: normalizeDepthTarget(state.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(state.depthTargetZ)
+  };
+}
+
+export function panThreeDFromDrag(
+  state: ViewerState,
+  viewport: ViewportInfo,
+  deltaX: number,
+  deltaY: number
+): DepthViewChange {
+  const current = normalizeDepthViewChange(state);
+  if (viewport.width <= 0 || viewport.height <= 0) {
+    return current;
+  }
+
+  const zoom = clampDepthZoom(state.depthZoom);
+  const aspect = Math.max(viewport.width / Math.max(viewport.height, 1), 1.0e-6);
+  const screenScaleX = viewport.width * zoom / aspect;
+  const screenScaleY = viewport.height * zoom;
+  if (screenScaleX <= 0 || screenScaleY <= 0) {
+    return current;
+  }
+
+  const worldDelta = inverseRotateDepthCameraVector(
+    {
+      x: -deltaX / screenScaleX,
+      y: deltaY / screenScaleY,
+      z: 0
+    },
+    state
+  );
+
+  return {
+    ...current,
+    depthTargetX: current.depthTargetX + worldDelta.x,
+    depthTargetY: current.depthTargetY + worldDelta.y,
+    depthTargetZ: current.depthTargetZ + worldDelta.z
   };
 }
 
@@ -70,7 +106,10 @@ export function zoomThreeDFromWheel(
   return {
     depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
     depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
-    depthZoom: clampDepthZoom(state.depthZoom * zoomFactor)
+    depthZoom: clampDepthZoom(state.depthZoom * zoomFactor),
+    depthTargetX: normalizeDepthTarget(state.depthTargetX),
+    depthTargetY: normalizeDepthTarget(state.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(state.depthTargetZ)
   };
 }
 
@@ -88,7 +127,10 @@ export function zoomThreeDByKeyboardStep(
   return {
     depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
     depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
-    depthZoom: clampDepthZoom(state.depthZoom * (THREE_D_KEYBOARD_ZOOM_STEP ** signedStep))
+    depthZoom: clampDepthZoom(state.depthZoom * (THREE_D_KEYBOARD_ZOOM_STEP ** signedStep)),
+    depthTargetX: normalizeDepthTarget(state.depthTargetX),
+    depthTargetY: normalizeDepthTarget(state.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(state.depthTargetZ)
   };
 }
 
@@ -177,7 +219,10 @@ export class ThreeDKeyboardOrbitController {
     if (
       nextView.depthYawDeg === state.depthYawDeg &&
       nextView.depthPitchDeg === state.depthPitchDeg &&
-      nextView.depthZoom === state.depthZoom
+      nextView.depthZoom === state.depthZoom &&
+      nextView.depthTargetX === state.depthTargetX &&
+      nextView.depthTargetY === state.depthTargetY &&
+      nextView.depthTargetZ === state.depthTargetZ
     ) {
       return;
     }
@@ -234,6 +279,52 @@ export class ThreeDKeyboardOrbitController {
 
     this.lastFrameTime = timestamp;
     this.ensureScheduledFrame();
+  };
+}
+
+function normalizeDepthViewChange(state: ViewerState): DepthViewChange {
+  return {
+    depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
+    depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
+    depthZoom: clampDepthZoom(state.depthZoom),
+    depthTargetX: normalizeDepthTarget(state.depthTargetX),
+    depthTargetY: normalizeDepthTarget(state.depthTargetY),
+    depthTargetZ: normalizeDepthTarget(state.depthTargetZ)
+  };
+}
+
+function inverseRotateDepthCameraVector(
+  vector: { x: number; y: number; z: number },
+  state: ViewerState
+): { x: number; y: number; z: number } {
+  const yawRad = -normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel) * Math.PI / 180;
+  const pitchRad = -normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel) * Math.PI / 180;
+  return rotateYaw(rotatePitch(vector, -pitchRad), -yawRad);
+}
+
+function rotateYaw(
+  vector: { x: number; y: number; z: number },
+  angleRad: number
+): { x: number; y: number; z: number } {
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return {
+    x: c * vector.x + s * vector.z,
+    y: vector.y,
+    z: -s * vector.x + c * vector.z
+  };
+}
+
+function rotatePitch(
+  vector: { x: number; y: number; z: number },
+  angleRad: number
+): { x: number; y: number; z: number } {
+  const c = Math.cos(angleRad);
+  const s = Math.sin(angleRad);
+  return {
+    x: vector.x,
+    y: c * vector.y - s * vector.z,
+    z: s * vector.y + c * vector.z
   };
 }
 

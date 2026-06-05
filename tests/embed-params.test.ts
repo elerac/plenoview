@@ -46,7 +46,10 @@ describe('embed params', () => {
       view: {
         depthYawDeg: -5.3,
         depthPitchDeg: 0.65,
-        depthZoom: 2
+        depthZoom: 2,
+        depthTargetX: 0.1,
+        depthTargetY: -0.2,
+        depthTargetZ: 0.3
       }
     };
 

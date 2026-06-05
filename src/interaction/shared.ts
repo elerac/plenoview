@@ -54,6 +54,9 @@ export interface InteractionCallbacks {
       | 'depthYawDeg'
       | 'depthPitchDeg'
       | 'depthZoom'
+      | 'depthTargetX'
+      | 'depthTargetY'
+      | 'depthTargetZ'
     >>
   ) => void;
   onHoverPixel: (pixel: ImagePixel | null) => void;

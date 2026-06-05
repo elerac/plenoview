@@ -342,6 +342,9 @@ describe('gl image renderer', () => {
       depthYawDeg: 120,
       depthPitchDeg: 91,
       depthZoom: 2.5,
+      depthTargetX: 0.1,
+      depthTargetY: -0.2,
+      depthTargetZ: 0.3,
       depthFocalLengthPx: null,
       depthPointSizePx: 3,
       displaySelection: createChannelRgbSelection('R', 'G', 'B'),
@@ -379,6 +382,7 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uDepthYawDeg')).toBeCloseTo(89.9, 7);
     expect(lastUniform1fValue(gl, 'uDepthPitchDeg')).toBeCloseTo(89.9, 7);
     expect(lastUniform1fValue(gl, 'uDepthZoom')).toBe(2.5);
+    expect(lastUniform3fValue(gl, 'uDepthTarget')).toEqual([0.1, -0.2, 0.3]);
     expect(lastUniform1fValue(gl, 'uDepthPointSizePx')).toBe(3);
     expect(lastUniform2fValue(gl, 'uDepthOutputOrigin')).toEqual([0, 0]);
     expect(lastUniform2iValue(gl, 'uDepthGridSize')).toEqual([2, 2]);

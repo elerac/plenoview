@@ -15,6 +15,7 @@ uniform float uDepthFocalLengthPx;
 uniform float uDepthYawDeg;
 uniform float uDepthPitchDeg;
 uniform float uDepthZoom;
+uniform vec3 uDepthTarget;
 uniform float uDepthPointSizePx;
 uniform ivec2 uDepthGridSize;
 uniform int uDepthSampleStep;
@@ -128,7 +129,7 @@ void main() {
 
   float yawRad = uDepthYawDeg * PI / 180.0;
   float pitchRad = uDepthPitchDeg * PI / 180.0;
-  vec3 cameraPoint = rotatePitch(rotateYaw(point, -yawRad), -pitchRad);
+  vec3 cameraPoint = rotatePitch(rotateYaw(point - uDepthTarget, -yawRad), -pitchRad);
   float zoom = max(uDepthZoom, 0.05);
   float aspect = max(uViewport.x / max(uViewport.y, 1.0), 1.0e-6);
   vec2 projected = vec2(cameraPoint.x / aspect, cameraPoint.y) * zoom * 2.0;

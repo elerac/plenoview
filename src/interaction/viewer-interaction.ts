@@ -21,6 +21,7 @@ import { imageToScreen } from './image-geometry';
 import {
   ThreeDKeyboardOrbitController,
   orbitThreeDFromDrag,
+  panThreeDFromDrag,
   zoomThreeDByKeyboardStep,
   zoomThreeDFromKeyboard,
   zoomThreeDFromWheel
@@ -69,7 +70,7 @@ import type {
 
 export type { InteractionCallbacks, InteractionDependencies } from './shared';
 
-type DragMode = 'pan' | 'roi' | 'roi-adjust' | 'screenshot' | null;
+type DragMode = 'pan' | 'depth-pan' | 'roi' | 'roi-adjust' | 'screenshot' | null;
 type PanePoint = {
   pane: ViewerPaneRenderInfo;
   point: PointerPosition;
@@ -378,12 +379,14 @@ export class ViewerInteraction {
       return;
     }
 
-    if (event.button !== 0) {
+    const imageSize = this.callbacks.getImageSize();
+    if (!imageSize) {
       return;
     }
 
-    const imageSize = this.callbacks.getImageSize();
-    if (!imageSize) {
+    const state = this.callbacks.getState();
+    const depthPanDrag = isThreeDPanDragStart(event, state);
+    if (event.button !== 0 && !depthPanDrag) {
       return;
     }
 
@@ -392,7 +395,6 @@ export class ViewerInteraction {
     this.dragPane = panePoint.pane;
     this.lastPointerInElement = point;
 
-    const state = this.callbacks.getState();
     const viewport = panePoint.pane.viewport;
     if (state.viewerMode === 'image') {
       const handle = state.roi ? resolveRoiAdjustmentHandle(point, state.roi, state, viewport) : null;
@@ -435,9 +437,12 @@ export class ViewerInteraction {
     }
 
     this.dragging = true;
-    this.dragMode = 'pan';
+    this.dragMode = depthPanDrag ? 'depth-pan' : 'pan';
     this.movedDuringDrag = false;
     this.previousPointer = point;
+    if (depthPanDrag) {
+      event.preventDefault();
+    }
     this.element.setPointerCapture(event.pointerId);
   };
 
@@ -531,10 +536,12 @@ export class ViewerInteraction {
         hoverState = { ...state, ...nextView };
         this.callbacks.onViewChange(nextView);
       } else if (state.viewerMode === '3d') {
-        const nextView = orbitThreeDFromDrag(state, viewport, deltaX, deltaY);
+        const nextView = this.dragMode === 'depth-pan'
+          ? panThreeDFromDrag(state, viewport, deltaX, deltaY)
+          : orbitThreeDFromDrag(state, viewport, deltaX, deltaY);
         hoverState = { ...state, ...nextView };
         this.callbacks.onViewChange(nextView);
-        if (this.dragMode === 'pan' && this.movedDuringDrag) {
+        if ((this.dragMode === 'pan' || this.dragMode === 'depth-pan') && this.movedDuringDrag) {
           this.pendingDepthDragProbeState = hoverState;
           skipProbeResolution = true;
         }
@@ -587,7 +594,7 @@ export class ViewerInteraction {
       return;
     }
 
-    if (event.button !== 0) {
+    if (event.button !== 0 && !(this.dragging && this.dragMode === 'depth-pan' && event.button === 1)) {
       return;
     }
 
@@ -649,7 +656,7 @@ export class ViewerInteraction {
       return;
     }
 
-    if (this.dragging && !this.movedDuringDrag) {
+    if (this.dragging && !this.movedDuringDrag && this.dragMode !== 'depth-pan') {
       const state = this.callbacks.getState();
       const viewport = panePoint.pane.viewport;
       this.callbacks.onToggleLockPixel(
@@ -657,7 +664,12 @@ export class ViewerInteraction {
       );
     }
 
-    if (this.dragging && this.movedDuringDrag && this.dragMode === 'pan' && this.pendingDepthDragProbeState) {
+    if (
+      this.dragging &&
+      this.movedDuringDrag &&
+      (this.dragMode === 'pan' || this.dragMode === 'depth-pan') &&
+      this.pendingDepthDragProbeState
+    ) {
       const viewport = panePoint.pane.viewport;
       this.callbacks.onHoverPixel(
         resolveProbePixel(
@@ -1155,6 +1167,13 @@ function sameViewerKeyboardZoomInput(
 
 function isScreenshotSelectionDragButton(event: PointerEvent): boolean {
   return event.button === 0 || (event.button === 2 && event.ctrlKey);
+}
+
+function isThreeDPanDragStart(event: PointerEvent, state: ViewerState): boolean {
+  return state.viewerMode === '3d' && (
+    event.button === 1 ||
+    (event.button === 0 && (event.ctrlKey || event.metaKey))
+  );
 }
 
 function isViewerContextMenuTarget(target: EventTarget | null): boolean {

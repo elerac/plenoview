@@ -799,6 +799,221 @@ describe('viewer interaction depth probe', () => {
     expect(harness.onHoverPixel).not.toHaveBeenCalled();
   });
 
+  it('pans the 3D target with middle-button drag instead of orbiting', () => {
+    const harness = createHarness({
+      viewerMode: '3d',
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 50,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 60,
+      clientY: 45
+    });
+    dispatchPointer(harness.element, 'pointerup', {
+      pointerId: 1,
+      button: 1,
+      clientX: 60,
+      clientY: 45
+    });
+
+    expect(harness.onViewChange).toHaveBeenCalledWith(expect.objectContaining({
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthTargetX: -0.1,
+      depthTargetY: -0.05,
+      depthTargetZ: 0
+    }));
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+  });
+
+  it('pans the 3D target with Ctrl-left and Meta-left drags', () => {
+    for (const modifier of ['ctrlKey', 'metaKey'] as const) {
+      const harness = createHarness({
+        viewerMode: '3d',
+        depthTargetX: 0,
+        depthTargetY: 0,
+        depthTargetZ: 0
+      });
+
+      dispatchPointer(harness.element, 'pointerdown', {
+        pointerId: 1,
+        clientX: 50,
+        clientY: 50,
+        [modifier]: true
+      });
+      dispatchPointer(harness.element, 'pointermove', {
+        pointerId: 1,
+        clientX: 60,
+        clientY: 50,
+        [modifier]: true
+      });
+      dispatchPointer(harness.element, 'pointerup', {
+        pointerId: 1,
+        clientX: 60,
+        clientY: 50,
+        [modifier]: true
+      });
+
+      expect(harness.onViewChange).toHaveBeenCalledWith(expect.objectContaining({
+        depthYawDeg: 0,
+        depthPitchDeg: 0,
+        depthTargetX: -0.1
+      }));
+      expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not lock picked depth probe pixels on 3D pan clicks without movement', () => {
+    const harness = createHarness({
+      viewerMode: '3d'
+    }, {
+      resolveDepthProbePixel: () => ({ ix: 2, iy: 1 })
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 50,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointerup', {
+      pointerId: 1,
+      button: 1,
+      clientX: 50,
+      clientY: 50
+    });
+
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+  });
+
+  it('recomputes depth hover once after middle-button 3D pan ends', () => {
+    const resolveDepthProbePixel = vi.fn((_point, state) => ({
+      ix: Math.round(state.depthTargetX * 100),
+      iy: Math.round(state.depthTargetY * 100)
+    }));
+    const harness = createHarness({
+      viewerMode: '3d',
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
+    }, {
+      resolveDepthProbePixel
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 50,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 60,
+      clientY: 45
+    });
+    expect(resolveDepthProbePixel).not.toHaveBeenCalled();
+
+    dispatchPointer(harness.element, 'pointerup', {
+      pointerId: 1,
+      button: 1,
+      clientX: 60,
+      clientY: 45
+    });
+
+    expect(resolveDepthProbePixel).toHaveBeenCalledTimes(1);
+    expect(harness.onHoverPixel).toHaveBeenLastCalledWith({ ix: -10, iy: -5 });
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+  });
+
+  it('does not route screenshot-selection middle drags to 3D pan', () => {
+    const harness = createHarness({
+      viewerMode: '3d'
+    }, {
+      screenshotRect: { x: 20, y: 20, width: 40, height: 40 }
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 40,
+      clientY: 40
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 50,
+      clientY: 40
+    });
+    dispatchPointer(harness.element, 'pointerup', {
+      pointerId: 1,
+      button: 1,
+      clientX: 50,
+      clientY: 40
+    });
+
+    expect(harness.onViewChange).not.toHaveBeenCalled();
+    expect(harness.onScreenshotSelectionRectChange).not.toHaveBeenCalled();
+  });
+
+  it('activates the clicked pane when starting a middle-button 3D pan', () => {
+    const harness = createHarness({
+      viewerMode: '3d'
+    }, {
+      viewport: { width: 50, height: 100 },
+      panes: [
+        {
+          path: [0],
+          rect: { x: 0, y: 0, width: 50, height: 100 }
+        },
+        {
+          path: [1],
+          rect: { x: 50, y: 0, width: 50, height: 100 }
+        }
+      ],
+      activePanePath: [0]
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 75,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      button: 1,
+      buttons: 4,
+      clientX: 85,
+      clientY: 50
+    });
+
+    expect(harness.onActivePaneChange).toHaveBeenCalledWith([1]);
+    expect(harness.onViewChange).toHaveBeenCalledWith(expect.objectContaining({
+      depthTargetX: -0.1
+    }));
+  });
+
   it('recomputes depth hover once after mouse orbit drag ends', () => {
     const resolveDepthProbePixel = vi.fn((_point, state) => ({
       ix: Math.round(state.depthYawDeg),

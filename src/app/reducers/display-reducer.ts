@@ -462,7 +462,10 @@ export function displayReducer(
           panoramaHfovDeg: DEFAULT_PANORAMA_HFOV_DEG,
           depthYawDeg: 0,
           depthPitchDeg: 0,
-          depthZoom: DEFAULT_DEPTH_ZOOM
+          depthZoom: DEFAULT_DEPTH_ZOOM,
+          depthTargetX: 0,
+          depthTargetY: 0,
+          depthTargetZ: 0
         },
         {
           syncInteractionView: true,

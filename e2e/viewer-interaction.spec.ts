@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './helpers/test';
+import { expect, test, type Locator, type Page } from './helpers/test';
 import { gotoViewerApp, openGalleryCbox, waitForE2ERenderIdle } from './helpers/app';
 import { buildScalarChannelExr, buildSpectralExr } from './helpers/exr-fixtures';
 import { dragViewerRoi, readProbeCoords } from './helpers/viewer';
@@ -15,6 +15,54 @@ async function readImageViewInputs(page: Page): Promise<{ zoom: string; panX: st
     panX: await page.locator('#viewer-state-pan-x-input').inputValue(),
     panY: await page.locator('#viewer-state-pan-y-input').inputValue()
   };
+}
+
+async function readDepthViewInputs(page: Page): Promise<{
+  yaw: string;
+  pitch: string;
+  targetX: string;
+  targetY: string;
+  targetZ: string;
+}> {
+  return {
+    yaw: await page.locator('#viewer-state-depth-yaw-input').inputValue(),
+    pitch: await page.locator('#viewer-state-depth-pitch-input').inputValue(),
+    targetX: await page.locator('#viewer-state-depth-target-x-input').inputValue(),
+    targetY: await page.locator('#viewer-state-depth-target-y-input').inputValue(),
+    targetZ: await page.locator('#viewer-state-depth-target-z-input').inputValue()
+  };
+}
+
+async function dragViewerBy(
+  page: Page,
+  viewer: Locator,
+  dx: number,
+  dy: number,
+  options: { button?: 'left' | 'middle' | 'right'; modifiers?: Array<'Control' | 'Meta' | 'Shift'> } = {}
+): Promise<void> {
+  const box = await viewer.boundingBox();
+  if (!box) {
+    throw new Error('Viewer container is not visible.');
+  }
+
+  const button = options.button ?? 'left';
+  const modifiers = options.modifiers ?? [];
+  const x = box.x + box.width * 0.5;
+  const y = box.y + box.height * 0.5;
+  for (const modifier of modifiers) {
+    await page.keyboard.down(modifier);
+  }
+  try {
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button });
+    await page.mouse.move(x + dx, y + dy, { steps: 4 });
+    await page.mouse.up({ button });
+  } finally {
+    for (const modifier of [...modifiers].reverse()) {
+      await page.keyboard.up(modifier);
+    }
+  }
+  await waitForE2ERenderIdle(page);
 }
 
 test('pans image view with global w/a/s/d keys while keeping the probe in sync', async ({ page }) => {
@@ -47,6 +95,42 @@ test('pans image view with global w/a/s/d keys while keeping the probe in sync',
 
   await page.keyboard.press('a');
   await expect.poll(async () => await readProbeCoords(probeCoords)).toEqual(initialCoords);
+});
+
+test('pans 3D view with middle mouse and Ctrl-left drags', async ({ page }) => {
+  await gotoViewerApp(page);
+
+  await page.setInputFiles('#file-input', {
+    name: 'scalar_z.exr',
+    mimeType: 'image/exr',
+    buffer: buildScalarChannelExr()
+  });
+  await expect(page.locator('#opened-images-select').locator('option:checked')).toContainText('scalar_z.exr', {
+    timeout: 30000
+  });
+
+  await page.locator('#view-menu-button').click();
+  await page.locator('#three-d-viewer-menu-item').click();
+  await expect(page.locator('#viewer-state-depth-fields')).toBeVisible();
+
+  const viewer = page.locator('#viewer-container');
+  const initial = await readDepthViewInputs(page);
+
+  await dragViewerBy(page, viewer, 40, 0, { button: 'middle' });
+  await expect.poll(async () => (await readDepthViewInputs(page)).targetX).not.toBe(initial.targetX);
+  const afterMiddle = await readDepthViewInputs(page);
+  expect(afterMiddle.yaw).toBe(initial.yaw);
+  expect(afterMiddle.pitch).toBe(initial.pitch);
+  expect(afterMiddle.targetY).toBe(initial.targetY);
+  expect(afterMiddle.targetZ).toBe(initial.targetZ);
+
+  await dragViewerBy(page, viewer, 0, 30, { modifiers: ['Control'] });
+  await expect.poll(async () => (await readDepthViewInputs(page)).targetY).not.toBe(afterMiddle.targetY);
+  const afterCtrl = await readDepthViewInputs(page);
+  expect(afterCtrl.yaw).toBe(initial.yaw);
+  expect(afterCtrl.pitch).toBe(initial.pitch);
+  expect(afterCtrl.targetX).toBe(afterMiddle.targetX);
+  expect(afterCtrl.targetZ).toBe(initial.targetZ);
 });
 
 test('resets all right-panel View state by double-clicking the View heading', async ({ page }) => {

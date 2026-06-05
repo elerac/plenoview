@@ -536,6 +536,45 @@ describe('depth utilities', () => {
     expect(narrowProjection!.screenY).not.toBeCloseTo(wideProjection!.screenY);
   });
 
+  it('applies depth target translation while projecting depth points', () => {
+    const viewport = { width: 100, height: 100 };
+    const centeredProjection = projectDepthPixelToScreen(0, 0, 1, {
+      width: 1,
+      height: 1,
+      viewport,
+      depthRange: { min: 1, max: 1 },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0,
+      depthPointSizePx: 2
+    });
+    const pannedProjection = projectDepthPixelToScreen(0, 0, 1, {
+      width: 1,
+      height: 1,
+      viewport,
+      depthRange: { min: 1, max: 1 },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthTargetX: -0.1,
+      depthTargetY: 0.2,
+      depthTargetZ: 0,
+      depthPointSizePx: 2
+    });
+
+    expect(centeredProjection).not.toBeNull();
+    expect(pannedProjection).not.toBeNull();
+    expect(centeredProjection!.screenX).toBeCloseTo(50);
+    expect(centeredProjection!.screenY).toBeCloseTo(50);
+    expect(pannedProjection!.screenX).toBeCloseTo(60);
+    expect(pannedProjection!.screenY).toBeCloseTo(70);
+  });
+
   it('chooses the frontmost point when projected depth hits overlap', () => {
     const layer = createLayerFromChannels({
       Z: [1, 10]
@@ -682,15 +721,21 @@ describe('depth utilities', () => {
 
     cache.pick({ x: 50, y: 50 }, {
       ...base,
-      viewport: { width: 120, height: 100 }
+      depthTargetX: -0.1
     });
     expect(getDepthProbeCacheDebug(cache).frameBuildCount).toBe(3);
 
     cache.pick({ x: 50, y: 50 }, {
       ...base,
-      channelName: 'depth.Z'
+      viewport: { width: 120, height: 100 }
     });
     expect(getDepthProbeCacheDebug(cache).frameBuildCount).toBe(4);
+
+    cache.pick({ x: 50, y: 50 }, {
+      ...base,
+      channelName: 'depth.Z'
+    });
+    expect(getDepthProbeCacheDebug(cache).frameBuildCount).toBe(5);
   });
 });
 

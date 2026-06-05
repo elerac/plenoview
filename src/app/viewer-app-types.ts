@@ -94,7 +94,10 @@ export interface ViewerStateReadoutModel {
   view: Pick<
     ViewerViewState,
     'zoom' | 'panX' | 'panY' | 'panoramaYawDeg' | 'panoramaPitchDeg' | 'panoramaHfovDeg'
-  > & Partial<Pick<ViewerViewState, 'depthYawDeg' | 'depthPitchDeg' | 'depthZoom'>>;
+  > & Partial<Pick<
+    ViewerViewState,
+    'depthYawDeg' | 'depthPitchDeg' | 'depthZoom' | 'depthTargetX' | 'depthTargetY' | 'depthTargetZ'
+  >>;
   depth?: {
     channel: string | null;
     sourceKind?: 'scalarDepth' | 'xyzPosition' | null;

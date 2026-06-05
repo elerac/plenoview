@@ -311,7 +311,10 @@ function sameViewerStateReadoutView(
     a.panoramaHfovDeg === b.panoramaHfovDeg &&
     (a.depthYawDeg ?? 0) === (b.depthYawDeg ?? 0) &&
     (a.depthPitchDeg ?? 0) === (b.depthPitchDeg ?? 0) &&
-    (a.depthZoom ?? 1) === (b.depthZoom ?? 1)
+    (a.depthZoom ?? 1) === (b.depthZoom ?? 1) &&
+    (a.depthTargetX ?? 0) === (b.depthTargetX ?? 0) &&
+    (a.depthTargetY ?? 0) === (b.depthTargetY ?? 0) &&
+    (a.depthTargetZ ?? 0) === (b.depthTargetZ ?? 0)
   );
 }
 

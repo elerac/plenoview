@@ -2,6 +2,7 @@ import { clampZoom } from '../interaction/image-geometry';
 import {
   type DepthRotationSource,
   clampDepthZoom,
+  normalizeDepthTarget,
   normalizeDepthFocalLengthPx,
   normalizeDepthPointSize,
   normalizeDepthPitchForSource,
@@ -40,7 +41,10 @@ export class ViewerStatePanel implements Disposable {
       panoramaHfovDeg: 100,
       depthYawDeg: 0,
       depthPitchDeg: 0,
-      depthZoom: 1
+      depthZoom: 1,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
     },
     depth: {
       channel: null,
@@ -66,6 +70,9 @@ export class ViewerStatePanel implements Disposable {
     this.bindInput(this.elements.viewerStateDepthYawInput, 'depthYawDeg');
     this.bindInput(this.elements.viewerStateDepthPitchInput, 'depthPitchDeg');
     this.bindInput(this.elements.viewerStateDepthZoomInput, 'depthZoom');
+    this.bindInput(this.elements.viewerStateDepthTargetXInput, 'depthTargetX');
+    this.bindInput(this.elements.viewerStateDepthTargetYInput, 'depthTargetY');
+    this.bindInput(this.elements.viewerStateDepthTargetZInput, 'depthTargetZ');
     this.bindDepthChannelSelect();
     this.bindDepthFocalInput();
     this.bindDepthPointSizeInput();
@@ -117,6 +124,9 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStateDepthYawInput.disabled = !depthFieldsActive;
     this.elements.viewerStateDepthPitchInput.disabled = !depthFieldsActive;
     this.elements.viewerStateDepthZoomInput.disabled = !depthFieldsActive;
+    this.elements.viewerStateDepthTargetXInput.disabled = !depthFieldsActive;
+    this.elements.viewerStateDepthTargetYInput.disabled = !depthFieldsActive;
+    this.elements.viewerStateDepthTargetZInput.disabled = !depthFieldsActive;
     this.elements.viewerStateDepthPointSizeInput.disabled = !depthFieldsActive;
 
     this.elements.viewerStateZoomInput.value = formatViewerStateNumber(readout.view.zoom, 'zoom');
@@ -137,6 +147,9 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStateDepthYawInput.value = formatViewerStateNumber(view.depthYawDeg, 'depthYawDeg');
     this.elements.viewerStateDepthPitchInput.value = formatViewerStateNumber(view.depthPitchDeg, 'depthPitchDeg');
     this.elements.viewerStateDepthZoomInput.value = formatViewerStateNumber(view.depthZoom, 'depthZoom');
+    this.elements.viewerStateDepthTargetXInput.value = formatViewerStateNumber(view.depthTargetX, 'depthTargetX');
+    this.elements.viewerStateDepthTargetYInput.value = formatViewerStateNumber(view.depthTargetY, 'depthTargetY');
+    this.elements.viewerStateDepthTargetZInput.value = formatViewerStateNumber(view.depthTargetZ, 'depthTargetZ');
     this.elements.viewerStateDepthPointSizeInput.value = formatCompactNumber(depth.pointSizePx, 2);
   }
 
@@ -304,6 +317,9 @@ export class ViewerStatePanel implements Disposable {
       this.elements.viewerStateDepthYawInput,
       this.elements.viewerStateDepthPitchInput,
       this.elements.viewerStateDepthZoomInput,
+      this.elements.viewerStateDepthTargetXInput,
+      this.elements.viewerStateDepthTargetYInput,
+      this.elements.viewerStateDepthTargetZInput,
       this.elements.viewerStateDepthPointSizeInput
     ];
   }
@@ -353,6 +369,10 @@ function normalizeViewerStateField(
       return normalizeDepthPitchForSource(value, depthSource);
     case 'depthZoom':
       return clampDepthZoom(value);
+    case 'depthTargetX':
+    case 'depthTargetY':
+    case 'depthTargetZ':
+      return normalizeDepthTarget(value);
     default:
       throw new Error(`Unknown viewer state field: ${field satisfies never}`);
   }
@@ -373,6 +393,9 @@ function formatViewerStateNumber(value: number, field: ViewerStateField): string
     case 'panoramaHfovDeg':
     case 'depthYawDeg':
     case 'depthPitchDeg':
+    case 'depthTargetX':
+    case 'depthTargetY':
+    case 'depthTargetZ':
       return formatCompactNumber(value, 2);
     case 'depthZoom':
       return formatCompactNumber(value, 2);
@@ -418,7 +441,10 @@ function normalizeViewReadout(
     panoramaHfovDeg: view.panoramaHfovDeg,
     depthYawDeg: normalizeDepthYawForSource(view.depthYawDeg ?? 0, depthSource),
     depthPitchDeg: normalizeDepthPitchForSource(view.depthPitchDeg ?? 0, depthSource),
-    depthZoom: clampDepthZoom(view.depthZoom ?? 1)
+    depthZoom: clampDepthZoom(view.depthZoom ?? 1),
+    depthTargetX: normalizeDepthTarget(view.depthTargetX ?? 0),
+    depthTargetY: normalizeDepthTarget(view.depthTargetY ?? 0),
+    depthTargetZ: normalizeDepthTarget(view.depthTargetZ ?? 0)
   };
 }
 

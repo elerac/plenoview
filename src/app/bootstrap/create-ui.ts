@@ -317,7 +317,10 @@ export function createViewerUi({
           panoramaHfovDeg: renderState.panoramaHfovDeg,
           depthYawDeg: renderState.depthYawDeg,
           depthPitchDeg: renderState.depthPitchDeg,
-          depthZoom: renderState.depthZoom
+          depthZoom: renderState.depthZoom,
+          depthTargetX: renderState.depthTargetX,
+          depthTargetY: renderState.depthTargetY,
+          depthTargetZ: renderState.depthTargetZ
         },
         imageSize: activeSession
           ? resolveDisplayImageSize(

@@ -223,6 +223,9 @@ export class ProbeOverlayRenderer implements Disposable {
       depthYawDeg: state.depthYawDeg,
       depthPitchDeg: state.depthPitchDeg,
       depthZoom: state.depthZoom,
+      depthTargetX: state.depthTargetX,
+      depthTargetY: state.depthTargetY,
+      depthTargetZ: state.depthTargetZ,
       depthPointSizePx: state.depthPointSizePx
     });
     if (!projected) {
