@@ -264,6 +264,43 @@ describe('channel recognition', () => {
     ]);
   });
 
+  it('prioritizes spectral RGB over generic XYZ and Position groups while keeping UV ahead', () => {
+    const xyzAndSpectral = [
+      'Position.X',
+      'Position.Y',
+      'Position.Z',
+      'vector.X',
+      'vector.Y',
+      'vector.Z',
+      '400nm',
+      '500nm'
+    ];
+    const uvAndSpectral = [
+      'motion.U',
+      'motion.V',
+      '400nm',
+      '500nm'
+    ];
+
+    expect(visibleKeys(xyzAndSpectral)).toEqual([
+      'spectralRgb:',
+      'groupXYZ:Position',
+      'groupXYZ:vector'
+    ]);
+    expect(defaultSelectionKey(['Position.X', 'Position.Y', 'Position.Z', '400nm', '500nm']))
+      .toBe('spectralRgb:');
+    expect(defaultSelectionKey(['vector.X', 'vector.Y', 'vector.Z', '400nm', '500nm']))
+      .toBe('spectralRgb:');
+    expect(defaultSelectionKey(['vector.X', 'vector.Y', 'vector.Z', 'Y'])).toBe(
+      'channelRgb:vector.X:vector.Y:vector.Z:'
+    );
+    expect(visibleKeys(uvAndSpectral)).toEqual([
+      'groupUV:motion',
+      'spectralRgb:'
+    ]);
+    expect(defaultSelectionKey(uvAndSpectral)).toBe('channelRgb:motion.U:motion.V::');
+  });
+
   it('recognizes scalar and RGB Stokes options with S3 availability metadata', () => {
     const linearStokes = ['S0', 'S1', 'S2'];
     const fullStokes = ['S0', 'S1', 'S2', 'S3'];

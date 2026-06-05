@@ -111,6 +111,41 @@ describe('channel view items', () => {
     ]);
   });
 
+  it('places spectral RGB before generic XYZ and Position channel view items while keeping UV ahead', () => {
+    const channelNames = [
+      'Position.X',
+      'Position.Y',
+      'Position.Z',
+      'vector.X',
+      'vector.Y',
+      'vector.Z',
+      'motion.U',
+      'motion.V',
+      '400nm',
+      '500nm'
+    ];
+    const items = buildChannelViewItems(channelNames);
+
+    expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual([
+      'groupUV:motion',
+      'spectralRgb:',
+      'groupXYZ:Position',
+      'groupXYZ:vector'
+    ]);
+    expect(selectVisibleChannelViewItems(items, true).map((item) => item.value)).toEqual([
+      'channel:motion.U',
+      'channel:motion.V',
+      'channel:400nm',
+      'channel:500nm',
+      'channel:Position.X',
+      'channel:Position.Y',
+      'channel:Position.Z',
+      'channel:vector.X',
+      'channel:vector.Y',
+      'channel:vector.Z'
+    ]);
+  });
+
   it('derives normal-map, XYZ, and UV stack children from existing split descriptors', () => {
     const channelNames = [
       'normal.X',

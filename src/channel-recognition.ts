@@ -233,6 +233,7 @@ const NORMAL_MAP_SOURCE_ORDER_BASE = 100_000;
 const COMPONENT_SOURCE_ORDER_BASE = 200_000;
 const SINGLE_SOURCE_ORDER_BASE = 500_000;
 const SPECTRAL_SOURCE_ORDER_BASE = 1_000_000;
+const DEFERRED_XYZ_COMPONENT_SOURCE_ORDER_BASE = 1_100_000;
 const STOKES_SOURCE_ORDER_BASE = 2_000_000;
 const MUELLER_SOURCE_ORDER_BASE = 3_000_000;
 
@@ -241,6 +242,7 @@ const DEFAULT_PRIORITY_RGB_MUELLER = 20;
 const DEFAULT_PRIORITY_RGB_LIKE = 30;
 const DEFAULT_PRIORITY_VECTOR = 40;
 const DEFAULT_PRIORITY_SPECTRAL_RGB = 50;
+const DEFAULT_PRIORITY_XYZ_VECTOR = 52;
 const DEFAULT_PRIORITY_EXACT_Y = 55;
 const DEFAULT_PRIORITY_GRAYSCALE = 60;
 const DEFAULT_PRIORITY_MUELLER = 70;
@@ -295,13 +297,15 @@ export function recognizeLayerChannels(
   );
   const groupedDisplays = [...normalMapGroups, ...componentGroups];
   const spectralRecognition = buildSpectralSeriesCandidates(names, settings, nameRules);
+  const deferGenericXyzGroups = spectralRecognition.candidates.length > 0;
   const splitSingleCandidates = buildSplitSingleChannelCandidates(
     names,
     groupedDisplays,
     spectralRecognition.parentKeyByChannel,
     includeAlphaCompanions,
     nameRules,
-    alphaLookup
+    alphaLookup,
+    deferGenericXyzGroups
   );
   const mergedSingleCandidates = buildMergedSingleChannelCandidates(
     names,
@@ -316,7 +320,7 @@ export function recognizeLayerChannels(
     channelNames: names,
     candidates: [
       ...normalMapGroups.map(buildNormalMapCandidate),
-      ...componentGroups.map(buildComponentGroupCandidate),
+      ...componentGroups.map((group, index) => buildComponentGroupCandidate(group, index, deferGenericXyzGroups)),
       ...mergedSingleCandidates,
       ...splitSingleCandidates,
       ...spectralRecognition.candidates,
@@ -571,7 +575,8 @@ function extractComponentChannelGroupsForRule(
 
 function buildComponentGroupCandidate(
   group: ComponentChannelGroup,
-  groupIndex: number
+  groupIndex: number,
+  deferGenericXyzGroups = false
 ): ComponentGroupCandidate {
   const ruleId = getComponentRuleId(group.kind);
   const channels = [group.r, group.g, ...(group.b ? [group.b] : []), ...(group.a ? [group.a] : [])];
@@ -592,7 +597,7 @@ function buildComponentGroupCandidate(
       displayA: group.a ?? null
     },
     priority,
-    sourceOrder: getComponentLikeSourceOrderBase(group) + groupIndex * 100,
+    sourceOrder: getComponentLikeSourceOrderBase(group, deferGenericXyzGroups) + groupIndex * 100,
     splitChildren: channels.map((channelName) => `channel:${channelName}`),
     mergedParentKey: null,
     availability: {
@@ -740,7 +745,8 @@ function buildSplitSingleChannelCandidates(
   spectralParentKeyByChannel: ReadonlyMap<string, string>,
   includeAlphaCompanions: boolean,
   nameRules: CompiledChannelRecognitionNameRules,
-  alphaLookup: AlphaChannelLookup
+  alphaLookup: AlphaChannelLookup,
+  deferGenericXyzGroups = false
 ): SingleChannelCandidate[] {
   const candidates: SingleChannelCandidate[] = [];
   const singleChannelOptions = new Set<string>();
@@ -777,7 +783,7 @@ function buildSplitSingleChannelCandidates(
       pushSplitCandidate(
         channelName,
         group.optionKey,
-        getComponentLikeSourceOrderBase(group) + groupIndex * 100 + channelIndex + 1
+        getComponentLikeSourceOrderBase(group, deferGenericXyzGroups) + groupIndex * 100 + channelIndex + 1
       );
     });
   });
@@ -1222,16 +1228,25 @@ function getComponentGroupPriority(group: ComponentChannelGroup): number {
       : DEFAULT_PRIORITY_NORMAL_RGB;
   }
 
-  return DEFAULT_PRIORITY_VECTOR;
+  return group.kind === 'xyz'
+    ? DEFAULT_PRIORITY_XYZ_VECTOR
+    : DEFAULT_PRIORITY_VECTOR;
 }
 
-function getComponentLikeSourceOrderBase(group: Pick<ComponentChannelGroup | NormalMapChannelGroup, 'kind'>): number {
+function getComponentLikeSourceOrderBase(
+  group: Pick<ComponentChannelGroup | NormalMapChannelGroup, 'kind'>,
+  deferGenericXyzGroups = false
+): number {
   if (group.kind === 'rgb') {
     return RGB_COMPONENT_SOURCE_ORDER_BASE;
   }
 
   if (group.kind === 'normalMap') {
     return NORMAL_MAP_SOURCE_ORDER_BASE;
+  }
+
+  if (group.kind === 'xyz' && deferGenericXyzGroups) {
+    return DEFERRED_XYZ_COMPONENT_SOURCE_ORDER_BASE;
   }
 
   return COMPONENT_SOURCE_ORDER_BASE;
