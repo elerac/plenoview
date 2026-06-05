@@ -119,8 +119,10 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStatePitchInput.disabled = !panoramaFieldsActive;
     this.elements.viewerStateHfovInput.disabled = !panoramaFieldsActive;
     this.elements.viewerStateDepthChannelSelect.disabled = !depthFieldsActive || normalizedDepth.channelOptions.length === 0;
-    const depthFocalInputActive = depthFieldsActive && normalizedDepth.sourceKind !== 'xyzPosition';
-    this.elements.viewerStateDepthFocalInput.disabled = !depthFocalInputActive;
+    const depthFocalVisible = depthFieldsActive && normalizedDepth.sourceKind !== 'xyzPosition';
+    this.elements.viewerStateDepthFocalLabel.classList.toggle('hidden', !depthFocalVisible);
+    this.elements.viewerStateDepthFocalInput.classList.toggle('hidden', !depthFocalVisible);
+    this.elements.viewerStateDepthFocalInput.disabled = !depthFocalVisible;
     this.elements.viewerStateDepthYawInput.disabled = !depthFieldsActive;
     this.elements.viewerStateDepthPitchInput.disabled = !depthFieldsActive;
     this.elements.viewerStateDepthZoomInput.disabled = !depthFieldsActive;

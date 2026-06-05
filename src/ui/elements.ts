@@ -237,6 +237,7 @@ export interface Elements {
   viewerStatePitchInput: HTMLInputElement;
   viewerStateHfovInput: HTMLInputElement;
   viewerStateDepthChannelSelect: HTMLSelectElement;
+  viewerStateDepthFocalLabel: HTMLLabelElement;
   viewerStateDepthFocalInput: HTMLInputElement;
   viewerStateDepthYawInput: HTMLInputElement;
   viewerStateDepthPitchInput: HTMLInputElement;
@@ -530,6 +531,7 @@ export type ViewerStatePanelElements = Pick<
   | 'viewerStatePitchInput'
   | 'viewerStateHfovInput'
   | 'viewerStateDepthChannelSelect'
+  | 'viewerStateDepthFocalLabel'
   | 'viewerStateDepthFocalInput'
   | 'viewerStateDepthYawInput'
   | 'viewerStateDepthPitchInput'
@@ -819,6 +821,7 @@ export function resolveElements(): Elements {
     viewerStatePitchInput: requireElement('viewer-state-pitch-input', HTMLInputElement),
     viewerStateHfovInput: requireElement('viewer-state-hfov-input', HTMLInputElement),
     viewerStateDepthChannelSelect: requireElement('viewer-state-depth-channel-select', HTMLSelectElement),
+    viewerStateDepthFocalLabel: requireElement('viewer-state-depth-focal-label', HTMLLabelElement),
     viewerStateDepthFocalInput: requireElement('viewer-state-depth-focal-input', HTMLInputElement),
     viewerStateDepthYawInput: requireElement('viewer-state-depth-yaw-input', HTMLInputElement),
     viewerStateDepthPitchInput: requireElement('viewer-state-depth-pitch-input', HTMLInputElement),

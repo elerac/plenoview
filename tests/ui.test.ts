@@ -1743,7 +1743,7 @@ describe('viewer state inspector', () => {
     expect(onDepthSettingsChange).not.toHaveBeenCalled();
   });
 
-  it('disables depth focal input for position depth sources', () => {
+  it('hides depth focal input for position depth sources', () => {
     installUiFixture();
 
     const onDepthSettingsChange = vi.fn();
@@ -1773,9 +1773,12 @@ describe('viewer state inspector', () => {
     });
 
     const sourceSelect = document.getElementById('viewer-state-depth-channel-select') as HTMLSelectElement;
+    const focalLabel = document.getElementById('viewer-state-depth-focal-label') as HTMLLabelElement;
     const focalInput = document.getElementById('viewer-state-depth-focal-input') as HTMLInputElement;
 
     expect(sourceSelect.value).toBe('__position:P');
+    expect(focalLabel.classList.contains('hidden')).toBe(true);
+    expect(focalInput.classList.contains('hidden')).toBe(true);
     expect(focalInput.disabled).toBe(true);
     expect(focalInput.title).toBe('Focal length applies to scalar depth sources.');
 
