@@ -3061,7 +3061,7 @@ describe('view menu', () => {
     expect(resetSettingsButton.type).toBe('button');
   });
 
-  it('renders the theme and Stokes defaults table before the exposure and memory settings', () => {
+  it('renders the theme and Stokes defaults table before the exposure and cache settings', () => {
     installUiFixture();
     new ViewerUi(createUiCallbacks());
 
@@ -3081,7 +3081,7 @@ describe('view menu', () => {
       'Stokes Defaults',
       'Auto Exposure Percentile',
       'Image Load Workers',
-      'Memory Budget'
+      'Display Cache Budget'
     ]);
     expect(Array.from(document.querySelectorAll('#channel-recognition-settings-control input[data-channel-recognition-setting]'))
       .map((input) => (input as HTMLInputElement).dataset.channelRecognitionSetting)).toEqual(
