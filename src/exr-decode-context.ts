@@ -2,11 +2,25 @@ import {
   summarizeExrHeader,
   type ExrHeaderSummary
 } from './exr-metadata';
+import type { DecodeMemoryReservationReason } from './memory/memory-manager';
 
 export interface DecodeBytesOptions {
   signal?: AbortSignal;
   filename?: string;
+  reservationReason?: DecodeMemoryReservationReason;
+  onDecodeAdmissionState?: (state: DecodeAdmissionState) => void;
 }
+
+export type DecodeAdmissionState =
+  | {
+      phase: 'waitingForMemory' | 'pausedMemoryPressure' | 'retrying' | 'started' | 'released';
+      filename: string | null;
+    }
+  | {
+      phase: 'failed';
+      filename: string | null;
+      error: Error;
+    };
 
 export interface DecodeErrorContext {
   filename: string | null;

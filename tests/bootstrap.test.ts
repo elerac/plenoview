@@ -408,6 +408,7 @@ vi.mock('../src/controllers/session-controller', () => ({
     readonly getActiveSessionId = vi.fn(() => null);
     readonly getSessions = vi.fn(() => []);
     readonly resetActiveSessionViewState = mocks.sessionResetActiveSessionViewState;
+    readonly retryPendingMemoryLoad = vi.fn();
   }
 }));
 
@@ -466,7 +467,9 @@ vi.mock('../src/services/load-queue', () => ({
 vi.mock('../src/exr-worker-client', () => ({
   loadExrOffMainThread: vi.fn(),
   disposeDecodeWorker: mocks.workerDispose,
-  setMaxDecodeWorkers: mocks.workerSetMaxWorkers
+  setMaxDecodeWorkers: mocks.workerSetMaxWorkers,
+  setDecodeMemoryReservationManager: vi.fn(),
+  retryDecodeMemoryAdmission: vi.fn()
 }));
 
 vi.mock('../src/colormaps', () => ({

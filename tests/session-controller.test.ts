@@ -131,6 +131,7 @@ function createController(options: {
   onPathSessionLoaded?: (entry: DesktopFileEntry) => void;
   onPathSessionLoadFailed?: (entry: DesktopFileEntry, error: unknown) => void;
   getFitInsets?: () => { top: number; right: number; bottom: number; left: number } | undefined;
+  retryDecodeAdmission?: () => void;
   maxWorkers?: number;
 } = {}) {
   const core = new ViewerAppCore();
@@ -141,6 +142,7 @@ function createController(options: {
     pathFileProvider: options.pathFileProvider,
     onPathSessionLoaded: options.onPathSessionLoaded,
     onPathSessionLoadFailed: options.onPathSessionLoadFailed,
+    retryDecodeAdmission: options.retryDecodeAdmission,
     getViewport: () => ({ width: 200, height: 100 }),
     getFitInsets: options.getFitInsets ?? (() => undefined)
   });
@@ -602,6 +604,63 @@ describe('session controller shim', () => {
         filename: 'beauty.exr'
       })
     );
+  });
+
+  it('passes decode reservation reasons for foreground, folder, and reload loads', async () => {
+    const decodeBytes = vi.fn<(
+      bytes: Uint8Array,
+      options?: DecodeBytesOptions
+    ) => Promise<DecodedExrImage>>(async () => createDecodedImage());
+    const { controller } = createController({ decodeBytes });
+
+    await controller.enqueueFiles([createFile('active.exr', [1])]);
+    await controller.enqueueFolderFiles([createFolderFile('shots/folder.exr', [2])]);
+    await controller.reloadSession(controller.getSessions()[0]!.id);
+    await controller.reloadAllSessions();
+
+    expect(decodeBytes.mock.calls.map((call) => call[1]?.reservationReason)).toEqual([
+      'active-open',
+      'folder-load',
+      'reload-cold-session',
+      'background-load',
+      'background-load'
+    ]);
+  });
+
+  it('updates pending rows for memory wait, pause, and retry', async () => {
+    const decode = createDeferred<DecodedExrImage>();
+    const retryDecodeAdmission = vi.fn();
+    const decodeBytes = vi.fn<(
+      bytes: Uint8Array,
+      options?: DecodeBytesOptions
+    ) => Promise<DecodedExrImage>>((_bytes, options) => {
+      options?.onDecodeAdmissionState?.({ phase: 'waitingForMemory', filename: 'huge.exr' });
+      options?.onDecodeAdmissionState?.({ phase: 'pausedMemoryPressure', filename: 'huge.exr' });
+      return decode.promise;
+    });
+    const { controller, core } = createController({ decodeBytes, retryDecodeAdmission });
+
+    const pending = controller.enqueueFiles([createFile('huge.exr', [1])]);
+    for (let index = 0; index < 6 && decodeBytes.mock.calls.length < 1; index += 1) {
+      await flushMicrotasks();
+    }
+
+    expect(buildOpenedImageOptions(core.getState())[0]).toMatchObject({
+      statusText: 'Paused due to memory pressure',
+      retryable: true
+    });
+
+    controller.retryPendingMemoryLoad(core.getState().pendingOpenedImages[0]!.id);
+
+    expect(retryDecodeAdmission).toHaveBeenCalledTimes(1);
+    expect(buildOpenedImageOptions(core.getState())[0]).toMatchObject({
+      statusText: 'Waiting for memory'
+    });
+    expect(buildOpenedImageOptions(core.getState())[0]?.retryable).toBeUndefined();
+
+    decode.resolve(createDecodedImage());
+    await pending;
+    expect(core.getState().pendingOpenedImages).toHaveLength(0);
   });
 
   it('keeps a matching plain channel selection when loading a new image', async () => {

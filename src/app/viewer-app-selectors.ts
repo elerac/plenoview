@@ -78,7 +78,10 @@ export function buildOpenedImageOptions(state: ViewerAppState): ViewerOpenedImag
     thumbnailDataUrl: entry.thumbnailDataUrl,
     thumbnailAspectRatio: entry.thumbnailAspectRatio,
     thumbnailLoading: entry.thumbnailLoading,
-    selectable: entry.selectable
+    selectable: entry.selectable,
+    ...(entry.loadStatus ? { loadStatus: entry.loadStatus } : {}),
+    ...(entry.statusText ? { statusText: entry.statusText } : {}),
+    ...(entry.retryable ? { retryable: true } : {})
   }));
 }
 
@@ -93,6 +96,9 @@ interface OpenedImageOptionEntry {
   thumbnailAspectRatio: number | null;
   thumbnailLoading: boolean;
   selectable: boolean;
+  loadStatus?: PendingOpenedImageReservation['loadStatus'];
+  statusText?: string;
+  retryable?: boolean;
 }
 
 function buildLoadedOpenedImageEntry(
@@ -124,6 +130,7 @@ function buildLoadedOpenedImageEntry(
 function buildPendingOpenedImageEntry(
   reservation: PendingOpenedImageReservation
 ): OpenedImageOptionEntry {
+  const loadStatus = reservation.loadStatus ?? 'loading';
   return {
     id: reservation.id,
     displayName: reservation.displayName,
@@ -134,7 +141,11 @@ function buildPendingOpenedImageEntry(
     thumbnailDataUrl: null,
     thumbnailAspectRatio: null,
     thumbnailLoading: true,
-    selectable: false
+    selectable: false,
+    ...(loadStatus === 'loading' ? {} : { loadStatus }),
+    ...(loadStatus === 'waitingForMemory' ? { statusText: 'Waiting for memory' } : {}),
+    ...(loadStatus === 'pausedMemoryPressure' ? { statusText: 'Paused due to memory pressure' } : {}),
+    ...(reservation.retryable ? { retryable: true } : {})
   };
 }
 

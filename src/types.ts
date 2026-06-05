@@ -248,6 +248,8 @@ export interface OpenedImageSession {
   state: ViewerSessionState;
 }
 
+export type PendingOpenedImageStatus = 'loading' | 'waitingForMemory' | 'pausedMemoryPressure';
+
 export interface PendingOpenedImageReservation {
   id: string;
   filename: string;
@@ -255,6 +257,8 @@ export interface PendingOpenedImageReservation {
   displayNameIsCustom?: boolean;
   fileSizeBytes: number | null;
   source: SessionSource;
+  loadStatus?: PendingOpenedImageStatus;
+  retryable?: boolean;
 }
 
 export interface ViewportInfo {

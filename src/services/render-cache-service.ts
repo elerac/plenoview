@@ -20,6 +20,7 @@ import {
 import { createMemoryUsageSnapshot, sanitizeByteCount, type MemoryUsageSnapshot } from '../memory/memory-accounting';
 import {
   enforceMemoryBudget,
+  type DecodeMemoryReservationManager,
   type EvictionContext,
   type ResidentResourceBinding,
   type ResidentResourceMetadata
@@ -285,6 +286,7 @@ export interface RenderCacheServiceDependencies {
   analysisChunkSize?: number;
   displayCacheBudgetHostKind?: DisplayCacheBudgetHostKind | null;
   displayCacheBudgetHints?: DisplayCacheBudgetResolutionHints;
+  decodeMemoryReservationManager?: DecodeMemoryReservationManager | null;
 }
 
 export class RenderCacheService implements Disposable {
@@ -297,6 +299,7 @@ export class RenderCacheService implements Disposable {
   private readonly windowLike: RenderCacheWindowLike | null;
   private readonly analysisChunkSize: number;
   private readonly displayCacheBudgetHints: DisplayCacheBudgetResolutionHints;
+  private readonly decodeMemoryReservationManager: DecodeMemoryReservationManager | null;
 
   private readonly entries = new Map<string, SessionResourceEntry>();
   private readonly pendingDisplayLuminanceRangeJobs = new Map<string, Map<string, PendingDisplayLuminanceRangeJob>>();
@@ -338,8 +341,15 @@ export class RenderCacheService implements Disposable {
     this.analysisChunkSize = normalizeAnalysisChunkSize(dependencies.analysisChunkSize);
     this.displayCacheBudgetHints = dependencies.displayCacheBudgetHints ??
       collectDisplayCacheBudgetEnvironmentHints(dependencies.displayCacheBudgetHostKind);
+    this.decodeMemoryReservationManager = dependencies.decodeMemoryReservationManager ?? null;
     this.budgetPreference = normalizeDisplayCacheBudgetPreference(this.budgetPreference);
     this.budgetMb = resolveDisplayCacheBudgetMb(this.budgetPreference, this.displayCacheBudgetHints);
+    this.syncDecodeMemoryReservationBudget();
+    this.decodeMemoryReservationManager?.setReservationChangeListener(() => {
+      if (!this.disposed) {
+        this.syncDisplayCacheUsageUi();
+      }
+    });
 
     this.ui.setDisplayCacheBudget(this.budgetPreference, this.budgetMb);
     this.syncDisplayCacheUsageUi();
@@ -844,6 +854,7 @@ export class RenderCacheService implements Disposable {
 
     this.budgetPreference = normalizeDisplayCacheBudgetPreference(preference);
     this.budgetMb = resolveDisplayCacheBudgetMb(this.budgetPreference, this.displayCacheBudgetHints);
+    this.syncDecodeMemoryReservationBudget();
     this.enforceResidencyBudget();
     saveStoredDisplayCacheBudgetPreference(this.budgetPreference);
     this.ui.setDisplayCacheBudget(this.budgetPreference, this.budgetMb);
@@ -908,6 +919,7 @@ export class RenderCacheService implements Disposable {
     }
 
     this.disposed = true;
+    this.decodeMemoryReservationManager?.setReservationChangeListener(null);
     this.abortController.abort(createAbortError('Render cache service has been disposed.'));
     this.cancelAllAnalysisJobs('Render cache service has been disposed.');
     for (const sessionId of this.entries.keys()) {
@@ -1493,8 +1505,13 @@ export class RenderCacheService implements Disposable {
 
   private createMemoryUsageSnapshot(): MemoryUsageSnapshot {
     return createMemoryUsageSnapshot(this.entries.values(), {
-      analysisCacheBytes: this.estimateAnalysisCacheBytes()
+      analysisCacheBytes: this.estimateAnalysisCacheBytes(),
+      activeReservationBytes: this.decodeMemoryReservationManager?.getActiveReservationBytes() ?? 0
     });
+  }
+
+  private syncDecodeMemoryReservationBudget(): void {
+    this.decodeMemoryReservationManager?.setDisplayCacheBudgetBytes(displayCacheBudgetMbToBytes(this.budgetMb));
   }
 
   private estimateAnalysisCacheBytes(): number {

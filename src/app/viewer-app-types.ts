@@ -17,6 +17,7 @@ import type {
   OpenedImageDropPlacement,
   OpenedImageSession,
   PendingOpenedImageReservation,
+  PendingOpenedImageStatus,
   PixelSample,
   RoiStats,
   StokesAolpDegreeModulationMode,
@@ -114,6 +115,9 @@ export interface ViewerOpenedImageOption {
   thumbnailAspectRatio: number | null;
   thumbnailLoading: boolean;
   selectable: boolean;
+  loadStatus?: PendingOpenedImageStatus;
+  statusText?: string;
+  retryable?: boolean;
 }
 
 export type ViewerChannelThumbnailItem = ChannelViewThumbnailItem;
@@ -268,6 +272,12 @@ export type ViewerIntent =
   | { type: 'interactionStatePublished'; interactionState: ViewerInteractionState }
   | { type: 'viewStateCommitted'; view: Partial<ViewerViewState> }
   | { type: 'pendingOpenedImagesReserved'; reservations: PendingOpenedImageReservation[] }
+  | {
+      type: 'pendingOpenedImageStatusChanged';
+      sessionId: string;
+      loadStatus: PendingOpenedImageStatus;
+      retryable?: boolean;
+    }
   | { type: 'pendingOpenedImagesCleared'; sessionIds?: string[] }
   | { type: 'sessionLoaded'; session: OpenedImageSession; activate?: boolean }
   | { type: 'sessionReloaded'; sessionId: string; session: OpenedImageSession }

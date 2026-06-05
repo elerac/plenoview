@@ -8201,6 +8201,49 @@ describe('opened files actions', () => {
     expect(onCloseSelectedOpenedImage).not.toHaveBeenCalled();
   });
 
+  it('renders memory-delayed pending rows and routes retry without selecting the row', () => {
+    installUiFixture();
+
+    const onOpenedImageSelected = vi.fn();
+    const onRetryPendingOpenedImageLoad = vi.fn();
+    const onReloadSelectedOpenedImage = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({
+      onOpenedImageSelected,
+      onRetryPendingOpenedImageLoad,
+      onReloadSelectedOpenedImage
+    }));
+    ui.setOpenedImageOptions([{
+      id: 'session-1',
+      label: 'huge.exr',
+      sourceDetail: 'shots/huge.exr',
+      sizeBytes: 3,
+      thumbnailDataUrl: null,
+      thumbnailAspectRatio: null,
+      thumbnailLoading: true,
+      selectable: false,
+      loadStatus: 'pausedMemoryPressure',
+      statusText: 'Paused due to memory pressure',
+      retryable: true
+    }], null);
+
+    const openedFilesList = document.getElementById('opened-files-list') as HTMLDivElement;
+    const row = openedFilesList.querySelector('.opened-file-row') as HTMLDivElement;
+    const retryButton = openedFilesList.querySelector<HTMLButtonElement>('.opened-file-action-button--reload');
+
+    expect(row.textContent).toContain('huge.exr');
+    expect(row.textContent).toContain('Paused due to memory pressure');
+    expect(row.getAttribute('aria-disabled')).toBe('true');
+    expect(retryButton?.disabled).toBe(false);
+    expect(retryButton?.getAttribute('aria-label')).toBe('Retry huge.exr');
+
+    retryButton?.click();
+    row.click();
+
+    expect(onRetryPendingOpenedImageLoad).toHaveBeenCalledWith('session-1');
+    expect(onReloadSelectedOpenedImage).not.toHaveBeenCalled();
+    expect(onOpenedImageSelected).not.toHaveBeenCalled();
+  });
+
   it('renders a loading indicator in the open-file thumbnail slot until the thumbnail arrives', () => {
     installUiFixture();
 
@@ -11844,6 +11887,7 @@ function createUiCallbacksBase() {
     onGalleryImageSelected: () => {},
     onReloadAllOpenedImages: () => {},
     onReloadSelectedOpenedImage: () => {},
+    onRetryPendingOpenedImageLoad: () => {},
     onCloseSelectedOpenedImage: () => {},
     onCloseAllOpenedImages: () => {},
     onOpenedImageSelected: () => {},

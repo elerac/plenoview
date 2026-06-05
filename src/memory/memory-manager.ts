@@ -1,11 +1,31 @@
 import { sanitizeByteCount } from './memory-accounting';
 
+const DECODE_HARD_GUARD_EXTRA_BYTES = 1024 * 1024 * 1024;
+
 export type ResidentResourceKind =
   | 'source-texture'
   | 'derived-texture'
   | 'cpu-materialized'
   | 'decoded-session'
   | 'analysis-cache';
+
+export type DecodeMemoryReservationReason =
+  | 'active-open'
+  | 'folder-load'
+  | 'background-load'
+  | 'reload-cold-session';
+
+export interface DecodeMemoryReservation {
+  id: string;
+  sourceBytes: number;
+  estimatedDecodedBytes: number;
+  estimatedScratchBytes: number;
+  estimatedFirstDisplayBytes: number;
+  totalReservedBytes: number;
+  reason: DecodeMemoryReservationReason;
+}
+
+export type DecodeMemoryReservationEstimate = Omit<DecodeMemoryReservation, 'id' | 'totalReservedBytes'>;
 
 export interface ResidentResourceBinding {
   sessionId: string;
@@ -39,6 +59,82 @@ export interface MemoryBudgetEnforcementResult {
   evictedBytes: number;
   evictedResources: ResidentResourceMetadata[];
   overBudget: boolean;
+}
+
+export class DecodeMemoryReservationManager {
+  private readonly reservations = new Map<string, DecodeMemoryReservation>();
+  private displayCacheBudgetBytes: number;
+  private nextReservationId = 1;
+  private onReservationsChanged: (() => void) | null = null;
+
+  constructor(options: { displayCacheBudgetBytes?: number } = {}) {
+    this.displayCacheBudgetBytes = sanitizeByteCount(options.displayCacheBudgetBytes ?? 0);
+  }
+
+  setDisplayCacheBudgetBytes(displayCacheBudgetBytes: number): void {
+    this.displayCacheBudgetBytes = sanitizeByteCount(displayCacheBudgetBytes);
+  }
+
+  setReservationChangeListener(listener: (() => void) | null): void {
+    this.onReservationsChanged = listener;
+  }
+
+  getHardGuardBytes(): number {
+    return resolveDecodeHardGuardBytes(this.displayCacheBudgetBytes);
+  }
+
+  reserveDecode(estimate: DecodeMemoryReservationEstimate): DecodeMemoryReservation | null {
+    const normalized = normalizeDecodeReservationEstimate(estimate);
+    if (!this.canAdmitDecode(normalized)) {
+      return null;
+    }
+
+    const reservation: DecodeMemoryReservation = {
+      id: `decode-reservation-${this.nextReservationId}`,
+      ...normalized,
+      totalReservedBytes: getDecodeReservationTotalBytes(normalized)
+    };
+    this.nextReservationId += 1;
+    this.reservations.set(reservation.id, reservation);
+    this.onReservationsChanged?.();
+    return reservation;
+  }
+
+  releaseReservation(id: string | null | undefined): void {
+    if (!id) {
+      return;
+    }
+
+    if (this.reservations.delete(id)) {
+      this.onReservationsChanged?.();
+    }
+  }
+
+  getActiveReservationBytes(): number {
+    let bytes = 0;
+    for (const reservation of this.reservations.values()) {
+      bytes += sanitizeByteCount(reservation.totalReservedBytes);
+    }
+    return bytes;
+  }
+
+  canAdmitDecode(estimate: DecodeMemoryReservationEstimate): boolean {
+    const normalized = normalizeDecodeReservationEstimate(estimate);
+    const activeReservationBytes = this.getActiveReservationBytes();
+    const totalReservedBytes = getDecodeReservationTotalBytes(normalized);
+    const hardGuardBytes = this.getHardGuardBytes();
+
+    if (activeReservationBytes + totalReservedBytes <= hardGuardBytes) {
+      return true;
+    }
+
+    return isPrivilegedDecodeReason(normalized.reason) && activeReservationBytes === 0;
+  }
+}
+
+export function resolveDecodeHardGuardBytes(displayCacheBudgetBytes: number): number {
+  const budgetBytes = sanitizeByteCount(displayCacheBudgetBytes);
+  return Math.max(2 * budgetBytes, budgetBytes + DECODE_HARD_GUARD_EXTRA_BYTES);
 }
 
 export function enforceMemoryBudget(args: {
@@ -191,6 +287,29 @@ function isLargeProbationaryDerivedResource(resource: ResidentResourceMetadata, 
     sanitizeByteCount(resource.bytes) > sanitizeByteCount(budgetBytes) * 0.25 &&
     resource.accessCount < 2
   );
+}
+
+function normalizeDecodeReservationEstimate(
+  estimate: DecodeMemoryReservationEstimate
+): DecodeMemoryReservationEstimate {
+  return {
+    sourceBytes: sanitizeByteCount(estimate.sourceBytes),
+    estimatedDecodedBytes: sanitizeByteCount(estimate.estimatedDecodedBytes),
+    estimatedScratchBytes: sanitizeByteCount(estimate.estimatedScratchBytes),
+    estimatedFirstDisplayBytes: sanitizeByteCount(estimate.estimatedFirstDisplayBytes),
+    reason: estimate.reason
+  };
+}
+
+function getDecodeReservationTotalBytes(estimate: DecodeMemoryReservationEstimate): number {
+  return sanitizeByteCount(estimate.sourceBytes) +
+    sanitizeByteCount(estimate.estimatedDecodedBytes) +
+    sanitizeByteCount(estimate.estimatedScratchBytes) +
+    sanitizeByteCount(estimate.estimatedFirstDisplayBytes);
+}
+
+function isPrivilegedDecodeReason(reason: DecodeMemoryReservationReason): boolean {
+  return reason === 'active-open' || reason === 'reload-cold-session';
 }
 
 function isResourceUsedByBinding(

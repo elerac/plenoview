@@ -1,4 +1,4 @@
-import type { ExrMetadataEntry } from '../types';
+import type { ExrMetadataEntry, PendingOpenedImageStatus } from '../types';
 
 export interface OpenedImageOptionItem {
   id: string;
@@ -10,6 +10,9 @@ export interface OpenedImageOptionItem {
   thumbnailAspectRatio?: number | null;
   thumbnailLoading?: boolean;
   selectable?: boolean;
+  loadStatus?: PendingOpenedImageStatus;
+  statusText?: string;
+  retryable?: boolean;
 }
 
 export interface LayerOptionItem {

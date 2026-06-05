@@ -123,6 +123,36 @@ describe('opened image option labels', () => {
     });
   });
 
+  it('exposes pending opened-image memory status and retry state', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({
+      type: 'pendingOpenedImagesReserved',
+      reservations: [{
+        id: 'pending-1',
+        filename: 'large.exr',
+        displayName: 'large.exr',
+        fileSizeBytes: 3,
+        source: {
+          kind: 'url',
+          url: '/large.exr'
+        }
+      }]
+    });
+    core.dispatch({
+      type: 'pendingOpenedImageStatusChanged',
+      sessionId: 'pending-1',
+      loadStatus: 'pausedMemoryPressure',
+      retryable: true
+    });
+
+    expect(buildOpenedImageOptions(core.getState())[0]).toMatchObject({
+      loadStatus: 'pausedMemoryPressure',
+      statusText: 'Paused due to memory pressure',
+      retryable: true,
+      selectable: false
+    });
+  });
+
   it('tracks loaded opened-image thumbnail loading status until thumbnail generation finishes', () => {
     const core = new ViewerAppCore();
     core.dispatch({

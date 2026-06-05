@@ -299,6 +299,7 @@ export interface UiCallbacks {
   onGalleryImageSelected: (galleryId: string) => void;
   onReloadAllOpenedImages: () => void;
   onReloadSelectedOpenedImage: (sessionId: string) => void;
+  onRetryPendingOpenedImageLoad: (sessionId: string) => void;
   onCloseSelectedOpenedImage: (sessionId: string) => void;
   onCloseAllOpenedImages: () => void;
   onOpenedImageSelected: (
@@ -496,6 +497,9 @@ export class ViewerUi implements Disposable {
       },
       onReloadSelectedOpenedImage: (sessionId) => {
         this.callbacks.onReloadSelectedOpenedImage(sessionId);
+      },
+      onRetryPendingOpenedImageLoad: (sessionId) => {
+        this.callbacks.onRetryPendingOpenedImageLoad(sessionId);
       },
       onCloseSelectedOpenedImage: (sessionId) => {
         this.callbacks.onCloseSelectedOpenedImage(sessionId);

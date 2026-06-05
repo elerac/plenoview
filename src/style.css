@@ -2950,6 +2950,21 @@ body.is-resizing-panel-rows * {
   overflow-wrap: anywhere;
 }
 
+.opened-file-label-name,
+.opened-file-label-status {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opened-file-label-status {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 .opened-file-rename-input {
   width: 100%;
   min-width: 0;

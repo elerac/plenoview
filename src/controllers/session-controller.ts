@@ -10,7 +10,8 @@ import { ViewerAppCore } from '../app/viewer-app-core';
 import { buildLoadedSession, buildReloadedSession } from '../app/session-resource';
 import { selectActiveSession } from '../app/viewer-app-selectors';
 import { LoadQueueService, type LoadQueueOptions, type LoadQueuePriority } from '../services/load-queue';
-import type { DecodeBytesOptions } from '../exr-decode-context';
+import type { DecodeAdmissionState, DecodeBytesOptions } from '../exr-decode-context';
+import type { DecodeMemoryReservationReason } from '../memory/memory-manager';
 import { buildSessionDisplayName, normalizeSessionDisplayName } from '../session-state';
 import {
   DEFAULT_FOLDER_LOAD_LIMITS,
@@ -241,6 +242,7 @@ export interface SessionControllerDependencies {
   pathFileProvider?: PathFileProvider | null;
   onPathSessionLoaded?: (entry: DesktopFileEntry) => void;
   onPathSessionLoadFailed?: (entry: DesktopFileEntry, error: unknown) => void;
+  retryDecodeAdmission?: () => void;
   getViewport: () => ViewportInfo;
   getFitInsets: () => ViewportInsets | undefined;
 }
@@ -252,6 +254,7 @@ export class SessionController implements Disposable {
   private readonly pathFileProvider: PathFileProvider | null;
   private readonly onPathSessionLoaded: NonNullable<SessionControllerDependencies['onPathSessionLoaded']>;
   private readonly onPathSessionLoadFailed: NonNullable<SessionControllerDependencies['onPathSessionLoadFailed']>;
+  private readonly retryDecodeAdmission: NonNullable<SessionControllerDependencies['retryDecodeAdmission']>;
   private readonly getViewport: SessionControllerDependencies['getViewport'];
   private readonly getFitInsets: SessionControllerDependencies['getFitInsets'];
 
@@ -270,6 +273,7 @@ export class SessionController implements Disposable {
     this.pathFileProvider = dependencies.pathFileProvider ?? null;
     this.onPathSessionLoaded = dependencies.onPathSessionLoaded ?? (() => {});
     this.onPathSessionLoadFailed = dependencies.onPathSessionLoadFailed ?? (() => {});
+    this.retryDecodeAdmission = dependencies.retryDecodeAdmission ?? (() => {});
     this.getViewport = dependencies.getViewport;
     this.getFitInsets = dependencies.getFitInsets;
   }
@@ -486,7 +490,7 @@ export class SessionController implements Disposable {
     this.cancelBackgroundLoads('Foreground load superseded background work.');
     return this.enqueueLoadTask(async (signal) => {
       this.throwIfStopped(signal);
-      const error = await this.reloadSessionByIdInternal(sessionId, signal);
+      const error = await this.reloadSessionByIdInternal(sessionId, signal, 'reload-cold-session');
       if (error) {
         this.core.dispatch({ type: 'errorSet', message: `Reload failed: ${error.message}` });
       }
@@ -495,6 +499,23 @@ export class SessionController implements Disposable {
       category: LOAD_CATEGORY_RELOAD_SESSION,
       sessionId
     });
+  }
+
+  retryPendingMemoryLoad(sessionId: string): void {
+    if (this.disposed) {
+      return;
+    }
+
+    if (!this.core.getState().pendingOpenedImages.some((reservation) => reservation.id === sessionId)) {
+      return;
+    }
+
+    this.core.dispatch({
+      type: 'pendingOpenedImageStatusChanged',
+      sessionId,
+      loadStatus: 'waitingForMemory'
+    });
+    this.retryDecodeAdmission();
   }
 
   reloadAllSessions(): Promise<void> {
@@ -516,7 +537,7 @@ export class SessionController implements Disposable {
           return;
         }
 
-        const error = await this.reloadSessionByIdInternal(target.id, signal);
+        const error = await this.reloadSessionByIdInternal(target.id, signal, 'background-load');
         if (error) {
           failures.push(`${target.label}: ${error.message}`);
         }
@@ -731,7 +752,10 @@ export class SessionController implements Disposable {
       return this.enqueueLoadTask(async (signal) => {
         this.throwIfStopped(signal);
         try {
-          const decoded = await this.decodeFile(load.file, signal);
+          const decoded = await this.decodeFile(load.file, signal, {
+            reservationReason: resolveDecodeReservationReason(options),
+            sessionId: load.reservation.id
+          });
           this.throwIfStopped(signal);
           group.results[index] = {
             status: 'loaded',
@@ -879,7 +903,10 @@ export class SessionController implements Disposable {
       return this.enqueueLoadTask(async (signal) => {
         this.throwIfStopped(signal);
         try {
-          const decoded = await this.decodePathEntry(load.entry, signal);
+          const decoded = await this.decodePathEntry(load.entry, signal, {
+            reservationReason: resolveDecodeReservationReason(options),
+            sessionId: load.reservation.id
+          });
           this.throwIfStopped(signal);
           group.results[index] = {
             status: 'loaded',
@@ -1214,6 +1241,40 @@ export class SessionController implements Disposable {
     });
   }
 
+  private handlePendingDecodeAdmissionState(sessionId: string, state: DecodeAdmissionState): void {
+    if (this.disposed || !this.core.getState().pendingOpenedImages.some((reservation) => reservation.id === sessionId)) {
+      return;
+    }
+
+    switch (state.phase) {
+      case 'waitingForMemory':
+      case 'retrying':
+        this.core.dispatch({
+          type: 'pendingOpenedImageStatusChanged',
+          sessionId,
+          loadStatus: 'waitingForMemory'
+        });
+        break;
+      case 'pausedMemoryPressure':
+        this.core.dispatch({
+          type: 'pendingOpenedImageStatusChanged',
+          sessionId,
+          loadStatus: 'pausedMemoryPressure',
+          retryable: true
+        });
+        break;
+      case 'started':
+      case 'released':
+      case 'failed':
+        this.core.dispatch({
+          type: 'pendingOpenedImageStatusChanged',
+          sessionId,
+          loadStatus: 'loading'
+        });
+        break;
+    }
+  }
+
   private async loadGalleryImage(
     galleryId: string,
     signal: AbortSignal,
@@ -1264,7 +1325,8 @@ export class SessionController implements Disposable {
     this.throwIfStopped(options.signal);
     const decoded = await this.decodeBytes(bytes, {
       signal: options.signal,
-      filename: options.filename
+      filename: options.filename,
+      reservationReason: 'active-open'
     });
     this.throwIfStopped(options.signal);
     this.applyDecodedImage(decoded, options.filename, bytes.byteLength, {
@@ -1277,7 +1339,8 @@ export class SessionController implements Disposable {
 
   private async decodeFile(
     file: File,
-    signal: AbortSignal
+    signal: AbortSignal,
+    options: { reservationReason: DecodeMemoryReservationReason; sessionId: string }
   ): Promise<DecodedExrImage> {
     this.throwIfStopped(signal);
 
@@ -1285,7 +1348,11 @@ export class SessionController implements Disposable {
     this.throwIfStopped(signal);
     const decoded = await this.decodeBytes(bytes, {
       signal,
-      filename: getFileDecodeName(file)
+      filename: getFileDecodeName(file),
+      reservationReason: options.reservationReason,
+      onDecodeAdmissionState: (state) => {
+        this.handlePendingDecodeAdmissionState(options.sessionId, state);
+      }
     });
     this.throwIfStopped(signal);
     return decoded;
@@ -1293,7 +1360,8 @@ export class SessionController implements Disposable {
 
   private async decodePathEntry(
     entry: DesktopFileEntry,
-    signal: AbortSignal
+    signal: AbortSignal,
+    options: { reservationReason: DecodeMemoryReservationReason; sessionId: string }
   ): Promise<DecodedExrImage> {
     if (!this.pathFileProvider) {
       throw new Error('Desktop path loading is unavailable.');
@@ -1304,7 +1372,11 @@ export class SessionController implements Disposable {
     this.throwIfStopped(signal);
     const decoded = await this.decodeBytes(file.bytes, {
       signal,
-      filename: entry.relativePath || entry.filename
+      filename: entry.relativePath || entry.filename,
+      reservationReason: options.reservationReason,
+      onDecodeAdmissionState: (state) => {
+        this.handlePendingDecodeAdmissionState(options.sessionId, state);
+      }
     });
     this.throwIfStopped(signal);
     return decoded;
@@ -1347,7 +1419,11 @@ export class SessionController implements Disposable {
     });
   }
 
-  private async reloadSessionByIdInternal(sessionId: string, signal: AbortSignal): Promise<Error | null> {
+  private async reloadSessionByIdInternal(
+    sessionId: string,
+    signal: AbortSignal,
+    reservationReason: DecodeMemoryReservationReason
+  ): Promise<Error | null> {
     this.throwIfStopped(signal);
 
     const session = this.getSessions().find((current) => current.id === sessionId);
@@ -1361,7 +1437,8 @@ export class SessionController implements Disposable {
         session.filename,
         this.decodeBytes,
         this.pathFileProvider,
-        signal
+        signal,
+        reservationReason
       );
       this.throwIfStopped(signal);
       const baseState = this.getActiveSessionId() === sessionId
@@ -1429,7 +1506,8 @@ async function decodeExrFromSessionSource(
   filename: string,
   decodeBytes: (bytes: Uint8Array, options?: DecodeBytesOptions) => Promise<DecodedExrImage>,
   pathFileProvider: PathFileProvider | null,
-  signal?: AbortSignal
+  signal: AbortSignal | undefined,
+  reservationReason: DecodeMemoryReservationReason
 ): Promise<DecodedExrImage> {
   if (source.kind === 'url') {
     const response = await fetch(source.url, { signal });
@@ -1441,7 +1519,7 @@ async function decodeExrFromSessionSource(
     if (signal) {
       throwIfAborted(signal, 'Session reload was aborted.');
     }
-    return decodeBytes(bytes, { signal, filename });
+    return decodeBytes(bytes, { signal, filename, reservationReason });
   }
 
   if (source.kind === 'path') {
@@ -1454,7 +1532,8 @@ async function decodeExrFromSessionSource(
     }
     return decodeBytes(file.bytes, {
       signal,
-      filename: source.relativePath || source.filename || filename
+      filename: source.relativePath || source.filename || filename,
+      reservationReason
     });
   }
 
@@ -1464,7 +1543,8 @@ async function decodeExrFromSessionSource(
   }
   return decodeBytes(bytes, {
     signal,
-    filename: getFileDecodeName(source.file) || filename
+    filename: getFileDecodeName(source.file) || filename,
+    reservationReason
   });
 }
 
@@ -1479,6 +1559,18 @@ function getPathLoadStats(entries: DesktopFileEntry[]) {
     totalBytes: entries.reduce((total, entry) => total + entry.fileSizeBytes, 0),
     partial: false
   };
+}
+
+function resolveDecodeReservationReason(options: LoadQueueOptions): DecodeMemoryReservationReason {
+  if (options.category === LOAD_CATEGORY_FOLDER) {
+    return 'folder-load';
+  }
+
+  if (options.priority === 'background') {
+    return 'background-load';
+  }
+
+  return 'active-open';
 }
 
 function formatFolderLimitMessage(reasons: string[]): string {

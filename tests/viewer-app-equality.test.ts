@@ -29,6 +29,12 @@ describe('viewer app equality helpers', () => {
     }])).toBe(false);
     expect(sameOpenedImageOptions(base, [{ ...base[0], displayNameIsCustom: true }])).toBe(false);
     expect(sameOpenedImageOptions(base, [{ ...base[0], thumbnailLoading: true }])).toBe(false);
+    expect(sameOpenedImageOptions(base, [{
+      ...base[0],
+      loadStatus: 'waitingForMemory',
+      statusText: 'Waiting for memory'
+    }])).toBe(false);
+    expect(sameOpenedImageOptions(base, [{ ...base[0], retryable: true }])).toBe(false);
   });
 
   it('compares viewer session state structurally', () => {

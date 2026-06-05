@@ -208,6 +208,9 @@ export function createViewerUi({
     onReloadSelectedOpenedImage: (sessionId) => {
       void getSessionController().reloadSession(sessionId);
     },
+    onRetryPendingOpenedImageLoad: (sessionId) => {
+      getSessionController().retryPendingMemoryLoad(sessionId);
+    },
     onCloseSelectedOpenedImage: (sessionId) => {
       getSessionController().closeSession(sessionId);
     },

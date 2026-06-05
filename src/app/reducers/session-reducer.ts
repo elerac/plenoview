@@ -71,6 +71,33 @@ export function sessionReducer(
             pendingOpenedImages
           };
     }
+    case 'pendingOpenedImageStatusChanged': {
+      let changed = false;
+      const pendingOpenedImages = state.pendingOpenedImages.map((reservation) => {
+        if (reservation.id !== intent.sessionId) {
+          return reservation;
+        }
+
+        const retryable = intent.retryable === true;
+        if (reservation.loadStatus === intent.loadStatus && (reservation.retryable === true) === retryable) {
+          return reservation;
+        }
+
+        changed = true;
+        return {
+          ...reservation,
+          loadStatus: intent.loadStatus,
+          ...(retryable ? { retryable: true } : { retryable: undefined })
+        };
+      });
+
+      return changed
+        ? {
+            ...state,
+            pendingOpenedImages
+          }
+        : state;
+    }
     case 'sessionLoaded': {
       const shouldActivate = intent.activate !== false || !selectActiveSession(state);
       const pendingOpenedImages = state.pendingOpenedImages.filter(

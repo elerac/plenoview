@@ -43,6 +43,7 @@ interface OpenedImagesPanelCallbacks {
   ) => void;
   onDisplayCacheBudgetPreferenceChange: (preference: DisplayCacheBudgetPreference) => void;
   onReloadSelectedOpenedImage: (sessionId: string) => void;
+  onRetryPendingOpenedImageLoad: (sessionId: string) => void;
   onCloseSelectedOpenedImage: (sessionId: string) => void;
 }
 
@@ -1231,7 +1232,13 @@ function createOpenedFileRow(
   const reloadButton = createOpenedFileActionButton({
     iconName: 'reload',
     onClick: () => {
-      callbacks.onReloadSelectedOpenedImage(item.id);
+      const sessionId = row.dataset.sessionId ?? item.id;
+      if (row.dataset.retryable === 'true') {
+        callbacks.onRetryPendingOpenedImageLoad(sessionId);
+        return;
+      }
+
+      callbacks.onReloadSelectedOpenedImage(sessionId);
     }
   });
   const closeButton = createOpenedFileActionButton({
@@ -1323,6 +1330,7 @@ function updateOpenedFileRow(
   }
 
   row.dataset.sessionId = item.id;
+  row.dataset.retryable = item.retryable === true ? 'true' : 'false';
   row.setAttribute('role', 'option');
   row.setAttribute('aria-selected', options.selected ? 'true' : 'false');
   row.setAttribute('aria-disabled', options.selectionDisabled ? 'true' : 'false');
@@ -1347,8 +1355,8 @@ function updateOpenedFileRow(
 
   updateOpenedFileActionButton(refs.reloadButton, {
     iconName: 'reload',
-    label: `Reload ${item.label}`,
-    disabled: options.actionDisabled
+    label: item.retryable === true ? `Retry ${item.label}` : `Reload ${item.label}`,
+    disabled: options.actionDisabled && item.retryable !== true
   });
   updateOpenedFileActionButton(refs.closeButton, {
     iconName: 'close',
@@ -1366,7 +1374,17 @@ function updateOpenedFileLabel(
   refs.label.classList.toggle('opened-file-label--editing', editing);
   if (!editing) {
     refs.renameInput = null;
-    refs.label.textContent = item.label;
+    if (!item.statusText) {
+      refs.label.textContent = item.label;
+    } else {
+      const name = document.createElement('span');
+      name.className = 'opened-file-label-name';
+      name.textContent = item.label;
+      const status = document.createElement('span');
+      status.className = 'opened-file-label-status';
+      status.textContent = item.statusText;
+      refs.label.replaceChildren(name, status);
+    }
     refs.label.removeAttribute('title');
     return;
   }

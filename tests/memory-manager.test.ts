@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DecodeMemoryReservationManager,
   enforceMemoryBudget,
   getEvictionCandidates,
+  resolveDecodeHardGuardBytes,
+  type DecodeMemoryReservationEstimate,
   type EvictionContext,
   type ResidentResourceKind,
   type ResidentResourceMetadata
@@ -121,5 +124,74 @@ describe('memory manager eviction', () => {
     expect(result.evictedResources[0]).toBe(hugeDerived);
     expect(hugeDerived.evict).toHaveBeenCalledTimes(1);
     expect(oldSource.evict).not.toHaveBeenCalled();
+  });
+});
+
+describe('decode memory reservations', () => {
+  const MB = 1024 * 1024;
+  const GB = 1024 * MB;
+
+  function createDecodeEstimate(
+    bytes: number,
+    reason: DecodeMemoryReservationEstimate['reason'] = 'folder-load'
+  ): DecodeMemoryReservationEstimate {
+    return {
+      sourceBytes: bytes,
+      estimatedDecodedBytes: bytes * 2,
+      estimatedScratchBytes: bytes,
+      estimatedFirstDisplayBytes: bytes,
+      reason
+    };
+  }
+
+  it('centralizes the hard guard formula', () => {
+    expect(resolveDecodeHardGuardBytes(256 * MB)).toBe(256 * MB + GB);
+    expect(resolveDecodeHardGuardBytes(2 * GB)).toBe(4 * GB);
+  });
+
+  it('sanitizes and sums active reservation bytes', () => {
+    const manager = new DecodeMemoryReservationManager({ displayCacheBudgetBytes: 256 * MB });
+    const reservation = manager.reserveDecode({
+      sourceBytes: 10.8,
+      estimatedDecodedBytes: 20.2,
+      estimatedScratchBytes: Number.NaN,
+      estimatedFirstDisplayBytes: -5,
+      reason: 'active-open'
+    });
+
+    expect(reservation).toMatchObject({
+      sourceBytes: 10,
+      estimatedDecodedBytes: 20,
+      estimatedScratchBytes: 0,
+      estimatedFirstDisplayBytes: 0,
+      totalReservedBytes: 30
+    });
+    expect(manager.getActiveReservationBytes()).toBe(30);
+  });
+
+  it('admits a single active open when alone even if it exceeds the guard', () => {
+    const manager = new DecodeMemoryReservationManager({ displayCacheBudgetBytes: 64 * MB });
+    expect(manager.canAdmitDecode(createDecodeEstimate(2 * GB, 'active-open'))).toBe(true);
+    expect(manager.reserveDecode(createDecodeEstimate(2 * GB, 'active-open'))).not.toBeNull();
+    expect(manager.canAdmitDecode(createDecodeEstimate(2 * GB, 'active-open'))).toBe(false);
+  });
+
+  it('throttles folder and background decodes near the hard guard', () => {
+    const manager = new DecodeMemoryReservationManager({ displayCacheBudgetBytes: 64 * MB });
+    expect(manager.reserveDecode(createDecodeEstimate(200 * MB, 'folder-load'))).not.toBeNull();
+    expect(manager.canAdmitDecode(createDecodeEstimate(50 * MB, 'folder-load'))).toBe(false);
+    expect(manager.canAdmitDecode(createDecodeEstimate(50 * MB, 'background-load'))).toBe(false);
+  });
+
+  it('releases reservations idempotently', () => {
+    const manager = new DecodeMemoryReservationManager({ displayCacheBudgetBytes: 256 * MB });
+    const reservation = manager.reserveDecode(createDecodeEstimate(1, 'folder-load'));
+    expect(reservation).not.toBeNull();
+
+    manager.releaseReservation(reservation?.id);
+    manager.releaseReservation(reservation?.id);
+    manager.releaseReservation('missing');
+
+    expect(manager.getActiveReservationBytes()).toBe(0);
   });
 });

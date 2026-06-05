@@ -1,4 +1,9 @@
-import { disposeDecodeWorker, loadExrOffMainThread } from '../../exr-worker-client';
+import {
+  disposeDecodeWorker,
+  loadExrOffMainThread,
+  retryDecodeMemoryAdmission,
+  setDecodeMemoryReservationManager
+} from '../../exr-worker-client';
 import { disposeExportWorker } from '../../export/export-worker-client';
 import { ViewerInteractionCoordinator } from '../../interaction-coordinator';
 import { WebGlExrRenderer } from '../../renderer';
@@ -13,6 +18,7 @@ import { SessionController } from '../../controllers/session-controller';
 import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 import { ViewerAppCore } from '../viewer-app-core';
 import type { DesktopFileEntry, PathFileProvider, ViewerHost } from '../../platform';
+import { DecodeMemoryReservationManager } from '../../memory/memory-manager';
 
 export interface BootstrapServices {
   renderer: WebGlExrRenderer;
@@ -54,11 +60,14 @@ export function createBootstrapServices({
     ui.rulerLabelOverlay
   );
   renderer.setRulersVisible(core.getState().rulersVisible);
+  const decodeMemoryReservationManager = new DecodeMemoryReservationManager();
+  setDecodeMemoryReservationManager(decodeMemoryReservationManager);
   const renderCache = new RenderCacheService({
     ui,
     renderer,
     getActiveSessionId: () => core.getState().activeSessionId,
     displayCacheBudgetHostKind: hostKind,
+    decodeMemoryReservationManager,
     onDisplayLuminanceRangeResolved: (event) => {
       core.dispatch({
         type: 'displayLuminanceRangeResolved',
@@ -136,6 +145,7 @@ export function createBootstrapServices({
     pathFileProvider,
     onPathSessionLoaded,
     onPathSessionLoadFailed,
+    retryDecodeAdmission: retryDecodeMemoryAdmission,
     getViewport: () => ui.getActiveViewerPane().viewport,
     getFitInsets: () => resolveRulerFitInsets(core.getState().rulersVisible)
   });
