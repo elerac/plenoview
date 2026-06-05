@@ -326,8 +326,8 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.status.textContent = 'Updating display...';
   }
 
-  setDisplayCacheBudget(_mb: number): void {}
-  setDisplayCacheUsage(_usedBytes: number, _budgetBytes: number): void {}
+  setDisplayCacheBudget(): void {}
+  setDisplayCacheUsage(): void {}
 
   setViewerViewportRect(rect: ViewportClientRect): void {
     this.viewport = {

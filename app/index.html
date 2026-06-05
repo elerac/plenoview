@@ -688,9 +688,24 @@
               </div>
             </div>
             <div id="display-cache-control" class="app-menu-setting-group">
-              <label class="app-menu-setting-label" for="display-cache-budget-input">Display Cache Budget</label>
-              <div class="app-menu-setting-row">
-                <select id="display-cache-budget-input" class="app-menu-setting-input" aria-describedby="display-cache-usage">
+              <label class="app-menu-setting-label" for="display-cache-budget-mode-input">Display Cache Budget</label>
+              <div class="app-menu-setting-row app-menu-setting-row--fit-control">
+                <select
+                  id="display-cache-budget-mode-input"
+                  class="app-menu-setting-input"
+                  aria-describedby="display-cache-explanation display-cache-usage"
+                >
+                  <option value="automatic" selected>Automatic</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+              </div>
+              <div id="display-cache-budget-fixed-row" class="app-menu-setting-row hidden">
+                <select
+                  id="display-cache-budget-input"
+                  class="app-menu-setting-input"
+                  aria-describedby="display-cache-explanation display-cache-usage"
+                  disabled
+                >
                   <option value="64">64</option>
                   <option value="128">128</option>
                   <option value="256" selected>256</option>
@@ -699,7 +714,39 @@
                 </select>
                 <span class="app-menu-setting-unit">MB</span>
               </div>
-              <span id="display-cache-usage" class="app-menu-setting-value">0 / 256 MB</span>
+              <p id="display-cache-explanation" class="app-menu-setting-help">
+                The display cache budget limits retained display textures and materialized display buffers. Decoded image pixels and browser/GPU overhead may exceed this value.
+              </p>
+              <div id="display-cache-breakdown" class="display-cache-breakdown" aria-label="Display cache memory breakdown">
+                <div class="display-cache-breakdown-row">
+                  <span>Display Cache Budget</span>
+                  <span id="display-cache-budget-breakdown-value" class="app-menu-setting-value">Automatic (256 MB)</span>
+                </div>
+                <div class="display-cache-breakdown-row">
+                  <span>Decoded pixels</span>
+                  <span id="display-cache-decoded-pixels-value" class="app-menu-setting-value">0 MB</span>
+                </div>
+                <div class="display-cache-breakdown-row">
+                  <span>GPU textures</span>
+                  <span id="display-cache-gpu-textures-value" class="app-menu-setting-value">0 MB</span>
+                </div>
+                <div class="display-cache-breakdown-row">
+                  <span>CPU materialized buffers</span>
+                  <span id="display-cache-cpu-materialized-value" class="app-menu-setting-value">0 MB</span>
+                </div>
+                <div class="display-cache-breakdown-row">
+                  <span>Analysis cache</span>
+                  <span id="display-cache-analysis-cache-value" class="app-menu-setting-value">0 MB</span>
+                </div>
+                <div id="display-cache-in-flight-reservations-row" class="display-cache-breakdown-row hidden">
+                  <span>In-flight reservations</span>
+                  <span id="display-cache-in-flight-reservations-value" class="app-menu-setting-value">0 MB</span>
+                </div>
+                <div class="display-cache-breakdown-row display-cache-breakdown-row--total">
+                  <span>Total tracked memory</span>
+                  <span id="display-cache-usage" class="app-menu-setting-value">0 MB</span>
+                </div>
+              </div>
             </div>
           </div>
           <div class="app-dialog-actions">

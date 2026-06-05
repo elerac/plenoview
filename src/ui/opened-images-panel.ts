@@ -1,5 +1,11 @@
 import type { OpenedImageOptionItem } from './image-browser-types';
 import { DisposableBag, type Disposable } from '../lifecycle';
+import {
+  displayCacheBudgetMbToBytes,
+  normalizeDisplayCacheBudgetPreference,
+  type DisplayCacheBudgetPreference
+} from '../display-cache';
+import type { MemoryUsageSnapshot } from '../memory/memory-accounting';
 import type { OpenedImageDropPlacement } from '../types';
 import type { OpenedImagesPanelElements } from './elements';
 import { createMetadataRows } from './metadata-panel';
@@ -35,7 +41,7 @@ interface OpenedImagesPanelCallbacks {
     targetSessionId: string,
     placement: OpenedImageDropPlacement
   ) => void;
-  onDisplayCacheBudgetChange: (mb: number) => void;
+  onDisplayCacheBudgetPreferenceChange: (preference: DisplayCacheBudgetPreference) => void;
   onReloadSelectedOpenedImage: (sessionId: string) => void;
   onCloseSelectedOpenedImage: (sessionId: string) => void;
 }
@@ -90,7 +96,8 @@ export class OpenedImagesPanel implements Disposable {
   private openedFileRenameState: OpenedFileRenameState | null = null;
   private openedFilesFilterText = '';
   private restoreOpenedFilesFocusAfterLoading = false;
-  private displayCacheBudgetMb = 256;
+  private displayCacheBudgetPreference: DisplayCacheBudgetPreference = { mode: 'automatic', fixedMb: 256 };
+  private displayCacheResolvedBudgetMb = 256;
   private openedFileInfoTooltipRow: HTMLDivElement | null = null;
   private openedFileInfoTooltipElement: HTMLDivElement | null = null;
   private openedFileInfoTooltipTimer: number | null = null;
@@ -104,7 +111,8 @@ export class OpenedImagesPanel implements Disposable {
   ) {
     this.elements.openedImagesSelect.disabled = true;
     this.elements.openedFilesFilterInput.disabled = true;
-    this.elements.displayCacheBudgetInput.disabled = false;
+    this.elements.displayCacheBudgetModeInput.disabled = false;
+    this.elements.displayCacheBudgetInput.disabled = true;
     this.elements.reloadAllOpenedImagesButton.disabled = true;
     this.elements.closeAllOpenedImagesButton.disabled = true;
 
@@ -263,15 +271,26 @@ export class OpenedImagesPanel implements Disposable {
       }
     });
 
+    this.disposables.addEventListener(this.elements.displayCacheBudgetModeInput, 'change', (event) => {
+      const target = event.currentTarget as HTMLSelectElement;
+      const mode = target.value === 'fixed' ? 'fixed' : 'automatic';
+      this.callbacks.onDisplayCacheBudgetPreferenceChange({
+        ...this.displayCacheBudgetPreference,
+        mode
+      });
+    });
     this.disposables.addEventListener(this.elements.displayCacheBudgetInput, 'change', (event) => {
       const target = event.currentTarget as HTMLSelectElement;
       const value = Number(target.value);
       if (!Number.isFinite(value)) {
-        this.setDisplayCacheBudget(this.displayCacheBudgetMb);
+        this.setDisplayCacheBudget(this.displayCacheBudgetPreference, this.displayCacheResolvedBudgetMb);
         return;
       }
 
-      this.callbacks.onDisplayCacheBudgetChange(value);
+      this.callbacks.onDisplayCacheBudgetPreferenceChange({
+        mode: 'fixed',
+        fixedMb: value
+      });
     });
 
     this.disposables.addEventListener(window, 'blur', () => {
@@ -409,25 +428,45 @@ export class OpenedImagesPanel implements Disposable {
     }
   }
 
-  setDisplayCacheBudget(mb: number): void {
+  setDisplayCacheBudget(preference: DisplayCacheBudgetPreference, resolvedBudgetMb: number): void {
     if (this.disposed) {
       return;
     }
 
-    this.displayCacheBudgetMb = Math.max(0, Math.round(mb));
-    this.elements.displayCacheBudgetInput.value = String(this.displayCacheBudgetMb);
+    this.displayCacheBudgetPreference = normalizeDisplayCacheBudgetPreference(preference);
+    this.displayCacheResolvedBudgetMb = Math.max(0, Math.round(resolvedBudgetMb));
+    this.elements.displayCacheBudgetModeInput.value = this.displayCacheBudgetPreference.mode;
+    this.elements.displayCacheBudgetInput.value = String(this.displayCacheBudgetPreference.fixedMb);
+    this.syncDisplayCacheBudgetControls();
+    this.elements.displayCacheBudgetBreakdownValue.textContent = formatDisplayCacheBudgetLabel(
+      this.displayCacheBudgetPreference,
+      displayCacheBudgetMbToBytes(this.displayCacheResolvedBudgetMb)
+    );
   }
 
-  setDisplayCacheUsage(usedBytes: number, budgetBytes: number): void {
+  setDisplayCacheUsage(snapshot: MemoryUsageSnapshot, budgetBytes: number): void {
     if (this.disposed) {
       return;
     }
 
-    const state = getDisplayCacheUsageState(usedBytes, budgetBytes);
-    this.elements.displayCacheUsage.textContent = state.text;
+    const state = getDisplayCacheMemoryUsageState(snapshot, budgetBytes);
+    this.elements.displayCacheBudgetBreakdownValue.textContent = formatDisplayCacheBudgetLabel(
+      this.displayCacheBudgetPreference,
+      budgetBytes
+    );
+    this.elements.displayCacheDecodedPixelsValue.textContent = formatFileSizeMb(snapshot.decodedBytes);
+    this.elements.displayCacheGpuTexturesValue.textContent = formatFileSizeMb(snapshot.gpuTextureBytes);
+    this.elements.displayCacheCpuMaterializedValue.textContent = formatFileSizeMb(snapshot.cpuMaterializedBytes);
+    this.elements.displayCacheAnalysisCacheValue.textContent = formatFileSizeMb(snapshot.analysisCacheBytes);
+    this.elements.displayCacheInFlightReservationsValue.textContent = formatFileSizeMb(snapshot.activeReservationBytes);
+    this.elements.displayCacheInFlightReservationsRow.classList.toggle(
+      'hidden',
+      snapshot.activeReservationBytes <= 0
+    );
+    this.elements.displayCacheUsage.textContent = formatFileSizeMb(snapshot.totalTrackedBytes);
     this.elements.displayCacheUsage.setAttribute(
       'title',
-      `Decoded + retained CPU/GPU residency: ${formatFileSizeMb(usedBytes)} / ${formatFileSizeMb(budgetBytes)}`
+      `Total tracked memory: ${formatFileSizeMb(snapshot.totalTrackedBytes)}; Display cache budget: ${formatFileSizeMb(budgetBytes)}`
     );
     this.elements.displayCacheControl.classList.toggle('is-over-budget', state.overBudget);
     this.elements.displayCacheUsage.classList.toggle('is-over-budget', state.overBudget);
@@ -476,9 +515,16 @@ export class OpenedImagesPanel implements Disposable {
     const selectionDisabled = this.isViewerBlocked || this.openedImageCount === 0;
     this.elements.openedImagesSelect.disabled = selectionDisabled;
     this.elements.openedFilesFilterInput.disabled = selectionDisabled;
-    this.elements.displayCacheBudgetInput.disabled = this.isLoading;
+    this.elements.displayCacheBudgetModeInput.disabled = this.isLoading;
+    this.syncDisplayCacheBudgetControls();
     this.elements.reloadAllOpenedImagesButton.disabled = this.isLoading || this.openedImageCount === 0;
     this.elements.closeAllOpenedImagesButton.disabled = this.isLoading || this.openedImageCount === 0;
+  }
+
+  private syncDisplayCacheBudgetControls(): void {
+    const fixed = this.displayCacheBudgetPreference.mode === 'fixed';
+    this.elements.displayCacheBudgetFixedRow.classList.toggle('hidden', !fixed);
+    this.elements.displayCacheBudgetInput.disabled = this.isLoading || !fixed;
   }
 
   private renderOpenedFileRows(): void {
@@ -1111,6 +1157,28 @@ export function getDisplayCacheUsageState(
     text: formatDisplayCacheUsageText(usedBytes, budgetBytes),
     overBudget: usedBytes > budgetBytes
   };
+}
+
+export function getDisplayCacheMemoryUsageState(
+  snapshot: MemoryUsageSnapshot,
+  budgetBytes: number
+): { retainedDisplayBytes: number; totalTrackedBytes: number; overBudget: boolean } {
+  const retainedDisplayBytes = Math.max(0, snapshot.gpuTextureBytes) + Math.max(0, snapshot.cpuMaterializedBytes);
+  return {
+    retainedDisplayBytes,
+    totalTrackedBytes: Math.max(0, snapshot.totalTrackedBytes),
+    overBudget: retainedDisplayBytes > budgetBytes
+  };
+}
+
+export function formatDisplayCacheBudgetLabel(
+  preference: DisplayCacheBudgetPreference,
+  budgetBytes: number
+): string {
+  const budgetText = `${formatDisplayCacheMegabytes(budgetBytes)} MB`;
+  return preference.mode === 'fixed'
+    ? `Fixed (${budgetText})`
+    : `Automatic (${budgetText})`;
 }
 
 function createOpenedFileRow(

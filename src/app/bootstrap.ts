@@ -219,6 +219,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
       core,
       ui,
       loadQueue,
+      hostKind: host.kind,
       pathFileProvider: host.pathFileProvider,
       onPathSessionLoaded: (entry) => {
         host.recordRecentFile(entry);

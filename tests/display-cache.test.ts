@@ -11,11 +11,16 @@ import {
   MIN_DISPLAY_CACHE_BUDGET_MB,
   clampDisplayCacheBudgetMb,
   clearSessionResources,
+  createDefaultDisplayCacheBudgetPreference,
   createSessionResourceEntry,
+  displayCacheBudgetPreferenceToStorageValue,
   estimateDecodedImageBytes,
   getTrackedResidentBytes,
   getTrackedResidentChannelBytes,
   parseDisplayCacheBudgetStorageValue,
+  parseDisplayCacheBudgetPreferenceStorageValue,
+  resolveAutomaticDisplayCacheBudgetMb,
+  resolveDisplayCacheBudgetMb,
   type ResidentChannelResourceEntry
 } from '../src/display-cache';
 import type { DecodedExrImage } from '../src/types';
@@ -128,6 +133,27 @@ describe('display cache budget parsing', () => {
     expect(parseDisplayCacheBudgetStorageValue('not-a-number')).toBe(DEFAULT_DISPLAY_CACHE_BUDGET_MB);
   });
 
+  it('defaults missing and corrupt preference storage to Automatic', () => {
+    expect(parseDisplayCacheBudgetPreferenceStorageValue(null)).toEqual(createDefaultDisplayCacheBudgetPreference());
+    expect(parseDisplayCacheBudgetPreferenceStorageValue('not-a-number')).toEqual(
+      createDefaultDisplayCacheBudgetPreference()
+    );
+  });
+
+  it('interprets old numeric storage values as fixed budgets', () => {
+    expect(parseDisplayCacheBudgetPreferenceStorageValue('128')).toEqual({
+      mode: 'fixed',
+      fixedMb: 128
+    });
+  });
+
+  it('round-trips the new JSON storage shape', () => {
+    const preference = { mode: 'automatic' as const, fixedMb: 512 };
+    expect(parseDisplayCacheBudgetPreferenceStorageValue(
+      displayCacheBudgetPreferenceToStorageValue(preference)
+    )).toEqual(preference);
+  });
+
   it('clamps parsed storage values to the allowed min and max', () => {
     expect(parseDisplayCacheBudgetStorageValue('8')).toBe(MIN_DISPLAY_CACHE_BUDGET_MB);
     expect(parseDisplayCacheBudgetStorageValue('9000')).toBe(MAX_DISPLAY_CACHE_BUDGET_MB);
@@ -144,5 +170,20 @@ describe('display cache budget parsing', () => {
 
   it('exposes the supported preset options in ascending order', () => {
     expect(DISPLAY_CACHE_BUDGET_OPTIONS_MB).toEqual([64, 128, 256, 512, 1024]);
+  });
+
+  it('resolves automatic budgets from conservative environment hints', () => {
+    expect(resolveAutomaticDisplayCacheBudgetMb()).toBe(256);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ deviceMemoryGb: 2 })).toBe(128);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ jsHeapSizeLimitBytes: 512 * 1024 * 1024 })).toBe(128);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ deviceMemoryGb: 4 })).toBe(512);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ hostKind: 'vscode' })).toBe(512);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ deviceMemoryGb: 8 })).toBe(1024);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ hostKind: 'tauri' })).toBe(1024);
+    expect(resolveAutomaticDisplayCacheBudgetMb({ hostKind: 'tauri', deviceMemoryGb: 2 })).toBe(128);
+  });
+
+  it('keeps fixed budgets independent from automatic hints', () => {
+    expect(resolveDisplayCacheBudgetMb({ mode: 'fixed', fixedMb: 128 }, { hostKind: 'tauri' })).toBe(128);
   });
 });

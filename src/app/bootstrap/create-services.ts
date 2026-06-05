@@ -12,7 +12,7 @@ import { DisplayController } from '../../controllers/display-controller';
 import { SessionController } from '../../controllers/session-controller';
 import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 import { ViewerAppCore } from '../viewer-app-core';
-import type { DesktopFileEntry, PathFileProvider } from '../../platform';
+import type { DesktopFileEntry, PathFileProvider, ViewerHost } from '../../platform';
 
 export interface BootstrapServices {
   renderer: WebGlExrRenderer;
@@ -29,6 +29,7 @@ interface CreateBootstrapServicesArgs {
   core: ViewerAppCore;
   ui: ViewerRuntimeUi;
   loadQueue: LoadQueueService;
+  hostKind: ViewerHost['kind'];
   pathFileProvider?: PathFileProvider | null;
   onPathSessionLoaded?: (entry: DesktopFileEntry) => void;
   onPathSessionLoadFailed?: (entry: DesktopFileEntry, error: unknown) => void;
@@ -39,6 +40,7 @@ export function createBootstrapServices({
   core,
   ui,
   loadQueue,
+  hostKind,
   pathFileProvider,
   onPathSessionLoaded,
   onPathSessionLoadFailed,
@@ -56,6 +58,7 @@ export function createBootstrapServices({
     ui,
     renderer,
     getActiveSessionId: () => core.getState().activeSessionId,
+    displayCacheBudgetHostKind: hostKind,
     onDisplayLuminanceRangeResolved: (event) => {
       core.dispatch({
         type: 'displayLuminanceRangeResolved',

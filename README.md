@@ -25,7 +25,7 @@ Prismifold is a multichannel image viewer for computational imaging, rendering, 
   - `Open Files` list allows switching active image by filename; rows show thumbnails/status and support filtering, inline rename, drag reorder, and drag-to-viewer-pane assignment.
   - Multi-layer EXR state is preserved per opened session. Display channel mapping, the active probe position, and the committed ROI carry across session switches when valid for the target image. The active viewer mode is preserved across session switches, and each session remembers separate image-view and panorama-view camera state.
   - When Auto Fit selected images is enabled, image-mode session switches and new loads fit to the viewer instead of carrying previous pan/zoom; this does not apply in `Panorama viewer`. Colormap state carries only when the display selection remains compatible.
-  - Decoded CPU pixels are included in the displayed memory usage. The LRU budget evicts retained display CPU/GPU channel resources, so decoded-only usage can exceed the selected cap. The default cap is `256 MB`, configurable from `Settings` dialog > `Display Cache Budget` with fixed presets (`64`, `128`, `256`, `512`, `1024` MB).
+  - Decoded CPU pixels are included in the displayed memory usage. The display cache budget evicts retained display textures and materialized display buffers, so decoded pixels and browser/GPU overhead can exceed the selected cap. `Settings` dialog > `Display Cache Budget` defaults to `Automatic` and also supports fixed presets (`64`, `128`, `256`, `512`, `1024` MB).
   - Per-file row `Reload` action re-decodes the selected session from its original source.
   - `File > Reload All` re-decodes all opened sessions from their original sources.
   - Per-file row `Close` action closes the selected filename entry.
@@ -277,7 +277,7 @@ Controller methods:
 - `File > Export Batch...`: export selected file/channel combinations as a ZIP of PNG images; the batch dialog has its own `Split RGB` option.
 - `File > Export Colormap...`: export a registered colormap to a PNG gradient with selectable colormap, `width`, `height`, `orientation`, and filename.
 - Right-click viewer menu > `Copy Image`: copy the current display image to the clipboard.
-- Settings dialog > `Display Cache Budget`: choose the retained display CPU/GPU residency budget from `64`, `128`, `256`, `512`, or `1024` MB. Displayed usage also includes decoded CPU pixels. The value persists in `localStorage`.
+- Settings dialog > `Display Cache Budget`: use `Automatic` or choose a fixed retained display residency budget from `64`, `128`, `256`, `512`, or `1024` MB. The memory breakdown also shows decoded pixels, GPU textures, CPU materialized buffers, analysis cache, and total tracked memory. The value persists in `localStorage`.
 - Settings dialog: configure theme, spectrum lattice motion, spectral grouping default, Stokes defaults/visibility, invalid Stokes masking, auto exposure percentile, and image load workers.
 - `View > Image viewer` / `Panorama viewer`: switch between planar image viewing and spherical panorama viewing.
 - `View > Rulers`: toggle pixel rulers in Image viewer.
@@ -330,6 +330,6 @@ Controller methods:
 - EXR metadata is parsed directly from header bytes before pixel decode because the current WASM decoder only exposes dimensions, layers, channels, and pixel data. Metadata parse failures do not block image loading.
 - Performance path for large images/channel sets:
   - channel thumbnail DOM updates are throttled to selection/image changes only,
-  - decoded CPU pixels are tracked in displayed memory usage, while the configurable LRU budget evicts retained display CPU/GPU channel resources with eviction protection limited to the currently bound display channels,
+  - decoded CPU pixels are tracked in displayed memory usage, while the configurable display cache budget evicts retained display textures and materialized display buffers with eviction protection limited to the currently bound display channels,
   - the active display texture buffer is reused across channel and layer switches,
   - GPU upload uses `texSubImage2D` for same-size updates.

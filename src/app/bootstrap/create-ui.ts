@@ -1,4 +1,4 @@
-import { DEFAULT_DISPLAY_CACHE_BUDGET_MB } from '../../display-cache';
+import { createDefaultDisplayCacheBudgetPreference } from '../../display-cache';
 import { serializeChannelThumbnailRequestKey } from '../../channel-thumbnail-keys';
 import { ViewerUi, type UiCallbacks } from '../../ui/viewer-ui';
 import { imageToScreen } from '../../interaction/image-geometry';
@@ -230,8 +230,8 @@ export function createViewerUi({
     ) => {
       getSessionController().reorderSessions(draggedSessionId, targetSessionId, placement);
     },
-    onDisplayCacheBudgetChange: (valueMb) => {
-      getRenderCache().setBudgetMb(valueMb);
+    onDisplayCacheBudgetPreferenceChange: (preference) => {
+      getRenderCache().setBudgetPreference(preference);
     },
     onExposureChange: (value) => {
       core.dispatch({ type: 'exposureSet', exposureEv: value });
@@ -440,7 +440,7 @@ export function createViewerUi({
       });
     },
     onResetSettings: () => {
-      getRenderCache().setBudgetMb(DEFAULT_DISPLAY_CACHE_BUDGET_MB);
+      getRenderCache().setBudgetPreference(createDefaultDisplayCacheBudgetPreference());
       void getDisplayController().resetStokesColormapDefaults();
       getDisplayController().resetStokesParameterVisibility();
       getDisplayController().resetMaskInvalidStokesVectors();

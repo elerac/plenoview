@@ -40,6 +40,8 @@ import type {
 import type { Disposable } from '../lifecycle';
 import type { DesktopCommandId } from '../platform';
 import type { ViewerBackgroundId } from '../viewer-background-settings';
+import type { DisplayCacheBudgetPreference } from '../display-cache';
+import type { MemoryUsageSnapshot } from '../memory/memory-accounting';
 
 export interface ScreenshotSelectionInteractionState {
   active: boolean;
@@ -60,8 +62,8 @@ export interface ViewerRuntimeUi extends Disposable {
   setLoading(loading: boolean, viewerBlocked?: boolean): void;
   setRgbViewLoading(displayBusy: boolean, overlayLoading?: boolean): void;
   setDeferredLoad?(handler: (() => void | Promise<void>) | null): void;
-  setDisplayCacheBudget(mb: number): void;
-  setDisplayCacheUsage(usedBytes: number, budgetBytes: number): void;
+  setDisplayCacheBudget(preference: DisplayCacheBudgetPreference, resolvedBudgetMb: number): void;
+  setDisplayCacheUsage(snapshot: MemoryUsageSnapshot, budgetBytes: number): void;
 
   setViewerViewportRect(rect: ViewportClientRect): void;
   setViewerPaneLayout(layout: ViewerPaneLayoutState): void;

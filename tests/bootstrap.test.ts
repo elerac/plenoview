@@ -452,6 +452,7 @@ vi.mock('../src/services/render-cache-service', () => ({
     readonly discard = vi.fn();
     readonly clear = vi.fn();
     readonly setBudgetMb = vi.fn();
+    readonly setBudgetPreference = vi.fn();
   }
 }));
 

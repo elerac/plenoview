@@ -1,16 +1,23 @@
 import {
-  clampDisplayCacheBudgetMb,
+  collectDisplayCacheBudgetEnvironmentHints,
+  createDefaultDisplayCacheBudgetPreference,
   createSessionResourceEntry,
   displayCacheBudgetMbToBytes,
   estimateDecodedImageBytes,
+  getTrackedDisplayResidencyBytes,
   getTrackedResidentChannelBytes,
-  readStoredDisplayCacheBudgetMb,
-  saveStoredDisplayCacheBudgetMb,
+  normalizeDisplayCacheBudgetPreference,
+  readStoredDisplayCacheBudgetPreference,
+  resolveDisplayCacheBudgetMb,
+  saveStoredDisplayCacheBudgetPreference,
+  type DisplayCacheBudgetHostKind,
+  type DisplayCacheBudgetPreference,
+  type DisplayCacheBudgetResolutionHints,
   type ResidentChannelUpload,
   type ResidentLayerResourceEntry,
   type SessionResourceEntry
 } from '../display-cache';
-import { createMemoryUsageSnapshot, sanitizeByteCount } from '../memory/memory-accounting';
+import { createMemoryUsageSnapshot, sanitizeByteCount, type MemoryUsageSnapshot } from '../memory/memory-accounting';
 import {
   enforceMemoryBudget,
   type EvictionContext,
@@ -23,7 +30,8 @@ import {
 } from '../analysis/auto-exposure';
 import {
   pendingResource,
-  successResource
+  successResource,
+  type AsyncResource
 } from '../async-resource';
 import {
   buildDisplaySourceBinding,
@@ -128,8 +136,8 @@ export interface AutoExposureResolvedEvent {
 }
 
 interface RenderCacheUi {
-  setDisplayCacheBudget: (mb: number) => void;
-  setDisplayCacheUsage: (usedBytes: number, budgetBytes: number) => void;
+  setDisplayCacheBudget: (preference: DisplayCacheBudgetPreference, resolvedBudgetMb: number) => void;
+  setDisplayCacheUsage: (snapshot: MemoryUsageSnapshot, budgetBytes: number) => void;
 }
 
 interface RenderCacheRenderer {
@@ -262,6 +270,9 @@ const DISPLAY_LUMINANCE_RANGE_IDLE_TIMEOUT_MS = 250;
 const DISPLAY_LUMINANCE_RANGE_IDLE_FALLBACK_DELAY_MS = 64;
 const SPECTRAL_RGB_PREWARM_IDLE_TIMEOUT_MS = 500;
 const DEFAULT_ANALYSIS_COMPUTE_CHUNK_SIZE = 32_768;
+const ANALYSIS_CACHE_ENTRY_OVERHEAD_BYTES = 64;
+const ANALYSIS_CACHE_NUMBER_BYTES = Float64Array.BYTES_PER_ELEMENT;
+const ANALYSIS_CACHE_CHAR_BYTES = 2;
 
 export interface RenderCacheServiceDependencies {
   ui: RenderCacheUi;
@@ -272,6 +283,8 @@ export interface RenderCacheServiceDependencies {
   onAutoExposureResolved?: (event: AutoExposureResolvedEvent) => void;
   windowLike?: RenderCacheWindowLike | null;
   analysisChunkSize?: number;
+  displayCacheBudgetHostKind?: DisplayCacheBudgetHostKind | null;
+  displayCacheBudgetHints?: DisplayCacheBudgetResolutionHints;
 }
 
 export class RenderCacheService implements Disposable {
@@ -283,6 +296,7 @@ export class RenderCacheService implements Disposable {
   private readonly onAutoExposureResolved: (event: AutoExposureResolvedEvent) => void;
   private readonly windowLike: RenderCacheWindowLike | null;
   private readonly analysisChunkSize: number;
+  private readonly displayCacheBudgetHints: DisplayCacheBudgetResolutionHints;
 
   private readonly entries = new Map<string, SessionResourceEntry>();
   private readonly pendingDisplayLuminanceRangeJobs = new Map<string, Map<string, PendingDisplayLuminanceRangeJob>>();
@@ -292,7 +306,8 @@ export class RenderCacheService implements Disposable {
   private readonly pendingAutoExposureJobs = new Map<string, Map<string, PendingAutoExposureJob>>();
   private readonly queuedAutoExposureJobs: PendingAutoExposureJob[] = [];
   private readonly abortController = new AbortController();
-  private budgetMb = readStoredDisplayCacheBudgetMb();
+  private budgetPreference = readStoredDisplayCacheBudgetPreference();
+  private budgetMb = 0;
   private boundSessionId: string | null = null;
   private boundLayerIndex: number | null = null;
   private boundChannelNames = new Set<string>();
@@ -321,8 +336,12 @@ export class RenderCacheService implements Disposable {
     this.onAutoExposureResolved = dependencies.onAutoExposureResolved ?? (() => undefined);
     this.windowLike = dependencies.windowLike ?? resolveWindowLike();
     this.analysisChunkSize = normalizeAnalysisChunkSize(dependencies.analysisChunkSize);
+    this.displayCacheBudgetHints = dependencies.displayCacheBudgetHints ??
+      collectDisplayCacheBudgetEnvironmentHints(dependencies.displayCacheBudgetHostKind);
+    this.budgetPreference = normalizeDisplayCacheBudgetPreference(this.budgetPreference);
+    this.budgetMb = resolveDisplayCacheBudgetMb(this.budgetPreference, this.displayCacheBudgetHints);
 
-    this.ui.setDisplayCacheBudget(this.budgetMb);
+    this.ui.setDisplayCacheBudget(this.budgetPreference, this.budgetMb);
     this.syncDisplayCacheUsageUi();
   }
 
@@ -807,19 +826,32 @@ export class RenderCacheService implements Disposable {
       revisionKey,
       successResource(buildSessionResourceKey(session.id, revisionKey), range)
     );
+    this.syncDisplayCacheUsageUi();
     return range;
   }
 
   setBudgetMb(valueMb: number): void {
+    this.setBudgetPreference({
+      mode: 'fixed',
+      fixedMb: valueMb
+    });
+  }
+
+  setBudgetPreference(preference: DisplayCacheBudgetPreference): void {
     if (this.disposed) {
       return;
     }
 
-    this.budgetMb = clampDisplayCacheBudgetMb(valueMb);
+    this.budgetPreference = normalizeDisplayCacheBudgetPreference(preference);
+    this.budgetMb = resolveDisplayCacheBudgetMb(this.budgetPreference, this.displayCacheBudgetHints);
     this.enforceResidencyBudget();
-    saveStoredDisplayCacheBudgetMb(this.budgetMb);
-    this.ui.setDisplayCacheBudget(this.budgetMb);
+    saveStoredDisplayCacheBudgetPreference(this.budgetPreference);
+    this.ui.setDisplayCacheBudget(this.budgetPreference, this.budgetMb);
     this.syncDisplayCacheUsageUi();
+  }
+
+  resetBudgetPreference(): void {
+    this.setBudgetPreference(createDefaultDisplayCacheBudgetPreference());
   }
 
   trackSession(session: OpenedImageSession): void {
@@ -975,6 +1007,7 @@ export class RenderCacheService implements Disposable {
 
           const requestKey = buildSessionResourceKey(job.sessionId, job.revisionKey);
           entry.luminanceRangeByRevision.set(job.revisionKey, successResource(requestKey, range));
+          this.syncDisplayCacheUsageUi();
           this.onDisplayLuminanceRangeResolved({
             requestId: job.requestId,
             requestKey,
@@ -1056,6 +1089,7 @@ export class RenderCacheService implements Disposable {
 
           const requestKey = buildSessionResourceKey(job.sessionId, job.revisionKey);
           entry.imageStatsByRevision.set(job.revisionKey, successResource(requestKey, imageStats));
+          this.syncDisplayCacheUsageUi();
           this.onImageStatsResolved({
             requestId: job.requestId,
             requestKey,
@@ -1139,6 +1173,7 @@ export class RenderCacheService implements Disposable {
 
           const requestKey = buildSessionResourceKey(job.sessionId, job.revisionKey);
           entry.autoExposureByRevision.set(job.revisionKey, successResource(requestKey, autoExposure));
+          this.syncDisplayCacheUsageUi();
           this.onAutoExposureResolved({
             requestId: job.requestId,
             requestKey,
@@ -1453,10 +1488,32 @@ export class RenderCacheService implements Disposable {
   }
 
   private syncDisplayCacheUsageUi(): void {
-    this.ui.setDisplayCacheUsage(
-      createMemoryUsageSnapshot(this.entries.values()).totalTrackedBytes,
-      displayCacheBudgetMbToBytes(this.budgetMb)
-    );
+    this.ui.setDisplayCacheUsage(this.createMemoryUsageSnapshot(), displayCacheBudgetMbToBytes(this.budgetMb));
+  }
+
+  private createMemoryUsageSnapshot(): MemoryUsageSnapshot {
+    return createMemoryUsageSnapshot(this.entries.values(), {
+      analysisCacheBytes: this.estimateAnalysisCacheBytes()
+    });
+  }
+
+  private estimateAnalysisCacheBytes(): number {
+    let bytes = 0;
+    for (const entry of this.entries.values()) {
+      bytes += estimateAnalysisResourceMapBytes(
+        entry.luminanceRangeByRevision.values(),
+        estimateDisplayLuminanceRangeCacheBytes
+      );
+      bytes += estimateAnalysisResourceMapBytes(
+        entry.imageStatsByRevision.values(),
+        estimateImageStatsCacheBytes
+      );
+      bytes += estimateAnalysisResourceMapBytes(
+        entry.autoExposureByRevision.values(),
+        estimateAutoExposureCacheBytes
+      );
+    }
+    return bytes;
   }
 
   private ensureResidentChannels(args: {
@@ -1847,7 +1904,7 @@ export class RenderCacheService implements Disposable {
   } = {}): void {
     const reservedBytes = sanitizeByteCount(options.reservedBytes ?? 0);
     const budgetBytes = displayCacheBudgetMbToBytes(this.budgetMb);
-    const trackedBytes = createMemoryUsageSnapshot(this.entries.values()).totalTrackedBytes;
+    const trackedBytes = getTrackedDisplayResidencyBytes(this.entries.values());
     if (trackedBytes + reservedBytes <= budgetBytes) {
       return;
     }
@@ -2380,6 +2437,47 @@ function normalizeAnalysisChunkSize(value: number | undefined): number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
     ? value
     : DEFAULT_ANALYSIS_COMPUTE_CHUNK_SIZE;
+}
+
+function estimateAnalysisResourceMapBytes<T>(
+  resources: Iterable<AsyncResource<T>>,
+  estimateValueBytes: (value: T) => number
+): number {
+  let bytes = 0;
+  for (const resource of resources) {
+    if (resource.status === 'success') {
+      bytes += ANALYSIS_CACHE_ENTRY_OVERHEAD_BYTES + sanitizeByteCount(estimateValueBytes(resource.value));
+    }
+  }
+  return bytes;
+}
+
+function estimateDisplayLuminanceRangeCacheBytes(value: DisplayLuminanceRange | null): number {
+  return value ? 2 * ANALYSIS_CACHE_NUMBER_BYTES : 0;
+}
+
+function estimateAutoExposureCacheBytes(value: AutoExposureResult | null): number {
+  if (!value) {
+    return 0;
+  }
+
+  return (
+    3 * ANALYSIS_CACHE_NUMBER_BYTES +
+    value.source.length * ANALYSIS_CACHE_CHAR_BYTES
+  );
+}
+
+function estimateImageStatsCacheBytes(value: ImageStats | null): number {
+  if (!value) {
+    return 0;
+  }
+
+  return (
+    3 * ANALYSIS_CACHE_NUMBER_BYTES +
+    value.channels.reduce((total, channel) => {
+      return total + 7 * ANALYSIS_CACHE_NUMBER_BYTES + channel.label.length * ANALYSIS_CACHE_CHAR_BYTES;
+    }, 0)
+  );
 }
 
 function buildSessionResourceKey(sessionId: string, revisionKey: string): string {

@@ -181,7 +181,16 @@ export interface Elements {
   openedFilesList: HTMLElement;
   openedFilesCount: HTMLElement;
   displayCacheControl: HTMLDivElement;
+  displayCacheBudgetModeInput: HTMLSelectElement;
+  displayCacheBudgetFixedRow: HTMLDivElement;
   displayCacheBudgetInput: HTMLSelectElement;
+  displayCacheBudgetBreakdownValue: HTMLElement;
+  displayCacheDecodedPixelsValue: HTMLElement;
+  displayCacheGpuTexturesValue: HTMLElement;
+  displayCacheCpuMaterializedValue: HTMLElement;
+  displayCacheAnalysisCacheValue: HTMLElement;
+  displayCacheInFlightReservationsRow: HTMLDivElement;
+  displayCacheInFlightReservationsValue: HTMLElement;
   displayCacheUsage: HTMLElement;
   reloadAllOpenedImagesButton: HTMLButtonElement;
   closeAllOpenedImagesButton: HTMLButtonElement;
@@ -269,7 +278,16 @@ export type OpenedImagesPanelElements = Pick<
   | 'openedFilesCount'
   | 'viewerContainer'
   | 'displayCacheControl'
+  | 'displayCacheBudgetModeInput'
+  | 'displayCacheBudgetFixedRow'
   | 'displayCacheBudgetInput'
+  | 'displayCacheBudgetBreakdownValue'
+  | 'displayCacheDecodedPixelsValue'
+  | 'displayCacheGpuTexturesValue'
+  | 'displayCacheCpuMaterializedValue'
+  | 'displayCacheAnalysisCacheValue'
+  | 'displayCacheInFlightReservationsRow'
+  | 'displayCacheInFlightReservationsValue'
   | 'displayCacheUsage'
   | 'reloadAllOpenedImagesButton'
   | 'closeAllOpenedImagesButton'
@@ -739,7 +757,16 @@ export function resolveElements(): Elements {
     openedFilesList: requireElement('opened-files-list', HTMLElement),
     openedFilesCount: requireElement('opened-files-count', HTMLElement),
     displayCacheControl: requireElement('display-cache-control', HTMLDivElement),
+    displayCacheBudgetModeInput: requireElement('display-cache-budget-mode-input', HTMLSelectElement),
+    displayCacheBudgetFixedRow: requireElement('display-cache-budget-fixed-row', HTMLDivElement),
     displayCacheBudgetInput: requireElement('display-cache-budget-input', HTMLSelectElement),
+    displayCacheBudgetBreakdownValue: requireElement('display-cache-budget-breakdown-value', HTMLElement),
+    displayCacheDecodedPixelsValue: requireElement('display-cache-decoded-pixels-value', HTMLElement),
+    displayCacheGpuTexturesValue: requireElement('display-cache-gpu-textures-value', HTMLElement),
+    displayCacheCpuMaterializedValue: requireElement('display-cache-cpu-materialized-value', HTMLElement),
+    displayCacheAnalysisCacheValue: requireElement('display-cache-analysis-cache-value', HTMLElement),
+    displayCacheInFlightReservationsRow: requireElement('display-cache-in-flight-reservations-row', HTMLDivElement),
+    displayCacheInFlightReservationsValue: requireElement('display-cache-in-flight-reservations-value', HTMLElement),
     displayCacheUsage: requireElement('display-cache-usage', HTMLElement),
     reloadAllOpenedImagesButton: requireElement('reload-all-opened-images-button', HTMLButtonElement),
     closeAllOpenedImagesButton: requireElement('close-all-opened-images-button', HTMLButtonElement),

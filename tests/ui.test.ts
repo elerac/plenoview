@@ -19,7 +19,12 @@ import {
   ProgressiveLoadingOverlayDisclosure,
   type LoadingOverlayPhase
 } from '../src/ui/loading-overlay-disclosure';
-import { formatDisplayCacheUsageText, getDisplayCacheUsageState } from '../src/ui/opened-images-panel';
+import {
+  formatDisplayCacheBudgetLabel,
+  formatDisplayCacheUsageText,
+  getDisplayCacheMemoryUsageState,
+  getDisplayCacheUsageState
+} from '../src/ui/opened-images-panel';
 import { type PanelSplitMetrics } from '../src/ui/panel-layout-types';
 import { formatProbeCoordinates } from '../src/ui/probe-readout';
 import { getListboxOptionIndexAtClientY } from '../src/ui/render-helpers';
@@ -4043,7 +4048,7 @@ describe('view menu', () => {
       'auto-exposure-percentile-input'
     ) as HTMLInputElement;
     const imageLoadWorkersInput = document.getElementById('image-load-workers-input') as HTMLInputElement;
-    const budgetInput = document.getElementById('display-cache-budget-input') as HTMLSelectElement;
+    const budgetModeInput = document.getElementById('display-cache-budget-mode-input') as HTMLSelectElement;
     const resetSettingsButton = document.getElementById('reset-settings-button') as HTMLButtonElement;
     const closeButton = document.getElementById('settings-dialog-close-button') as HTMLButtonElement;
     const focusableSettingsControls = Array.from(
@@ -4093,7 +4098,7 @@ describe('view menu', () => {
       normalizedZeroCenter,
       autoExposurePercentileInput,
       imageLoadWorkersInput,
-      budgetInput,
+      budgetModeInput,
       resetSettingsButton,
       closeButton
     ]);
@@ -7978,14 +7983,131 @@ describe('display cache UI helpers', () => {
     });
   });
 
-  it('describes the usage tooltip as decoded plus retained CPU/GPU residency', () => {
+  it('marks the memory snapshot state from retained display residency only', () => {
+    expect(getDisplayCacheMemoryUsageState({
+      decodedBytes: 400,
+      gpuTextureBytes: 40,
+      cpuMaterializedBytes: 20,
+      analysisCacheBytes: 10,
+      totalTrackedBytes: 470,
+      activeReservationBytes: 0
+    }, 64)).toEqual({
+      retainedDisplayBytes: 60,
+      totalTrackedBytes: 470,
+      overBudget: false
+    });
+  });
+
+  it('formats display cache budget mode labels', () => {
+    expect(formatDisplayCacheBudgetLabel({ mode: 'automatic', fixedMb: 256 }, 512 * 1024 * 1024)).toBe(
+      'Automatic (512 MB)'
+    );
+    expect(formatDisplayCacheBudgetLabel({ mode: 'fixed', fixedMb: 128 }, 128 * 1024 * 1024)).toBe(
+      'Fixed (128 MB)'
+    );
+  });
+
+  it('renders Automatic mode and the memory snapshot breakdown in Settings', () => {
     installUiFixture();
 
     const ui = new ViewerUi(createUiCallbacks());
-    ui.setDisplayCacheUsage(64 * 1024 * 1024, 256 * 1024 * 1024);
+    ui.setDisplayCacheBudget({ mode: 'automatic', fixedMb: 256 }, 512);
+    ui.setDisplayCacheUsage({
+      decodedBytes: 10 * 1024 * 1024,
+      gpuTextureBytes: 20 * 1024 * 1024,
+      cpuMaterializedBytes: 30 * 1024 * 1024,
+      analysisCacheBytes: 1 * 1024 * 1024,
+      totalTrackedBytes: 61 * 1024 * 1024,
+      activeReservationBytes: 0
+    }, 512 * 1024 * 1024);
+
+    const modeInput = document.getElementById('display-cache-budget-mode-input') as HTMLSelectElement;
+    const fixedRow = document.getElementById('display-cache-budget-fixed-row') as HTMLDivElement;
+    const fixedInput = document.getElementById('display-cache-budget-input') as HTMLSelectElement;
+
+    expect(modeInput.value).toBe('automatic');
+    expect(fixedRow.classList.contains('hidden')).toBe(true);
+    expect(fixedInput.disabled).toBe(true);
+    expect(document.getElementById('display-cache-explanation')?.textContent?.trim()).toBe(
+      'The display cache budget limits retained display textures and materialized display buffers. Decoded image pixels and browser/GPU overhead may exceed this value.'
+    );
+    expect(document.getElementById('display-cache-budget-breakdown-value')?.textContent).toBe('Automatic (512 MB)');
+    expect(document.getElementById('display-cache-decoded-pixels-value')?.textContent).toBe('10.0 MB');
+    expect(document.getElementById('display-cache-gpu-textures-value')?.textContent).toBe('20.0 MB');
+    expect(document.getElementById('display-cache-cpu-materialized-value')?.textContent).toBe('30.0 MB');
+    expect(document.getElementById('display-cache-analysis-cache-value')?.textContent).toBe('1.0 MB');
+    expect(document.getElementById('display-cache-in-flight-reservations-row')?.classList.contains('hidden')).toBe(
+      true
+    );
+    expect(document.getElementById('display-cache-usage')?.textContent).toBe('61.0 MB');
+  });
+
+  it('renders and dispatches Fixed display cache budget preferences', () => {
+    installUiFixture();
+
+    const onDisplayCacheBudgetPreferenceChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onDisplayCacheBudgetPreferenceChange }));
+    const modeInput = document.getElementById('display-cache-budget-mode-input') as HTMLSelectElement;
+    const fixedRow = document.getElementById('display-cache-budget-fixed-row') as HTMLDivElement;
+    const fixedInput = document.getElementById('display-cache-budget-input') as HTMLSelectElement;
+
+    modeInput.value = 'fixed';
+    modeInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onDisplayCacheBudgetPreferenceChange).toHaveBeenLastCalledWith({
+      mode: 'fixed',
+      fixedMb: 256
+    });
+
+    ui.setDisplayCacheBudget({ mode: 'fixed', fixedMb: 128 }, 128);
+
+    expect(fixedRow.classList.contains('hidden')).toBe(false);
+    expect(fixedInput.disabled).toBe(false);
+    expect(fixedInput.value).toBe('128');
+
+    fixedInput.value = '512';
+    fixedInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onDisplayCacheBudgetPreferenceChange).toHaveBeenLastCalledWith({
+      mode: 'fixed',
+      fixedMb: 512
+    });
+  });
+
+  it('shows in-flight reservations only when the snapshot reports them', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setDisplayCacheUsage({
+      decodedBytes: 0,
+      gpuTextureBytes: 0,
+      cpuMaterializedBytes: 0,
+      analysisCacheBytes: 0,
+      totalTrackedBytes: 0,
+      activeReservationBytes: 2 * 1024 * 1024
+    }, 256 * 1024 * 1024);
+
+    expect(document.getElementById('display-cache-in-flight-reservations-row')?.classList.contains('hidden')).toBe(
+      false
+    );
+    expect(document.getElementById('display-cache-in-flight-reservations-value')?.textContent).toBe('2.0 MB');
+  });
+
+  it('describes the usage tooltip as total tracked memory versus display cache budget', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setDisplayCacheUsage({
+      decodedBytes: 64 * 1024 * 1024,
+      gpuTextureBytes: 0,
+      cpuMaterializedBytes: 0,
+      analysisCacheBytes: 0,
+      totalTrackedBytes: 64 * 1024 * 1024,
+      activeReservationBytes: 0
+    }, 256 * 1024 * 1024);
 
     expect(document.getElementById('display-cache-usage')?.getAttribute('title')).toBe(
-      'Decoded + retained CPU/GPU residency: 64.0 MB / 256.0 MB'
+      'Total tracked memory: 64.0 MB; Display cache budget: 256.0 MB'
     );
   });
 });
@@ -11728,7 +11850,7 @@ function createUiCallbacksBase() {
     onOpenedImageAssignedToViewerPane: () => {},
     onOpenedImageDisplayNameChange: () => {},
     onReorderOpenedImage: () => {},
-    onDisplayCacheBudgetChange: () => {},
+    onDisplayCacheBudgetPreferenceChange: () => {},
     onExposureChange: () => {},
     onExposureCommit: () => {},
     onDisplayGammaChange: () => {},

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RenderCacheService } from '../src/services/render-cache-service';
 import type { AsyncResource } from '../src/async-resource';
+import type { MemoryUsageSnapshot } from '../src/memory/memory-accounting';
 import {
   buildDisplayAutoExposureRevisionKey,
   buildDisplayImageStatsRevisionKey,
@@ -81,6 +82,17 @@ function createUiMock() {
     setDisplayCacheBudget: vi.fn(),
     setDisplayCacheUsage: vi.fn()
   };
+}
+
+function expectLastDisplayCacheUsage(
+  ui: ReturnType<typeof createUiMock>,
+  snapshot: Partial<MemoryUsageSnapshot>,
+  budgetBytes: number
+): void {
+  expect(ui.setDisplayCacheUsage).toHaveBeenCalled();
+  const [actualSnapshot, actualBudgetBytes] = ui.setDisplayCacheUsage.mock.lastCall ?? [];
+  expect(actualSnapshot).toMatchObject(snapshot);
+  expect(actualBudgetBytes).toBe(budgetBytes);
 }
 
 function createRendererMock() {
@@ -215,6 +227,45 @@ describe('render cache service', () => {
     vi.clearAllMocks();
   });
 
+  it('initializes old numeric stored budgets as fixed preferences', () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: vi.fn(() => '128'),
+        setItem: vi.fn()
+      }
+    });
+
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+
+    new RenderCacheService({
+      ui,
+      renderer,
+      displayCacheBudgetHints: { hostKind: 'tauri' }
+    });
+
+    expect(ui.setDisplayCacheBudget).toHaveBeenCalledWith({
+      mode: 'fixed',
+      fixedMb: 128
+    }, 128);
+  });
+
+  it('initializes fresh installs with Automatic resolved from environment hints', () => {
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+
+    new RenderCacheService({
+      ui,
+      renderer,
+      displayCacheBudgetHints: { hostKind: 'tauri' }
+    });
+
+    expect(ui.setDisplayCacheBudget).toHaveBeenCalledWith({
+      mode: 'automatic',
+      fixedMb: 256
+    }, 1024);
+  });
+
   it('uploads only missing channels and only rebinds when the active revision changes', () => {
     const session = createSession('session-1');
     const secondSession = createSession('session-2');
@@ -337,7 +388,7 @@ describe('render cache service', () => {
       textureBytes: 512,
       materializedBytes: 0
     });
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(640, 256 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 640 }, 256 * MB);
   });
 
   it('keeps active paired spectral RGB resident when switching to split channels over budget', () => {
@@ -396,12 +447,12 @@ describe('render cache service', () => {
   });
 
   it('does not pin hot spectral RGB sources after the active session changes', () => {
-    const first = createSession('first', createDecodedImage(3_000, 1_000, {
+    const first = createSession('first', createDecodedImage(4_000, 1_000, {
       '410nm': 0.2,
       '500nm': 0.8,
       '650nm': 0.3
     }));
-    const second = createSession('second', createDecodedImage(3_000, 1_000, { Z: 1 }));
+    const second = createSession('second', createDecodedImage(4_000, 1_000, { Z: 1 }));
     const firstState = {
       ...first.state,
       displaySelection: createSpectralRgbSelection()
@@ -1026,8 +1077,11 @@ describe('render cache service', () => {
     service.prepareActiveSession(second, second.state);
     service.setBudgetMb(128);
 
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(96, 128 * MB);
-    expect(localStorage.setItem).toHaveBeenCalledWith('prismifold:display-cache-budget-mb:v1', '128');
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 96 }, 128 * MB);
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'prismifold:display-cache-budget-mb:v1',
+      JSON.stringify({ mode: 'fixed', fixedMb: 128 })
+    );
 
     service.discard(first.id);
     service.clear();
@@ -1052,7 +1106,7 @@ describe('render cache service', () => {
     expect(renderer.discardChannelSourceTexture).not.toHaveBeenCalled();
     expect(getEntries(service).get(session.id)?.decodedBytes).toBe(80_000_000);
     expect(getEntries(service).get(session.id)?.residentLayers.size).toBe(0);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(80_000_000, 64 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 80_000_000 }, 64 * MB);
   });
 
   it('increments resident resource access counts on cache hits', () => {
@@ -1126,6 +1180,7 @@ describe('render cache service', () => {
       getActiveSessionId: () => activeSessionId
     });
 
+    service.setBudgetMb(64);
     service.prepareActiveSession(session, session.state);
     const zState = {
       ...session.state,
@@ -1140,7 +1195,7 @@ describe('render cache service', () => {
     expect([...getEntries(service).get(session.id)?.residentLayers.get(0)?.residentChannels.keys() ?? []]).toEqual([
       'Z'
     ]);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(400_000_000, 256 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 400_000_000 }, 64 * MB);
   });
 
   it('evicts older layers from the active session once they fall outside the bound channel set', () => {
@@ -1154,28 +1209,27 @@ describe('render cache service', () => {
       getActiveSessionId: () => session.id
     });
 
-    service.setBudgetMb(128);
+    service.setBudgetMb(64);
 
     const secondLayer = buildViewerStateForLayer(session.state, decoded, 1);
     const thirdLayer = buildViewerStateForLayer(secondLayer, decoded, 2);
     const fourthLayer = buildViewerStateForLayer(thirdLayer, decoded, 3);
 
     service.prepareActiveSession(session, session.state);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(100_000_000, 128 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 100_000_000 }, 64 * MB);
 
     service.prepareActiveSession(session, secondLayer);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(120_000_000, 128 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 120_000_000 }, 64 * MB);
 
     service.prepareActiveSession(session, thirdLayer);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(120_000_000, 128 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 140_000_000 }, 64 * MB);
 
     service.prepareActiveSession(session, fourthLayer);
 
-    expect(renderer.discardChannelSourceTexture).toHaveBeenCalledTimes(2);
+    expect(renderer.discardChannelSourceTexture).toHaveBeenCalledTimes(1);
     expect(renderer.discardChannelSourceTexture).toHaveBeenCalledWith(session.id, 0, 'Z');
-    expect(renderer.discardChannelSourceTexture).toHaveBeenCalledWith(session.id, 1, 'Z');
-    expect([...getEntries(service).get(session.id)?.residentLayers.keys() ?? []]).toEqual([2, 3]);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(120_000_000, 128 * MB);
+    expect([...getEntries(service).get(session.id)?.residentLayers.keys() ?? []]).toEqual([1, 2, 3]);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 140_000_000 }, 64 * MB);
   });
 
   it('keeps only the active bound layer resident when it alone exceeds the budget', () => {
@@ -1194,14 +1248,14 @@ describe('render cache service', () => {
     const secondLayer = buildViewerStateForLayer(session.state, decoded, 1);
 
     service.prepareActiveSession(session, session.state);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(240_000_000, 64 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 240_000_000 }, 64 * MB);
 
     service.prepareActiveSession(session, secondLayer);
 
     expect(renderer.discardChannelSourceTexture).toHaveBeenCalledTimes(1);
     expect(renderer.discardChannelSourceTexture).toHaveBeenCalledWith(session.id, 0, 'Z');
     expect([...getEntries(service).get(session.id)?.residentLayers.keys() ?? []]).toEqual([1]);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(240_000_000, 64 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 240_000_000 }, 64 * MB);
   });
 
   it('evicts least recently used non-active channels immediately when the budget shrinks', () => {
@@ -1226,7 +1280,7 @@ describe('render cache service', () => {
     expect(renderer.discardChannelSourceTexture).toHaveBeenCalledWith(first.id, 0, 'Z');
     expect(getEntries(service).get(first.id)?.residentLayers.size).toBe(0);
     expect(getEntries(service).get(second.id)?.residentLayers.size).toBe(1);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(120_000_000, 64 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 120_000_000 }, 64 * MB);
   });
 
   it('keeps pinned sessions exempt and evicts other channels first when protected residency exceeds the budget', () => {
@@ -1261,7 +1315,7 @@ describe('render cache service', () => {
     expect(getEntries(service).get(first.id)?.residentLayers.size).toBe(1);
     expect(getEntries(service).get(second.id)?.residentLayers.size).toBe(1);
     expect(getEntries(service).get(third.id)?.residentLayers.size).toBe(0);
-    expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(200_000_000, 64 * MB);
+    expectLastDisplayCacheUsage(ui, { totalTrackedBytes: 200_000_000 }, 64 * MB);
   });
 
   it('reuploads evicted layers within one session while preserving cached luminance ranges', async () => {

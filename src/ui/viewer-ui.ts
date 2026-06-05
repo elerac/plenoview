@@ -43,6 +43,8 @@ import {
 } from './loading-overlay-disclosure';
 import { OpenedImagesPanel } from './opened-images-panel';
 import { DisposableBag, type Disposable } from '../lifecycle';
+import type { DisplayCacheBudgetPreference } from '../display-cache';
+import type { MemoryUsageSnapshot } from '../memory/memory-accounting';
 import type { ColormapLut } from '../colormaps';
 import type { ExportImagePixels } from '../export/export-pixels';
 import {
@@ -313,7 +315,7 @@ export interface UiCallbacks {
     targetSessionId: string,
     placement: OpenedImageDropPlacement
   ) => void;
-  onDisplayCacheBudgetChange: (mb: number) => void;
+  onDisplayCacheBudgetPreferenceChange: (preference: DisplayCacheBudgetPreference) => void;
   onExposureChange: (value: number) => void;
   onExposureCommit: () => void;
   onDisplayGammaChange: (value: number) => void;
@@ -489,8 +491,8 @@ export class ViewerUi implements Disposable {
       onReorderOpenedImage: (draggedSessionId, targetSessionId, placement) => {
         this.callbacks.onReorderOpenedImage(draggedSessionId, targetSessionId, placement);
       },
-      onDisplayCacheBudgetChange: (mb) => {
-        this.callbacks.onDisplayCacheBudgetChange(mb);
+      onDisplayCacheBudgetPreferenceChange: (preference) => {
+        this.callbacks.onDisplayCacheBudgetPreferenceChange(preference);
       },
       onReloadSelectedOpenedImage: (sessionId) => {
         this.callbacks.onReloadSelectedOpenedImage(sessionId);
@@ -1011,20 +1013,20 @@ export class ViewerUi implements Disposable {
     this.updateLoadingOverlayVisibility();
   }
 
-  setDisplayCacheBudget(mb: number): void {
+  setDisplayCacheBudget(preference: DisplayCacheBudgetPreference, resolvedBudgetMb: number): void {
     if (this.disposed) {
       return;
     }
 
-    this.openedImagesPanel.setDisplayCacheBudget(mb);
+    this.openedImagesPanel.setDisplayCacheBudget(preference, resolvedBudgetMb);
   }
 
-  setDisplayCacheUsage(usedBytes: number, budgetBytes: number): void {
+  setDisplayCacheUsage(snapshot: MemoryUsageSnapshot, budgetBytes: number): void {
     if (this.disposed) {
       return;
     }
 
-    this.openedImagesPanel.setDisplayCacheUsage(usedBytes, budgetBytes);
+    this.openedImagesPanel.setDisplayCacheUsage(snapshot, budgetBytes);
   }
 
   setTheme(theme: ThemeId, persist = true): void {

@@ -903,13 +903,32 @@ output {
   gap: 7px;
 }
 
+.app-menu-setting-row--fit-control {
+  grid-template-columns: max-content auto;
+}
+
 .app-menu-setting-row .app-menu-setting-input {
   width: 100%;
   min-width: 0;
   padding: 4px 6px;
 }
 
+.app-menu-setting-row--fit-control .app-menu-setting-input {
+  width: auto;
+}
+
+#display-cache-budget-mode-input {
+  min-width: calc(9ch + 3rem);
+}
+
 .app-menu-setting-unit {
+  color: var(--text-dim);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line-height);
+}
+
+.app-menu-setting-help {
+  margin: 0;
   color: var(--text-dim);
   font-size: var(--type-label-size);
   line-height: var(--type-label-line-height);
@@ -924,6 +943,34 @@ output {
 
 .app-menu-setting-group.is-over-budget .app-menu-setting-value {
   color: #ffb0aa;
+}
+
+.display-cache-breakdown {
+  display: grid;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.display-cache-breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  color: var(--text-dim);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line-height);
+}
+
+.display-cache-breakdown-row--total {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.display-cache-breakdown-row--total .app-menu-setting-value {
+  color: var(--text);
 }
 
 .app-menu-setting-action {
