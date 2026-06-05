@@ -633,6 +633,23 @@ main {
   overflow-wrap: anywhere;
 }
 
+.gallery-code-frame .syntax-punctuation {
+  color: #64748b;
+}
+
+.gallery-code-frame .syntax-tag {
+  color: #075985;
+  font-weight: 600;
+}
+
+.gallery-code-frame .syntax-attribute {
+  color: #9a3412;
+}
+
+.gallery-code-frame .syntax-string {
+  color: #166534;
+}
+
 .gallery-live-embed-frame {
   min-width: 0;
 }

@@ -465,6 +465,9 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   await expect(embedCode).toContainText('src="cbox_rgb.exr"');
   await expect(embedCode).not.toContainText('name=');
   await expect(embedCode).toContainText('height="360"');
+  await expect(embedCode.locator('.syntax-tag')).toHaveCount(4);
+  await expect(embedCode.locator('.syntax-attribute')).toHaveCount(3);
+  await expect(embedCode.locator('.syntax-string')).toHaveCount(3);
   const liveEmbed = htmlEmbedItem.locator('.gallery-live-embed-frame prismifold-viewer');
   await expect(liveEmbed).toHaveAttribute('src', 'cbox_rgb.exr');
   await expect(liveEmbed).not.toHaveAttribute('name');
