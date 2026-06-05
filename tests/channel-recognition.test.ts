@@ -298,6 +298,12 @@ describe('channel recognition', () => {
       '400nm',
       '500nm'
     ];
+    const depthAndSpectral = [
+      '400nm',
+      '500nm',
+      'Z',
+      'depth.Z'
+    ];
     const uvAndSpectral = [
       'motion.U',
       'motion.V',
@@ -310,10 +316,20 @@ describe('channel recognition', () => {
       'groupXYZ:Position',
       'groupXYZ:vector'
     ]);
+    expect(visibleKeys(depthAndSpectral)).toEqual([
+      'spectralRgb:',
+      'channel:Z',
+      'channel:depth.Z'
+    ]);
+    expect(visibleKeys(['400nm', '500nm', 'mask'])).toEqual([
+      'channel:mask',
+      'spectralRgb:'
+    ]);
     expect(defaultSelectionKey(['Position.X', 'Position.Y', 'Position.Z', '400nm', '500nm']))
       .toBe('spectralRgb:');
     expect(defaultSelectionKey(['vector.X', 'vector.Y', 'vector.Z', '400nm', '500nm']))
       .toBe('spectralRgb:');
+    expect(defaultSelectionKey(['400nm', '500nm', 'Z'])).toBe('spectralRgb:');
     expect(defaultSelectionKey(['vector.X', 'vector.Y', 'vector.Z', 'Y'])).toBe(
       'channelRgb:vector.X:vector.Y:vector.Z:'
     );

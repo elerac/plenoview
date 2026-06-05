@@ -49,6 +49,7 @@ import {
   compileChannelRecognitionNameRules,
   parseAlphaChannelNameWithRules,
   parseComponentChannelNameWithRules,
+  parseDepthMapChannelNameWithRules,
   parseNormalMapChannelNameWithRules,
   type ChannelRecognitionNameRules,
   type CompiledChannelRecognitionNameRules
@@ -234,6 +235,7 @@ const NORMAL_MAP_SOURCE_ORDER_BASE = 100_000;
 const COMPONENT_SOURCE_ORDER_BASE = 200_000;
 const SINGLE_SOURCE_ORDER_BASE = 500_000;
 const SPECTRAL_SOURCE_ORDER_BASE = 1_000_000;
+const DEFERRED_DEPTH_SINGLE_SOURCE_ORDER_BASE = 1_050_000;
 const DEFERRED_XYZ_COMPONENT_SOURCE_ORDER_BASE = 1_100_000;
 const STOKES_SOURCE_ORDER_BASE = 2_000_000;
 const MUELLER_SOURCE_ORDER_BASE = 3_000_000;
@@ -299,6 +301,8 @@ export function recognizeLayerChannels(
   const groupedDisplays = [...normalMapGroups, ...componentGroups];
   const spectralRecognition = buildSpectralSeriesCandidates(names, settings, nameRules);
   const deferGenericXyzGroups = spectralRecognition.candidates.length > 0;
+  const deferDepthSingleChannels = spectralRecognition.candidates.length > 0 &&
+    isRecognitionSettingEnabled(settings, 'depth.map');
   const splitSingleCandidates = buildSplitSingleChannelCandidates(
     names,
     groupedDisplays,
@@ -306,7 +310,8 @@ export function recognizeLayerChannels(
     includeAlphaCompanions,
     nameRules,
     alphaLookup,
-    deferGenericXyzGroups
+    deferGenericXyzGroups,
+    deferDepthSingleChannels
   );
   const mergedSingleCandidates = buildMergedSingleChannelCandidates(
     names,
@@ -314,7 +319,8 @@ export function recognizeLayerChannels(
     spectralRecognition.parentKeyByChannel,
     includeAlphaCompanions,
     nameRules,
-    alphaLookup
+    alphaLookup,
+    deferDepthSingleChannels
   );
 
   return {
@@ -666,7 +672,8 @@ function buildMergedSingleChannelCandidates(
   spectralParentKeyByChannel: ReadonlyMap<string, string>,
   includeAlphaCompanions: boolean,
   nameRules: CompiledChannelRecognitionNameRules,
-  alphaLookup: AlphaChannelLookup
+  alphaLookup: AlphaChannelLookup,
+  deferDepthSingleChannels = false
 ): SingleChannelCandidate[] {
   const groupedComponentChannels = new Set<string>();
   const consumedAlphaChannels = new Set<string>();
@@ -723,10 +730,16 @@ function buildMergedSingleChannelCandidates(
     }
 
     singleChannelOptions.add(channelName);
+    const sourceOrder = getSingleChannelSourceOrder(
+      channelName,
+      candidates.length,
+      nameRules,
+      deferDepthSingleChannels
+    );
     candidates.push(buildSingleChannelCandidate({
       channelName,
       selection,
-      sourceOrder: SINGLE_SOURCE_ORDER_BASE + candidates.length,
+      sourceOrder,
       merged: true,
       split: false,
       mergedParentKey: null,
@@ -747,7 +760,8 @@ function buildSplitSingleChannelCandidates(
   includeAlphaCompanions: boolean,
   nameRules: CompiledChannelRecognitionNameRules,
   alphaLookup: AlphaChannelLookup,
-  deferGenericXyzGroups = false
+  deferGenericXyzGroups = false,
+  deferDepthSingleChannels = false
 ): SingleChannelCandidate[] {
   const candidates: SingleChannelCandidate[] = [];
   const singleChannelOptions = new Set<string>();
@@ -805,7 +819,11 @@ function buildSplitSingleChannelCandidates(
     const mergedParentKey = parentKeyByGroupedChannel.get(channelName)
       ?? spectralParentKeyByChannel.get(channelName)
       ?? alphaParentKey;
-    pushSplitCandidate(channelName, mergedParentKey, SINGLE_SOURCE_ORDER_BASE + index);
+    pushSplitCandidate(
+      channelName,
+      mergedParentKey,
+      getSingleChannelSourceOrder(channelName, index, nameRules, deferDepthSingleChannels)
+    );
   });
 
   return candidates;
@@ -1298,6 +1316,18 @@ function orderSingleChannelNames(channelNames: readonly string[]): string[] {
         : left.index - right.index;
     })
     .map(({ channelName }) => channelName);
+}
+
+function getSingleChannelSourceOrder(
+  channelName: string,
+  orderIndex: number,
+  nameRules: CompiledChannelRecognitionNameRules,
+  deferDepthSingleChannels: boolean
+): number {
+  const base = deferDepthSingleChannels && parseDepthMapChannelNameWithRules(channelName, nameRules)
+    ? DEFERRED_DEPTH_SINGLE_SOURCE_ORDER_BASE
+    : SINGLE_SOURCE_ORDER_BASE;
+  return base + orderIndex;
 }
 
 function isExactYChannel(channelName: string): boolean {

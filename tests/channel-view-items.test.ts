@@ -111,7 +111,7 @@ describe('channel view items', () => {
     ]);
   });
 
-  it('places spectral RGB before generic XYZ and Position channel view items while keeping UV ahead', () => {
+  it('places spectral RGB before generic XYZ, Position, and depth Z channel view items while keeping UV ahead', () => {
     const channelNames = [
       'Position.X',
       'Position.Y',
@@ -124,7 +124,9 @@ describe('channel view items', () => {
       '400nm',
       '500nm'
     ];
+    const depthChannelNames = ['400nm', '500nm', 'Z', 'depth.Z', 'mask'];
     const items = buildChannelViewItems(channelNames);
+    const depthItems = buildChannelViewItems(depthChannelNames);
 
     expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual([
       'groupUV:motion',
@@ -143,6 +145,12 @@ describe('channel view items', () => {
       'channel:vector.X',
       'channel:vector.Y',
       'channel:vector.Z'
+    ]);
+    expect(selectVisibleChannelViewItems(depthItems, false).map((item) => item.value)).toEqual([
+      'channel:mask',
+      'spectralRgb:',
+      'channel:Z',
+      'channel:depth.Z'
     ]);
   });
 
