@@ -186,6 +186,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   expect(sitemapResponse.ok()).toBe(true);
   const sitemapXml = await sitemapResponse.text();
   expect(sitemapXml).toContain(`<loc>${PROJECT_PAGE_URL}</loc>`);
+  expect(sitemapXml).toContain('<loc>https://elerac.github.io/prismifold/embed/</loc>');
   expect(sitemapXml).not.toContain('/app/');
 
   const brandIcon = page.locator('.brand-mark');
@@ -210,14 +211,16 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   await expect(heroAppLink).toHaveAttribute('href', 'app/');
   await expect(heroAppLink).toHaveAttribute('target', '_blank');
   await expect(heroAppLink).toHaveAttribute('rel', 'noopener');
-  const heroDownloadLink = page.getByRole('link', { name: 'Download Desktop', exact: true }).first();
-  await expect(heroDownloadLink).toBeVisible();
-  await expect(heroDownloadLink).toHaveAttribute('href', '#downloads');
+  await expect(page.getByRole('link', { name: 'Download Desktop', exact: true })).toHaveCount(0);
+  const heroEmbedLink = page.locator('.hero-actions').getByRole('link', { name: 'Embed', exact: true });
+  await expect(heroEmbedLink).toBeVisible();
+  await expect(heroEmbedLink).toHaveAttribute('href', 'embed/');
   await expect(page.getByRole('link', { name: 'Downloads', exact: true }).first()).toHaveAttribute(
     'href',
     '#downloads'
   );
   await expect(page.getByRole('link', { name: 'Gallery', exact: true })).toHaveAttribute('href', '#gallery');
+  await expect(page.locator('.site-nav').getByRole('link', { name: 'Embed', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Guidance', exact: true })).toHaveAttribute('href', '#openexr-io');
 
   const preview = page.getByRole('img', { name: /Prismifold interface/ });
@@ -442,7 +445,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   await expect(htmlEmbedItem).toHaveCount(1);
   await expect(htmlEmbedItem.locator('img')).toHaveCount(0);
   await expect(htmlEmbedItem.getByText(
-    'Add the hosted JavaScript file and a <prismifold-viewer> tag to publish an interactive OpenEXR viewer directly inside HTML pages.',
+    'Add the hosted JavaScript file and an HTML tag to publish an interactive viewer directly inside HTML pages.',
     { exact: true }
   )).toBeVisible();
   await expect(htmlEmbedItem.locator('figcaption .gallery-code-frame')).toHaveCount(1);
@@ -472,6 +475,10 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   await expect(liveEmbed).toHaveAttribute('src', 'cbox_rgb.exr');
   await expect(liveEmbed).not.toHaveAttribute('name');
   await expect(liveEmbed).toHaveAttribute('height', '360');
+  await expect(htmlEmbedItem.getByRole('link', { name: 'Open Embed Guide', exact: true })).toHaveAttribute(
+    'href',
+    'embed/'
+  );
   await htmlEmbedItem.scrollIntoViewIfNeeded();
   const liveEmbedFrame = htmlEmbedItem.locator('prismifold-viewer iframe');
   await expect(liveEmbedFrame).toBeVisible({ timeout: 30000 });

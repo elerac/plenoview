@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Embed Prismifold OpenEXR viewers in HTML pages with the prismifold-viewer web component, declarative attributes, deferred loading, channel panels, and the JavaScript API."
+    />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="application-name" content="Prismifold" />
+    <link rel="canonical" href="https://elerac.github.io/prismifold/embed/" />
+    <link rel="icon" type="image/png" href="../project-page/app-icon.png" />
+    <link rel="apple-touch-icon" href="../project-page/app-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Prismifold" />
+    <meta property="og:title" content="Prismifold Embed Guide" />
+    <meta
+      property="og:description"
+      content="Embed interactive OpenEXR viewers in HTML pages with Prismifold."
+    />
+    <meta property="og:url" content="https://elerac.github.io/prismifold/embed/" />
+    <meta property="og:image" content="https://elerac.github.io/prismifold/project-page/social-preview.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Luminous glass prism splitting RGB light beams on a dark technical viewer backdrop"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Prismifold Embed Guide" />
+    <meta
+      name="twitter:description"
+      content="Embed interactive OpenEXR viewers in HTML pages with Prismifold."
+    />
+    <meta name="twitter:image" content="https://elerac.github.io/prismifold/project-page/social-preview.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="Luminous glass prism splitting RGB light beams on a dark technical viewer backdrop"
+    />
+    <title>Prismifold Embed Guide | OpenEXR Image Viewer</title>
+    <script src="prismifold.js"></script>
+    <script type="module" src="/src/embed-page.ts"></script>
+  </head>
+  <body>
+    <div class="intro-shell">
+      <header class="site-header" aria-label="Embed guide navigation">
+        <a class="brand-link" href="../" aria-label="Prismifold project page">
+          <img
+            class="brand-mark"
+            src="../project-page/app-icon.png"
+            width="28"
+            height="28"
+            alt=""
+            aria-hidden="true"
+          />
+          <span>Prismifold</span>
+        </a>
+        <nav class="site-nav" aria-label="Embed guide links">
+          <a href="../">Project</a>
+          <a href="#examples">Examples</a>
+          <a href="#attributes">Attributes</a>
+          <a href="#javascript-api">API</a>
+          <a href="https://github.com/elerac/prismifold">GitHub</a>
+        </nav>
+      </header>
+    </div>
+
+    <main>
+      <section class="hero-section embed-hero-section" aria-labelledby="embed-hero-title">
+        <div class="section-inner embed-hero-layout">
+          <div class="embed-hero-copy">
+            <h1 id="embed-hero-title">Embed Prismifold</h1>
+            <p class="hero-lede">
+              Publish interactive OpenEXR inspection directly inside documentation, papers,
+              datasets, and project pages. The hosted web component wraps the Prismifold viewer in
+              an iframe and can load EXR sources declaratively or through JavaScript.
+            </p>
+          </div>
+          <div class="embed-hero-panel" aria-label="Embed setup summary">
+            <strong>Hosted component</strong>
+            <p>
+              Load <code>embed/prismifold.js</code>, then place
+              <code>&lt;prismifold-viewer&gt;</code> where the viewer should appear.
+            </p>
+            <div class="embed-hero-mini-code">
+              <code>&lt;script src="https://elerac.github.io/prismifold/embed/prismifold.js"&gt;&lt;/script&gt;</code>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="examples" class="embed-guide-section" aria-labelledby="examples-title">
+        <div class="section-inner">
+          <div class="section-heading embed-guide-heading">
+            <h2 id="examples-title">Embed examples</h2>
+            <p>
+              Each example shows the code used by the page and the live rendered viewer beside it.
+              The snippets are written for a page inside an <code>embed/</code> directory.
+            </p>
+          </div>
+
+          <div class="embed-example-list">
+            <section class="embed-example" aria-labelledby="basic-embed-title">
+              <div class="embed-example-copy">
+                <h3 id="basic-embed-title">Basic custom element</h3>
+                <p>
+                  The smallest embed loads the hosted script once and adds a
+                  <code>&lt;prismifold-viewer&gt;</code> element with a source and height.
+                </p>
+                <div class="gallery-code-frame" aria-label="Basic embed code">
+                  <pre><code class="language-html"><span class="syntax-punctuation">&lt;</span><span class="syntax-tag">script</span> <span class="syntax-attribute">src</span><span class="syntax-punctuation">=</span><span class="syntax-string">"https://elerac.github.io/prismifold/embed/prismifold.js"</span><span class="syntax-punctuation">&gt;&lt;/</span><span class="syntax-tag">script</span><span class="syntax-punctuation">&gt;</span>
+
+<span class="syntax-punctuation">&lt;</span><span class="syntax-tag">prismifold-viewer</span>
+  <span class="syntax-attribute">src</span><span class="syntax-punctuation">=</span><span class="syntax-string">"../cbox_rgb.exr"</span>
+  <span class="syntax-attribute">height</span><span class="syntax-punctuation">=</span><span class="syntax-string">"340"</span><span class="syntax-punctuation">&gt;</span>
+<span class="syntax-punctuation">&lt;/</span><span class="syntax-tag">prismifold-viewer</span><span class="syntax-punctuation">&gt;</span></code></pre>
+                </div>
+              </div>
+              <div class="exr-embed-frame embed-example-view">
+                <prismifold-viewer
+                  class="embed-page-live"
+                  src="../cbox_rgb.exr"
+                  height="340"
+                  data-embed-page-responsive-height></prismifold-viewer>
+              </div>
+            </section>
+
+            <section class="embed-example" aria-labelledby="channels-embed-title">
+              <div class="embed-example-copy">
+                <h3 id="channels-embed-title">Named source with channel panel</h3>
+                <p>
+                  Add <code>name</code> for the embed toolbar label and set
+                  <code>bottom-panel="channels"</code> when channel selection is more useful than
+                  the pixel probe readout.
+                </p>
+                <div class="gallery-code-frame" aria-label="Named channel embed code">
+                  <pre><code class="language-html"><span class="syntax-punctuation">&lt;</span><span class="syntax-tag">prismifold-viewer</span>
+  <span class="syntax-attribute">src</span><span class="syntax-punctuation">=</span><span class="syntax-string">"../cbox_rgb.exr"</span>
+  <span class="syntax-attribute">name</span><span class="syntax-punctuation">=</span><span class="syntax-string">"Cornell Box RGB"</span>
+  <span class="syntax-attribute">bottom-panel</span><span class="syntax-punctuation">=</span><span class="syntax-string">"channels"</span>
+  <span class="syntax-attribute">height</span><span class="syntax-punctuation">=</span><span class="syntax-string">"360"</span><span class="syntax-punctuation">&gt;</span>
+<span class="syntax-punctuation">&lt;/</span><span class="syntax-tag">prismifold-viewer</span><span class="syntax-punctuation">&gt;</span></code></pre>
+                </div>
+              </div>
+              <div class="exr-embed-frame embed-example-view">
+                <prismifold-viewer
+                  class="embed-page-live"
+                  src="../cbox_rgb.exr"
+                  name="Cornell Box RGB"
+                  bottom-panel="channels"
+                  height="360"
+                  data-embed-page-responsive-height></prismifold-viewer>
+              </div>
+            </section>
+
+            <section class="embed-example" aria-labelledby="panorama-embed-title">
+              <div class="embed-example-copy">
+                <h3 id="panorama-embed-title">Panorama view</h3>
+                <p>
+                  Set <code>view="panorama"</code> for equirectangular HDRI data. This local
+                  sample demonstrates the embedded panorama mode and hides the bottom panel to keep
+                  the camera view clean.
+                </p>
+                <div class="gallery-code-frame" aria-label="Panorama embed code">
+                  <pre><code class="language-html"><span class="syntax-punctuation">&lt;</span><span class="syntax-tag">prismifold-viewer</span>
+  <span class="syntax-attribute">src</span><span class="syntax-punctuation">=</span><span class="syntax-string">"../cbox_rgb.exr"</span>
+  <span class="syntax-attribute">name</span><span class="syntax-punctuation">=</span><span class="syntax-string">"Cornell Box panorama mode"</span>
+  <span class="syntax-attribute">view</span><span class="syntax-punctuation">=</span><span class="syntax-string">"panorama"</span>
+  <span class="syntax-attribute">bottom-panel</span><span class="syntax-punctuation">=</span><span class="syntax-string">"none"</span>
+  <span class="syntax-attribute">source-origin</span><span class="syntax-punctuation">=</span><span class="syntax-string">"viewer"</span>
+  <span class="syntax-attribute">height</span><span class="syntax-punctuation">=</span><span class="syntax-string">"360"</span><span class="syntax-punctuation">&gt;</span>
+<span class="syntax-punctuation">&lt;/</span><span class="syntax-tag">prismifold-viewer</span><span class="syntax-punctuation">&gt;</span></code></pre>
+                </div>
+              </div>
+              <div class="exr-embed-frame embed-example-view">
+                <prismifold-viewer
+                  class="embed-page-live"
+                  src="../cbox_rgb.exr"
+                  name="Cornell Box panorama mode"
+                  view="panorama"
+                  bottom-panel="none"
+                  source-origin="viewer"
+                  height="360"
+                  data-embed-page-responsive-height></prismifold-viewer>
+              </div>
+            </section>
+
+            <section class="embed-example" aria-labelledby="three-d-embed-title">
+              <div class="embed-example-copy">
+                <h3 id="three-d-embed-title">3D view</h3>
+                <p>
+                  Set <code>view="3d"</code> for EXR files that include RGB plus depth. Prismifold
+                  opens the compact point-cloud viewer when it can infer a depth channel such as
+                  <code>Z</code>.
+                </p>
+                <div class="gallery-code-frame" aria-label="3D embed code">
+                  <pre><code class="language-html"><span class="syntax-punctuation">&lt;</span><span class="syntax-tag">prismifold-viewer</span>
+  <span class="syntax-attribute">src</span><span class="syntax-punctuation">=</span><span class="syntax-string">"../middlebury_chess1_rgb_z.exr"</span>
+  <span class="syntax-attribute">name</span><span class="syntax-punctuation">=</span><span class="syntax-string">"Middlebury RGB + Z"</span>
+  <span class="syntax-attribute">view</span><span class="syntax-punctuation">=</span><span class="syntax-string">"3d"</span>
+  <span class="syntax-attribute">bottom-panel</span><span class="syntax-punctuation">=</span><span class="syntax-string">"none"</span>
+  <span class="syntax-attribute">source-origin</span><span class="syntax-punctuation">=</span><span class="syntax-string">"viewer"</span>
+  <span class="syntax-attribute">height</span><span class="syntax-punctuation">=</span><span class="syntax-string">"360"</span><span class="syntax-punctuation">&gt;</span>
+<span class="syntax-punctuation">&lt;/</span><span class="syntax-tag">prismifold-viewer</span><span class="syntax-punctuation">&gt;</span></code></pre>
+                </div>
+              </div>
+              <div class="exr-embed-frame embed-example-view">
+                <prismifold-viewer
+                  class="embed-page-live"
+                  src="../middlebury_chess1_rgb_z.exr"
+                  name="Middlebury RGB + Z"
+                  view="3d"
+                  bottom-panel="none"
+                  source-origin="viewer"
+                  height="360"
+                  data-embed-page-responsive-height></prismifold-viewer>
+              </div>
+            </section>
+
+            <section class="embed-example" aria-labelledby="deferred-embed-title">
+              <div class="embed-example-copy">
+                <h3 id="deferred-embed-title">Deferred loading</h3>
+                <p>
+                  Use <code>auto-load="false"</code> when an EXR should load only after the reader
+                  opts in. This is useful for pages with several heavy examples.
+                </p>
+                <div class="gallery-code-frame" aria-label="Deferred embed code">
+                  <pre><code class="language-html"><span class="syntax-punctuation">&lt;</span><span class="syntax-tag">prismifold-viewer</span>
+  <span class="syntax-attribute">src</span><span class="syntax-punctuation">=</span><span class="syntax-string">"../cbox_rgb.exr"</span>
+  <span class="syntax-attribute">name</span><span class="syntax-punctuation">=</span><span class="syntax-string">"Deferred Cornell Box"</span>
+  <span class="syntax-attribute">auto-load</span><span class="syntax-punctuation">=</span><span class="syntax-string">"false"</span>
+  <span class="syntax-attribute">height</span><span class="syntax-punctuation">=</span><span class="syntax-string">"340"</span><span class="syntax-punctuation">&gt;</span>
+<span class="syntax-punctuation">&lt;/</span><span class="syntax-tag">prismifold-viewer</span><span class="syntax-punctuation">&gt;</span></code></pre>
+                </div>
+              </div>
+              <div class="exr-embed-frame embed-example-view">
+                <prismifold-viewer
+                  class="embed-page-live"
+                  src="../cbox_rgb.exr"
+                  name="Deferred Cornell Box"
+                  auto-load="false"
+                  height="340"></prismifold-viewer>
+              </div>
+            </section>
+
+            <section id="javascript-api" class="embed-example" aria-labelledby="javascript-api-title">
+              <div class="embed-example-copy">
+                <h3 id="javascript-api-title">JavaScript API and local files</h3>
+                <p>
+                  Create a viewer from JavaScript when the source comes from controls, application
+                  state, or a local file input.
+                </p>
+                <div class="gallery-code-frame" aria-label="JavaScript API embed code">
+                  <pre><code class="language-js"><span class="syntax-keyword">const</span> controller <span class="syntax-punctuation">=</span> window.Prismifold.create<span class="syntax-punctuation">(</span><span class="syntax-string">"#prismifold-js-example"</span><span class="syntax-punctuation">,</span> <span class="syntax-punctuation">{</span>
+  height<span class="syntax-punctuation">:</span> <span class="syntax-string">"360"</span><span class="syntax-punctuation">,</span>
+  bottomPanel<span class="syntax-punctuation">:</span> <span class="syntax-string">"channels"</span>
+<span class="syntax-punctuation">});</span>
+
+document.querySelector<span class="syntax-punctuation">(</span><span class="syntax-string">"#load-sample"</span><span class="syntax-punctuation">)</span>.addEventListener<span class="syntax-punctuation">(</span><span class="syntax-string">"click"</span><span class="syntax-punctuation">,</span> <span class="syntax-punctuation">()</span> <span class="syntax-punctuation">=&gt;</span> <span class="syntax-punctuation">{</span>
+  controller.loadUrl<span class="syntax-punctuation">(</span><span class="syntax-string">"../cbox_rgb.exr"</span><span class="syntax-punctuation">,</span> <span class="syntax-punctuation">{</span> name<span class="syntax-punctuation">:</span> <span class="syntax-string">"Cornell Box RGB"</span> <span class="syntax-punctuation">});</span>
+<span class="syntax-punctuation">});</span>
+
+document.querySelector<span class="syntax-punctuation">(</span><span class="syntax-string">"#local-exr"</span><span class="syntax-punctuation">)</span>.addEventListener<span class="syntax-punctuation">(</span><span class="syntax-string">"change"</span><span class="syntax-punctuation">,</span> <span class="syntax-punctuation">(</span>event<span class="syntax-punctuation">)</span> <span class="syntax-punctuation">=&gt;</span> <span class="syntax-punctuation">{</span>
+  <span class="syntax-keyword">const</span> file <span class="syntax-punctuation">=</span> event.target.files<span class="syntax-punctuation">?.[</span><span class="syntax-string">0</span><span class="syntax-punctuation">];</span>
+  <span class="syntax-keyword">if</span> <span class="syntax-punctuation">(</span>file<span class="syntax-punctuation">)</span> controller.loadFile<span class="syntax-punctuation">(</span>file<span class="syntax-punctuation">,</span> <span class="syntax-punctuation">{</span> name<span class="syntax-punctuation">:</span> file.name <span class="syntax-punctuation">});</span>
+<span class="syntax-punctuation">});</span></code></pre>
+                </div>
+              </div>
+              <div class="embed-js-demo">
+                <div class="embed-js-controls" aria-label="JavaScript API controls">
+                  <button id="embed-js-load-sample-button" class="button button-primary" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 5h14v14H5z" />
+                      <path d="m10 8 6 4-6 4z" />
+                    </svg>
+                    <span>Load Sample</span>
+                  </button>
+                  <label class="embed-file-control">
+                    <input id="embed-js-file-input" type="file" accept=".exr,image/x-exr" />
+                    <span>Load Local EXR</span>
+                  </label>
+                </div>
+                <div id="embed-js-status" class="embed-js-status" role="status" aria-live="polite"></div>
+                <div id="embed-js-viewer" class="exr-embed-frame embed-example-view"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="attributes" class="embed-reference-section" aria-labelledby="attributes-title">
+        <div class="section-inner">
+          <div class="section-heading">
+            <h2 id="attributes-title">Element attributes</h2>
+            <p>
+              These attributes configure the iframe wrapper. Unknown or empty values fall back to
+              the default embed behavior.
+            </p>
+          </div>
+          <div class="embed-reference-grid" role="table" aria-label="prismifold-viewer attributes">
+            <div class="embed-reference-row embed-reference-row--head" role="row">
+              <span role="columnheader">Attribute</span>
+              <span role="columnheader">Values</span>
+              <span role="columnheader">Use</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">src</code>
+              <span role="cell">URL or relative path</span>
+              <span role="cell">EXR source to load.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">name</code>
+              <span role="cell">Text</span>
+              <span role="cell">Custom toolbar label and iframe title.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">width</code>
+              <span role="cell">CSS size or pixels</span>
+              <span role="cell">Host element width. Defaults to <code>100%</code>.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">height</code>
+              <span role="cell">CSS size or pixels</span>
+              <span role="cell">Iframe height. Defaults to <code>320px</code>.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">view</code>
+              <span role="cell"><code>image</code>, <code>panorama</code>, <code>3d</code></span>
+              <span role="cell">Initial viewer mode when the loaded data supports it.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">bottom-panel</code>
+              <span role="cell"><code>probe</code>, <code>channels</code>, <code>none</code></span>
+              <span role="cell">Compact panel shown below the embedded viewport.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">auto-load</code>
+              <span role="cell"><code>true</code> or <code>false</code></span>
+              <span role="cell">Set to false to wait for a click before fetching the source.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">viewer-url</code>
+              <span role="cell">Viewer app URL</span>
+              <span role="cell">Override the iframe target when self-hosting the app.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">source-origin</code>
+              <span role="cell"><code>auto</code>, <code>parent</code>, <code>viewer</code></span>
+              <span role="cell">Choose whether the parent page or iframe fetches the EXR source.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="embed-reference-section embed-reference-section--api" aria-labelledby="methods-title">
+        <div class="section-inner">
+          <div class="section-heading">
+            <h2 id="methods-title">JavaScript methods</h2>
+            <p>
+              <code>window.Prismifold.create</code> returns a controller for loading sources and
+              cleaning up the embedded element.
+            </p>
+          </div>
+          <div class="embed-reference-grid" role="table" aria-label="Prismifold JavaScript methods">
+            <div class="embed-reference-row embed-reference-row--head" role="row">
+              <span role="columnheader">Method</span>
+              <span role="columnheader">Arguments</span>
+              <span role="columnheader">Use</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">loadUrl(src, options)</code>
+              <span role="cell"><code>src</code>, optional <code>name</code>, <code>view</code>, <code>sourceOrigin</code></span>
+              <span role="cell">Load an EXR URL from the parent page or viewer iframe.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">loadFile(file, options)</code>
+              <span role="cell"><code>File</code>, optional <code>name</code> or <code>view</code></span>
+              <span role="cell">Load a browser <code>File</code> object, such as one selected through a local file input.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">setView(view)</code>
+              <span role="cell"><code>image</code>, <code>panorama</code>, or <code>3d</code></span>
+              <span role="cell">Update the viewer mode attribute and refresh the embedded iframe.</span>
+            </div>
+            <div class="embed-reference-row" role="row">
+              <code role="cell">destroy()</code>
+              <span role="cell">None</span>
+              <span role="cell">Remove the embedded custom element from the page.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <strong>Prismifold embed guide</strong>
+        <span>Interactive OpenEXR views for technical pages and documentation.</span>
+      </div>
+    </footer>
+  </body>
+</html>

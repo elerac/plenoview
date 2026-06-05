@@ -6,6 +6,7 @@ const githubPagesBase = '/prismifold/';
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 const appHtml = resolve(rootDir, 'app/index.html');
 const projectHtml = resolve(rootDir, 'index.html');
+const embedHtml = resolve(rootDir, 'embed/index.html');
 
 export default defineConfig(({ mode }) => {
   const desktopBuild = mode === 'desktop';
@@ -19,6 +20,7 @@ export default defineConfig(({ mode }) => {
       }
     : {
         main: projectHtml,
+        embed: embedHtml,
         app: appHtml
       };
 
