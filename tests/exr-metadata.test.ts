@@ -66,6 +66,19 @@ describe('EXR metadata parsing', () => {
     expect(second.get('name')).toBe('depth');
     expect(second.get('channels')).toBe('1 (Z)');
   });
+
+  it('sorts numeric channel names naturally in metadata summaries', () => {
+    const [metadata] = parseExrMetadata(createSinglePartExr([
+      '1000nm',
+      '1100nm',
+      '500nm',
+      'AOV10',
+      'AOV2'
+    ]));
+    const byKey = metadataByKey(metadata ?? []);
+
+    expect(byKey.get('channels')).toBe('5 (500nm, 1000nm, 1100nm, AOV2, AOV10)');
+  });
 });
 
 function readFixture(filename: string): Uint8Array {
@@ -77,10 +90,7 @@ function metadataByKey(metadata: ExrMetadataEntry[]): Map<string, string> {
 }
 
 function createSinglePartMultichannelExr(): Uint8Array {
-  ensureExrEncoderInitialized();
-  const width = 512;
-  const height = 320;
-  const channelNames = [
+  return createSinglePartExr([
     'R',
     'G',
     'B',
@@ -99,7 +109,11 @@ function createSinglePartMultichannelExr(): Uint8Array {
     '500nm',
     '600nm',
     '700nm'
-  ];
+  ], 512, 320);
+}
+
+function createSinglePartExr(channelNames: string[], width = 4, height = 4): Uint8Array {
+  ensureExrEncoderInitialized();
   const encoder = new ExrEncoder(width, height);
   try {
     encoder.addLayer(

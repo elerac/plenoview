@@ -337,30 +337,30 @@ describe('channel view items', () => {
     expect(findSelectedChannelViewItem(items, createChannelMonoSelection('depth.Z'))?.value).toBe('channel:depth.Z');
   });
 
-  it('splits spectral RGB descriptors into wavelength channels', () => {
-    const items = buildChannelViewItems(['410nm', '500nm', '650nm']);
+  it('splits spectral RGB descriptors into naturally sorted wavelength channels', () => {
+    const items = buildChannelViewItems(['1000nm', '500nm', '650nm']);
 
     expect(hasSplitChannelViewItems(items)).toBe(true);
     expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual(['spectralRgb:']);
     expect(selectVisibleChannelViewItems(items, true).map((item) => item.value)).toEqual([
-      'channel:410nm',
       'channel:500nm',
-      'channel:650nm'
+      'channel:650nm',
+      'channel:1000nm'
     ]);
     expect(findSelectedChannelViewItem(items, createSpectralRgbSelection())?.label).toBe('Spectral RGB');
   });
 
   it('shows spectral wavelength channels individually when spectral RGB grouping is disabled', () => {
-    const items = buildChannelViewItems(['410nm', '500nm', '650nm'], {
+    const items = buildChannelViewItems(['1000nm', '500nm', '650nm'], {
       spectralRgbGroupingEnabled: false
     });
     const values = selectVisibleChannelViewItems(items, false).map((item) => item.value);
 
     expect(hasSplitChannelViewItems(items)).toBe(false);
     expect(values).toEqual([
-      'channel:410nm',
       'channel:500nm',
-      'channel:650nm'
+      'channel:650nm',
+      'channel:1000nm'
     ]);
     expect(values.some((value) => value.startsWith('spectralRgb:'))).toBe(false);
     expect(findSelectedChannelViewItem(items, createSpectralRgbSelection())).toBeNull();
@@ -376,11 +376,11 @@ describe('channel view items', () => {
     });
 
     expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual([
+      'channel:400nm',
+      'channel:500nm',
       'channel:R',
       'channel:G',
-      'channel:B',
-      'channel:400nm',
-      'channel:500nm'
+      'channel:B'
     ]);
     expect(buildChannelViewStacks(['R', 'G', 'B', '400nm', '500nm'], items, {
       channelRecognitionSettings: {
@@ -391,8 +391,8 @@ describe('channel view items', () => {
     })).toEqual([]);
   });
 
-  it('derives spectral RGB stack children and expands one stack at a time', () => {
-    const channelNames = ['410nm', '500nm', '650nm', 'mask'];
+  it('derives naturally sorted spectral RGB stack children and expands one stack at a time', () => {
+    const channelNames = ['1000nm', '500nm', '650nm', 'mask'];
     const items = buildChannelViewItems(channelNames);
     const stacks = buildChannelViewStacks(channelNames, items);
     const stackKey = stacks[0]?.key ?? '';
@@ -401,7 +401,7 @@ describe('channel view items', () => {
       {
         key: 'stack:spectralRgb::spectralRgb:',
         parentValue: 'spectralRgb:',
-        childValues: ['channel:410nm', 'channel:500nm', 'channel:650nm']
+        childValues: ['channel:500nm', 'channel:650nm', 'channel:1000nm']
       }
     ]);
     expect(selectStackedChannelViewItems(channelNames, items, new Set()).map((item) => ({
@@ -416,24 +416,24 @@ describe('channel view items', () => {
       stack: item.stack && { role: item.stack.role, index: item.stack.index, count: item.stack.count }
     }))).toEqual([
       { value: 'channel:mask', stack: null },
-      { value: 'channel:410nm', stack: { role: 'child', index: 0, count: 3 } },
-      { value: 'channel:500nm', stack: { role: 'child', index: 1, count: 3 } },
-      { value: 'channel:650nm', stack: { role: 'child', index: 2, count: 3 } }
+      { value: 'channel:500nm', stack: { role: 'child', index: 0, count: 3 } },
+      { value: 'channel:650nm', stack: { role: 'child', index: 1, count: 3 } },
+      { value: 'channel:1000nm', stack: { role: 'child', index: 2, count: 3 } }
     ]);
     expect([...pruneExpandedChannelStackKeys(channelNames, items, new Set([stackKey, 'missing']))]).toEqual([stackKey]);
   });
 
   it('keeps auxiliary channels visible while splitting valid spectral series', () => {
-    const items = buildChannelViewItems(['410nm', '500nm', '650nm', 'mask']);
+    const items = buildChannelViewItems(['1000nm', '500nm', '650nm', 'mask']);
 
     expect(selectVisibleChannelViewItems(items, false).map((item) => item.value)).toEqual([
       'channel:mask',
       'spectralRgb:'
     ]);
     expect(selectVisibleChannelViewItems(items, true).map((item) => item.value)).toEqual([
-      'channel:410nm',
       'channel:500nm',
       'channel:650nm',
+      'channel:1000nm',
       'channel:mask'
     ]);
   });

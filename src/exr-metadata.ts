@@ -1,4 +1,5 @@
 import { ExrMetadataEntry } from './types';
+import { compareChannelNamesNaturally, hasNumericChannelNameToken } from './channel-name-sort';
 
 const OPENEXR_MAGIC = 0x01312f76;
 const MULTIPART_FLAG = 0x1000;
@@ -343,7 +344,7 @@ function formatChannels(channelNames: string[]): string {
   const channelSummary = [
     ...rootChannels,
     ...tokens
-      .sort((a, b) => a.firstIndex - b.firstIndex || a.value.localeCompare(b.value))
+      .sort((a, b) => compareChannelNamesNaturally(a.value, b.value) || a.firstIndex - b.firstIndex)
       .map((token) => token.value)
   ];
 
@@ -359,7 +360,14 @@ function sortChannelSuffixes(suffixes: string[]): string[] {
       return (preferredA >= 0 ? preferredA : Number.MAX_SAFE_INTEGER) -
         (preferredB >= 0 ? preferredB : Number.MAX_SAFE_INTEGER);
     }
-    return a.localeCompare(b);
+    const naturalComparison = compareChannelNamesNaturally(a, b);
+    if (naturalComparison !== 0) {
+      return naturalComparison;
+    }
+
+    return hasNumericChannelNameToken(a) || hasNumericChannelNameToken(b)
+      ? 0
+      : a.localeCompare(b);
   });
 }
 

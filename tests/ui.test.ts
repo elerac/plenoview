@@ -11,6 +11,7 @@ import {
   parsePanelSplitStorageValue
 } from '../src/ui/layout-split-controller';
 import {
+  buildExportBatchColumns,
   buildExportBatchChannelFilenameToken,
   buildExportBatchOutputFilename,
   buildExportBatchScreenshotOutputFilename
@@ -6621,6 +6622,35 @@ describe('view menu', () => {
     expect(splitToggle.getAttribute('aria-pressed')).toBe('true');
     expect(getExportBatchColumnLabels()).toEqual(['R', 'G', 'B', 'Z']);
     expect(getCheckedExportBatchCellIds()).toEqual(['session-1:G']);
+  });
+
+  it('sorts equal-order numeric batch export columns naturally', () => {
+    const firstChannels = createBatchChannels(['AOV10']);
+    const secondChannels = createBatchChannels(['AOV2']);
+    const columns = buildExportBatchColumns([
+      {
+        sessionId: 'session-1',
+        filename: 'first.exr',
+        label: 'first.exr',
+        sourcePath: 'first.exr',
+        thumbnailDataUrl: null,
+        activeLayer: 0,
+        displaySelection: firstChannels[0]!.selection,
+        channels: firstChannels
+      },
+      {
+        sessionId: 'session-2',
+        filename: 'second.exr',
+        label: 'second.exr',
+        sourcePath: 'second.exr',
+        thumbnailDataUrl: null,
+        activeLayer: 0,
+        displaySelection: secondChannels[0]!.selection,
+        channels: secondChannels
+      }
+    ]);
+
+    expect(columns.map((column) => column.label)).toEqual(['AOV2', 'AOV10']);
   });
 
   it('falls back to the default batch selection when remembered cells are incompatible', async () => {

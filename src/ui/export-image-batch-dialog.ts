@@ -2,6 +2,7 @@ import {
   hasSplitChannelViewItems,
   selectVisibleChannelViewItems
 } from '../channel-view-items';
+import { compareChannelNamesNaturally, hasNumericChannelNameToken } from '../channel-name-sort';
 import {
   errorResource,
   getSuccessValue,
@@ -1999,7 +2000,15 @@ export function buildExportBatchColumns(
     if (a.order !== b.order) {
       return a.order - b.order;
     }
-    return a.label.localeCompare(b.label);
+
+    const naturalComparison = compareChannelNamesNaturally(a.label, b.label);
+    if (naturalComparison !== 0) {
+      return naturalComparison;
+    }
+
+    return hasNumericChannelNameToken(a.label) || hasNumericChannelNameToken(b.label)
+      ? 0
+      : a.label.localeCompare(b.label);
   });
 }
 

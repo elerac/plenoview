@@ -53,6 +53,7 @@ import {
   type ChannelRecognitionNameRules,
   type CompiledChannelRecognitionNameRules
 } from './channel-recognition-name-rules';
+import { compareChannelNamesNaturally, hasNumericChannelNameToken } from './channel-name-sort';
 import type { DisplayChannelMapping } from './types';
 
 export type ComponentChannelGroupKind = 'rgb' | 'xyz' | 'uv';
@@ -1283,14 +1284,20 @@ function getSingleChannelDefaultReason(priority: number): ChannelRecognitionMeta
 }
 
 function orderSingleChannelNames(channelNames: readonly string[]): string[] {
-  if (!channelNames.some(isExactYChannel)) {
-    return [...channelNames];
-  }
+  return channelNames
+    .map((channelName, index) => ({ channelName, index }))
+    .sort((left, right) => {
+      const exactYComparison = Number(isExactYChannel(right.channelName)) - Number(isExactYChannel(left.channelName));
+      if (exactYComparison !== 0) {
+        return exactYComparison;
+      }
 
-  return [
-    ...channelNames.filter(isExactYChannel),
-    ...channelNames.filter((channelName) => !isExactYChannel(channelName))
-  ];
+      const naturalComparison = compareChannelNamesNaturally(left.channelName, right.channelName);
+      return naturalComparison !== 0
+        ? naturalComparison
+        : left.index - right.index;
+    })
+    .map(({ channelName }) => channelName);
 }
 
 function isExactYChannel(channelName: string): boolean {
@@ -1388,7 +1395,15 @@ function compareComponentChannelGroups(
   if (b.key.length === 0) {
     return 1;
   }
-  return a.key.localeCompare(b.key);
+
+  const naturalComparison = compareChannelNamesNaturally(a.key, b.key);
+  if (naturalComparison !== 0) {
+    return naturalComparison;
+  }
+
+  return hasNumericChannelNameToken(a.key) || hasNumericChannelNameToken(b.key)
+    ? 0
+    : a.key.localeCompare(b.key);
 }
 
 function buildComponentGroupLabel(base: string, suffixes: readonly string[], hasAlpha: boolean): string {

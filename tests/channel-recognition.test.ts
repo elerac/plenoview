@@ -245,6 +245,29 @@ describe('channel recognition', () => {
     expect(selectionKey(spectral)).toBe('spectralRgb:');
   });
 
+  it('sorts numeric fallback channel names naturally for presentation', () => {
+    expect(visibleKeys(['1000nm', '1100nm', '500nm', '600nm', '900nm'], true)).toEqual([
+      'channel:500nm',
+      'channel:600nm',
+      'channel:900nm',
+      'channel:1000nm',
+      'channel:1100nm'
+    ]);
+    expect(visibleKeys(['1000nm', '1100nm', '500nm', '600nm', '900nm'], false, {
+      spectralRgbGroupingEnabled: false
+    })).toEqual([
+      'channel:500nm',
+      'channel:600nm',
+      'channel:900nm',
+      'channel:1000nm',
+      'channel:1100nm'
+    ]);
+    expect(visibleKeys(['AOV10', 'AOV2'])).toEqual([
+      'channel:AOV2',
+      'channel:AOV10'
+    ]);
+  });
+
   it('preserves spectral series ordering and duplicate wavelength ordering', () => {
     expect(visibleKeys([
       'hoge.450nm',
