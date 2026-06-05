@@ -142,6 +142,68 @@ describe('spectral readout presentation', () => {
     expect(readout.yAxis).toBeNull();
   });
 
+  it('plots depth mode spectral values for a valid depth probe pixel', () => {
+    const layer = createLayerFromChannels({
+      '400nm': [0.1, 0.2, 0.3, 0.4],
+      '500nm': [1.1, 1.2, 1.3, 1.4],
+      Z: [1, 2, 3, 4]
+    });
+    const session = createSession(layer);
+    const readout = buildSpectralPlotReadoutModel({
+      activeSession: session,
+      activeLayer: layer,
+      sessionState: createViewerSessionState({
+        viewerMode: 'depth',
+        depthChannel: 'Z'
+      }),
+      interactionState: createViewerInteractionState({ hoveredPixel: { ix: 1, iy: 0 } })
+    });
+
+    expect(readout.visible).toBe(true);
+    expect(readout.pixel).toEqual({ x: 1, y: 0 });
+    expect(readout.channels).toEqual([
+      { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '' },
+      { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '' }
+    ]);
+    expect(readout.points.map(({ channelName, wavelength, seriesKey, seriesLabel }) => ({
+      channelName,
+      wavelength,
+      seriesKey,
+      seriesLabel
+    }))).toEqual([
+      { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '' },
+      { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '' }
+    ]);
+    expect(readout.points[0]?.intensity).toBeCloseTo(0.2, 6);
+    expect(readout.points[1]?.intensity).toBeCloseTo(1.2, 6);
+  });
+
+  it('keeps the depth mode spectral panel visible without points for invalid depth probe pixels', () => {
+    const layer = createLayerFromChannels({
+      '400nm': [0.1, 0.2, 0.3, 0.4],
+      '500nm': [1.1, 1.2, 1.3, 1.4],
+      Z: [1, 0, 3, 4]
+    });
+    const session = createSession(layer);
+    const readout = buildSpectralPlotReadoutModel({
+      activeSession: session,
+      activeLayer: layer,
+      sessionState: createViewerSessionState({
+        viewerMode: 'depth',
+        depthChannel: 'Z'
+      }),
+      interactionState: createViewerInteractionState({ hoveredPixel: { ix: 1, iy: 0 } })
+    });
+
+    expect(readout.visible).toBe(true);
+    expect(readout.pixel).toBeNull();
+    expect(readout.channels).toEqual([
+      { channelName: '400nm', wavelength: 400, seriesKey: '', seriesLabel: '' },
+      { channelName: '500nm', wavelength: 500, seriesKey: '', seriesLabel: '' }
+    ]);
+    expect(readout.points).toEqual([]);
+  });
+
   it('plots the selected spectral Stokes component across wavelengths', () => {
     const layer = createLayerFromChannels({
       'S0.400nm': [2, 2, 2, 2],

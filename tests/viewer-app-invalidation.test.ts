@@ -777,6 +777,134 @@ describe('viewer app lanes', () => {
     expect(after.renderState).not.toBe(before.renderState);
   });
 
+  it('invalidates the spectral readout when switching into depth mode changes the active spectral pixel', () => {
+    const decoded: DecodedExrImage = {
+      width: 2,
+      height: 1,
+      layers: [createLayerFromChannels({
+        '400nm': [0.1, 0.2],
+        '500nm': [1.1, 1.2],
+        Z: [1, 0]
+      }, 'spectral-depth')]
+    };
+    const sessionState = {
+      ...buildViewerStateForLayer(createInitialState(), decoded, 0),
+      displaySelection: createChannelMonoSelection('400nm')
+    };
+    const session = createSession('session-1', decoded);
+    const state: ViewerAppState = {
+      ...createInitialViewerAppState(),
+      sessions: [{ ...session, state: sessionState }],
+      activeSessionId: session.id,
+      sessionState,
+      interactionState: {
+        ...createInteractionState(sessionState),
+        hoveredPixel: { ix: 1, iy: 0 }
+      }
+    };
+    const nextSessionState = {
+      ...sessionState,
+      viewerMode: 'depth' as const,
+      depthChannel: 'Z'
+    };
+    const next: ViewerAppState = {
+      ...state,
+      sessionState: nextSessionState,
+      interactionState: {
+        ...createInteractionState(nextSessionState),
+        hoveredPixel: { ix: 1, iy: 0 }
+      }
+    };
+
+    const renderFlags = createRenderFlags(state, next);
+
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.SpectralReadout)).toBe(true);
+  });
+
+  it('invalidates the spectral readout when the depth channel changes', () => {
+    const decoded: DecodedExrImage = {
+      width: 2,
+      height: 1,
+      layers: [createLayerFromChannels({
+        '400nm': [0.1, 0.2],
+        '500nm': [1.1, 1.2],
+        Z: [1, 0],
+        'depth.Z': [1, 2]
+      }, 'spectral-depth')]
+    };
+    const sessionState = {
+      ...buildViewerStateForLayer(createInitialState(), decoded, 0),
+      viewerMode: 'depth' as const,
+      displaySelection: createChannelMonoSelection('400nm'),
+      depthChannel: 'depth.Z'
+    };
+    const session = createSession('session-1', decoded);
+    const state: ViewerAppState = {
+      ...createInitialViewerAppState(),
+      sessions: [{ ...session, state: sessionState }],
+      activeSessionId: session.id,
+      sessionState,
+      interactionState: {
+        ...createInteractionState(sessionState),
+        hoveredPixel: { ix: 1, iy: 0 }
+      }
+    };
+    const next: ViewerAppState = {
+      ...state,
+      sessionState: {
+        ...sessionState,
+        depthChannel: 'Z'
+      }
+    };
+
+    const renderFlags = createRenderFlags(state, next);
+
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.SpectralReadout)).toBe(true);
+  });
+
+  it('invalidates the spectral readout when depth recognition settings change', () => {
+    const decoded: DecodedExrImage = {
+      width: 2,
+      height: 1,
+      layers: [createLayerFromChannels({
+        '400nm': [0.1, 0.2],
+        '500nm': [1.1, 1.2],
+        Z: [1, 2]
+      }, 'spectral-depth')]
+    };
+    const sessionState = {
+      ...buildViewerStateForLayer(createInitialState(), decoded, 0),
+      viewerMode: 'depth' as const,
+      displaySelection: createChannelMonoSelection('400nm'),
+      depthChannel: 'Z'
+    };
+    const session = createSession('session-1', decoded);
+    const channelRecognitionSettings = createDefaultChannelRecognitionSettings();
+    const nextChannelRecognitionSettings = {
+      ...channelRecognitionSettings,
+      'depth.map': false
+    };
+    const state: ViewerAppState = {
+      ...createInitialViewerAppState(),
+      sessions: [{ ...session, state: sessionState }],
+      activeSessionId: session.id,
+      sessionState,
+      channelRecognitionSettings,
+      interactionState: {
+        ...createInteractionState(sessionState),
+        hoveredPixel: { ix: 1, iy: 0 }
+      }
+    };
+    const next: ViewerAppState = {
+      ...state,
+      channelRecognitionSettings: nextChannelRecognitionSettings
+    };
+
+    const renderFlags = createRenderFlags(state, next);
+
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.SpectralReadout)).toBe(true);
+  });
+
   it('invalidates the spectral readout when saved Stokes plot defaults change', () => {
     const decoded: DecodedExrImage = {
       width: 2,

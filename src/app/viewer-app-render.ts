@@ -475,10 +475,13 @@ function createSpectralPlotReadoutSelector(): (
   let previousHeight = 0;
   let previousLockedPixel: ViewerAppState['sessionState']['lockedPixel'] = null;
   let previousHoveredPixel: ViewerAppState['interactionState']['hoveredPixel'] = null;
+  let previousViewerMode: ViewerAppState['sessionState']['viewerMode'] = 'image';
+  let previousDepthChannel: ViewerAppState['sessionState']['depthChannel'] = null;
   let previousDisplaySelection: ViewerAppState['sessionState']['displaySelection'] = null;
   let previousStokesColormapDefaults: ViewerAppState['stokesColormapDefaults'] | null = null;
   let previousMaskInvalidStokesVectors = true;
   let previousSpectralRgbGroupingEnabled = true;
+  let previousChannelRecognitionSettings = stateLikeRecognitionSettings();
   let previousChannelRecognitionNameRules = stateLikeNameRules();
   let previousResult = buildSpectralPlotReadoutModel({
     activeSession: null,
@@ -505,9 +508,12 @@ function createSpectralPlotReadoutSelector(): (
       height === previousHeight &&
       samePixel(state.sessionState.lockedPixel, previousLockedPixel) &&
       samePixel(state.interactionState.hoveredPixel, previousHoveredPixel) &&
+      state.sessionState.viewerMode === previousViewerMode &&
+      state.sessionState.depthChannel === previousDepthChannel &&
       sameDisplaySelection(state.sessionState.displaySelection, previousDisplaySelection) &&
       state.maskInvalidStokesVectors === previousMaskInvalidStokesVectors &&
       state.spectralRgbGroupingEnabled === previousSpectralRgbGroupingEnabled &&
+      sameChannelRecognitionSettings(state.channelRecognitionSettings, previousChannelRecognitionSettings) &&
       sameChannelRecognitionNameRules(state.channelRecognitionNameRules, previousChannelRecognitionNameRules) &&
       previousStokesColormapDefaults !== null &&
       sameStokesColormapDefaultSettings(state.stokesColormapDefaults, previousStokesColormapDefaults)
@@ -521,9 +527,12 @@ function createSpectralPlotReadoutSelector(): (
     previousHeight = height;
     previousLockedPixel = state.sessionState.lockedPixel;
     previousHoveredPixel = state.interactionState.hoveredPixel;
+    previousViewerMode = state.sessionState.viewerMode;
+    previousDepthChannel = state.sessionState.depthChannel;
     previousDisplaySelection = state.sessionState.displaySelection;
     previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
     previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
+    previousChannelRecognitionSettings = state.channelRecognitionSettings;
     previousChannelRecognitionNameRules = state.channelRecognitionNameRules;
     previousStokesColormapDefaults = state.stokesColormapDefaults;
     previousResult = buildSpectralPlotReadoutModel({
@@ -534,6 +543,7 @@ function createSpectralPlotReadoutSelector(): (
       stokesColormapDefaults: state.stokesColormapDefaults,
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+      channelRecognitionSettings: state.channelRecognitionSettings,
       channelRecognitionNameRules: state.channelRecognitionNameRules
     });
     return previousResult;

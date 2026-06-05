@@ -1,4 +1,8 @@
 import { buildZeroCenteredColormapRange, cloneDisplayLuminanceRange } from '../colormap-range';
+import {
+  isValidDepthProbePixel,
+  resolveDepthChannelForLayer
+} from '../depth';
 import { isSpectralRgbSelection, isStokesSelection } from '../display-model';
 import { samplePixelValues } from '../sampling/probe';
 import {
@@ -19,6 +23,7 @@ import {
   resolveActiveProbePixel,
   resolveProbeMode
 } from '../probe';
+import type { ChannelRecognitionSettings } from '../channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from '../channel-recognition-name-rules';
 import type { SpectralPlotReadoutModel } from './viewer-app-types';
 import type {
@@ -36,6 +41,7 @@ export interface BuildSpectralPresentationArgs {
   stokesColormapDefaults?: StokesColormapDefaultSettings;
   maskInvalidStokesVectors?: boolean;
   spectralRgbGroupingEnabled?: boolean;
+  channelRecognitionSettings?: ChannelRecognitionSettings;
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
 }
 
@@ -62,7 +68,7 @@ export function buildSpectralPlotReadoutModel(args: BuildSpectralPresentationArg
       }
     : null;
 
-  if (!args.activeSession || !args.activeLayer || args.sessionState.viewerMode === 'depth') {
+  if (!args.activeSession || !args.activeLayer) {
     return hiddenReadout;
   }
 
@@ -75,7 +81,7 @@ export function buildSpectralPlotReadoutModel(args: BuildSpectralPresentationArg
     args.sessionState.lockedPixel,
     args.interactionState.hoveredPixel
   );
-  if (!targetPixel) {
+  if (!targetPixel || !isSpectralProbePixelActive(args, targetPixel)) {
     return {
       visible: true,
       mode,
@@ -108,6 +114,38 @@ export function buildSpectralPlotReadoutModel(args: BuildSpectralPresentationArg
 type SpectralPlotSource = Pick<SpectralPlotReadoutModel, 'channels' | 'yAxis'> & {
   buildPoints: (sample: ReturnType<typeof samplePixelValues>) => SpectralPlotReadoutModel['points'];
 };
+
+function isSpectralProbePixelActive(
+  args: BuildSpectralPresentationArgs,
+  targetPixel: NonNullable<ReturnType<typeof resolveActiveProbePixel>>
+): boolean {
+  if (args.sessionState.viewerMode !== 'depth') {
+    return true;
+  }
+
+  const activeLayer = args.activeLayer;
+  const activeSession = args.activeSession;
+  if (!activeLayer || !activeSession) {
+    return false;
+  }
+
+  const depthChannel = resolveDepthChannelForLayer(
+    activeLayer.channelNames,
+    args.sessionState.depthChannel,
+    {
+      allowArbitraryZSuffix: true,
+      channelRecognitionSettings: args.channelRecognitionSettings,
+      channelRecognitionNameRules: args.channelRecognitionNameRules
+    }
+  );
+
+  return isValidDepthProbePixel(targetPixel, {
+    layer: activeLayer,
+    width: activeSession.decoded.width,
+    height: activeSession.decoded.height,
+    channelName: depthChannel
+  });
+}
 
 function resolveSpectralPlotSource(args: BuildSpectralPresentationArgs): SpectralPlotSource | null {
   const selection = args.sessionState.displaySelection;
