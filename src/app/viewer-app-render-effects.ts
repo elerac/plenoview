@@ -32,6 +32,11 @@ export function applyRenderEffects(
     }
   }
 
+  renderCache.setVisibleDisplaySources(snapshot.paneRenderSources.map((source) => ({
+    session: source.session,
+    state: source.renderState
+  })));
+
   if (invalidation & ViewerRenderInvalidationFlags.ProbeReadout) {
     ui.setProbeReadout(
       snapshot.probeReadout.mode,
@@ -204,6 +209,10 @@ function renderPaneSources(
   sources: ViewerPaneRenderSource[]
 ): void {
   const panesByPath = new Map(panes.map((pane) => [serializePanePath(pane.path), pane]));
+  renderCache.setVisibleDisplaySources(sources.map((source) => ({
+    session: source.session,
+    state: source.renderState
+  })));
   renderer.beginPaneRender();
   for (const source of sources) {
     const pane = panesByPath.get(serializePanePath(source.path));

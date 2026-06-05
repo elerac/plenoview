@@ -54,13 +54,13 @@ describe('gl image renderer', () => {
     );
 
     expect(firstUploadedChannels).toEqual([
-      { channelName: 'R', textureBytes: 8, materializedBytes: 8 },
-      { channelName: 'G', textureBytes: 8, materializedBytes: 8 },
-      { channelName: 'B', textureBytes: 8, materializedBytes: 8 }
+      { channelName: 'R', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' },
+      { channelName: 'G', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' },
+      { channelName: 'B', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' }
     ]);
     expect(secondUploadedChannels).toEqual([
-      { channelName: 'Z', textureBytes: 8, materializedBytes: 8 },
-      { channelName: 'A', textureBytes: 8, materializedBytes: 8 }
+      { channelName: 'Z', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' },
+      { channelName: 'A', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' }
     ]);
     expect(texImageCallsAfterFirstUpload).toBe(5);
     expect(gl.texImage2D).toHaveBeenCalledTimes(7);
@@ -79,9 +79,9 @@ describe('gl image renderer', () => {
 
     expect(layer.channelStorage.kind).toBe('interleaved-f32');
     expect(uploads).toEqual([
-      { channelName: 'R', textureBytes: 8, materializedBytes: 8 },
-      { channelName: 'G', textureBytes: 8, materializedBytes: 8 },
-      { channelName: 'B', textureBytes: 8, materializedBytes: 8 }
+      { channelName: 'R', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' },
+      { channelName: 'G', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' },
+      { channelName: 'B', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' }
     ]);
     expect(__debugGetMaterializedChannelCount(layer)).toBe(3);
     expect(gl.texImage2D.mock.calls[2]?.[8]).toBe(
@@ -106,8 +106,8 @@ describe('gl image renderer', () => {
 
     expect(layer.channelStorage.kind).toBe('planar-f32');
     expect(uploads).toEqual([
-      { channelName: 'R', textureBytes: 8, materializedBytes: 0 },
-      { channelName: 'G', textureBytes: 8, materializedBytes: 0 }
+      { channelName: 'R', textureBytes: 8, materializedBytes: 0, resourceKind: 'source-texture' },
+      { channelName: 'G', textureBytes: 8, materializedBytes: 0, resourceKind: 'source-texture' }
     ]);
     expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
   });
@@ -135,7 +135,7 @@ describe('gl image renderer', () => {
 
     const texImageCall = gl.texImage2D.mock.calls.at(-1);
     expect(uploads).toEqual([
-      { channelName: '__spectralRgb:', textureBytes: 16, materializedBytes: 0 }
+      { channelName: '__spectralRgb:', textureBytes: 16, materializedBytes: 0, resourceKind: 'derived-texture' }
     ]);
     expect(texImageCall?.[2]).toBe(gl.RGBA32F);
     expect(texImageCall?.[6]).toBe(gl.RGBA);
@@ -170,10 +170,10 @@ describe('gl image renderer', () => {
 
     const texImageCalls = gl.texImage2D.mock.calls.slice(-4);
     expect(uploads).toEqual([
-      { channelName: '__spectralStokesRgb:S0', textureBytes: 16, materializedBytes: 0 },
-      { channelName: '__spectralStokesRgb:S1', textureBytes: 16, materializedBytes: 0 },
-      { channelName: '__spectralStokesRgb:S2', textureBytes: 16, materializedBytes: 0 },
-      { channelName: '__spectralStokesRgb:S3', textureBytes: 16, materializedBytes: 0 }
+      { channelName: '__spectralStokesRgb:S0', textureBytes: 16, materializedBytes: 0, resourceKind: 'derived-texture' },
+      { channelName: '__spectralStokesRgb:S1', textureBytes: 16, materializedBytes: 0, resourceKind: 'derived-texture' },
+      { channelName: '__spectralStokesRgb:S2', textureBytes: 16, materializedBytes: 0, resourceKind: 'derived-texture' },
+      { channelName: '__spectralStokesRgb:S3', textureBytes: 16, materializedBytes: 0, resourceKind: 'derived-texture' }
     ]);
     expect(texImageCalls).toHaveLength(4);
     for (const texImageCall of texImageCalls) {
@@ -225,6 +225,23 @@ describe('gl image renderer', () => {
     expect(gl.deleteTexture).toHaveBeenCalledTimes(2);
     expect(getLayerTexturesBySession(renderer).has('session-1')).toBe(false);
     expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
+  });
+
+  it('discards materialized CPU data without deleting a resident texture', () => {
+    const { renderer, gl } = createHarness();
+    const layer = createInterleavedLayerFromChannels({
+      R: [1, 2],
+      G: [3, 4]
+    });
+
+    renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R', 'G']);
+    expect(__debugGetMaterializedChannelCount(layer)).toBe(2);
+
+    renderer.discardChannelMaterializedBuffer('session-1', 0, 'R');
+
+    expect(gl.deleteTexture).not.toHaveBeenCalled();
+    expect(getLayerTextureChannels(renderer, 'session-1', 0)).toEqual(['R', 'G']);
+    expect(__debugGetMaterializedChannelCount(layer)).toBe(1);
   });
 
   it('deletes owned GL resources exactly once', () => {

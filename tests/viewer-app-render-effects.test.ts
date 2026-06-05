@@ -71,6 +71,7 @@ function createRendererMock() {
 
 function createRenderCacheMock() {
   return {
+    setVisibleDisplaySources: vi.fn(),
     prepareActiveSession: vi.fn(() => ({
       textureRevisionKey: 'texture',
       textureDirty: true

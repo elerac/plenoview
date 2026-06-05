@@ -15,9 +15,25 @@ import {
   estimateDecodedImageBytes,
   getTrackedResidentBytes,
   getTrackedResidentChannelBytes,
-  parseDisplayCacheBudgetStorageValue
+  parseDisplayCacheBudgetStorageValue,
+  type ResidentChannelResourceEntry
 } from '../src/display-cache';
 import type { DecodedExrImage } from '../src/types';
+
+function createResidentChannelEntry(
+  textureBytes: number,
+  materializedBytes: number,
+  lastAccessToken: number
+): ResidentChannelResourceEntry {
+  return {
+    textureBytes,
+    materializedBytes,
+    resourceKind: 'source-texture',
+    bytes: textureBytes,
+    lastAccessToken,
+    accessCount: 1
+  };
+}
 
 describe('display cache resource accounting', () => {
   it('tracks decoded baseline and retained CPU/GPU bytes across session layer channels', () => {
@@ -29,18 +45,18 @@ describe('display cache resource accounting', () => {
     sessions[0].decodedBytes = 10;
     sessions[0].residentLayers.set(0, {
       residentChannels: new Map([
-        ['R', { textureBytes: 24, materializedBytes: 12, lastAccessToken: 1 }]
+        ['R', createResidentChannelEntry(24, 12, 1)]
       ])
     });
     sessions[1].decodedBytes = 5;
     sessions[1].residentLayers.set(0, {
       residentChannels: new Map([
-        ['G', { textureBytes: 8, materializedBytes: 0, lastAccessToken: 2 }]
+        ['G', createResidentChannelEntry(8, 0, 2)]
       ])
     });
     sessions[1].residentLayers.set(1, {
       residentChannels: new Map([
-        ['Z', { textureBytes: 4, materializedBytes: 2, lastAccessToken: 3 }]
+        ['Z', createResidentChannelEntry(4, 2, 3)]
       ])
     });
 
@@ -92,7 +108,7 @@ describe('display cache resource accounting', () => {
     session.decodedBytes = 12;
     session.residentLayers.set(0, {
       residentChannels: new Map([
-        ['R', { textureBytes: 24, materializedBytes: 12, lastAccessToken: 7 }]
+        ['R', createResidentChannelEntry(24, 12, 7)]
       ])
     });
     session.luminanceRangeByRevision.set('rev', successResource('a:rev', { min: 0, max: 1 }));

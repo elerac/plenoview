@@ -106,11 +106,18 @@ function createRendererMock() {
           layer.channelStorage.kind === 'interleaved-f32'
         )
           ? width * height * Float32Array.BYTES_PER_ELEMENT
-          : 0
+          : 0,
+        resourceKind: (
+          channelName.startsWith('__muellerMatrix:') ||
+          channelName.startsWith('__spectral')
+        )
+          ? 'derived-texture' as const
+          : 'source-texture' as const
       }))
     ),
     setDisplaySelectionBindings: vi.fn(),
     discardChannelSourceTexture: vi.fn(),
+    discardChannelMaterializedBuffer: vi.fn(),
     discardLayerSourceTextures: vi.fn(),
     discardSessionTextures: vi.fn()
   };
@@ -120,7 +127,14 @@ function getEntries(service: RenderCacheService): Map<string, {
   pinned: boolean;
   decodedBytes: number;
   residentLayers: Map<number, {
-    residentChannels: Map<string, { textureBytes: number; materializedBytes: number; lastAccessToken: number }>;
+    residentChannels: Map<string, {
+      textureBytes: number;
+      materializedBytes: number;
+      resourceKind: 'source-texture' | 'derived-texture';
+      bytes: number;
+      lastAccessToken: number;
+      accessCount: number;
+    }>;
   }>;
   luminanceRangeByRevision: Map<string, AsyncResource<DisplayLuminanceRange | null>>;
   imageStatsByRevision: Map<string, AsyncResource<ImageStats | null>>;
@@ -1039,6 +1053,65 @@ describe('render cache service', () => {
     expect(getEntries(service).get(session.id)?.decodedBytes).toBe(80_000_000);
     expect(getEntries(service).get(session.id)?.residentLayers.size).toBe(0);
     expect(ui.setDisplayCacheUsage).toHaveBeenLastCalledWith(80_000_000, 64 * MB);
+  });
+
+  it('increments resident resource access counts on cache hits', () => {
+    const session = createSession('session-1');
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+    const service = new RenderCacheService({
+      ui,
+      renderer,
+      getActiveSessionId: () => session.id
+    });
+
+    service.prepareActiveSession(session, session.state);
+    const residentChannels = getEntries(service).get(session.id)?.residentLayers.get(0)?.residentChannels;
+
+    expect(residentChannels?.get('R')?.accessCount).toBe(1);
+    expect(residentChannels?.get('G')?.accessCount).toBe(1);
+    expect(residentChannels?.get('B')?.accessCount).toBe(1);
+
+    service.prepareActiveSession(session, session.state);
+
+    expect(residentChannels?.get('R')?.accessCount).toBe(2);
+    expect(residentChannels?.get('G')?.accessCount).toBe(2);
+    expect(residentChannels?.get('B')?.accessCount).toBe(2);
+  });
+
+  it('protects visible pane bindings and evicts non-visible resources first', () => {
+    const first = createSession('first', createDecodedImage(10_000, 1_000, { Z: 1 }));
+    const second = createSession('second', createDecodedImage(10_000, 1_000, { Z: 1 }));
+    const ui = createUiMock();
+    const renderer = createRendererMock();
+    const service = new RenderCacheService({
+      ui,
+      renderer,
+      getActiveSessionId: () => second.id
+    });
+
+    service.setBudgetMb(64);
+    service.setVisibleDisplaySources([
+      { session: first, state: first.state },
+      { session: second, state: second.state }
+    ]);
+
+    service.prepareActiveSession(first, first.state);
+    service.prepareActiveSession(second, second.state);
+
+    expect(renderer.discardChannelSourceTexture).not.toHaveBeenCalled();
+    expect(getEntries(service).get(first.id)?.residentLayers.size).toBe(1);
+    expect(getEntries(service).get(second.id)?.residentLayers.size).toBe(1);
+
+    service.setVisibleDisplaySources([
+      { session: second, state: second.state }
+    ]);
+    service.setBudgetMb(64);
+
+    expect(renderer.discardChannelSourceTexture).toHaveBeenCalledTimes(1);
+    expect(renderer.discardChannelSourceTexture).toHaveBeenCalledWith(first.id, 0, 'Z');
+    expect(getEntries(service).get(first.id)?.residentLayers.size).toBe(0);
+    expect(getEntries(service).get(second.id)?.residentLayers.size).toBe(1);
   });
 
   it('evicts inactive channels from the active layer while keeping the bound selection resident', () => {

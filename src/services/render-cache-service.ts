@@ -3,7 +3,6 @@ import {
   createSessionResourceEntry,
   displayCacheBudgetMbToBytes,
   estimateDecodedImageBytes,
-  getTrackedResidentBytes,
   getTrackedResidentChannelBytes,
   readStoredDisplayCacheBudgetMb,
   saveStoredDisplayCacheBudgetMb,
@@ -11,6 +10,13 @@ import {
   type ResidentLayerResourceEntry,
   type SessionResourceEntry
 } from '../display-cache';
+import { createMemoryUsageSnapshot, sanitizeByteCount } from '../memory/memory-accounting';
+import {
+  enforceMemoryBudget,
+  type EvictionContext,
+  type ResidentResourceBinding,
+  type ResidentResourceMetadata
+} from '../memory/memory-manager';
 import {
   AUTO_EXPOSURE_PERCENTILE,
   type AutoExposureResult
@@ -159,6 +165,7 @@ interface RenderCacheRenderer {
     depthRange: DisplayLuminanceRange | null
   ) => void;
   discardChannelSourceTexture: (sessionId: string, layerIndex: number, channelName: string) => void;
+  discardChannelMaterializedBuffer: (sessionId: string, layerIndex: number, channelName: string) => void;
   discardLayerSourceTextures: (sessionId: string, layerIndex: number) => void;
   discardSessionTextures: (sessionId: string) => void;
 }
@@ -167,6 +174,11 @@ interface ProtectedBinding {
   sessionId: string;
   layerIndex: number;
   channelNames: Set<string>;
+}
+
+export interface RenderCacheVisibleDisplaySource {
+  session: OpenedImageSession;
+  state: RenderCacheDisplayState;
 }
 
 interface IdleDeadlineLike {
@@ -239,9 +251,9 @@ type PendingAnalysisJob =
   | PendingImageStatsJob
   | PendingAutoExposureJob;
 
-type RenderCacheDisplayState =
+export type RenderCacheDisplayState =
   Pick<ViewerSessionState, 'activeLayer' | 'displaySelection' | 'visualizationMode'> &
-  Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled'>> & {
+  Partial<Pick<ViewerRenderState, 'maskInvalidStokesVectors' | 'spectralRgbGroupingEnabled' | 'viewerMode' | 'depthChannel'>> & {
     channelRecognitionSettings?: ChannelRecognitionSettings;
     channelRecognitionNameRules?: ChannelRecognitionNameRules;
   };
@@ -286,6 +298,9 @@ export class RenderCacheService implements Disposable {
   private boundChannelNames = new Set<string>();
   private boundTextureRevisionKey = '';
   private boundChannelRecognitionNameRulesKey = '';
+  private readonly visibleSessionIds = new Set<string>();
+  private visibleBindings: ProtectedBinding[] = [];
+  private readonly transientProtectedResourceKeys = new Set<string>();
   private activeHotSessionId: string | null = null;
   private activeHotLayerIndex: number | null = null;
   private activeHotChannelNames = new Set<string>();
@@ -309,6 +324,31 @@ export class RenderCacheService implements Disposable {
 
     this.ui.setDisplayCacheBudget(this.budgetMb);
     this.syncDisplayCacheUsageUi();
+  }
+
+  setVisibleDisplaySources(sources: readonly RenderCacheVisibleDisplaySource[]): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.visibleSessionIds.clear();
+    const visibleBindings: ProtectedBinding[] = [];
+
+    for (const source of sources) {
+      this.visibleSessionIds.add(source.session.id);
+      const layer = source.session.decoded.layers[source.state.activeLayer] ?? null;
+      if (!layer || source.session.decoded.width <= 0 || source.session.decoded.height <= 0) {
+        continue;
+      }
+
+      visibleBindings.push(this.createProtectedBinding(
+        source.session.id,
+        source.state.activeLayer,
+        this.resolveRequiredTextureChannelNames(source.session, layer, source.state)
+      ));
+    }
+
+    this.visibleBindings = visibleBindings;
   }
 
   prepareActiveSession(
@@ -803,6 +843,7 @@ export class RenderCacheService implements Disposable {
     this.renderer.discardSessionTextures(sessionId);
     this.clearBoundTextureTracking(sessionId);
     this.clearActiveHotSourceTracking(sessionId);
+    this.clearVisibleDisplaySourceTracking(sessionId);
     this.syncDisplayCacheUsageUi();
   }
 
@@ -821,6 +862,9 @@ export class RenderCacheService implements Disposable {
     this.boundChannelNames.clear();
     this.boundTextureRevisionKey = '';
     this.boundChannelRecognitionNameRulesKey = '';
+    this.visibleSessionIds.clear();
+    this.visibleBindings = [];
+    this.transientProtectedResourceKeys.clear();
     this.clearActiveHotSourceTracking();
     this.nextAccessToken = 1;
     this.syncDisplayCacheUsageUi();
@@ -843,6 +887,9 @@ export class RenderCacheService implements Disposable {
     this.boundChannelNames.clear();
     this.boundTextureRevisionKey = '';
     this.boundChannelRecognitionNameRulesKey = '';
+    this.visibleSessionIds.clear();
+    this.visibleBindings = [];
+    this.transientProtectedResourceKeys.clear();
     this.clearActiveHotSourceTracking();
     this.nextAccessToken = 1;
   }
@@ -1407,7 +1454,7 @@ export class RenderCacheService implements Disposable {
 
   private syncDisplayCacheUsageUi(): void {
     this.ui.setDisplayCacheUsage(
-      getTrackedResidentBytes([...this.entries.values()]),
+      createMemoryUsageSnapshot(this.entries.values()).totalTrackedBytes,
       displayCacheBudgetMbToBytes(this.budgetMb)
     );
   }
@@ -1431,6 +1478,7 @@ export class RenderCacheService implements Disposable {
     const missingChannelNames = channelNames.filter((channelName) => {
       return !residentLayer.residentChannels.has(channelName);
     });
+    const missingChannelNameSet = new Set(missingChannelNames);
 
     if (missingChannelNames.length === 0) {
       this.touchResidentChannels(residentLayer, channelNames);
@@ -1487,14 +1535,20 @@ export class RenderCacheService implements Disposable {
       residentLayer.residentChannels.set(upload.channelName, {
         textureBytes: upload.textureBytes,
         materializedBytes: upload.materializedBytes,
-        lastAccessToken: this.takeAccessToken()
+        resourceKind: upload.resourceKind,
+        bytes: upload.textureBytes,
+        lastAccessToken: this.takeAccessToken(),
+        accessCount: 1
       });
     }
 
     this.enforceResidencyBudget({
       protectedBinding: args.protectedBinding
     });
-    this.touchResidentChannels(residentLayer, channelNames);
+    this.touchResidentChannels(
+      residentLayer,
+      channelNames.filter((channelName) => !missingChannelNameSet.has(channelName))
+    );
 
     return {
       residentLayer,
@@ -1535,6 +1589,32 @@ export class RenderCacheService implements Disposable {
       layerIndex,
       unionStrings(requiredChannelNames, this.activeHotChannelNames)
     );
+  }
+
+  private resolveRequiredTextureChannelNames(
+    session: OpenedImageSession,
+    layer: DecodedLayer,
+    state: RenderCacheDisplayState
+  ): string[] {
+    const binding = buildDisplaySourceBinding(layer, state.displaySelection, state.visualizationMode, {
+      spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
+      channelRecognitionNameRules: state.channelRecognitionNameRules
+    });
+    const depthChannel = state.viewerMode === 'depth'
+      ? resolveDepthChannelForLayer(layer.channelNames, state.depthChannel ?? null, {
+          allowArbitraryZSuffix: true,
+          channelRecognitionSettings: state.channelRecognitionSettings,
+          channelRecognitionNameRules: state.channelRecognitionNameRules
+        })
+      : null;
+    const requiredChannelNames = getDisplaySourceBindingChannelNames(binding).filter((channelName) => {
+      return isDerivedDisplaySourceName(channelName) ||
+        layer.channelStorage.channelIndexByName[channelName] !== undefined;
+    });
+    return [
+      ...requiredChannelNames,
+      ...(depthChannel && layer.channelStorage.channelIndexByName[depthChannel] !== undefined ? [depthChannel] : [])
+    ];
   }
 
   private setActiveHotSourceContext(sessionId: string, layerIndex: number): void {
@@ -1698,6 +1778,11 @@ export class RenderCacheService implements Disposable {
     }
   }
 
+  private clearVisibleDisplaySourceTracking(sessionId: string): void {
+    this.visibleSessionIds.delete(sessionId);
+    this.visibleBindings = this.visibleBindings.filter((binding) => binding.sessionId !== sessionId);
+  }
+
   private createProtectedBinding(sessionId: string, layerIndex: number, channelNames: Iterable<string>): ProtectedBinding {
     return {
       sessionId,
@@ -1746,6 +1831,7 @@ export class RenderCacheService implements Disposable {
       }
 
       channel.lastAccessToken = this.takeAccessToken();
+      channel.accessCount += 1;
     }
   }
 
@@ -1759,20 +1845,21 @@ export class RenderCacheService implements Disposable {
     reservedBytes?: number;
     protectedBinding?: ProtectedBinding | null;
   } = {}): void {
-    const reservedBytes = Math.max(0, Math.floor(options.reservedBytes ?? 0));
+    const reservedBytes = sanitizeByteCount(options.reservedBytes ?? 0);
     const budgetBytes = displayCacheBudgetMbToBytes(this.budgetMb);
-    let trackedBytes = getTrackedResidentBytes([...this.entries.values()]);
+    const trackedBytes = createMemoryUsageSnapshot(this.entries.values()).totalTrackedBytes;
     if (trackedBytes + reservedBytes <= budgetBytes) {
       return;
     }
 
-    const protectedBinding = this.resolveProtectedBinding(options.protectedBinding);
-    for (const candidate of this.getEvictionCandidates(protectedBinding)) {
-      if (trackedBytes + reservedBytes <= budgetBytes) {
-        break;
-      }
-      trackedBytes -= this.evictResidentChannel(candidate.sessionId, candidate.layerIndex, candidate.channelName);
-    }
+    const evictionContext = this.createEvictionContext(options.protectedBinding);
+    enforceMemoryBudget({
+      resources: this.collectResidentResourceMetadata(),
+      trackedBytes,
+      budgetBytes,
+      reservedBytes,
+      context: evictionContext
+    });
   }
 
   private resolveProtectedBinding(protectedBinding: ProtectedBinding | null | undefined): ProtectedBinding | null {
@@ -1808,50 +1895,113 @@ export class RenderCacheService implements Disposable {
     return unionStrings(boundChannelNames, this.activeHotChannelNames);
   }
 
-  private getEvictionCandidates(
-    protectedBinding: ProtectedBinding | null
-  ): Array<{ sessionId: string; layerIndex: number; channelName: string; lastAccessToken: number }> {
-    const candidates: Array<{ sessionId: string; layerIndex: number; channelName: string; lastAccessToken: number }> = [];
+  private createEvictionContext(protectedBinding: ProtectedBinding | null | undefined): EvictionContext {
+    const activeBinding = this.resolveProtectedBinding(protectedBinding);
+    const activeBindings = [
+      ...this.visibleBindings,
+      ...(activeBinding ? [activeBinding] : [])
+    ].map(toResidentResourceBinding);
 
+    return {
+      activeSessionId: this.getActiveSessionId(),
+      visibleSessionIds: new Set(this.visibleSessionIds),
+      activeBindings,
+      pinnedSessionIds: this.getPinnedSessionIds(),
+      protectedResourceKeys: this.transientProtectedResourceKeys
+    };
+  }
+
+  private getPinnedSessionIds(): Set<string> {
+    const pinnedSessionIds = new Set<string>();
     for (const [sessionId, entry] of this.entries) {
       if (entry.pinned) {
-        continue;
+        pinnedSessionIds.add(sessionId);
       }
+    }
+    return pinnedSessionIds;
+  }
+
+  private collectResidentResourceMetadata(): ResidentResourceMetadata[] {
+    const resources: ResidentResourceMetadata[] = [];
+
+    for (const [sessionId, entry] of this.entries) {
+      resources.push({
+        sessionId,
+        layerIndex: null,
+        sourceName: null,
+        resourceKind: 'decoded-session',
+        bytes: entry.decodedBytes,
+        lastAccessToken: 0,
+        accessCount: 0,
+        visible: this.visibleSessionIds.has(sessionId),
+        pinned: entry.pinned,
+        evict: () => 0
+      });
 
       for (const [layerIndex, layer] of entry.residentLayers) {
         for (const [channelName, channel] of layer.residentChannels) {
-          if (
-            protectedBinding &&
-            protectedBinding.sessionId === sessionId &&
-            protectedBinding.layerIndex === layerIndex &&
-            protectedBinding.channelNames.has(channelName)
-          ) {
-            continue;
+          if (sanitizeByteCount(channel.textureBytes) > 0) {
+            resources.push({
+              sessionId,
+              layerIndex,
+              sourceName: channelName,
+              resourceKind: channel.resourceKind,
+              bytes: channel.textureBytes,
+              lastAccessToken: channel.lastAccessToken,
+              accessCount: channel.accessCount,
+              visible: this.isVisibleTextureResource(sessionId, layerIndex, channelName),
+              pinned: entry.pinned,
+              evict: () => this.evictResidentChannel(sessionId, layerIndex, channelName)
+            });
           }
 
-          candidates.push({
-            sessionId,
-            layerIndex,
-            channelName,
-            lastAccessToken: channel.lastAccessToken
-          });
+          if (sanitizeByteCount(channel.materializedBytes) > 0) {
+            resources.push({
+              sessionId,
+              layerIndex,
+              sourceName: channelName,
+              resourceKind: 'cpu-materialized',
+              bytes: channel.materializedBytes,
+              lastAccessToken: channel.lastAccessToken,
+              accessCount: channel.accessCount,
+              visible: false,
+              pinned: entry.pinned,
+              evict: () => this.evictResidentChannelMaterializedBuffer(sessionId, layerIndex, channelName)
+            });
+          }
         }
       }
     }
 
-    candidates.sort((left, right) => {
-      if (left.lastAccessToken !== right.lastAccessToken) {
-        return left.lastAccessToken - right.lastAccessToken;
-      }
-      if (left.sessionId !== right.sessionId) {
-        return left.sessionId.localeCompare(right.sessionId);
-      }
-      if (left.layerIndex !== right.layerIndex) {
-        return left.layerIndex - right.layerIndex;
-      }
-      return left.channelName.localeCompare(right.channelName);
+    return resources;
+  }
+
+  private isVisibleTextureResource(sessionId: string, layerIndex: number, channelName: string): boolean {
+    return this.visibleBindings.some((binding) => {
+      return (
+        binding.sessionId === sessionId &&
+        binding.layerIndex === layerIndex &&
+        binding.channelNames.has(channelName)
+      );
     });
-    return candidates;
+  }
+
+  private evictResidentChannelMaterializedBuffer(sessionId: string, layerIndex: number, channelName: string): number {
+    const entry = this.entries.get(sessionId);
+    const layer = entry?.residentLayers.get(layerIndex);
+    const channel = layer?.residentChannels.get(channelName);
+    if (!entry || !layer || !channel) {
+      return 0;
+    }
+
+    const materializedBytes = sanitizeByteCount(channel.materializedBytes);
+    if (materializedBytes <= 0) {
+      return 0;
+    }
+
+    channel.materializedBytes = 0;
+    this.renderer.discardChannelMaterializedBuffer(sessionId, layerIndex, channelName);
+    return materializedBytes;
   }
 
   private evictResidentChannel(sessionId: string, layerIndex: number, channelName: string): number {
@@ -2208,6 +2358,14 @@ function unionStrings(...groups: Iterable<string>[]): string[] {
     }
   }
   return [...values];
+}
+
+function toResidentResourceBinding(binding: ProtectedBinding): ResidentResourceBinding {
+  return {
+    sessionId: binding.sessionId,
+    layerIndex: binding.layerIndex,
+    sourceNames: binding.channelNames
+  };
 }
 
 function resolveWindowLike(): RenderCacheWindowLike | null {

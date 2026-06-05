@@ -183,6 +183,14 @@ export class WebGlExrRenderer implements Disposable {
     this.imageRenderer.discardLayerSourceTextures(sessionId, layerIndex);
   }
 
+  discardChannelMaterializedBuffer(sessionId: string, layerIndex: number, channelName: string): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.imageRenderer.discardChannelMaterializedBuffer(sessionId, layerIndex, channelName);
+  }
+
   discardChannelSourceTexture(sessionId: string, layerIndex: number, channelName: string): void {
     if (this.disposed) {
       return;

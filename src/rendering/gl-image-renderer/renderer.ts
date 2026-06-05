@@ -11,6 +11,7 @@ import { deleteExportSurface, readExportPixels } from './export-surface';
 import { render } from './render-pass';
 import { createGlImageRendererState } from './shared-state';
 import {
+  discardChannelMaterializedBuffer,
   discardChannelSourceTexture,
   discardLayerSourceTextures,
   discardSessionTextures,
@@ -155,6 +156,14 @@ export class GlImageRenderer implements Disposable {
     }
 
     discardLayerSourceTextures(this.state, sessionId, layerIndex);
+  }
+
+  discardChannelMaterializedBuffer(sessionId: string, layerIndex: number, channelName: string): void {
+    if (this.state.disposed) {
+      return;
+    }
+
+    discardChannelMaterializedBuffer(this.state, sessionId, layerIndex, channelName);
   }
 
   discardChannelSourceTexture(sessionId: string, layerIndex: number, channelName: string): void {

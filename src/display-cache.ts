@@ -1,5 +1,10 @@
 import type { AutoExposureResult } from './analysis/auto-exposure';
 import type { AsyncResource } from './async-resource';
+import {
+  createMemoryUsageSnapshot,
+  sanitizeByteCount
+} from './memory/memory-accounting';
+import type { ResidentResourceKind } from './memory/memory-manager';
 import type { DecodedExrImage, DisplayLuminanceRange, ImageStats } from './types';
 
 export const DISPLAY_CACHE_BUDGET_STORAGE_KEY = 'prismifold:display-cache-budget-mb:v1';
@@ -10,16 +15,22 @@ export const MAX_DISPLAY_CACHE_BUDGET_MB =
 export const DEFAULT_DISPLAY_CACHE_BUDGET_MB = 256;
 export const BYTES_PER_MEGABYTE = 1024 * 1024;
 
+export type ResidentTextureResourceKind = Extract<ResidentResourceKind, 'source-texture' | 'derived-texture'>;
+
 export interface ResidentChannelResourceEntry {
   textureBytes: number;
   materializedBytes: number;
+  resourceKind: ResidentTextureResourceKind;
+  bytes: number;
   lastAccessToken: number;
+  accessCount: number;
 }
 
 export interface ResidentChannelUpload {
   channelName: string;
   textureBytes: number;
   materializedBytes: number;
+  resourceKind: ResidentTextureResourceKind;
 }
 
 export interface ResidentLayerResourceEntry {
@@ -66,15 +77,7 @@ export function getTrackedResidentChannelBytes(
 export function getTrackedResidentBytes(
   sessions: Array<Pick<SessionResourceEntry, 'decodedBytes' | 'residentLayers'>>
 ): number {
-  return sessions.reduce((total, session) => {
-    let sessionBytes = sanitizeByteCount(session.decodedBytes);
-    for (const layer of session.residentLayers.values()) {
-      for (const channel of layer.residentChannels.values()) {
-        sessionBytes += getTrackedResidentChannelBytes(channel);
-      }
-    }
-    return total + sessionBytes;
-  }, 0);
+  return createMemoryUsageSnapshot(sessions).totalTrackedBytes;
 }
 
 export function estimateDecodedImageBytes(image: DecodedExrImage): number {
@@ -148,8 +151,4 @@ export function saveStoredDisplayCacheBudgetMb(valueMb: number): void {
   } catch {
     // Storage can be unavailable in private contexts; keep the runtime budget anyway.
   }
-}
-
-function sanitizeByteCount(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }

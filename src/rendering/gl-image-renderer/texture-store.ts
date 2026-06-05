@@ -158,7 +158,8 @@ export function ensureLayerChannelsResident(
       uploads.push({
         channelName,
         textureBytes: predictR32fTextureBytes(width, height),
-        materializedBytes
+        materializedBytes,
+        resourceKind: 'source-texture'
       });
     } catch (error) {
       if (texture) {
@@ -210,7 +211,8 @@ function uploadMuellerMatrixSourceTexture(
     return {
       channelName: sourceName,
       textureBytes: predictRgba32fTextureBytes(displaySize.width, displaySize.height),
-      materializedBytes: 0
+      materializedBytes: 0,
+      resourceKind: 'derived-texture'
     };
   } catch (error) {
     if (texture) {
@@ -319,7 +321,8 @@ function uploadSpectralStokesRgbSourceTexture(
     return {
       channelName: sourceName,
       textureBytes: predictRgba32fTextureBytes(width, height),
-      materializedBytes: 0
+      materializedBytes: 0,
+      resourceKind: 'derived-texture'
     };
   } catch (error) {
     if (texture) {
@@ -396,7 +399,8 @@ function uploadSpectralRgbSourceTexture(
     return {
       channelName: sourceName,
       textureBytes: predictRgba32fTextureBytes(width, height),
-      materializedBytes: 0
+      materializedBytes: 0,
+      resourceKind: 'derived-texture'
     };
   } catch (error) {
     if (texture) {
@@ -481,6 +485,25 @@ export function discardLayerSourceTextures(
   for (const channelName of [...layerTextures.textureByChannel.keys()]) {
     discardChannelSourceTexture(state, sessionId, layerIndex, channelName);
   }
+}
+
+export function discardChannelMaterializedBuffer(
+  state: GlImageRendererState,
+  sessionId: string,
+  layerIndex: number,
+  channelName: string
+): void {
+  const sessionLayers = state.layerTexturesBySession.get(sessionId);
+  if (!sessionLayers) {
+    return;
+  }
+
+  const layerTextures = sessionLayers.get(layerIndex);
+  if (!layerTextures) {
+    return;
+  }
+
+  discardMaterializedChannel(layerTextures.layer, channelName);
 }
 
 export function discardChannelSourceTexture(

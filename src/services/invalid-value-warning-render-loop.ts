@@ -39,6 +39,10 @@ export class InvalidValueWarningRenderLoop implements Disposable {
     }
 
     this.sources = sources.map(cloneViewerPaneRenderSource);
+    this.renderCache.setVisibleDisplaySources(this.sources.map((source) => ({
+      session: source.session,
+      state: source.renderState
+    })));
     if (!this.shouldRun()) {
       this.stop();
       return;
@@ -108,6 +112,10 @@ function renderWarningPhaseSources(
   phase: number
 ): void {
   const panesByPath = new Map(panes.map((pane) => [serializePanePath(pane.path), pane]));
+  renderCache.setVisibleDisplaySources(sources.map((source) => ({
+    session: source.session,
+    state: source.renderState
+  })));
   renderer.beginPaneRender();
   for (const source of sources) {
     const pane = panesByPath.get(serializePanePath(source.path));
