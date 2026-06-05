@@ -1,10 +1,10 @@
 import { DEFAULT_DISPLAY_GAMMA } from './color';
 import {
-  clampDepthPitch,
-  clampDepthYaw,
   clampDepthZoom,
   DEFAULT_DEPTH_POINT_SIZE_PX,
   DEFAULT_DEPTH_ZOOM,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource,
   resolveDepthChannelForLayer
 } from './depth';
 import { DEFAULT_PANORAMA_HFOV_DEG } from './interaction/panorama-geometry';
@@ -101,7 +101,7 @@ export class ViewerStore {
   }
 
   setState(patch: Partial<ViewerSessionState>): void {
-    const normalizedPatch = pickSessionStatePatch(patch);
+    const normalizedPatch = pickSessionStatePatch(patch, this.state);
     if (!hasStateChanges(this.state, normalizedPatch)) {
       return;
     }
@@ -141,28 +141,32 @@ export function buildViewerStateForLayer(
       ...currentState,
       activeLayer: 0,
       displaySelection: null,
-      depthYawDeg: clampDepthYaw(currentState.depthYawDeg),
-      depthPitchDeg: clampDepthPitch(currentState.depthPitchDeg),
+      depthYawDeg: normalizeDepthYawForSource(currentState.depthYawDeg, null),
+      depthPitchDeg: normalizeDepthPitchForSource(currentState.depthPitchDeg, null),
       depthZoom: clampDepthZoom(currentState.depthZoom),
       depthChannel: null
     };
   }
 
+  const depthChannel = resolveDepthChannelForLayer(layer.channelNames, currentState.depthChannel, {
+    channelRecognitionSettings: config.channelRecognitionSettings,
+    channelRecognitionNameRules: config.channelRecognitionNameRules
+  });
   return {
     ...currentState,
     activeLayer,
     displaySelection: resolveDisplaySelectionForLayer(layer.channelNames, currentState.displaySelection, config),
-    depthYawDeg: clampDepthYaw(currentState.depthYawDeg),
-    depthPitchDeg: clampDepthPitch(currentState.depthPitchDeg),
+    depthYawDeg: normalizeDepthYawForSource(currentState.depthYawDeg, depthChannel),
+    depthPitchDeg: normalizeDepthPitchForSource(currentState.depthPitchDeg, depthChannel),
     depthZoom: clampDepthZoom(currentState.depthZoom),
-    depthChannel: resolveDepthChannelForLayer(layer.channelNames, currentState.depthChannel, {
-      channelRecognitionSettings: config.channelRecognitionSettings,
-      channelRecognitionNameRules: config.channelRecognitionNameRules
-    })
+    depthChannel
   };
 }
 
-function pickSessionStatePatch(patch: Partial<ViewerSessionState>): Partial<ViewerSessionState> {
+function pickSessionStatePatch(
+  patch: Partial<ViewerSessionState>,
+  currentState: ViewerSessionState
+): Partial<ViewerSessionState> {
   const nextPatch: Partial<ViewerSessionState> = {};
   for (const key of SESSION_STATE_KEYS) {
     if (key in patch) {
@@ -171,11 +175,18 @@ function pickSessionStatePatch(patch: Partial<ViewerSessionState>): Partial<View
       });
     }
   }
+  const depthSource = patch.depthChannel !== undefined
+    ? patch.depthChannel
+    : currentState.depthChannel;
   if (patch.depthYawDeg !== undefined) {
-    nextPatch.depthYawDeg = clampDepthYaw(patch.depthYawDeg);
+    nextPatch.depthYawDeg = normalizeDepthYawForSource(patch.depthYawDeg, depthSource);
+  } else if (patch.depthChannel !== undefined) {
+    nextPatch.depthYawDeg = normalizeDepthYawForSource(currentState.depthYawDeg, depthSource);
   }
   if (patch.depthPitchDeg !== undefined) {
-    nextPatch.depthPitchDeg = clampDepthPitch(patch.depthPitchDeg);
+    nextPatch.depthPitchDeg = normalizeDepthPitchForSource(patch.depthPitchDeg, depthSource);
+  } else if (patch.depthChannel !== undefined) {
+    nextPatch.depthPitchDeg = normalizeDepthPitchForSource(currentState.depthPitchDeg, depthSource);
   }
   if (patch.depthZoom !== undefined) {
     nextPatch.depthZoom = clampDepthZoom(patch.depthZoom);

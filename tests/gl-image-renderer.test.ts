@@ -401,8 +401,8 @@ describe('gl image renderer', () => {
       ...createInitialState(),
       viewerMode: 'depth' as const,
       depthChannel: '__position:P',
-      depthYawDeg: 10,
-      depthPitchDeg: 20,
+      depthYawDeg: 120,
+      depthPitchDeg: -120,
       depthZoom: 1.5,
       depthFocalLengthPx: null,
       depthPointSizePx: 4,
@@ -450,6 +450,8 @@ describe('gl image renderer', () => {
 
     expect(gl.drawArrays).toHaveBeenLastCalledWith(gl.POINTS, 0, 4);
     expect(lastUniform1iValue(gl, 'uDepthSourceKind')).toBe(1);
+    expect(lastUniform1fValue(gl, 'uDepthYawDeg')).toBe(120);
+    expect(lastUniform1fValue(gl, 'uDepthPitchDeg')).toBe(-120);
     expect(lastUniform3fValue(gl, 'uDepthPositionBoundsMin')).toEqual([-1, -2, 3]);
     expect(lastUniform3fValue(gl, 'uDepthPositionBoundsMax')).toEqual([1, 2, 5]);
   });

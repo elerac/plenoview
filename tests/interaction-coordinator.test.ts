@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { ViewerInteractionCoordinator } from '../src/interaction-coordinator';
 import { createEmptyRoiInteractionState } from '../src/view-state';
 import { createInitialState } from '../src/viewer-store';
+import type { ViewerSessionState } from '../src/types';
 
-function createHarness() {
-  let sessionState = createInitialState();
+function createHarness(initialSessionState: Partial<ViewerSessionState> = {}) {
+  let sessionState = {
+    ...createInitialState(),
+    ...initialSessionState
+  };
   let frameCallback: FrameRequestCallback | null = null;
   const onInteractionChange = vi.fn();
   const commitViewState = vi.fn((view) => {
@@ -206,6 +210,37 @@ describe('interaction coordinator', () => {
       expect.objectContaining({
         depthYawDeg: 89.9,
         depthPitchDeg: -89.9,
+        depthZoom: 50
+      })
+    );
+  });
+
+  it('preserves position depth view patches before publishing and committing interaction state', () => {
+    const harness = createHarness({
+      depthChannel: '__position:P'
+    });
+
+    harness.coordinator.enqueueViewPatch({
+      depthYawDeg: 120,
+      depthPitchDeg: -120,
+      depthZoom: 100
+    });
+    harness.flush();
+
+    expect(harness.onInteractionChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        view: expect.objectContaining({
+          depthYawDeg: 120,
+          depthPitchDeg: -120,
+          depthZoom: 50
+        })
+      }),
+      expect.anything()
+    );
+    expect(harness.commitViewState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        depthYawDeg: 120,
+        depthPitchDeg: -120,
         depthZoom: 50
       })
     );

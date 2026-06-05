@@ -8,6 +8,8 @@ import {
   getDepthSourceOptions,
   hasDepthChannelCandidate,
   isDepthSampledPixel,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource,
   pickDepthPixelAtScreenPoint,
   projectDepthPixelToScreen,
   projectDepthPixelToPoint,
@@ -100,6 +102,15 @@ describe('depth utilities', () => {
     expect(clampDepthYaw(181)).toBe(89.9);
     expect(clampDepthYaw(-181)).toBe(-89.9);
     expect(clampDepthYaw(270)).toBe(89.9);
+  });
+
+  it('normalizes depth orbit angles by source kind', () => {
+    expect(normalizeDepthYawForSource(120, 'Z')).toBe(89.9);
+    expect(normalizeDepthPitchForSource(-120, 'Z')).toBe(-89.9);
+    expect(normalizeDepthYawForSource(120, '__position:P')).toBe(120);
+    expect(normalizeDepthPitchForSource(-120, 'xyzPosition')).toBe(-120);
+    expect(normalizeDepthYawForSource(270, '__position:P')).toBe(-90);
+    expect(normalizeDepthPitchForSource(181, '__position:P')).toBe(-179);
   });
 
   it('only selects arbitrary .Z suffix channels when explicitly allowed', () => {
@@ -265,6 +276,85 @@ describe('depth utilities', () => {
       screenY: expect.any(Number),
       depth: -3
     });
+  });
+
+  it('projects position points with unrestricted orbit angles', () => {
+    const bounds = {
+      minX: -1,
+      maxX: 1,
+      minY: -1,
+      maxY: 1,
+      minZ: -1,
+      maxZ: 1
+    };
+    const projection = projectPositionPointToScreen(0, 0, { x: 1, y: 0, z: 0 }, {
+      width: 1,
+      height: 1,
+      viewport: { width: 100, height: 100 },
+      bounds,
+      depthFocalLengthPx: null,
+      depthYawDeg: 120,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthPointSizePx: 2
+    });
+    const clampedProjection = projectPositionPointToScreen(0, 0, { x: 1, y: 0, z: 0 }, {
+      width: 1,
+      height: 1,
+      viewport: { width: 100, height: 100 },
+      bounds,
+      depthFocalLengthPx: null,
+      depthYawDeg: 89.9,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthPointSizePx: 2
+    });
+
+    expect(projection).not.toBeNull();
+    expect(clampedProjection).not.toBeNull();
+    expect(projection!.screenX).toBeCloseTo(25, 6);
+    expect(projection!.screenX).not.toBeCloseTo(clampedProjection!.screenX, 2);
+  });
+
+  it('projects cached position probe pixels with unrestricted orbit angles', () => {
+    const layer = createLayerFromChannels({
+      'P.X': [1],
+      'P.Y': [0],
+      'P.Z': [0]
+    });
+    const cache = new DepthProbeProjectionCache();
+    const projection = cache.projectPixel({ ix: 0, iy: 0 }, {
+      layer,
+      width: 1,
+      height: 1,
+      source: {
+        kind: 'xyzPosition',
+        base: 'P',
+        xChannel: 'P.X',
+        yChannel: 'P.Y',
+        zChannel: 'P.Z'
+      },
+      viewport: { width: 100, height: 100 },
+      geometry: {
+        kind: 'xyzPosition',
+        bounds: {
+          minX: -1,
+          maxX: 1,
+          minY: -1,
+          maxY: 1,
+          minZ: -1,
+          maxZ: 1
+        }
+      },
+      depthFocalLengthPx: null,
+      depthYawDeg: 120,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthPointSizePx: 2
+    });
+
+    expect(projection).not.toBeNull();
+    expect(projection!.screenX).toBeCloseTo(25, 6);
   });
 
   it('limits point sampling to the configured budget', () => {

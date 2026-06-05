@@ -61,10 +61,11 @@ export class ViewerInteractionCoordinator implements Disposable {
       return;
     }
 
+    const sessionState = this.getSessionState();
     const nextView = pickViewState({
       ...this.state.view,
       ...patch
-    });
+    }, sessionState.depthChannel);
 
     if (sameViewState(this.state.view, nextView)) {
       return;
@@ -119,7 +120,7 @@ export class ViewerInteractionCoordinator implements Disposable {
   ): SessionInteractionSyncResult {
     const previous = this.publishedState;
     const next: ViewerInteractionState = {
-      view: pickViewState(sessionState),
+      view: pickViewState(sessionState, sessionState.depthChannel),
       hoveredPixel: options.clearHover ? null : this.state.hoveredPixel,
       draftRoi: null,
       roiInteraction: createInteractionState(sessionState).roiInteraction
@@ -173,7 +174,8 @@ export class ViewerInteractionCoordinator implements Disposable {
       this.publishedState = next;
     }
 
-    const sessionView = pickViewState(this.getSessionState());
+    const sessionState = this.getSessionState();
+    const sessionView = pickViewState(sessionState, sessionState.depthChannel);
     if (!sameViewState(sessionView, next.view)) {
       this.commitViewState(next.view);
     }

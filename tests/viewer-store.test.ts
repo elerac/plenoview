@@ -121,6 +121,48 @@ describe('viewer store', () => {
     expect(fallback.displaySelection).toEqual(createChannelRgbSelection('R', 'G', 'B'));
   });
 
+  it('normalizes depth camera state using the resolved depth source for the layer', () => {
+    const layer = createLayerFromChannels({
+      Z: [1, 1, 1, 1],
+      'P.X': [0, 1, 0, 1],
+      'P.Y': [0, 0, 1, 1],
+      'P.Z': [0, 0, 0, 0]
+    });
+    const image = createImage([layer]);
+
+    const positionState = buildViewerStateForLayer(
+      createViewerState({
+        viewerMode: 'depth',
+        depthChannel: '__position:P',
+        depthYawDeg: 120,
+        depthPitchDeg: -120
+      }),
+      image,
+      0
+    );
+    expect(positionState).toMatchObject({
+      depthChannel: '__position:P',
+      depthYawDeg: 120,
+      depthPitchDeg: -120
+    });
+
+    const scalarState = buildViewerStateForLayer(
+      createViewerState({
+        viewerMode: 'depth',
+        depthChannel: 'Z',
+        depthYawDeg: 120,
+        depthPitchDeg: -120
+      }),
+      image,
+      0
+    );
+    expect(scalarState).toMatchObject({
+      depthChannel: 'Z',
+      depthYawDeg: 89.9,
+      depthPitchDeg: -89.9
+    });
+  });
+
   it('ignores transient hover fields in runtime store patches', () => {
     const store = new ViewerStore(createInitialState());
 

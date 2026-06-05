@@ -19,6 +19,8 @@ import {
   DEFAULT_DEPTH_ZOOM,
   normalizeDepthFocalLengthPx,
   normalizeDepthPointSize,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource,
   resolveDepthChannelForLayer
 } from '../../depth';
 import { computeFitView } from '../../interaction/image-geometry';
@@ -367,7 +369,7 @@ export function displayReducer(
       if (!selectActiveSession(state)) {
         return state;
       }
-      const patch = normalizeViewerViewPatch(intent.patch);
+      const patch = normalizeViewerViewPatch(intent.patch, state.sessionState.depthChannel);
       return patch ? patchSessionState(state, patch, {
         syncInteractionView: true,
         clearHover: true
@@ -391,6 +393,8 @@ export function displayReducer(
             channelRecognitionNameRules: state.channelRecognitionNameRules
           }
         );
+        patch.depthYawDeg = normalizeDepthYawForSource(state.sessionState.depthYawDeg, patch.depthChannel);
+        patch.depthPitchDeg = normalizeDepthPitchForSource(state.sessionState.depthPitchDeg, patch.depthChannel);
       }
       if (intent.patch.depthFocalLengthPx !== undefined) {
         patch.depthFocalLengthPx = normalizeDepthFocalLengthPx(intent.patch.depthFocalLengthPx);
@@ -400,17 +404,19 @@ export function displayReducer(
       }
 
       return patchSessionState(state, patch, {
-        syncInteractionView: false,
+        syncInteractionView: intent.patch.depthChannel !== undefined,
         clearHover: true
       });
     }
-    case 'interactionStatePublished':
-      return sameInteractionState(state.interactionState, intent.interactionState) ? state : {
+    case 'interactionStatePublished': {
+      const interactionState = cloneInteractionState(intent.interactionState, state.sessionState.depthChannel);
+      return sameInteractionState(state.interactionState, interactionState) ? state : {
         ...state,
-        interactionState: cloneInteractionState(intent.interactionState)
+        interactionState
       };
+    }
     case 'viewStateCommitted': {
-      const patch = normalizeViewerViewPatch(intent.view);
+      const patch = normalizeViewerViewPatch(intent.view, state.sessionState.depthChannel);
       if (!patch || sameViewCommit(state.sessionState, { ...state.sessionState, ...patch })) {
         return state;
       }

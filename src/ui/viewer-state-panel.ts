@@ -1,10 +1,11 @@
 import { clampZoom } from '../interaction/image-geometry';
 import {
-  clampDepthPitch,
-  clampDepthYaw,
+  type DepthRotationSource,
   clampDepthZoom,
   normalizeDepthFocalLengthPx,
-  normalizeDepthPointSize
+  normalizeDepthPointSize,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource
 } from '../depth';
 import {
   clampPanoramaHfov,
@@ -76,11 +77,12 @@ export class ViewerStatePanel implements Disposable {
       return;
     }
 
+    const normalizedDepth = normalizeDepthReadout(readout.depth);
     this.readout = {
       hasActiveImage: readout.hasActiveImage,
       viewerMode: readout.viewerMode,
-      view: normalizeViewReadout(readout.view),
-      depth: normalizeDepthReadout(readout.depth)
+      view: normalizeViewReadout(readout.view, getDepthReadoutRotationSource(normalizedDepth)),
+      depth: normalizedDepth
     };
 
     const imageFieldsActive = readout.hasActiveImage && readout.viewerMode === 'image';
@@ -109,7 +111,6 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStateYawInput.disabled = !panoramaFieldsActive;
     this.elements.viewerStatePitchInput.disabled = !panoramaFieldsActive;
     this.elements.viewerStateHfovInput.disabled = !panoramaFieldsActive;
-    const normalizedDepth = normalizeDepthReadout(readout.depth);
     this.elements.viewerStateDepthChannelSelect.disabled = !depthFieldsActive || normalizedDepth.channelOptions.length === 0;
     const depthFocalInputActive = depthFieldsActive && normalizedDepth.sourceKind !== 'xyzPosition';
     this.elements.viewerStateDepthFocalInput.disabled = !depthFocalInputActive;
@@ -132,7 +133,7 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStateDepthFocalInput.title = depth.sourceKind === 'xyzPosition'
       ? 'Focal length applies to scalar depth sources.'
       : focalDisplayValue;
-    const view = normalizeViewReadout(readout.view);
+    const view = normalizeViewReadout(readout.view, getDepthReadoutRotationSource(depth));
     this.elements.viewerStateDepthYawInput.value = formatViewerStateNumber(view.depthYawDeg, 'depthYawDeg');
     this.elements.viewerStateDepthPitchInput.value = formatViewerStateNumber(view.depthPitchDeg, 'depthPitchDeg');
     this.elements.viewerStateDepthZoomInput.value = formatViewerStateNumber(view.depthZoom, 'depthZoom');
@@ -174,7 +175,11 @@ export class ViewerStatePanel implements Disposable {
       return;
     }
 
-    const normalized = normalizeViewerStateField(field, value);
+    const normalized = normalizeViewerStateField(
+      field,
+      value,
+      getDepthReadoutRotationSource(normalizeDepthReadout(this.readout.depth))
+    );
     input.removeAttribute('aria-invalid');
     input.value = formatViewerStateNumber(normalized, field);
 
@@ -325,7 +330,11 @@ export class ViewerStatePanel implements Disposable {
   }
 }
 
-function normalizeViewerStateField(field: ViewerStateField, value: number): number {
+function normalizeViewerStateField(
+  field: ViewerStateField,
+  value: number,
+  depthSource: DepthRotationSource = null
+): number {
   switch (field) {
     case 'zoom':
       return clampZoom(value);
@@ -339,9 +348,9 @@ function normalizeViewerStateField(field: ViewerStateField, value: number): numb
     case 'panoramaHfovDeg':
       return clampPanoramaHfov(value);
     case 'depthYawDeg':
-      return clampDepthYaw(value);
+      return normalizeDepthYawForSource(value, depthSource);
     case 'depthPitchDeg':
-      return clampDepthPitch(value);
+      return normalizeDepthPitchForSource(value, depthSource);
     case 'depthZoom':
       return clampDepthZoom(value);
     default:
@@ -385,13 +394,20 @@ function normalizeDepthReadout(
   };
 }
 
+function getDepthReadoutRotationSource(
+  depth: NonNullable<ViewerStateReadoutModel['depth']>
+): DepthRotationSource {
+  return depth.sourceKind ?? depth.channel;
+}
+
 function formatDepthFocalInputValue(depth: NonNullable<ViewerStateReadoutModel['depth']>): string {
   const value = depth.focalLengthPx ?? depth.resolvedFocalLengthPx;
   return value === null ? '' : formatCompactNumber(value, 2);
 }
 
 function normalizeViewReadout(
-  view: ViewerStateReadoutModel['view']
+  view: ViewerStateReadoutModel['view'],
+  depthSource: DepthRotationSource = null
 ): ViewerViewState {
   return {
     zoom: view.zoom,
@@ -400,8 +416,8 @@ function normalizeViewReadout(
     panoramaYawDeg: view.panoramaYawDeg,
     panoramaPitchDeg: view.panoramaPitchDeg,
     panoramaHfovDeg: view.panoramaHfovDeg,
-    depthYawDeg: clampDepthYaw(view.depthYawDeg ?? 0),
-    depthPitchDeg: clampDepthPitch(view.depthPitchDeg ?? 0),
+    depthYawDeg: normalizeDepthYawForSource(view.depthYawDeg ?? 0, depthSource),
+    depthPitchDeg: normalizeDepthPitchForSource(view.depthPitchDeg ?? 0, depthSource),
     depthZoom: clampDepthZoom(view.depthZoom ?? 1)
   };
 }

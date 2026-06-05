@@ -513,6 +513,25 @@ describe('interaction math', () => {
     expect(next.depthPitchDeg).toBe(89.9);
   });
 
+  it('allows position depth orbit to cross to the backside', () => {
+    const viewport = { width: 100, height: 100 };
+    const next = orbitDepthFromDrag(
+      {
+        ...state,
+        viewerMode: 'depth',
+        depthChannel: '__position:P',
+        depthYawDeg: 80,
+        depthPitchDeg: 80
+      },
+      viewport,
+      20,
+      20
+    );
+
+    expect(next.depthYawDeg).toBe(116);
+    expect(next.depthPitchDeg).toBe(116);
+  });
+
   it('keeps stale depth orbit fields clamped while zooming', () => {
     const next = zoomDepthFromWheel(
       {
@@ -527,6 +546,24 @@ describe('interaction math', () => {
 
     expect(next.depthYawDeg).toBe(89.9);
     expect(next.depthPitchDeg).toBe(-89.9);
+    expect(next.depthZoom).toBeGreaterThan(1);
+  });
+
+  it('keeps stale position depth orbit fields normalized while zooming', () => {
+    const next = zoomDepthFromWheel(
+      {
+        ...state,
+        viewerMode: 'depth',
+        depthChannel: '__position:P',
+        depthYawDeg: 190,
+        depthPitchDeg: -190,
+        depthZoom: 1
+      },
+      -100
+    );
+
+    expect(next.depthYawDeg).toBe(-170);
+    expect(next.depthPitchDeg).toBe(170);
     expect(next.depthZoom).toBeGreaterThan(1);
   });
 

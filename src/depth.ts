@@ -40,6 +40,7 @@ export interface DepthChannelOption {
 }
 
 export type DepthSourceKind = 'scalarDepth' | 'xyzPosition';
+export type DepthRotationSource = DepthSource | DepthSourceKind | string | null | undefined;
 
 export interface ScalarDepthSource {
   kind: 'scalarDepth';
@@ -176,11 +177,15 @@ const POSITION_DEPTH_BASE_PRIORITY = new Map<string, number>(
 );
 
 export function normalizeDepthYaw(yawDeg: number): number {
-  if (!Number.isFinite(yawDeg)) {
+  return normalizeDepthRotationAngle(yawDeg);
+}
+
+export function normalizeDepthRotationAngle(angleDeg: number): number {
+  if (!Number.isFinite(angleDeg)) {
     return 0;
   }
 
-  const wrapped = ((yawDeg + 180) % 360 + 360) % 360;
+  const wrapped = ((angleDeg + 180) % 360 + 360) % 360;
   return wrapped - 180;
 }
 
@@ -190,6 +195,24 @@ export function clampDepthYaw(yawDeg: number): number {
 
 export function clampDepthPitch(pitchDeg: number): number {
   return clampFinite(pitchDeg, MIN_DEPTH_PITCH_DEG, MAX_DEPTH_PITCH_DEG, 0);
+}
+
+export function normalizeDepthYawForSource(
+  yawDeg: number,
+  source: DepthRotationSource
+): number {
+  return isFreeDepthRotationSource(source)
+    ? normalizeDepthYaw(yawDeg)
+    : clampDepthYaw(yawDeg);
+}
+
+export function normalizeDepthPitchForSource(
+  pitchDeg: number,
+  source: DepthRotationSource
+): number {
+  return isFreeDepthRotationSource(source)
+    ? normalizeDepthRotationAngle(pitchDeg)
+    : clampDepthPitch(pitchDeg);
 }
 
 export function clampDepthZoom(zoom: number): number {
@@ -419,6 +442,18 @@ export function isXyzPositionDepthSourceValue(value: string | null | undefined):
   return Boolean(value?.startsWith(POSITION_DEPTH_SOURCE_PREFIX));
 }
 
+export function isFreeDepthRotationSource(source: DepthRotationSource): boolean {
+  if (!source) {
+    return false;
+  }
+
+  if (typeof source === 'string') {
+    return source === 'xyzPosition' || isXyzPositionDepthSourceValue(source);
+  }
+
+  return source.kind === 'xyzPosition';
+}
+
 export function getDepthSourceChannelNames(source: DepthSource | null | undefined): string[] {
   if (!source) {
     return [];
@@ -548,6 +583,7 @@ export function projectDepthPixelToScreen(
 
   return projectNormalizedDepthPointToScreen(normalizedPoint, {
     pixel: { ix: x, iy: y },
+    depthSource: 'scalarDepth',
     viewport,
     depthYawDeg: options.depthYawDeg,
     depthPitchDeg: options.depthPitchDeg,
@@ -591,6 +627,7 @@ export function projectPositionPointToScreen(
     z: (point.z - centerZ) / sceneScale
   }, {
     pixel: { ix: x, iy: y },
+    depthSource: 'xyzPosition',
     viewport,
     depthYawDeg: options.depthYawDeg,
     depthPitchDeg: options.depthPitchDeg,
@@ -783,8 +820,8 @@ export class DepthProbeProjectionCache {
     const positionProjection = geometry.kind === 'xyzPosition'
       ? createPositionProjectionNormalization(geometry.bounds)
       : null;
-    const yawRad = -clampDepthYaw(args.depthYawDeg) * Math.PI / 180;
-    const pitchRad = -clampDepthPitch(args.depthPitchDeg) * Math.PI / 180;
+    const yawRad = -normalizeDepthYawForSource(args.depthYawDeg, source) * Math.PI / 180;
+    const pitchRad = -normalizeDepthPitchForSource(args.depthPitchDeg, source) * Math.PI / 180;
     const yawCos = Math.cos(yawRad);
     const yawSin = Math.sin(yawRad);
     const pitchCos = Math.cos(pitchRad);
@@ -1209,6 +1246,7 @@ function projectNormalizedDepthPointToScreen(
   point: DepthPoint,
   options: Pick<DepthProjectionView, 'depthYawDeg' | 'depthPitchDeg' | 'depthZoom'> & {
     pixel: ImagePixel;
+    depthSource: DepthRotationSource;
     viewport: ViewportInfo;
     depth: number;
   }
@@ -1217,8 +1255,8 @@ function projectNormalizedDepthPointToScreen(
     return null;
   }
 
-  const yawRad = -clampDepthYaw(options.depthYawDeg) * Math.PI / 180;
-  const pitchRad = -clampDepthPitch(options.depthPitchDeg) * Math.PI / 180;
+  const yawRad = -normalizeDepthYawForSource(options.depthYawDeg, options.depthSource) * Math.PI / 180;
+  const pitchRad = -normalizeDepthPitchForSource(options.depthPitchDeg, options.depthSource) * Math.PI / 180;
   const yawPoint = rotateYaw(point, yawRad);
   const cameraPoint = rotatePitch(yawPoint, pitchRad);
   const zoom = clampDepthZoom(options.depthZoom);
@@ -1351,8 +1389,8 @@ function buildDepthProjectionFrameKey(
     Math.floor(args.height),
     serializeDepthSource(source),
     ...geometryParts,
-    clampDepthYaw(args.depthYawDeg),
-    clampDepthPitch(args.depthPitchDeg),
+    normalizeDepthYawForSource(args.depthYawDeg, source),
+    normalizeDepthPitchForSource(args.depthPitchDeg, source),
     clampDepthZoom(args.depthZoom),
     Math.floor(args.viewport.width),
     Math.floor(args.viewport.height),

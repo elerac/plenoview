@@ -3,9 +3,10 @@ import { sameDisplaySelection } from '../../display-model';
 import { idleResource } from '../../async-resource';
 import { clampZoom } from '../../interaction/image-geometry';
 import {
-  clampDepthPitch,
-  clampDepthYaw,
-  clampDepthZoom
+  type DepthRotationSource,
+  clampDepthZoom,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource
 } from '../../depth';
 import {
   clampPanoramaHfov,
@@ -72,6 +73,15 @@ export function patchSessionState(
     ...state.sessionState,
     ...patch
   };
+  nextSessionState.depthYawDeg = normalizeDepthYawForSource(
+    nextSessionState.depthYawDeg,
+    nextSessionState.depthChannel
+  );
+  nextSessionState.depthPitchDeg = normalizeDepthPitchForSource(
+    nextSessionState.depthPitchDeg,
+    nextSessionState.depthChannel
+  );
+  nextSessionState.depthZoom = clampDepthZoom(nextSessionState.depthZoom);
   if (sameViewerSessionState(state.sessionState, nextSessionState)) {
     return state;
   }
@@ -124,7 +134,10 @@ export function updateActiveSessionStoredState(
   return changed ? nextSessions : sessions;
 }
 
-export function normalizeViewerViewPatch(patch: Partial<ViewerViewState>): Partial<ViewerViewState> | null {
+export function normalizeViewerViewPatch(
+  patch: Partial<ViewerViewState>,
+  depthSource: DepthRotationSource = null
+): Partial<ViewerViewState> | null {
   const normalized: Partial<ViewerViewState> = {};
   if (patch.zoom !== undefined && Number.isFinite(patch.zoom)) {
     normalized.zoom = clampZoom(patch.zoom);
@@ -145,10 +158,10 @@ export function normalizeViewerViewPatch(patch: Partial<ViewerViewState>): Parti
     normalized.panoramaHfovDeg = clampPanoramaHfov(patch.panoramaHfovDeg);
   }
   if (patch.depthYawDeg !== undefined && Number.isFinite(patch.depthYawDeg)) {
-    normalized.depthYawDeg = clampDepthYaw(patch.depthYawDeg);
+    normalized.depthYawDeg = normalizeDepthYawForSource(patch.depthYawDeg, depthSource);
   }
   if (patch.depthPitchDeg !== undefined && Number.isFinite(patch.depthPitchDeg)) {
-    normalized.depthPitchDeg = clampDepthPitch(patch.depthPitchDeg);
+    normalized.depthPitchDeg = normalizeDepthPitchForSource(patch.depthPitchDeg, depthSource);
   }
   if (patch.depthZoom !== undefined && Number.isFinite(patch.depthZoom)) {
     normalized.depthZoom = clampDepthZoom(patch.depthZoom);
@@ -157,9 +170,12 @@ export function normalizeViewerViewPatch(patch: Partial<ViewerViewState>): Parti
   return Object.keys(normalized).length > 0 ? normalized : null;
 }
 
-export function cloneInteractionState(state: ViewerAppState['interactionState']): ViewerAppState['interactionState'] {
+export function cloneInteractionState(
+  state: ViewerAppState['interactionState'],
+  depthSource: DepthRotationSource = null
+): ViewerAppState['interactionState'] {
   return {
-    view: pickViewState(state.view),
+    view: pickViewState(state.view, depthSource),
     hoveredPixel: state.hoveredPixel ? { ...state.hoveredPixel } : null,
     draftRoi: cloneImageRoi(state.draftRoi),
     roiInteraction: { ...(state.roiInteraction ?? createEmptyRoiInteractionState()) }

@@ -212,6 +212,83 @@ describe('viewer app core', () => {
     expect(core.getState().sessionState.depthChannel).toBe('__position:P');
   });
 
+  it('preserves position depth camera state beyond scalar front-facing limits', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({
+      type: 'sessionLoaded',
+      session: createSession('session-1', createDecodedImage(['R', 'G', 'B', 'P.X', 'P.Y', 'P.Z']))
+    });
+    core.dispatch({ type: 'viewerModeSet', viewerMode: 'depth' });
+
+    core.dispatch({
+      type: 'interactionStatePublished',
+      interactionState: {
+        ...createInteractionState(core.getState().sessionState),
+        view: {
+          ...core.getState().interactionState.view,
+          depthYawDeg: 120,
+          depthPitchDeg: -120,
+          depthZoom: 100
+        }
+      }
+    });
+
+    expect(core.getState().interactionState.view).toMatchObject({
+      depthYawDeg: 120,
+      depthPitchDeg: -120,
+      depthZoom: 50
+    });
+
+    core.dispatch({
+      type: 'viewStateCommitted',
+      view: {
+        depthYawDeg: 120,
+        depthPitchDeg: -120,
+        depthZoom: 100
+      }
+    });
+
+    expect(core.getState().sessionState).toMatchObject({
+      depthYawDeg: 120,
+      depthPitchDeg: -120,
+      depthZoom: 50
+    });
+  });
+
+  it('clamps position depth camera state when switching back to scalar depth', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({
+      type: 'sessionLoaded',
+      session: createSession('session-1', createDecodedImage(['R', 'G', 'B', 'Z', 'P.X', 'P.Y', 'P.Z']))
+    });
+    core.dispatch({ type: 'viewerModeSet', viewerMode: 'depth' });
+    expect(core.getState().sessionState.depthChannel).toBe('__position:P');
+
+    core.dispatch({
+      type: 'viewStateCommitted',
+      view: {
+        depthYawDeg: 120,
+        depthPitchDeg: -120
+      }
+    });
+    core.dispatch({
+      type: 'depthSettingsEdited',
+      patch: {
+        depthChannel: 'Z'
+      }
+    });
+
+    expect(core.getState().sessionState).toMatchObject({
+      depthChannel: 'Z',
+      depthYawDeg: 89.9,
+      depthPitchDeg: -89.9
+    });
+    expect(core.getState().interactionState.view).toMatchObject({
+      depthYawDeg: 89.9,
+      depthPitchDeg: -89.9
+    });
+  });
+
   it('splits, activates, and resets viewer panes without changing view state', () => {
     const core = new ViewerAppCore();
     const initialView = {

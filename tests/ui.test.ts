@@ -1831,6 +1831,51 @@ describe('viewer state inspector', () => {
     ]);
   });
 
+  it('allows typed depth orbit values past the front-facing range for position sources', () => {
+    installUiFixture();
+
+    const onViewerViewStateChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onViewerViewStateChange }));
+    ui.setViewerStateReadout({
+      hasActiveImage: true,
+      viewerMode: 'depth',
+      view: {
+        zoom: 2,
+        panX: 10,
+        panY: 12.5,
+        panoramaYawDeg: 30,
+        panoramaPitchDeg: 5,
+        panoramaHfovDeg: 80,
+        depthYawDeg: 30,
+        depthPitchDeg: 5,
+        depthZoom: 1
+      },
+      depth: {
+        channel: '__position:P',
+        sourceKind: 'xyzPosition',
+        channelOptions: [{ value: '__position:P', label: 'P.X/P.Y/P.Z' }],
+        focalLengthPx: null,
+        resolvedFocalLengthPx: null,
+        pointSizePx: 2
+      }
+    });
+
+    const yawInput = document.getElementById('viewer-state-depth-yaw-input') as HTMLInputElement;
+    const pitchInput = document.getElementById('viewer-state-depth-pitch-input') as HTMLInputElement;
+
+    yawInput.value = '120';
+    yawInput.dispatchEvent(new Event('blur'));
+    pitchInput.value = '-120';
+    pitchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+
+    expect(yawInput.value).toBe('120');
+    expect(pitchInput.value).toBe('-120');
+    expect(onViewerViewStateChange.mock.calls).toEqual([
+      [{ depthYawDeg: 120 }],
+      [{ depthPitchDeg: -120 }]
+    ]);
+  });
+
   it('commits manual depth focal edits and clears back to auto focal', () => {
     installUiFixture();
 

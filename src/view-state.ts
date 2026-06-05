@@ -9,9 +9,10 @@ import type {
 import type { ChannelRecognitionSettings } from './channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from './channel-recognition-name-rules';
 import {
-  clampDepthPitch,
-  clampDepthYaw,
-  clampDepthZoom
+  type DepthRotationSource,
+  clampDepthZoom,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource
 } from './depth';
 import { sameImageRoi } from './roi';
 import { DEFAULT_MASK_INVALID_STOKES_VECTORS } from './stokes';
@@ -29,7 +30,10 @@ export interface MergeRenderStateOptions {
   invalidValueWarningPhase?: number;
 }
 
-export function pickViewState(state: ViewerViewState): ViewerViewState {
+export function pickViewState(
+  state: ViewerViewState,
+  depthSource: DepthRotationSource = null
+): ViewerViewState {
   return {
     zoom: state.zoom,
     panX: state.panX,
@@ -37,15 +41,15 @@ export function pickViewState(state: ViewerViewState): ViewerViewState {
     panoramaYawDeg: state.panoramaYawDeg,
     panoramaPitchDeg: state.panoramaPitchDeg,
     panoramaHfovDeg: state.panoramaHfovDeg,
-    depthYawDeg: clampDepthYaw(state.depthYawDeg),
-    depthPitchDeg: clampDepthPitch(state.depthPitchDeg),
+    depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, depthSource),
+    depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, depthSource),
     depthZoom: clampDepthZoom(state.depthZoom)
   };
 }
 
 export function createInteractionState(sessionState: ViewerSessionState): ViewerInteractionState {
   return {
-    view: pickViewState(sessionState),
+    view: pickViewState(sessionState, sessionState.depthChannel),
     hoveredPixel: null,
     draftRoi: null,
     roiInteraction: createEmptyRoiInteractionState()
@@ -59,7 +63,7 @@ export function mergeRenderState(
 ): ViewerRenderState {
   return {
     ...sessionState,
-    ...pickViewState(interactionState.view),
+    ...pickViewState(interactionState.view, sessionState.depthChannel),
     viewerBackground: options.viewerBackground ?? DEFAULT_VIEWER_BACKGROUND_ID,
     maskInvalidStokesVectors: options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
     spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled ?? DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED,

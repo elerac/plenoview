@@ -1,8 +1,8 @@
 import { cloneDisplayLuminanceRange } from './colormap-range';
 import {
-  clampDepthPitch,
-  clampDepthYaw,
-  clampDepthZoom
+  clampDepthZoom,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource
 } from './depth';
 import { cloneDisplaySelection } from './display-model';
 import { cloneImageRoi } from './roi';
@@ -73,8 +73,8 @@ export function cloneViewerSessionState(state: ViewerSessionState): ViewerSessio
     panoramaYawDeg: state.panoramaYawDeg,
     panoramaPitchDeg: state.panoramaPitchDeg,
     panoramaHfovDeg: state.panoramaHfovDeg,
-    depthYawDeg: clampDepthYaw(state.depthYawDeg),
-    depthPitchDeg: clampDepthPitch(state.depthPitchDeg),
+    depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
+    depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
     depthZoom: clampDepthZoom(state.depthZoom),
     activeLayer: state.activeLayer,
     displaySelection: cloneDisplaySelection(state.displaySelection),

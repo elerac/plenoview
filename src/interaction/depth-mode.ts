@@ -1,7 +1,7 @@
 import {
-  clampDepthPitch,
-  clampDepthYaw,
-  clampDepthZoom
+  clampDepthZoom,
+  normalizeDepthPitchForSource,
+  normalizeDepthYawForSource
 } from '../depth';
 import type {
   DepthKeyboardOrbitDirection,
@@ -40,17 +40,24 @@ export function orbitDepthFromDrag(
   deltaX: number,
   deltaY: number
 ): DepthViewChange {
+  const depthSource = state.depthChannel;
   if (viewport.width <= 0 || viewport.height <= 0) {
     return {
-      depthYawDeg: clampDepthYaw(state.depthYawDeg),
-      depthPitchDeg: clampDepthPitch(state.depthPitchDeg),
+      depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, depthSource),
+      depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, depthSource),
       depthZoom: clampDepthZoom(state.depthZoom)
     };
   }
 
   return {
-    depthYawDeg: clampDepthYaw(state.depthYawDeg + (deltaX / viewport.width) * 180),
-    depthPitchDeg: clampDepthPitch(state.depthPitchDeg + (deltaY / viewport.height) * 180),
+    depthYawDeg: normalizeDepthYawForSource(
+      state.depthYawDeg + (deltaX / viewport.width) * 180,
+      depthSource
+    ),
+    depthPitchDeg: normalizeDepthPitchForSource(
+      state.depthPitchDeg + (deltaY / viewport.height) * 180,
+      depthSource
+    ),
     depthZoom: state.depthZoom
   };
 }
@@ -61,8 +68,8 @@ export function zoomDepthFromWheel(
 ): DepthViewChange {
   const zoomFactor = Math.exp(-deltaY * 0.0015);
   return {
-    depthYawDeg: clampDepthYaw(state.depthYawDeg),
-    depthPitchDeg: clampDepthPitch(state.depthPitchDeg),
+    depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
+    depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
     depthZoom: clampDepthZoom(state.depthZoom * zoomFactor)
   };
 }
@@ -79,8 +86,8 @@ export function zoomDepthByKeyboardStep(
   signedStep: number
 ): DepthViewChange {
   return {
-    depthYawDeg: clampDepthYaw(state.depthYawDeg),
-    depthPitchDeg: clampDepthPitch(state.depthPitchDeg),
+    depthYawDeg: normalizeDepthYawForSource(state.depthYawDeg, state.depthChannel),
+    depthPitchDeg: normalizeDepthPitchForSource(state.depthPitchDeg, state.depthChannel),
     depthZoom: clampDepthZoom(state.depthZoom * (DEPTH_KEYBOARD_ZOOM_STEP ** signedStep))
   };
 }

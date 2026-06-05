@@ -55,4 +55,15 @@ describe('session state', () => {
     });
     expect('hoveredPixel' in cloned).toBe(false);
   });
+
+  it('preserves free rotation when cloning position depth session state', () => {
+    const cloned = cloneViewerSessionState(createViewerSessionState({
+      depthChannel: '__position:P',
+      depthYawDeg: 120,
+      depthPitchDeg: -120
+    }));
+
+    expect(cloned.depthYawDeg).toBe(120);
+    expect(cloned.depthPitchDeg).toBe(-120);
+  });
 });
