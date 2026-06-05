@@ -575,6 +575,76 @@ describe('depth utilities', () => {
     expect(pannedProjection!.screenY).toBeCloseTo(70);
   });
 
+  it('applies depth target translation while projecting cached scalar probe pixels', () => {
+    const layer = createLayerFromChannels({
+      Z: [1]
+    });
+    const projection = new DepthProbeProjectionCache().projectPixel({ ix: 0, iy: 0 }, {
+      layer,
+      width: 1,
+      height: 1,
+      channelName: 'Z',
+      viewport: { width: 100, height: 100 },
+      depthRange: { min: 1, max: 1 },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthTargetX: -0.1,
+      depthTargetY: 0.2,
+      depthTargetZ: 0,
+      depthPointSizePx: 2
+    });
+
+    expect(projection).not.toBeNull();
+    expect(projection!.screenX).toBeCloseTo(60);
+    expect(projection!.screenY).toBeCloseTo(70);
+  });
+
+  it('applies depth target translation while projecting cached position probe pixels', () => {
+    const layer = createLayerFromChannels({
+      'P.X': [0],
+      'P.Y': [0],
+      'P.Z': [0]
+    });
+    const projection = new DepthProbeProjectionCache().projectPixel({ ix: 0, iy: 0 }, {
+      layer,
+      width: 1,
+      height: 1,
+      source: {
+        kind: 'xyzPosition',
+        base: 'P',
+        xChannel: 'P.X',
+        yChannel: 'P.Y',
+        zChannel: 'P.Z'
+      },
+      viewport: { width: 100, height: 100 },
+      geometry: {
+        kind: 'xyzPosition',
+        bounds: {
+          minX: -1,
+          maxX: 1,
+          minY: -1,
+          maxY: 1,
+          minZ: -1,
+          maxZ: 1
+        }
+      },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 1,
+      depthTargetX: -0.1,
+      depthTargetY: 0.2,
+      depthTargetZ: 0,
+      depthPointSizePx: 2
+    });
+
+    expect(projection).not.toBeNull();
+    expect(projection!.screenX).toBeCloseTo(60);
+    expect(projection!.screenY).toBeCloseTo(70);
+  });
+
   it('chooses the frontmost point when projected depth hits overlap', () => {
     const layer = createLayerFromChannels({
       Z: [1, 10]

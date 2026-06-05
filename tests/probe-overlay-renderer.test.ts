@@ -83,6 +83,37 @@ describe('probe overlay renderer', () => {
     expect(context.strokeRect).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the 3D probe marker with the current depth target translation', () => {
+    const { renderer, context } = createProbeOverlayHarness();
+    const layer = createLayerFromChannels({
+      Z: [1]
+    });
+
+    renderer.resize(100, 100);
+    renderer.setImagePresent(true);
+    renderer.setSourceContext(1, 1, layer);
+    renderer.setDepthSourceContext(
+      { kind: 'scalarDepth', channelName: 'Z' },
+      { kind: 'scalarDepth', range: { min: 1, max: 1 } }
+    );
+    renderer.render(createViewerState({
+      viewerMode: '3d',
+      depthChannel: 'Z',
+      depthTargetX: -0.1,
+      depthTargetY: 0.2,
+      depthTargetZ: 0,
+      depthPointSizePx: 6,
+      hoveredPixel: { ix: 0, iy: 0 }
+    }));
+
+    expect(context.strokeRect).toHaveBeenCalledTimes(1);
+    const [[x, y, width, height]] = context.strokeRect.mock.calls as Array<[number, number, number, number]>;
+    expect(x).toBeCloseTo(57);
+    expect(y).toBeCloseTo(67);
+    expect(width).toBeCloseTo(6);
+    expect(height).toBeCloseTo(6);
+  });
+
   it('renders the probe marker in 3D mode using position projection', () => {
     const { renderer, context } = createProbeOverlayHarness();
     const layer = createLayerFromChannels({

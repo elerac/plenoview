@@ -756,6 +756,9 @@ export class DepthProbeProjectionCache {
       depthYawDeg: args.depthYawDeg,
       depthPitchDeg: args.depthPitchDeg,
       depthZoom: args.depthZoom,
+      depthTargetX: args.depthTargetX,
+      depthTargetY: args.depthTargetY,
+      depthTargetZ: args.depthTargetZ,
       depthPointSizePx: args.depthPointSizePx
     };
     if (source.kind === 'xyzPosition') {
