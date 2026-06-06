@@ -81,11 +81,14 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            src-tauri/target
-          key: desktop-cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          key: plenoview-cargo-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('src-tauri/Cargo.lock') }}
           restore-keys: |
-            desktop-cargo-${{ runner.os }}-${{ matrix.arch }}-
-            desktop-cargo-${{ runner.os }}-
+            plenoview-cargo-${{ runner.os }}-${{ matrix.arch }}-
+            plenoview-cargo-${{ runner.os }}-
+
+      - name: Remove stale Tauri build outputs
+        shell: bash
+        run: rm -rf src-tauri/target
 
       - name: Install dependencies
         run: npm ci
