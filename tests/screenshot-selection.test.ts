@@ -8,6 +8,7 @@ import {
   resolveScreenshotSelectionHandle,
   screenRectToImageRect,
   screenRectToPanoramaProjectionRect,
+  unionScreenshotSelectionRects,
   updateScreenshotSelectionRectFromDrag
 } from '../src/interaction/screenshot-selection';
 
@@ -33,6 +34,27 @@ describe('screenshot selection geometry', () => {
       width: 16,
       height: 120
     });
+  });
+
+  it('partitions overlapping selected rectangles into a non-overlapping union', () => {
+    expect(unionScreenshotSelectionRects([
+      { x: 10, y: 10, width: 50, height: 50 },
+      { x: 40, y: 30, width: 50, height: 40 }
+    ])).toEqual([
+      { x: 10, y: 10, width: 30, height: 50 },
+      { x: 40, y: 10, width: 20, height: 60 },
+      { x: 60, y: 30, width: 30, height: 40 }
+    ]);
+  });
+
+  it('coalesces adjacent selected rectangles in the union', () => {
+    expect(unionScreenshotSelectionRects([
+      { x: 0, y: 0, width: 10, height: 10 },
+      { x: 10, y: 0, width: 10, height: 10 },
+      { x: 30, y: 5, width: 0, height: 10 }
+    ])).toEqual([
+      { x: 0, y: 0, width: 20, height: 10 }
+    ]);
   });
 
   it('converts screen rectangles to clamped source image pixel rectangles', () => {

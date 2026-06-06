@@ -351,7 +351,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
     });
 
     await services.displayController.initialize();
-    cleanupE2EHooks = installE2EHooks(core);
+    cleanupE2EHooks = installE2EHooks(core, ui);
 
     window.addEventListener('beforeunload', onBeforeUnload);
   } catch (error) {

@@ -79,6 +79,49 @@ export function clampScreenshotSelectionRect(
   };
 }
 
+export function unionScreenshotSelectionRects(rects: ViewportRect[]): ViewportRect[] {
+  const normalized = rects
+    .map((rect) => ({
+      x: sanitizeCoordinate(rect.x),
+      y: sanitizeCoordinate(rect.y),
+      width: sanitizeDimension(rect.width, 0),
+      height: sanitizeDimension(rect.height, 0)
+    }))
+    .filter((rect) => rect.width > 0 && rect.height > 0);
+  if (normalized.length <= 1) {
+    return normalized.map((rect) => ({ ...rect }));
+  }
+
+  const xEdges = Array.from(new Set(normalized.flatMap((rect) => [
+    rect.x,
+    rect.x + rect.width
+  ]))).sort((left, right) => left - right);
+  const unionRects: ViewportRect[] = [];
+  for (let index = 0; index < xEdges.length - 1; index += 1) {
+    const x0 = xEdges[index]!;
+    const x1 = xEdges[index + 1]!;
+    if (x1 <= x0) {
+      continue;
+    }
+
+    const intervals = normalized
+      .filter((rect) => rect.x < x1 && rect.x + rect.width > x0)
+      .map((rect) => ({ start: rect.y, end: rect.y + rect.height }))
+      .sort((left, right) => left.start - right.start || left.end - right.end);
+    const mergedIntervals = mergeIntervals(intervals);
+    for (const interval of mergedIntervals) {
+      appendUnionRect(unionRects, {
+        x: x0,
+        y: interval.start,
+        width: x1 - x0,
+        height: interval.end - interval.start
+      });
+    }
+  }
+
+  return unionRects;
+}
+
 export function clampScreenshotSelectionImageRect(
   rect: ImageRect,
   imageSize: ViewportInfo
@@ -1067,6 +1110,35 @@ export function createEmptySnapGuide(): ScreenshotSelectionSnapGuide {
     x: null,
     y: null
   };
+}
+
+function mergeIntervals(intervals: Array<{ start: number; end: number }>): Array<{ start: number; end: number }> {
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const interval of intervals) {
+    const previous = merged.at(-1);
+    if (!previous || interval.start > previous.end) {
+      merged.push({ ...interval });
+      continue;
+    }
+
+    previous.end = Math.max(previous.end, interval.end);
+  }
+  return merged;
+}
+
+function appendUnionRect(rects: ViewportRect[], rect: ViewportRect): void {
+  const previous = rects.at(-1);
+  if (
+    previous &&
+    previous.y === rect.y &&
+    previous.height === rect.height &&
+    previous.x + previous.width === rect.x
+  ) {
+    previous.width += rect.width;
+    return;
+  }
+
+  rects.push(rect);
 }
 
 function sanitizeCoordinate(value: number): number {

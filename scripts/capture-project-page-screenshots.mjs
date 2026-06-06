@@ -21,6 +21,7 @@ const viewerTimeoutMs = Number(process.env.PROJECT_PAGE_CAPTURE_TIMEOUT_MS ?? 12
 const renderSettleMs = Number(process.env.PROJECT_PAGE_CAPTURE_SETTLE_MS ?? 250);
 const args = parseArgs(process.argv.slice(2));
 const outputDir = resolve(repoRoot, args.outDir ?? defaultOutputDir);
+const colormapIdsByLabel = readColormapIdsByLabel();
 const scenes = createScenes();
 const selectedScenes = filterScenes(scenes, args.only);
 
@@ -49,6 +50,12 @@ try {
 }
 
 function createScenes() {
+  const hsvColormapId = requireColormapId('HSV');
+  const rdBuColormapId = requireColormapId('RdBu');
+  const heroState = {
+    viewerMode: 'image',
+    view: { zoom: 2.8, panX: 128, panY: 128 }
+  };
   const rgbState = {
     viewerMode: 'image',
     view: { zoom: 180, panX: 195.5, panY: 169.5 },
@@ -57,6 +64,7 @@ function createScenes() {
   const spoonsState = {
     viewerMode: 'image',
     visualizationMode: 'colormap',
+    activeColormapId: rdBuColormapId,
     displaySelection: {
       kind: 'stokesScalar',
       parameter: 's2_over_s0',
@@ -68,11 +76,15 @@ function createScenes() {
   };
   const stokesState = {
     viewerMode: 'image',
+    visualizationMode: 'colormap',
+    activeColormapId: hsvColormapId,
     displaySelection: {
       kind: 'stokesAngle',
       parameter: 'aolp',
       source: { kind: 'scalar', suffix: 'Y' }
-    }
+    },
+    colormapRange: { min: 0, max: Math.PI },
+    colormapZeroCentered: false
   };
   const hyperspectralState = {
     viewerMode: 'image',
@@ -91,6 +103,16 @@ function createScenes() {
   };
 
   return [
+    {
+      id: 'hero',
+      aliases: ['app-preview', 'preview'],
+      output: 'app-preview.jpg',
+      viewport: { width: 1440, height: 900 },
+      expectedImageName: 'cbox_rgb.exr',
+      src: localAssetUrl('cbox_rgb.exr'),
+      state: heroState,
+      screenshot: { type: 'jpeg', quality: 88 }
+    },
     {
       id: 'rgb',
       aliases: ['cbox', 'source'],
@@ -114,9 +136,17 @@ function createScenes() {
       expectedImageName: 'spoons.exr',
       src: 'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/spoons.exr',
       state: spoonsState,
+      waitAfterPrepare: false,
       prepare: async (page) => {
+        await reselectColormap(page, rdBuColormapId);
         await openScreenshotSelection(page);
+        await waitForRenderIdle(page);
         await positionScreenshotRegions(page, {
+          active: { x: 875, y: 205, width: 122, height: 124 },
+          inactive: { x: 913, y: 525, width: 363, height: 315 },
+          controls: { x: 573, y: 340 }
+        });
+        await assertScreenshotRegionLayout(page, {
           active: { x: 875, y: 205, width: 122, height: 124 },
           inactive: { x: 913, y: 525, width: 363, height: 315 },
           controls: { x: 573, y: 340 }
@@ -132,6 +162,7 @@ function createScenes() {
       src: 'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/owl_spheres.exr',
       state: stokesState,
       prepare: async (page) => {
+        await reselectColormap(page, hsvColormapId);
         await page.mouse.move(24, 24);
       }
     },
@@ -229,7 +260,9 @@ async function captureScene(browser, scene) {
     await waitForRenderIdle(page);
     if (scene.prepare) {
       await scene.prepare(page);
-      await waitForRenderIdle(page);
+      if (scene.waitAfterPrepare !== false) {
+        await waitForRenderIdle(page);
+      }
     }
     await waitForNextPaint(page);
     await page.waitForTimeout(renderSettleMs);
@@ -245,10 +278,11 @@ async function captureScene(browser, scene) {
     await page.screenshot({
       path: outputPath,
       type: 'png',
-      fullPage: false
+      fullPage: false,
+      ...(scene.screenshot ?? {})
     });
 
-    const dimensions = readPngDimensions(outputPath);
+    const dimensions = readImageDimensions(outputPath);
     if (dimensions.width !== scene.viewport.width || dimensions.height !== scene.viewport.height) {
       throw new Error(
         `Expected ${scene.output} to be ${scene.viewport.width}x${scene.viewport.height}, ` +
@@ -385,6 +419,35 @@ async function setCollapsibleExpanded(page, toggleSelector, expanded) {
   }
 }
 
+async function reselectColormap(page, colormapId) {
+  const select = page.locator('#colormap-select');
+  await select.waitFor({ state: 'visible', timeout: 30000 });
+  const optionValues = await select.evaluate((element) => {
+    if (!(element instanceof HTMLSelectElement)) {
+      throw new Error('The colormap select was not ready.');
+    }
+    if (element.disabled) {
+      throw new Error('The colormap select was disabled.');
+    }
+    return Array.from(element.options).map((option) => ({
+      label: (option.textContent ?? '').trim(),
+      value: option.value
+    }));
+  });
+  const noneValue = optionValues.find((option) => option.label === 'None')?.value;
+  if (!noneValue) {
+    throw new Error('Could not find the None colormap option.');
+  }
+  if (!optionValues.some((option) => option.value === colormapId)) {
+    throw new Error(`Could not find colormap option "${colormapId}".`);
+  }
+
+  await select.selectOption(noneValue);
+  await waitForRenderIdle(page);
+  await select.selectOption(colormapId);
+  await waitForRenderIdle(page);
+}
+
 async function openScreenshotSelection(page) {
   await page.getByRole('button', { name: 'File', exact: true }).click();
   await page.locator('#export-screenshot-button').click();
@@ -396,49 +459,115 @@ async function openScreenshotSelection(page) {
 
 async function positionScreenshotRegions(page, layout) {
   await page.evaluate(({ active, inactive, controls }) => {
-    const activeBox = document.querySelector('#screenshot-selection-box');
-    const inactiveBox = document.querySelector('.screenshot-selection-region-box');
-    const controlsElement = document.querySelector('#screenshot-selection-controls');
-    const maskSvg = document.querySelector('#screenshot-selection-mask-svg');
-    const maskPath = document.querySelector('#screenshot-selection-mask-path');
-    if (
-      !(activeBox instanceof HTMLElement) ||
-      !(inactiveBox instanceof HTMLElement) ||
-      !(controlsElement instanceof HTMLElement) ||
-      !(maskSvg instanceof SVGSVGElement) ||
-      !(maskPath instanceof SVGElement)
-    ) {
+    const overlay = document.querySelector('#screenshot-selection-overlay');
+    if (!(overlay instanceof HTMLElement)) {
       throw new Error('Screenshot selection overlay was not ready for deterministic positioning.');
     }
-
-    setBox(activeBox, active);
-    setBox(inactiveBox, inactive);
-    setBox(controlsElement, {
-      x: controls.x,
-      y: controls.y,
-      width: controlsElement.offsetWidth || 244,
-      height: controlsElement.offsetHeight || 64
-    });
-    activeBox.querySelector('.screenshot-selection-region-badge')?.replaceChildren('1');
-    inactiveBox.querySelector('.screenshot-selection-region-badge')?.replaceChildren('2');
-    maskSvg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
-    maskPath.setAttribute('d', [
-      `M0 0 H${window.innerWidth} V${window.innerHeight} H0 Z`,
-      rectPath(active),
-      rectPath(inactive)
-    ].join(' '));
-
-    function setBox(element, rect) {
-      element.style.left = `${rect.x}px`;
-      element.style.top = `${rect.y}px`;
-      element.style.width = `${rect.width}px`;
-      element.style.height = `${rect.height}px`;
+    const hooks = window.__openExrViewerE2E;
+    if (!hooks?.setScreenshotSelectionRegions) {
+      throw new Error('Plenoview E2E screenshot selection hooks were not available.');
     }
 
-    function rectPath(rect) {
-      return `M${rect.x} ${rect.y} H${rect.x + rect.width} V${rect.y + rect.height} H${rect.x} Z`;
+    const overlayRect = overlay.getBoundingClientRect();
+    const activeLocal = toLocalRect(active);
+    const inactiveLocal = toLocalRect(inactive);
+    hooks.setScreenshotSelectionRegions([activeLocal, inactiveLocal], 0);
+
+    const controlsElement = document.querySelector('#screenshot-selection-controls');
+    if (!(controlsElement instanceof HTMLElement)) {
+      throw new Error('Screenshot selection controls were not ready for deterministic positioning.');
+    }
+
+    const controlsLocal = {
+      x: controls.x - overlayRect.left,
+      y: controls.y - overlayRect.top
+    };
+    const styleId = 'project-page-capture-screenshot-selection-layout';
+    document.getElementById(styleId)?.remove();
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      #screenshot-selection-controls {
+        left: ${controlsLocal.x}px !important;
+        top: ${controlsLocal.y}px !important;
+      }
+    `;
+    document.head.append(style);
+
+    controlsElement.style.left = `${controlsLocal.x}px`;
+    controlsElement.style.top = `${controlsLocal.y}px`;
+
+    function toLocalRect(rect) {
+      return {
+        x: rect.x - overlayRect.left,
+        y: rect.y - overlayRect.top,
+        width: rect.width,
+        height: rect.height
+      };
     }
   }, layout);
+  await waitForNextPaint(page);
+}
+
+async function assertScreenshotRegionLayout(page, expected) {
+  const actual = await page.evaluate(() => {
+    const activeBox = document.querySelector('#screenshot-selection-box');
+    const inactiveBoxes = Array.from(document.querySelectorAll('.screenshot-selection-region-box'));
+    const controls = document.querySelector('#screenshot-selection-controls');
+    if (
+      !(activeBox instanceof HTMLElement) ||
+      inactiveBoxes.length !== 1 ||
+      !(inactiveBoxes[0] instanceof HTMLElement) ||
+      !(controls instanceof HTMLElement)
+    ) {
+      throw new Error('Screenshot selection overlay did not render the expected two-region layout.');
+    }
+
+    return {
+      active: readRect(activeBox),
+      inactive: readRect(inactiveBoxes[0]),
+      controls: readRect(controls),
+      activeBadge: (activeBox.querySelector('.screenshot-selection-region-badge')?.textContent ?? '').trim(),
+      inactiveBadge: (inactiveBoxes[0].querySelector('.screenshot-selection-region-badge')?.textContent ?? '').trim()
+    };
+
+    function readRect(element) {
+      const rect = element.getBoundingClientRect();
+      return {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+  });
+
+  if (actual.activeBadge !== '1' || actual.inactiveBadge !== '2') {
+    throw new Error(
+      `Expected screenshot region badges 1 and 2, got ${actual.activeBadge} and ${actual.inactiveBadge}.`
+    );
+  }
+  assertRectClose('active screenshot region', actual.active, expected.active, 2);
+  assertRectClose('inactive screenshot region', actual.inactive, expected.inactive, 2);
+  assertPointClose('screenshot selection controls', actual.controls, expected.controls, 2);
+}
+
+function assertRectClose(name, actual, expected, tolerance) {
+  for (const key of ['x', 'y', 'width', 'height']) {
+    assertClose(`${name} ${key}`, actual[key], expected[key], tolerance);
+  }
+}
+
+function assertPointClose(name, actual, expected, tolerance) {
+  for (const key of ['x', 'y']) {
+    assertClose(`${name} ${key}`, actual[key], expected[key], tolerance);
+  }
+}
+
+function assertClose(name, actual, expected, tolerance) {
+  if (Math.abs(actual - expected) > tolerance) {
+    throw new Error(`Expected ${name} to be ${expected} +/- ${tolerance}, got ${actual}.`);
+  }
 }
 
 async function expandSpectralThumbnailStack(page) {
@@ -623,21 +752,108 @@ function contentTypeFor(filePath) {
   }
 }
 
-function readPngDimensions(path) {
+function readColormapIdsByLabel() {
+  const manifestPath = resolve(repoRoot, 'public', 'colormaps', 'manifest.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const colormaps = manifest?.colormaps;
+  if (!Array.isArray(colormaps)) {
+    throw new Error(`${manifestPath} does not contain a colormaps array.`);
+  }
+
+  return new Map(colormaps.map((entry, index) => {
+    if (!entry || typeof entry !== 'object' || typeof entry.label !== 'string') {
+      throw new Error(`${manifestPath} contains an invalid colormap entry at index ${index}.`);
+    }
+    return [entry.label.toLocaleLowerCase(), String(index)];
+  }));
+}
+
+function requireColormapId(label) {
+  const id = colormapIdsByLabel.get(label.toLocaleLowerCase());
+  if (!id) {
+    throw new Error(`Could not find colormap "${label}" in public/colormaps/manifest.json.`);
+  }
+  return id;
+}
+
+function readImageDimensions(path) {
   const bytes = readFileSync(path);
   if (
-    bytes.length < 24 ||
-    bytes[0] !== 0x89 ||
-    bytes[1] !== 0x50 ||
-    bytes[2] !== 0x4e ||
-    bytes[3] !== 0x47
+    bytes.length >= 24 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
   ) {
-    throw new Error(`${path} is not a PNG file.`);
+    return {
+      width: bytes.readUInt32BE(16),
+      height: bytes.readUInt32BE(20)
+    };
   }
-  return {
-    width: bytes.readUInt32BE(16),
-    height: bytes.readUInt32BE(20)
-  };
+
+  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    return readJpegDimensions(path, bytes);
+  }
+
+  throw new Error(`${path} is not a supported PNG or JPEG file.`);
+}
+
+function readJpegDimensions(path, bytes) {
+  let offset = 2;
+  while (offset < bytes.length) {
+    while (bytes[offset] === 0xff) {
+      offset += 1;
+    }
+
+    const marker = bytes[offset];
+    offset += 1;
+    if (marker === undefined) {
+      break;
+    }
+    if (marker === 0xd9 || marker === 0xda) {
+      break;
+    }
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      continue;
+    }
+    if (offset + 2 > bytes.length) {
+      break;
+    }
+
+    const segmentLength = bytes.readUInt16BE(offset);
+    const segmentStart = offset + 2;
+    const segmentEnd = offset + segmentLength;
+    if (segmentLength < 2 || segmentEnd > bytes.length) {
+      break;
+    }
+
+    if (isJpegStartOfFrameMarker(marker)) {
+      if (segmentLength < 7) {
+        break;
+      }
+      return {
+        width: bytes.readUInt16BE(segmentStart + 3),
+        height: bytes.readUInt16BE(segmentStart + 1)
+      };
+    }
+
+    offset = segmentEnd;
+  }
+
+  throw new Error(`${path} does not contain a JPEG size marker.`);
+}
+
+function isJpegStartOfFrameMarker(marker) {
+  return (
+    (marker >= 0xc0 && marker <= 0xc3) ||
+    (marker >= 0xc5 && marker <= 0xc7) ||
+    (marker >= 0xc9 && marker <= 0xcb) ||
+    (marker >= 0xcd && marker <= 0xcf)
+  );
 }
 
 function parseArgs(argv) {
@@ -687,11 +903,13 @@ function printHelp() {
 Options:
   --only=<ids>       Comma-separated scene ids or aliases.
                      Known ids: ${scenes.map((scene) => scene.id).join(', ')}
+                     Known aliases: ${scenes.flatMap((scene) => scene.aliases).sort().join(', ')}
   --out-dir=<path>   Output directory. Defaults to public/project-page.
   --help             Show this help.
 
 Examples:
   npm run capture:project-page
+  npm run capture:project-page -- --only=hero
   npm run capture:project-page -- --only=rgb
   npm run capture:project-page -- --only=rgb,depth --out-dir=/tmp/plenoview-shots
 `);

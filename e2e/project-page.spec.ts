@@ -225,11 +225,22 @@ test('serves the project page with app, desktop, and VS Code download calls to a
 
   const preview = page.getByRole('img', { name: /Plenoview interface/ });
   await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('src', 'project-page/app-preview.jpg');
+  await expect(preview).toHaveAttribute('width', '1440');
+  await expect(preview).toHaveAttribute('height', '900');
   await expect(preview).toHaveAttribute('decoding', 'async');
   await expect(preview).toHaveAttribute('fetchpriority', 'high');
   await expect.poll(async () => (
-    await preview.evaluate((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)
-  )).toBe(true);
+    await preview.evaluate((image) => {
+      if (!(image instanceof HTMLImageElement) || !image.complete) {
+        return null;
+      }
+      return {
+        width: image.naturalWidth,
+        height: image.naturalHeight
+      };
+    })
+  )).toEqual({ width: 1440, height: 900 });
   await expectNoHorizontalOverflow(page);
 
   await expect(page.getByRole('heading', { name: 'Downloads', level: 2 })).toBeVisible();

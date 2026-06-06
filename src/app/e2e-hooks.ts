@@ -1,5 +1,10 @@
 import type { ViewerAppState } from './viewer-app-types';
 import type { ViewerAppCore } from './viewer-app-core';
+import type {
+  ScreenshotSelectionInteractionState,
+  ViewerRuntimeUi
+} from '../ui/viewer-runtime-ui';
+import type { ViewportRect } from '../types';
 
 interface E2EStateSnapshot {
   appReady: boolean;
@@ -24,6 +29,10 @@ interface E2EHooks {
   waitForSessionCount(count: number, timeoutMs?: number): Promise<E2EStateSnapshot>;
   waitForThumbnailIdle(timeoutMs?: number): Promise<E2EStateSnapshot>;
   waitForFrames(count?: number): Promise<void>;
+  setScreenshotSelectionRegions(
+    regions: ViewportRect[],
+    activeIndex?: number
+  ): ScreenshotSelectionInteractionState;
 }
 
 declare global {
@@ -42,7 +51,7 @@ type E2EWaiter = {
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
-export function installE2EHooks(core: ViewerAppCore): () => void {
+export function installE2EHooks(core: ViewerAppCore, ui: ViewerRuntimeUi): () => void {
   if (import.meta.env.VITE_E2E !== 'true') {
     return () => {};
   }
@@ -115,7 +124,8 @@ export function installE2EHooks(core: ViewerAppCore): () => void {
       await waitForFrames(2);
       return state;
     },
-    waitForFrames
+    waitForFrames,
+    setScreenshotSelectionRegions: (regions, activeIndex) => setScreenshotSelectionRegions(ui, regions, activeIndex)
   };
   notify();
 
@@ -131,6 +141,33 @@ export function installE2EHooks(core: ViewerAppCore): () => void {
       delete window.__openExrViewerE2E;
     }
   };
+}
+
+function setScreenshotSelectionRegions(
+  ui: ViewerRuntimeUi,
+  regions: ViewportRect[],
+  activeIndex = 0
+): ScreenshotSelectionInteractionState {
+  const current = ui.getScreenshotSelectionInteractionState();
+  if (!current.active) {
+    throw new Error('Screenshot selection is not active.');
+  }
+  if (regions.length !== current.regions.length) {
+    throw new Error(`Expected ${current.regions.length} screenshot regions, got ${regions.length}.`);
+  }
+  if (!Number.isInteger(activeIndex) || activeIndex < 0 || activeIndex >= current.regions.length) {
+    throw new Error(`Invalid screenshot selection active index: ${activeIndex}.`);
+  }
+
+  current.regions.forEach((region, index) => {
+    ui.setScreenshotSelectionActiveRegion(region.id);
+    ui.setScreenshotSelectionRect(regions[index]!, {
+      squareSnapped: false,
+      snapGuide: { x: null, y: null }
+    });
+  });
+  ui.setScreenshotSelectionActiveRegion(current.regions[activeIndex]!.id);
+  return ui.getScreenshotSelectionInteractionState();
 }
 
 function createSnapshot(state: ViewerAppState, appReady: boolean): E2EStateSnapshot {

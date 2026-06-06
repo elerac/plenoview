@@ -5808,6 +5808,38 @@ describe('view menu', () => {
     );
   });
 
+  it('renders overlapping screenshot selection mask holes as a union', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+    ui.setExportTarget({ filename: 'image.png' });
+
+    mockDomRect(document.getElementById('viewer-container') as HTMLElement, {
+      top: 0,
+      bottom: 100,
+      height: 100,
+      width: 200
+    });
+
+    (document.getElementById('export-screenshot-button') as HTMLButtonElement).click();
+    ui.setScreenshotSelectionRect({ x: 20, y: 10, width: 100, height: 60 });
+    (document.getElementById('screenshot-selection-add-button') as HTMLButtonElement).click();
+    ui.setScreenshotSelectionRect({ x: 80, y: 30, width: 100, height: 50 });
+
+    const maskPath = document.querySelector<SVGElement>('#screenshot-selection-mask-path');
+    expect(maskPath).not.toBeNull();
+    expect(maskPath!.getAttribute('d')).toBe(
+      'M0 0 H200 V100 H0 Z ' +
+      'M20 10 H80 V70 H20 Z ' +
+      'M80 10 H120 V80 H80 Z ' +
+      'M120 30 H180 V80 H120 Z'
+    );
+
+    ui.cancelScreenshotSelection();
+    ui.dispose();
+  });
+
   it('deletes the active screenshot region without leaving selection mode until the last region is removed', () => {
     installUiFixture();
 

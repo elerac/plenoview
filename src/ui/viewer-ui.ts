@@ -27,6 +27,7 @@ import {
   panoramaProjectionRectToScreenRect,
   screenRectToImageRect,
   screenRectToPanoramaProjectionRect,
+  unionScreenshotSelectionRects,
   type ScreenshotSelectionHandle,
   type ScreenshotSelectionSnapGuide
 } from '../interaction/screenshot-selection';
@@ -2357,10 +2358,11 @@ export class ViewerUi implements Disposable {
     }
 
     this.elements.screenshotSelectionMaskSvg.setAttribute('viewBox', `0 0 ${viewport.width} ${viewport.height}`);
+    const maskRegions = unionScreenshotSelectionRects(regions.map((region) => region.rect));
     const path = [
       `M0 0 H${viewport.width} V${viewport.height} H0 Z`,
-      ...regions.map((region) => {
-        const { x, y, width, height } = region.rect;
+      ...maskRegions.map((region) => {
+        const { x, y, width, height } = region;
         return `M${x} ${y} H${x + width} V${y + height} H${x} Z`;
       })
     ].join(' ');
