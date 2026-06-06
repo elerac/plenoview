@@ -121,8 +121,8 @@ test('serves the embed guide with live examples and reference content @smoke', a
     .locator('.embed-example')
     .filter({ hasText: '3D view' })
     .locator('.gallery-code-frame code');
-  await expect(threeDCode).toContainText('src="../middlebury_chess1_rgb_z.exr"');
-  await expect(threeDCode).toContainText('name="Middlebury RGB + Z"');
+  await expect(threeDCode).toContainText('src="../middlebury_chess1_rgb_p.exr"');
+  await expect(threeDCode).toContainText('name="Middlebury RGB + Position"');
   await expect(threeDCode).toContainText('view="3d"');
   await expect(threeDCode).toContainText('three-d-auto-orbit="true"');
   await expect(threeDCode).toContainText('bottom-panel="none"');
@@ -157,14 +157,14 @@ test('serves the embed guide with live examples and reference content @smoke', a
   expect(panoramaUrl.searchParams.get('bottomPanel')).toBe('none');
   expect(panoramaUrl.searchParams.get('name')).toBe(POLYHAVEN_BROWN_PHOTOSTUDIO_NAME);
   const threeDUrl = await expectEmbedIframeUiMode(page, '3D view');
-  expect(threeDUrl.searchParams.get('src')).toBe('../middlebury_chess1_rgb_z.exr');
+  expect(threeDUrl.searchParams.get('src')).toBe('../middlebury_chess1_rgb_p.exr');
   expect(threeDUrl.searchParams.get('view')).toBe('3d');
   expect(threeDUrl.searchParams.get('threeDAutoOrbit')).toBe('true');
   expect(threeDUrl.searchParams.get('threeDOrbitSpeed')).toBe('6');
   expect(threeDUrl.searchParams.get('threeDOrbitYaw')).toBe('12');
   expect(threeDUrl.searchParams.get('threeDOrbitPitch')).toBe('2');
   expect(threeDUrl.searchParams.get('bottomPanel')).toBe('none');
-  expect(threeDUrl.searchParams.get('name')).toBe('Middlebury RGB + Z');
+  expect(threeDUrl.searchParams.get('name')).toBe('Middlebury RGB + Position');
   const deferredUrl = await expectEmbedIframeUiMode(page, 'Deferred loading');
   expect(deferredUrl.searchParams.get('autoLoad')).toBe('false');
   expect(deferredUrl.searchParams.get('name')).toBe('Deferred Cornell Box');

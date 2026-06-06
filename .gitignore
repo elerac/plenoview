@@ -36,4 +36,4 @@ uv.lock
 # OpenEXR files (ignore all .exr files except for committed public gallery samples)
 *.exr
 !public/cbox_rgb.exr
-!public/middlebury_chess1_rgb_z.exr
+!public/middlebury_chess1_rgb_p.exr

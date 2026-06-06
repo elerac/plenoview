@@ -200,7 +200,7 @@ test('boots an empty app shell with menu actions gated until an image opens @smo
   const galleryMiddleburyItem = page.locator('#gallery-middlebury-menu-button');
   const galleryMiddleburyMenu = page.locator('#gallery-middlebury-menu');
   const galleryMiddleburyChess1Item = page.getByRole('menuitem', {
-    name: 'middlebury_chess1_rgb_z.exr',
+    name: 'middlebury_chess1_rgb_p.exr',
     exact: true
   });
   const galleryPolyHavenItem = page.locator('#gallery-polyhaven-menu-button');
@@ -1046,7 +1046,7 @@ test('exports image-viewer screenshot reproduction metadata as a zip download', 
     };
     viewer: { viewerMode: string };
   };
-  expect(metadata.schemaVersion).toBe(2);
+  expect(metadata.schemaVersion).toBe(3);
   expect(metadata.export).toMatchObject({
     pngFilename: 'cbox_rgb-screenshot.png',
     jsonFilename: 'cbox_rgb-screenshot.json'

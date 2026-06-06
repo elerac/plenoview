@@ -7,7 +7,7 @@ Prismifold is a multichannel image viewer for computational imaging, rendering, 
 ## Features
 
 - OpenEXR decode via a browser-safe `exrs` WASM adapter with full layer/channel extraction.
-- Gallery samples: local `Gallery > cbox_rgb.exr` and `Gallery > Middlebury Stereo > middlebury_chess1_rgb_z.exr`, plus remote `Gallery > Beachball > multipart.0001.exr`, Poly Haven HDRIs under `Gallery > Poly Haven`, KAIST hyperspectral samples under `Gallery > KAIST Hyperspectral`, and Polanalyser Stokes samples under `Gallery > Polanalyser`; remote samples require network access.
+- Gallery samples: local `Gallery > cbox_rgb.exr` and `Gallery > Middlebury Stereo > middlebury_chess1_rgb_p.exr`, plus remote `Gallery > Beachball > multipart.0001.exr`, Poly Haven HDRIs under `Gallery > Poly Haven`, KAIST hyperspectral samples under `Gallery > KAIST Hyperspectral`, and Polanalyser Stokes samples under `Gallery > Polanalyser`; remote samples require network access.
 - Local EXR load via `File > Open...` or drag/drop (drag-and-drop supports multiple files and recursive folder drops in one action).
 - Recursive folder EXR load via `File > Open Folder...`; all `.exr` files under the selected folder are appended as sessions.
 - `File > Export...` exports the full active display to PNG at display image size with configurable PNG compression and current channel/stokes, exposure/gamma, colormap, and alpha settings applied.
@@ -15,7 +15,7 @@ Prismifold is a multichannel image viewer for computational imaging, rendering, 
 - `File > Export Batch...` exports selected file/channel combinations as a ZIP of PNG images.
 - `File > Export Colormap...` exports any registered colormap as a standalone PNG gradient with configurable colormap, size, orientation, and filename.
 - Right-click `Copy Image` copies the current display image to the clipboard.
-- `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, an equirectangular panorama projection suitable for 360-degree environment maps and HDRIs, and a point-cloud view for RGB plus depth data.
+- `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, an equirectangular panorama projection suitable for 360-degree environment maps and HDRIs, and a point-cloud view for RGB plus depth or position data.
 - `View > Rulers` toggles pixel rulers in `Image viewer`.
 - `Window` controls include normal/full-screen preview plus single-pane, vertical split, and horizontal split viewer layouts.
 - Top-bar quick actions include Auto Fit, Auto Exposure, invalid-value warning, screenshot export, Metadata, app fullscreen, and the Settings gear.
@@ -83,7 +83,7 @@ Prismifold is a multichannel image viewer for computational imaging, rendering, 
 
 ## Sample data attribution
 
-`public/middlebury_chess1_rgb_z.exr` is a half-resolution OpenEXR conversion of RGB plus metric depth from the `chess1` scene in the Middlebury 2021 mobile stereo datasets.
+`public/middlebury_chess1_rgb_p.exr` is a half-resolution OpenEXR conversion of RGB plus metric camera-space position from the `chess1` scene in the Middlebury 2021 mobile stereo datasets.
 
 ## UI Layout
 
@@ -280,7 +280,7 @@ Controller methods:
 
 - `Open Files` list: switch active image session by filename, filter rows, rename rows inline, or drag rows to reorder/assign to a split pane.
 - `Alt/Option+Up/Down`: reorder the active `Open Files` row.
-- `Gallery > cbox_rgb.exr` / `Middlebury Stereo > middlebury_chess1_rgb_z.exr` / `Beachball > multipart.0001.exr` / `Poly Haven` / `KAIST Hyperspectral` / `Polanalyser`: open a gallery sample and append it as a new session. Remote samples require network access.
+- `Gallery > cbox_rgb.exr` / `Middlebury Stereo > middlebury_chess1_rgb_p.exr` / `Beachball > multipart.0001.exr` / `Poly Haven` / `KAIST Hyperspectral` / `Polanalyser`: open a gallery sample and append it as a new session. Remote samples require network access.
 - `File > Open...`: open one EXR file and append it as a new session.
 - `File > Open Folder...`: recursively open every `.exr` file under the selected folder and append them as new sessions.
 - Drag/drop: drop one or more `.exr` files, or drop a folder to recursively load every `.exr` under it.

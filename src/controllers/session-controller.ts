@@ -42,8 +42,8 @@ interface GalleryImage {
 }
 
 const DESKTOP_CBOX_RGB_URL = 'https://raw.githubusercontent.com/elerac/prismifold/main/public/cbox_rgb.exr';
-const DESKTOP_MIDDLEBURY_CHESS1_RGB_Z_URL =
-  'https://raw.githubusercontent.com/elerac/prismifold/main/public/middlebury_chess1_rgb_z.exr';
+const DESKTOP_MIDDLEBURY_CHESS1_RGB_P_URL =
+  'https://raw.githubusercontent.com/elerac/prismifold/main/public/middlebury_chess1_rgb_p.exr';
 const POLANALYSER_STOKES_BASE_URL =
   'https://huggingface.co/datasets/elerac/polanalyser/resolve/main/data/stokes/imx250mzr/stokes/';
 const KAIST_HYPERSPECTRAL_BASE_URL =
@@ -119,18 +119,18 @@ const CBOX_RGB_GALLERY_IMAGE = useRemotePackagedGallerySamples
       filename: 'cbox_rgb.exr'
     };
 
-const MIDDLEBURY_CHESS1_RGB_Z_GALLERY_IMAGE: GalleryImage = useRemotePackagedGallerySamples
+const MIDDLEBURY_CHESS1_RGB_P_GALLERY_IMAGE: GalleryImage = useRemotePackagedGallerySamples
   ? {
-      id: 'middlebury-chess1-rgb-z',
-      label: 'middlebury_chess1_rgb_z.exr',
-      filename: 'middlebury_chess1_rgb_z.exr',
-      url: DESKTOP_MIDDLEBURY_CHESS1_RGB_Z_URL,
+      id: 'middlebury-chess1-rgb-p',
+      label: 'middlebury_chess1_rgb_p.exr',
+      filename: 'middlebury_chess1_rgb_p.exr',
+      url: DESKTOP_MIDDLEBURY_CHESS1_RGB_P_URL,
       viewerMode: '3d'
     }
   : {
-      id: 'middlebury-chess1-rgb-z',
-      label: 'middlebury_chess1_rgb_z.exr',
-      filename: 'middlebury_chess1_rgb_z.exr',
+      id: 'middlebury-chess1-rgb-p',
+      label: 'middlebury_chess1_rgb_p.exr',
+      filename: 'middlebury_chess1_rgb_p.exr',
       viewerMode: '3d'
     };
 
@@ -163,7 +163,7 @@ const GALLERY_IMAGES: GalleryImage[] = [
     filename: 'multipart.0001.exr',
     url: 'https://raw.githubusercontent.com/AcademySoftwareFoundation/openexr-images/main/Beachball/multipart.0001.exr'
   },
-  MIDDLEBURY_CHESS1_RGB_Z_GALLERY_IMAGE
+  MIDDLEBURY_CHESS1_RGB_P_GALLERY_IMAGE
 ].concat(POLY_HAVEN_GALLERY_IMAGES, KAIST_GALLERY_IMAGES, POLANALYSER_GALLERY_IMAGES);
 
 const LOAD_CATEGORY_OPEN_FILES = 'open-files';

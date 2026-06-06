@@ -156,6 +156,7 @@ test('auto-orbits 3D embeds and ramps resume after mouse release', async ({ page
   const orbitSpeedDegPerSecond = 30;
   const centeredThreeDState = encodeURIComponent(JSON.stringify({
     viewerMode: '3d',
+    depthChannel: '__position:P',
     view: {
       depthYawDeg: 0,
       depthPitchDeg: 0
@@ -164,7 +165,7 @@ test('auto-orbits 3D embeds and ramps resume after mouse release', async ({ page
   await page.setViewportSize({ width: 640, height: 360 });
   await gotoEmbed(
     page,
-    `/app/?ui=embed&src=%2Fmiddlebury_chess1_rgb_z.exr&view=3d&threeDAutoOrbit=true&threeDOrbitSpeed=${orbitSpeedDegPerSecond}&state=${centeredThreeDState}`
+    `/app/?ui=embed&src=%2Fmiddlebury_chess1_rgb_p.exr&view=3d&threeDAutoOrbit=true&threeDOrbitSpeed=${orbitSpeedDegPerSecond}&state=${centeredThreeDState}`
   );
 
   const initialView = await readEmbedDepthView(page);

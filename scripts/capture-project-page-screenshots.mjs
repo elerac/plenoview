@@ -80,8 +80,7 @@ function createScenes() {
   };
   const depthState = {
     viewerMode: '3d',
-    depthChannel: 'Z',
-    depthFocalLengthPx: 960,
+    depthChannel: '__position:P',
     depthPointSizePx: 2,
     view: { depthYawDeg: -5.3, depthPitchDeg: 0.65, depthZoom: 2 },
     lockedPixel: { ix: 406, iy: 300 }
@@ -152,10 +151,10 @@ function createScenes() {
     {
       id: 'depth',
       aliases: ['middlebury'],
-      output: 'middlebury-depth-inspection.png',
+      output: 'middlebury-position-inspection.png',
       viewport: { width: 1440, height: 900 },
-      expectedImageName: 'middlebury_chess1_rgb_z.exr',
-      src: localAssetUrl('middlebury_chess1_rgb_z.exr'),
+      expectedImageName: 'middlebury_chess1_rgb_p.exr',
+      src: localAssetUrl('middlebury_chess1_rgb_p.exr'),
       state: depthState
     },
     {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
@@ -11,14 +12,25 @@ import OpenImageIO as oiio
 
 SCENE_URL = "https://vision.middlebury.edu/stereo/data/scenes2021/data/chess1"
 RAW_DIR = Path("output/middlebury_chess1_raw")
-OUTPUT_PATH = Path("public/middlebury_chess1_rgb_z.exr")
+OUTPUT_PATH = Path("public/middlebury_chess1_rgb_p.exr")
 OUTPUT_SCALE = 0.5
+POSITION_CHANNEL_NAMES = ("P.X", "P.Y", "P.Z")
 
 DOWNLOADS = {
     "im0.png": f"{SCENE_URL}/im0.png",
     "disp0.pfm": f"{SCENE_URL}/disp0.pfm",
     "calib.txt": f"{SCENE_URL}/calib.txt",
 }
+
+
+@dataclass(frozen=True)
+class CameraCalibration:
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+    baseline_mm: float
+    doffs_px: float
 
 
 def download_if_missing(path: Path, url: str) -> None:
@@ -76,7 +88,7 @@ def read_pfm(path: Path) -> np.ndarray:
     return np.flipud(image).astype(np.float32)
 
 
-def parse_calibration(path: Path) -> tuple[float, float, float]:
+def parse_calibration(path: Path) -> CameraCalibration:
     values: dict[str, str] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
@@ -94,19 +106,44 @@ def parse_calibration(path: Path) -> tuple[float, float, float]:
     if len(matrix_values) != 9:
         raise ValueError(f"Expected 9 cam0 matrix values in {path}, got {len(matrix_values)}")
 
-    focal_px = matrix_values[0]
-    baseline_mm = float(values["baseline"])
-    doffs_px = float(values["doffs"])
-    return focal_px, baseline_mm, doffs_px
+    return CameraCalibration(
+        fx=matrix_values[0],
+        fy=matrix_values[4],
+        cx=matrix_values[2],
+        cy=matrix_values[5],
+        baseline_mm=float(values["baseline"]),
+        doffs_px=float(values["doffs"]),
+    )
 
 
-def disparity_to_depth_m(disparity: np.ndarray, focal_px: float, baseline_mm: float, doffs_px: float) -> np.ndarray:
-    denominator = disparity + np.float32(doffs_px)
+def disparity_to_depth_m(disparity: np.ndarray, calibration: CameraCalibration) -> np.ndarray:
+    denominator = disparity + np.float32(calibration.doffs_px)
     valid = np.isfinite(disparity) & (denominator > 0.0)
 
     depth = np.full(disparity.shape, np.nan, dtype=np.float32)
-    depth[valid] = (baseline_mm * focal_px / denominator[valid] / 1000.0).astype(np.float32)
+    depth[valid] = (
+        calibration.baseline_mm * calibration.fx / denominator[valid] / 1000.0
+    ).astype(np.float32)
     return depth
+
+
+def depth_to_position_m(depth_m: np.ndarray, calibration: CameraCalibration) -> np.ndarray:
+    if depth_m.ndim != 2:
+        raise ValueError(f"Expected HxW depth array, got {depth_m.shape}")
+    if calibration.fx <= 0.0 or calibration.fy <= 0.0:
+        raise ValueError(f"Expected positive focal lengths, got fx={calibration.fx}, fy={calibration.fy}")
+
+    height, width = depth_m.shape
+    x_centers = (np.arange(width, dtype=np.float32) + np.float32(0.5))[np.newaxis, :]
+    y_centers = (np.arange(height, dtype=np.float32) + np.float32(0.5))[:, np.newaxis]
+    valid = np.isfinite(depth_m) & (depth_m > 0.0)
+
+    position = np.full((height, width, 3), np.nan, dtype=np.float32)
+    position[:, :, 0] = (x_centers - np.float32(calibration.cx)) * depth_m / np.float32(calibration.fx)
+    position[:, :, 1] = (np.float32(calibration.cy) - y_centers) * depth_m / np.float32(calibration.fy)
+    position[:, :, 2] = depth_m
+    position[~valid] = np.nan
+    return position.astype(np.float32)
 
 
 def scaled_size(width: int, height: int, scale: float) -> tuple[int, int]:
@@ -125,44 +162,49 @@ def resize_rgb(rgb: np.ndarray, scale: float) -> np.ndarray:
     return cv2.resize(rgb, (output_width, output_height), interpolation=cv2.INTER_AREA).astype(np.float32)
 
 
-def resize_depth_finite_weighted(depth_m: np.ndarray, scale: float) -> np.ndarray:
-    height, width = depth_m.shape
+def resize_position_finite_weighted(position_m: np.ndarray, scale: float) -> np.ndarray:
+    if position_m.ndim != 3 or position_m.shape[2] != 3:
+        raise ValueError(f"Expected HxWx3 position array, got {position_m.shape}")
+
+    height, width = position_m.shape[:2]
     output_width, output_height = scaled_size(width, height, scale)
     if output_width == width and output_height == height:
-        return depth_m.copy()
+        return position_m.copy()
 
-    valid = np.isfinite(depth_m)
+    valid = np.isfinite(position_m).all(axis=2)
     weights = valid.astype(np.float32)
-    weighted_depth = np.where(valid, depth_m, 0.0).astype(np.float32)
+    weighted_position = np.where(valid[:, :, np.newaxis], position_m, 0.0).astype(np.float32)
 
     resized_weights = cv2.resize(weights, (output_width, output_height), interpolation=cv2.INTER_AREA)
-    resized_weighted_depth = cv2.resize(
-        weighted_depth,
+    resized_weighted_position = cv2.resize(
+        weighted_position,
         (output_width, output_height),
         interpolation=cv2.INTER_AREA,
     )
 
-    resized_depth = np.full((output_height, output_width), np.nan, dtype=np.float32)
+    resized_position = np.full((output_height, output_width, 3), np.nan, dtype=np.float32)
     np.divide(
-        resized_weighted_depth,
-        resized_weights,
-        out=resized_depth,
-        where=resized_weights > 0.0,
+        resized_weighted_position,
+        resized_weights[:, :, np.newaxis],
+        out=resized_position,
+        where=resized_weights[:, :, np.newaxis] > 0.0,
     )
-    return resized_depth
+    return resized_position
 
 
-def write_rgb_z_exr(path: Path, rgb: np.ndarray, depth_m: np.ndarray) -> None:
+def write_rgb_position_exr(path: Path, rgb: np.ndarray, position_m: np.ndarray) -> None:
     if rgb.ndim != 3 or rgb.shape[2] != 3:
         raise ValueError(f"Expected HxWx3 RGB array, got {rgb.shape}")
-    if depth_m.shape != rgb.shape[:2]:
-        raise ValueError(f"Depth shape {depth_m.shape} does not match RGB shape {rgb.shape[:2]}")
+    if position_m.shape != (*rgb.shape[:2], 3):
+        raise ValueError(f"Position shape {position_m.shape} does not match RGB shape {(*rgb.shape[:2], 3)}")
 
-    pixels = np.dstack([rgb, depth_m]).astype(np.float32)
+    pixels = np.concatenate([rgb, position_m], axis=2).astype(np.float32)
     height, width, channel_count = pixels.shape
+    channel_names = ("R", "G", "B", *POSITION_CHANNEL_NAMES)
 
     spec = oiio.ImageSpec(width, height, channel_count, oiio.FLOAT)
-    spec.channelnames = ("R", "G", "B", "Z")
+    spec.channelnames = channel_names
+    spec.attribute("compression", "zip")
 
     path.parent.mkdir(parents=True, exist_ok=True)
     output = oiio.ImageOutput.create(str(path))
@@ -192,8 +234,11 @@ def verify_exr(path: Path, expected_shape: tuple[int, int]) -> None:
             )
 
         channel_names = list(spec.channelnames)
-        if channel_names != ["R", "G", "B", "Z"]:
-            raise RuntimeError(f"Expected channels ['R', 'G', 'B', 'Z'], got {channel_names}")
+        expected_channels = {"R", "G", "B", *POSITION_CHANNEL_NAMES}
+        if set(channel_names) != expected_channels:
+            raise RuntimeError(f"Expected channels {sorted(expected_channels)}, got {channel_names}")
+        if "Z" in channel_names:
+            raise RuntimeError("Generated position EXR must not include a standalone Z channel")
 
         pixels = image_input.read_image(format=oiio.FLOAT)
         if pixels is None:
@@ -202,24 +247,40 @@ def verify_exr(path: Path, expected_shape: tuple[int, int]) -> None:
         image_input.close()
 
     pixels = np.asarray(pixels)
-    rgb = pixels[:, :, :3]
-    z = pixels[:, :, 3]
+    channel_indices = {channel_name: index for index, channel_name in enumerate(channel_names)}
+    rgb = np.stack([pixels[:, :, channel_indices[channel_name]] for channel_name in ("R", "G", "B")], axis=2)
+    position = np.stack(
+        [pixels[:, :, channel_indices[channel_name]] for channel_name in POSITION_CHANNEL_NAMES],
+        axis=2,
+    )
 
     if not np.isfinite(rgb).all():
         raise RuntimeError("RGB contains non-finite values")
     if float(rgb.min()) < 0.0 or float(rgb.max()) > 1.0:
         raise RuntimeError(f"RGB is outside [0, 1]: min={rgb.min()}, max={rgb.max()}")
 
-    finite_z = z[np.isfinite(z)]
-    if finite_z.size == 0:
-        raise RuntimeError("Z channel has no finite values")
-    if not (finite_z > 0.0).all():
-        raise RuntimeError("Z channel contains non-positive finite values")
+    finite_components = np.isfinite(position)
+    finite_triplets = finite_components.all(axis=2)
+    partial_triplets = finite_components.any(axis=2) & ~finite_triplets
+    if partial_triplets.any():
+        raise RuntimeError("Position map contains partially finite XYZ triplets")
 
-    invalid_count = int(np.size(z) - finite_z.size)
+    valid_position = position[finite_triplets]
+    if valid_position.size == 0:
+        raise RuntimeError("Position map has no finite XYZ triplets")
+
+    finite_z = valid_position[:, 2]
+    if not (finite_z > 0.0).all():
+        raise RuntimeError("P.Z channel contains non-positive finite values")
+
+    invalid_count = int(finite_triplets.size - valid_position.shape[0])
+    bounds_min = valid_position.min(axis=0)
+    bounds_max = valid_position.max(axis=0)
     print(
         f"Verified {path}: {spec.width}x{spec.height}, channels={channel_names}, "
-        f"Z range={finite_z.min():.4f}..{finite_z.max():.4f} m, invalid={invalid_count}"
+        f"X range={bounds_min[0]:.4f}..{bounds_max[0]:.4f} m, "
+        f"Y range={bounds_min[1]:.4f}..{bounds_max[1]:.4f} m, "
+        f"Z range={bounds_min[2]:.4f}..{bounds_max[2]:.4f} m, invalid={invalid_count}"
     )
 
 
@@ -229,16 +290,17 @@ def main() -> None:
 
     rgb = read_rgb_png(RAW_DIR / "im0.png")
     disparity = read_pfm(RAW_DIR / "disp0.pfm")
-    focal_px, baseline_mm, doffs_px = parse_calibration(RAW_DIR / "calib.txt")
+    calibration = parse_calibration(RAW_DIR / "calib.txt")
 
     if disparity.shape != rgb.shape[:2]:
         raise RuntimeError(f"Disparity shape {disparity.shape} does not match RGB shape {rgb.shape[:2]}")
 
-    depth_m = disparity_to_depth_m(disparity, focal_px, baseline_mm, doffs_px)
+    depth_m = disparity_to_depth_m(disparity, calibration)
+    position_m = depth_to_position_m(depth_m, calibration)
     output_rgb = resize_rgb(rgb, OUTPUT_SCALE)
-    output_depth_m = resize_depth_finite_weighted(depth_m, OUTPUT_SCALE)
+    output_position_m = resize_position_finite_weighted(position_m, OUTPUT_SCALE)
 
-    write_rgb_z_exr(OUTPUT_PATH, output_rgb, output_depth_m)
+    write_rgb_position_exr(OUTPUT_PATH, output_rgb, output_position_m)
     verify_exr(OUTPUT_PATH, output_rgb.shape[:2])
 
 

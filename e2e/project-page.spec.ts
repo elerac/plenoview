@@ -3,7 +3,7 @@ import { expectViewerAppReady } from './helpers/app';
 import { readProbeCoords } from './helpers/viewer';
 
 const CBOX_RGB_URL = 'cbox_rgb.exr';
-const MIDDLEBURY_CHESS1_RGB_Z_URL = 'middlebury_chess1_rgb_z.exr';
+const MIDDLEBURY_CHESS1_RGB_P_URL = 'middlebury_chess1_rgb_p.exr';
 const MIDDLEBURY_SCENES2021_URL = 'https://vision.middlebury.edu/stereo/data/scenes2021/';
 const KAIST_DATASET_URL = 'https://vclab.kaist.ac.kr/siggraphasia2017p1/kaistdataset.html';
 const POLYHAVEN_BROWN_PHOTOSTUDIO_PAGE_URL = 'https://polyhaven.com/a/brown_photostudio_02';
@@ -307,7 +307,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   )).toBeVisible();
   await expect(page.getByText('3D view', { exact: true })).toBeVisible();
   await expect(page.locator('.gallery-item').filter({
-    hasText: /Switch RGB plus Z data into a 3D point-cloud view, tune focal length, camera\s+angles/
+    hasText: /Switch RGB plus position data into a 3D point-cloud view, tune camera angles\s+and point size/
   })).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Middlebury Stereo Datasets', exact: true })).toHaveAttribute(
     'href',
@@ -530,14 +530,13 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   });
 
   await expectGalleryCardLaunch(page, '3D view', {
-    accessibleName: /Prismifold 3D viewer with focal length 960/,
-    src: 'project-page/middlebury-depth-inspection.png'
+    accessibleName: /Prismifold 3D viewer with a position-map source/,
+    src: 'project-page/middlebury-position-inspection.png'
   }, {
-    src: new RegExp(`/${MIDDLEBURY_CHESS1_RGB_Z_URL}$`),
+    src: new RegExp(`/${MIDDLEBURY_CHESS1_RGB_P_URL}$`),
     state: {
       viewerMode: '3d',
-      depthChannel: 'Z',
-      depthFocalLengthPx: 960,
+      depthChannel: '__position:P',
       depthPointSizePx: 2,
       view: { depthYawDeg: -5.3, depthPitchDeg: 0.65, depthZoom: 2 },
       lockedPixel: { ix: 406, iy: 300 }

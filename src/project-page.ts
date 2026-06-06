@@ -26,8 +26,7 @@ const CBOX_RGB_INSPECTION_STATE: EmbedViewerStateSnapshot = {
 
 const THREE_D_INSPECTION_STATE: EmbedViewerStateSnapshot = {
   viewerMode: '3d',
-  depthChannel: 'Z',
-  depthFocalLengthPx: 960,
+  depthChannel: '__position:P',
   depthPointSizePx: 2,
   view: {
     depthYawDeg: -5.3,
@@ -67,7 +66,7 @@ const GALLERY_LAUNCHES: Record<string, { src: string; state?: EmbedViewerStateSn
     state: null
   },
   '3d': {
-    src: resolveAssetUrl('middlebury_chess1_rgb_z.exr'),
+    src: resolveAssetUrl('middlebury_chess1_rgb_p.exr'),
     state: THREE_D_INSPECTION_STATE
   },
   hyperspectral: {
