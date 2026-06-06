@@ -978,6 +978,27 @@ main {
     order: 3;
     margin-top: 0;
   }
+
+  .gallery-item.gallery-item--embed-demo figcaption {
+    display: contents;
+  }
+
+  .gallery-item--embed-demo .gallery-caption-copy {
+    order: 1;
+  }
+
+  .gallery-item--embed-demo .gallery-code-frame {
+    order: 2;
+  }
+
+  .gallery-item--embed-demo .gallery-live-embed-frame {
+    order: 3;
+  }
+
+  .gallery-item--embed-demo .gallery-web-app-link {
+    order: 4;
+    justify-self: start;
+  }
 }
 
 @media (max-width: 620px) {

@@ -593,6 +593,36 @@ test('serves the project page with app, desktop, and VS Code download calls to a
     );
   });
   expect(mobileGalleryOrder).toBe(true);
+  const mobileEmbedGalleryOrder = await htmlEmbedItem.evaluate((item) => {
+    const copy = item.querySelector('.gallery-caption-copy');
+    const code = item.querySelector('.gallery-code-frame');
+    const frame = item.querySelector('.gallery-live-embed-frame');
+    const link = item.querySelector('.gallery-web-app-link');
+    if (
+      !(item instanceof HTMLElement) ||
+      !(copy instanceof HTMLElement) ||
+      !(code instanceof HTMLElement) ||
+      !(frame instanceof HTMLElement) ||
+      !(link instanceof HTMLElement)
+    ) {
+      return false;
+    }
+    const itemRect = item.getBoundingClientRect();
+    const copyRect = copy.getBoundingClientRect();
+    const codeRect = code.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const linkRect = link.getBoundingClientRect();
+    return (
+      Math.abs(copyRect.left - itemRect.left) < 1 &&
+      Math.abs(codeRect.left - itemRect.left) < 1 &&
+      Math.abs(frameRect.left - itemRect.left) < 1 &&
+      Math.abs(linkRect.left - itemRect.left) < 1 &&
+      copyRect.bottom <= codeRect.top &&
+      codeRect.bottom <= frameRect.top &&
+      frameRect.bottom <= linkRect.top
+    );
+  });
+  expect(mobileEmbedGalleryOrder).toBe(true);
   await expect.poll(async () => (
     await preview.evaluate((image) => {
       if (!(image instanceof HTMLImageElement) || image.naturalWidth === 0 || image.naturalHeight === 0) {
