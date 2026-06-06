@@ -21,6 +21,7 @@ import {
   normalizeDepthPointSize,
   normalizeDepthPitchForSource,
   normalizeDepthYawForSource,
+  resolveDepthCameraZRange,
   resolveDepthFocalLengthPx,
   resolveDepthPointSampling
 } from '../../depth';
@@ -161,6 +162,18 @@ export function renderDepthPass(
   }
 
   const program = state.depthProgram;
+  const depthCameraZRange = resolveDepthCameraZRange({
+    width: sourceSize.width,
+    height: sourceSize.height,
+    source: depthSource,
+    geometry: depthGeometry,
+    depthFocalLengthPx: viewerState.depthFocalLengthPx,
+    depthYawDeg: viewerState.depthYawDeg,
+    depthPitchDeg: viewerState.depthPitchDeg,
+    depthTargetX: viewerState.depthTargetX,
+    depthTargetY: viewerState.depthTargetY,
+    depthTargetZ: viewerState.depthTargetZ
+  });
   gl.useProgram(program.program);
   gl.bindVertexArray(state.vao);
   gl.activeTexture(gl.TEXTURE0 + COLORMAP_TEXTURE_UNIT);
@@ -200,6 +213,7 @@ export function renderDepthPass(
   );
   gl.uniform2i(program.uniforms.depthGridSize, sampling.gridWidth, sampling.gridHeight);
   gl.uniform1i(program.uniforms.depthSampleStep, sampling.step);
+  gl.uniform2f(program.uniforms.depthCameraZRange, depthCameraZRange.min, depthCameraZRange.max);
   if (depthGeometry.kind === 'xyzPosition') {
     gl.uniform2f(program.uniforms.depthRange, 0, 1);
     gl.uniform3f(

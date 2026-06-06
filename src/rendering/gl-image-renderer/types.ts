@@ -56,6 +56,7 @@ export interface DepthUniforms extends CommonUniforms {
   depthGridSize: WebGLUniformLocation;
   depthSampleStep: WebGLUniformLocation;
   depthRange: WebGLUniformLocation;
+  depthCameraZRange: WebGLUniformLocation;
   depthPositionBoundsMin: WebGLUniformLocation;
   depthPositionBoundsMax: WebGLUniformLocation;
 }

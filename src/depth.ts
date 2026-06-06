@@ -32,6 +32,9 @@ export const DEFAULT_DEPTH_POINT_SIZE_PX = 2;
 export const MIN_DEPTH_POINT_SIZE_PX = 1;
 export const MAX_DEPTH_POINT_SIZE_PX = 8;
 export const MAX_DEPTH_POINTS = 1_000_000;
+export const DEPTH_NDC_LIMIT = 0.999999;
+const DEPTH_CAMERA_Z_RANGE_MIN_SPAN = 1.0e-6;
+const DEPTH_CAMERA_Z_RANGE_MARGIN_RATIO = 0.01;
 const DEPTH_PROBE_SPATIAL_GRID_CELL_SIZE_PX = 16;
 const DEPTH_PROBE_FRAME_MARGIN_PX = Math.max(MAX_DEPTH_POINT_SIZE_PX * 0.5, 3);
 
@@ -119,6 +122,21 @@ export interface ProjectedDepthPixel {
   screenY: number;
   ndcZ: number;
   depth: number;
+}
+
+export interface DepthCameraZRange {
+  min: number;
+  max: number;
+}
+
+export interface ResolveDepthCameraZRangeOptions extends Pick<
+  DepthProjectionView,
+  'depthFocalLengthPx' | 'depthYawDeg' | 'depthPitchDeg' | 'depthTargetX' | 'depthTargetY' | 'depthTargetZ'
+> {
+  width: number;
+  height: number;
+  source: DepthRotationSource;
+  geometry: DepthSourceGeometry;
 }
 
 export interface ProjectDepthPixelToScreenOptions extends DepthProjectionView {
@@ -588,6 +606,21 @@ export function projectDepthPixelToScreen(
     y: point.y / sceneScale,
     z: (point.z - centerDepth) / sceneScale
   };
+  const depthCameraZRange = resolveDepthCameraZRange({
+    width,
+    height,
+    source: 'scalarDepth',
+    geometry: {
+      kind: 'scalarDepth',
+      range: depthRange
+    },
+    depthFocalLengthPx: options.depthFocalLengthPx,
+    depthYawDeg: options.depthYawDeg,
+    depthPitchDeg: options.depthPitchDeg,
+    depthTargetX: options.depthTargetX,
+    depthTargetY: options.depthTargetY,
+    depthTargetZ: options.depthTargetZ
+  });
 
   return projectNormalizedDepthPointToScreen(normalizedPoint, {
     pixel: { ix: x, iy: y },
@@ -599,6 +632,7 @@ export function projectDepthPixelToScreen(
     depthTargetX: options.depthTargetX,
     depthTargetY: options.depthTargetY,
     depthTargetZ: options.depthTargetZ,
+    depthCameraZRange,
     depth
   });
 }
@@ -632,6 +666,22 @@ export function projectPositionPointToScreen(
   const centerY = (bounds.minY + bounds.maxY) * 0.5;
   const centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
   const sceneScale = computePositionBoundsScale(bounds);
+  const depthCameraZRange = resolveDepthCameraZRange({
+    width,
+    height,
+    source: 'xyzPosition',
+    geometry: {
+      kind: 'xyzPosition',
+      bounds
+    },
+    depthFocalLengthPx: options.depthFocalLengthPx,
+    depthYawDeg: options.depthYawDeg,
+    depthPitchDeg: options.depthPitchDeg,
+    depthTargetX: options.depthTargetX,
+    depthTargetY: options.depthTargetY,
+    depthTargetZ: options.depthTargetZ
+  });
+
   return projectNormalizedDepthPointToScreen({
     x: (point.x - centerX) / sceneScale,
     y: (point.y - centerY) / sceneScale,
@@ -646,8 +696,61 @@ export function projectPositionPointToScreen(
     depthTargetX: options.depthTargetX,
     depthTargetY: options.depthTargetY,
     depthTargetZ: options.depthTargetZ,
+    depthCameraZRange,
     depth: point.z
   });
+}
+
+export function resolveDepthCameraZRange(options: ResolveDepthCameraZRangeOptions): DepthCameraZRange {
+  const normalizedBounds = createNormalizedDepthBounds(options);
+  if (!normalizedBounds) {
+    return { min: -1, max: 1 };
+  }
+
+  const yawRad = -normalizeDepthYawForSource(options.depthYawDeg, options.source) * Math.PI / 180;
+  const pitchRad = -normalizeDepthPitchForSource(options.depthPitchDeg, options.source) * Math.PI / 180;
+  const depthTargetX = normalizeDepthTarget(options.depthTargetX ?? DEFAULT_DEPTH_TARGET);
+  const depthTargetY = normalizeDepthTarget(options.depthTargetY ?? DEFAULT_DEPTH_TARGET);
+  const depthTargetZ = normalizeDepthTarget(options.depthTargetZ ?? DEFAULT_DEPTH_TARGET);
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (const x of [normalizedBounds.minX, normalizedBounds.maxX]) {
+    for (const y of [normalizedBounds.minY, normalizedBounds.maxY]) {
+      for (const z of [normalizedBounds.minZ, normalizedBounds.maxZ]) {
+        const cameraPoint = rotatePitch(rotateYaw({
+          x: x - depthTargetX,
+          y: y - depthTargetY,
+          z: z - depthTargetZ
+        }, yawRad), pitchRad);
+        if (!Number.isFinite(cameraPoint.z)) {
+          continue;
+        }
+        min = Math.min(min, cameraPoint.z);
+        max = Math.max(max, cameraPoint.z);
+      }
+    }
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return { min: -1, max: 1 };
+  }
+
+  return expandDepthCameraZRange(min, max);
+}
+
+export function mapDepthCameraZToNdc(cameraZ: number, range: DepthCameraZRange): number {
+  if (
+    !Number.isFinite(cameraZ) ||
+    !Number.isFinite(range.min) ||
+    !Number.isFinite(range.max)
+  ) {
+    return 0;
+  }
+
+  const span = Math.max(range.max - range.min, DEPTH_CAMERA_Z_RANGE_MIN_SPAN);
+  const ndcZ = ((cameraZ - range.min) / span) * 2 - 1;
+  return clampFinite(ndcZ, -DEPTH_NDC_LIMIT, DEPTH_NDC_LIMIT, 0);
 }
 
 export function pickDepthPixelAtScreenPoint(
@@ -837,6 +940,18 @@ export class DepthProbeProjectionCache {
     const positionProjection = geometry.kind === 'xyzPosition'
       ? createPositionProjectionNormalization(geometry.bounds)
       : null;
+    const depthCameraZRange = resolveDepthCameraZRange({
+      width: args.width,
+      height: args.height,
+      source,
+      geometry,
+      depthFocalLengthPx: args.depthFocalLengthPx,
+      depthYawDeg: args.depthYawDeg,
+      depthPitchDeg: args.depthPitchDeg,
+      depthTargetX: args.depthTargetX,
+      depthTargetY: args.depthTargetY,
+      depthTargetZ: args.depthTargetZ
+    });
     const yawRad = -normalizeDepthYawForSource(args.depthYawDeg, source) * Math.PI / 180;
     const pitchRad = -normalizeDepthPitchForSource(args.depthPitchDeg, source) * Math.PI / 180;
     const yawCos = Math.cos(yawRad);
@@ -927,7 +1042,7 @@ export class DepthProbeProjectionCache {
       pixelY[count] = y;
       screenX[count] = projectedScreenX;
       screenY[count] = projectedScreenY;
-      ndcZ[count] = clampFinite(cameraZ * zoom, -1, 1, 1);
+      ndcZ[count] = mapDepthCameraZToNdc(cameraZ, depthCameraZRange);
       nextPoint[count] = cellHeads[cellIndex]!;
       cellHeads[cellIndex] = count;
       count += 1;
@@ -1265,6 +1380,80 @@ function computePositionBoundsScale(bounds: DepthPositionBounds): number {
   );
 }
 
+function createNormalizedDepthBounds(
+  options: ResolveDepthCameraZRangeOptions
+): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+} | null {
+  if (options.width <= 0 || options.height <= 0 || !isUsableDepthSourceGeometry(options.geometry)) {
+    return null;
+  }
+
+  if (options.geometry.kind === 'xyzPosition') {
+    const { bounds } = options.geometry;
+    const centerX = (bounds.minX + bounds.maxX) * 0.5;
+    const centerY = (bounds.minY + bounds.maxY) * 0.5;
+    const centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
+    const invSceneScale = 1 / computePositionBoundsScale(bounds);
+    return {
+      minX: (bounds.minX - centerX) * invSceneScale,
+      maxX: (bounds.maxX - centerX) * invSceneScale,
+      minY: (bounds.minY - centerY) * invSceneScale,
+      maxY: (bounds.maxY - centerY) * invSceneScale,
+      minZ: (bounds.minZ - centerZ) * invSceneScale,
+      maxZ: (bounds.maxZ - centerZ) * invSceneScale
+    };
+  }
+
+  const scalarProjection = createScalarProjectionNormalization(
+    options.width,
+    options.height,
+    options.depthFocalLengthPx,
+    options.geometry.range
+  );
+  const minDepth = options.geometry.range.min;
+  const maxDepth = Math.max(options.geometry.range.max, minDepth + DEPTH_CAMERA_Z_RANGE_MIN_SPAN);
+  const xExtent = options.width * maxDepth * scalarProjection.invFocalSceneScale * 0.5;
+  const yExtent = options.height * maxDepth * scalarProjection.invFocalSceneScale * 0.5;
+  const minZ = (minDepth - scalarProjection.centerDepth) * scalarProjection.invSceneScale;
+  const maxZ = (maxDepth - scalarProjection.centerDepth) * scalarProjection.invSceneScale;
+
+  if (
+    !Number.isFinite(xExtent) ||
+    !Number.isFinite(yExtent) ||
+    !Number.isFinite(minZ) ||
+    !Number.isFinite(maxZ)
+  ) {
+    return null;
+  }
+
+  return {
+    minX: -Math.abs(xExtent),
+    maxX: Math.abs(xExtent),
+    minY: -Math.abs(yExtent),
+    maxY: Math.abs(yExtent),
+    minZ: Math.min(minZ, maxZ),
+    maxZ: Math.max(minZ, maxZ)
+  };
+}
+
+function expandDepthCameraZRange(min: number, max: number): DepthCameraZRange {
+  const span = Math.max(max - min, DEPTH_CAMERA_Z_RANGE_MIN_SPAN);
+  const margin = Math.max(
+    span * DEPTH_CAMERA_Z_RANGE_MARGIN_RATIO,
+    DEPTH_CAMERA_Z_RANGE_MIN_SPAN
+  );
+  return {
+    min: min - margin,
+    max: max + margin
+  };
+}
+
 function projectNormalizedDepthPointToScreen(
   point: DepthPoint,
   options: Pick<
@@ -1274,6 +1463,7 @@ function projectNormalizedDepthPointToScreen(
     pixel: ImagePixel;
     depthSource: DepthRotationSource;
     viewport: ViewportInfo;
+    depthCameraZRange: DepthCameraZRange;
     depth: number;
   }
 ): ProjectedDepthPixel | null {
@@ -1302,7 +1492,7 @@ function projectNormalizedDepthPointToScreen(
     },
     screenX: (projectedX * 0.5 + 0.5) * options.viewport.width,
     screenY: (0.5 - projectedY * 0.5) * options.viewport.height,
-    ndcZ: clampFinite(cameraPoint.z * zoom, -1, 1, 1),
+    ndcZ: mapDepthCameraZToNdc(cameraPoint.z, options.depthCameraZRange),
     depth: options.depth
   };
 }

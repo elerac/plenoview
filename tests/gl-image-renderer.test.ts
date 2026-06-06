@@ -388,7 +388,14 @@ describe('gl image renderer', () => {
     expect(lastUniform2iValue(gl, 'uDepthGridSize')).toEqual([2, 2]);
     expect(lastUniform1iValue(gl, 'uDepthSampleStep')).toBe(1);
     expect(lastUniform2fValue(gl, 'uDepthRange')).toEqual([1, 4]);
+    const depthCameraZRange = lastUniform2fValue(gl, 'uDepthCameraZRange');
+    expect(depthCameraZRange).toEqual([expect.any(Number), expect.any(Number)]);
+    expect(depthCameraZRange![0]).toBeLessThan(depthCameraZRange![1]);
     expect(lastUniform1iValue(gl, 'uDepthSourceKind')).toBe(0);
+    const depthVertexShaderSource = getDepthVertexShaderSource(gl);
+    expect(depthVertexShaderSource).toContain('uniform vec2 uDepthCameraZRange;');
+    expect(depthVertexShaderSource).toContain('mapDepthCameraZToNdc(cameraPoint.z)');
+    expect(depthVertexShaderSource).not.toContain('cameraPoint.z * zoom');
   });
 
   it('renders XYZ position sources through the point-cloud pass', () => {
@@ -458,6 +465,9 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uDepthPitchDeg')).toBe(-120);
     expect(lastUniform3fValue(gl, 'uDepthPositionBoundsMin')).toEqual([-1, -2, 3]);
     expect(lastUniform3fValue(gl, 'uDepthPositionBoundsMax')).toEqual([1, 2, 5]);
+    const depthCameraZRange = lastUniform2fValue(gl, 'uDepthCameraZRange');
+    expect(depthCameraZRange).toEqual([expect.any(Number), expect.any(Number)]);
+    expect(depthCameraZRange![0]).toBeLessThan(depthCameraZRange![1]);
   });
 
   it('reuses export framebuffers and textures when the export size is unchanged', () => {
@@ -1202,6 +1212,15 @@ function lastUniform2iValue(
     return undefined;
   }
   return [lastCall[1] as number, lastCall[2] as number];
+}
+
+function getDepthVertexShaderSource(gl: ReturnType<typeof createWebGlContextMock>): string {
+  const shaderSource = gl.shaderSource as unknown as ReturnType<typeof vi.fn>;
+  const source = shaderSource.mock.calls
+    .map((call) => call[1] as string)
+    .find((shaderSource) => shaderSource.includes('uDepthCameraZRange'));
+  expect(source).toBeTruthy();
+  return source ?? '';
 }
 
 function createWebGlContextMock(): WebGL2RenderingContext & {

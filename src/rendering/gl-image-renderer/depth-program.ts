@@ -24,6 +24,7 @@ export function createDepthProgram(gl: WebGL2RenderingContext): ProgramBundle<De
       depthGridSize: getRequiredUniformLocation(gl, program, 'uDepthGridSize'),
       depthSampleStep: getRequiredUniformLocation(gl, program, 'uDepthSampleStep'),
       depthRange: getRequiredUniformLocation(gl, program, 'uDepthRange'),
+      depthCameraZRange: getRequiredUniformLocation(gl, program, 'uDepthCameraZRange'),
       depthPositionBoundsMin: getRequiredUniformLocation(gl, program, 'uDepthPositionBoundsMin'),
       depthPositionBoundsMax: getRequiredUniformLocation(gl, program, 'uDepthPositionBoundsMax')
     }

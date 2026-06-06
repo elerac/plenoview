@@ -20,6 +20,7 @@ uniform float uDepthPointSizePx;
 uniform ivec2 uDepthGridSize;
 uniform int uDepthSampleStep;
 uniform vec2 uDepthRange;
+uniform vec2 uDepthCameraZRange;
 uniform vec3 uDepthPositionBoundsMin;
 uniform vec3 uDepthPositionBoundsMax;
 
@@ -27,6 +28,7 @@ out vec2 vDepthPixel;
 flat out int vDepthValid;
 
 const float PI = 3.1415926535897932384626433832795;
+const float DEPTH_NDC_LIMIT = 0.999999;
 const int DEPTH_SOURCE_SCALAR = 0;
 const int DEPTH_SOURCE_XYZ_POSITION = 1;
 
@@ -52,6 +54,13 @@ vec3 rotatePitch(vec3 value, float angleRad) {
     c * value.y - s * value.z,
     s * value.y + c * value.z
   );
+}
+
+float mapDepthCameraZToNdc(float cameraZ) {
+  float minZ = uDepthCameraZRange.x;
+  float maxZ = max(uDepthCameraZRange.y, minZ + 1.0e-6);
+  float ndcZ = ((cameraZ - minZ) / (maxZ - minZ)) * 2.0 - 1.0;
+  return clamp(ndcZ, -DEPTH_NDC_LIMIT, DEPTH_NDC_LIMIT);
 }
 
 void rejectVertex() {
@@ -146,5 +155,5 @@ void main() {
   vDepthValid = 1;
   vDepthPixel = vec2(pixel);
   gl_PointSize = max(uDepthPointSizePx, 1.0);
-  gl_Position = vec4(outputNdc, clamp(cameraPoint.z * zoom, -1.0, 1.0), 1.0);
+  gl_Position = vec4(outputNdc, mapDepthCameraZToNdc(cameraPoint.z), 1.0);
 }

@@ -3,6 +3,7 @@ import {
   clampDepthYaw,
   computeFinitePositionBounds,
   computePositiveFiniteDepthRange,
+  DEPTH_NDC_LIMIT,
   DepthProbeProjectionCache,
   getDepthChannelOptions,
   getDepthSourceOptions,
@@ -536,6 +537,33 @@ describe('depth utilities', () => {
     expect(narrowProjection!.screenY).not.toBeCloseTo(wideProjection!.screenY);
   });
 
+  it('keeps projected depth ordering independent from 3D zoom', () => {
+    const viewport = { width: 200, height: 200 };
+    const baseOptions = {
+      width: 2,
+      height: 1,
+      viewport,
+      depthRange: { min: 1, max: 10 },
+      depthFocalLengthPx: 2,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthPointSizePx: 2
+    };
+    const normalZoom = projectDepthPixelToScreen(1, 0, 10, {
+      ...baseOptions,
+      depthZoom: 1
+    });
+    const highZoom = projectDepthPixelToScreen(1, 0, 10, {
+      ...baseOptions,
+      depthZoom: 50
+    });
+
+    expect(normalZoom).not.toBeNull();
+    expect(highZoom).not.toBeNull();
+    expect(highZoom!.ndcZ).toBeCloseTo(normalZoom!.ndcZ, 7);
+    expect(highZoom!.screenX).not.toBeCloseTo(normalZoom!.screenX, 2);
+  });
+
   it('applies depth target translation while projecting depth points', () => {
     const viewport = { width: 100, height: 100 };
     const centeredProjection = projectDepthPixelToScreen(0, 0, 1, {
@@ -664,6 +692,123 @@ describe('depth utilities', () => {
       depthPointSizePx: 2,
       hitRadiusPx: 1000
     })).toEqual({ ix: 0, iy: 0 });
+  });
+
+  it('keeps high-zoom scalar depth picking ordered by true camera depth', () => {
+    const layer = createLayerFromChannels({
+      Z: [100, 90]
+    });
+
+    expect(pickDepthPixelAtScreenPoint({ x: 50, y: 50 }, {
+      layer,
+      width: 2,
+      height: 1,
+      channelName: 'Z',
+      viewport: { width: 100, height: 100 },
+      depthRange: { min: 1, max: 100 },
+      depthFocalLengthPx: 2000,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 50,
+      depthPointSizePx: 2,
+      hitRadiusPx: 100
+    })).toEqual({ ix: 1, iy: 0 });
+  });
+
+  it('keeps high-zoom XYZ position picking ordered by true camera depth', () => {
+    const layer = createLayerFromChannels({
+      'P.X': [0, 0],
+      'P.Y': [0, 0],
+      'P.Z': [10, 8]
+    });
+    const source = {
+      kind: 'xyzPosition' as const,
+      base: 'P',
+      xChannel: 'P.X',
+      yChannel: 'P.Y',
+      zChannel: 'P.Z'
+    };
+
+    expect(pickDepthPixelAtScreenPoint({ x: 50, y: 50 }, {
+      layer,
+      width: 2,
+      height: 1,
+      source,
+      viewport: { width: 100, height: 100 },
+      geometry: {
+        kind: 'xyzPosition',
+        bounds: {
+          minX: 0,
+          maxX: 0,
+          minY: 0,
+          maxY: 0,
+          minZ: 0,
+          maxZ: 10
+        }
+      },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 50,
+      depthPointSizePx: 2,
+      hitRadiusPx: 100
+    })).toEqual({ ix: 1, iy: 0 });
+  });
+
+  it('keeps degenerate and large depth ranges inside the open NDC range', () => {
+    const equalScalarDepth = projectDepthPixelToScreen(0, 0, 1, {
+      width: 1,
+      height: 1,
+      viewport: { width: 100, height: 100 },
+      depthRange: { min: 1, max: 1 },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 50,
+      depthTargetX: -0.1,
+      depthTargetY: 0.2,
+      depthTargetZ: 0.3,
+      depthPointSizePx: 2
+    });
+    const largeScalarDepth = projectDepthPixelToScreen(0, 0, 1.0e9, {
+      width: 1,
+      height: 1,
+      viewport: { width: 100, height: 100 },
+      depthRange: { min: 1, max: 1.0e9 },
+      depthFocalLengthPx: null,
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthZoom: 50,
+      depthPointSizePx: 2
+    });
+    const zeroSpanPosition = projectPositionPointToScreen(0, 0, { x: 5, y: -2, z: 7 }, {
+      width: 1,
+      height: 1,
+      viewport: { width: 100, height: 100 },
+      bounds: {
+        minX: 5,
+        maxX: 5,
+        minY: -2,
+        maxY: -2,
+        minZ: 7,
+        maxZ: 7
+      },
+      depthFocalLengthPx: null,
+      depthYawDeg: 120,
+      depthPitchDeg: -45,
+      depthZoom: 50,
+      depthTargetX: 0.1,
+      depthTargetY: -0.2,
+      depthTargetZ: 0.3,
+      depthPointSizePx: 2
+    });
+
+    expect(equalScalarDepth).not.toBeNull();
+    expect(largeScalarDepth).not.toBeNull();
+    expect(zeroSpanPosition).not.toBeNull();
+    expect(Math.abs(equalScalarDepth!.ndcZ)).toBeLessThan(DEPTH_NDC_LIMIT);
+    expect(Math.abs(largeScalarDepth!.ndcZ)).toBeLessThanOrEqual(DEPTH_NDC_LIMIT);
+    expect(Math.abs(zeroSpanPosition!.ndcZ)).toBeLessThan(DEPTH_NDC_LIMIT);
   });
 
   it('honors depth point hit radius and missing prerequisites', () => {
