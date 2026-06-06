@@ -748,6 +748,140 @@ describe('viewer interaction roi gestures', () => {
   });
 });
 
+describe('viewer interaction touch gestures', () => {
+  it('pinch-zooms image view around the touch midpoint without toggling the probe lock', () => {
+    const harness = createHarness({
+      zoom: 10,
+      panX: 5,
+      panY: 5
+    });
+
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 40, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 2, clientX: 60, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 30, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 2, clientX: 70, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 30, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 2, clientX: 70, clientY: 50 });
+
+    expect(harness.getState().zoom).toBeGreaterThan(10);
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+    expect(harness.onCommitRoi).not.toHaveBeenCalled();
+  });
+
+  it('pans image view with two-finger midpoint movement without committing ROI', () => {
+    const harness = createHarness({
+      zoom: 10,
+      panX: 5,
+      panY: 5
+    });
+
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 40, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 2, clientX: 60, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 2, clientX: 70, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 2, clientX: 70, clientY: 50 });
+
+    expect(harness.getState().panX).toBeLessThan(5);
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+    expect(harness.onCommitRoi).not.toHaveBeenCalled();
+  });
+
+  it('pinch-zooms and orbits panorama view with two fingers', () => {
+    const harness = createHarness({
+      viewerMode: 'panorama',
+      panoramaYawDeg: 0,
+      panoramaPitchDeg: 0,
+      panoramaHfovDeg: 100
+    }, {
+      imageSize: { width: 360, height: 180 }
+    });
+
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 40, clientY: 40 });
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 2, clientX: 60, clientY: 60 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 35, clientY: 45 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 2, clientX: 75, clientY: 65 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 35, clientY: 45 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 2, clientX: 75, clientY: 65 });
+
+    const state = harness.getState();
+    expect(state.panoramaHfovDeg).toBeLessThan(100);
+    expect(Math.abs(state.panoramaYawDeg) + Math.abs(state.panoramaPitchDeg)).toBeGreaterThan(0);
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+  });
+
+  it('pinch-zooms and pans 3D view with two fingers', () => {
+    const harness = createHarness({
+      viewerMode: '3d',
+      depthZoom: 1,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
+    });
+
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 40, clientY: 40 });
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 2, clientX: 60, clientY: 60 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 35, clientY: 45 });
+    dispatchTouchPointer(harness.element, 'pointermove', { pointerId: 2, clientX: 75, clientY: 65 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 35, clientY: 45 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 2, clientX: 75, clientY: 65 });
+
+    const state = harness.getState();
+    expect(state.depthZoom).toBeGreaterThan(1);
+    expect(Math.abs(state.depthTargetX) + Math.abs(state.depthTargetY)).toBeGreaterThan(0);
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending one-finger touch tap when a second touch starts', () => {
+    const harness = createHarness();
+
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerdown', { pointerId: 2, clientX: 70, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchTouchPointer(harness.element, 'pointerup', { pointerId: 2, clientX: 70, clientY: 50 });
+
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+    expect(harness.onCommitRoi).not.toHaveBeenCalled();
+  });
+
+  it('clears touch drags on pointercancel so auto camera motion can resume', () => {
+    const panoramaHarness = createHarness({
+      viewerMode: 'panorama'
+    });
+
+    panoramaHarness.interaction.setPanoramaAutoRotateConfig({
+      autoRotate: true,
+      rotationSpeedDegPerSecond: 10
+    });
+    expect(panoramaHarness.hasScheduledFrame()).toBe(true);
+
+    dispatchTouchPointer(panoramaHarness.element, 'pointerdown', { pointerId: 1, clientX: 50, clientY: 50 });
+    expect(panoramaHarness.hasScheduledFrame()).toBe(false);
+
+    dispatchTouchPointer(panoramaHarness.element, 'pointercancel', { pointerId: 1, clientX: 50, clientY: 50 });
+    expect(panoramaHarness.hasScheduledFrame()).toBe(true);
+
+    const depthHarness = createHarness({
+      viewerMode: '3d',
+      depthChannel: 'Z'
+    });
+
+    depthHarness.interaction.setThreeDAutoOrbitConfig({
+      autoOrbit: true,
+      orbitSpeedDegPerSecond: 30,
+      orbitYawAmplitudeDeg: 12,
+      orbitPitchAmplitudeDeg: 2
+    });
+    expect(depthHarness.hasScheduledFrame()).toBe(true);
+
+    dispatchTouchPointer(depthHarness.element, 'pointerdown', { pointerId: 1, clientX: 50, clientY: 50 });
+    expect(depthHarness.hasScheduledFrame()).toBe(false);
+
+    dispatchTouchPointer(depthHarness.element, 'pointercancel', { pointerId: 1, clientX: 50, clientY: 50 });
+    expect(depthHarness.hasScheduledFrame()).toBe(true);
+  });
+});
+
 describe('viewer interaction depth probe', () => {
   it('resolves depth hover pixels from the depth probe resolver', () => {
     const resolveDepthProbePixel = vi.fn(() => ({ ix: 1, iy: 0 }));
@@ -1557,7 +1691,7 @@ function createHarness(
   let activePanePath = options.activePanePath ? [...options.activePanePath] : options.panes?.[0]?.path ?? [];
   const paneInfos = options.panes?.map((pane) => createPaneRenderInfo(pane.path, pane.rect, activePanePath)) ?? null;
 
-  let capturedPointerId: number | null = null;
+  const capturedPointerIds = new Set<number>();
   Object.defineProperty(element, 'getBoundingClientRect', {
     configurable: true,
     value: () => ({
@@ -1573,14 +1707,12 @@ function createHarness(
     })
   });
   element.setPointerCapture = ((pointerId: number) => {
-    capturedPointerId = pointerId;
+    capturedPointerIds.add(pointerId);
   }) as typeof element.setPointerCapture;
   element.releasePointerCapture = ((pointerId: number) => {
-    if (capturedPointerId === pointerId) {
-      capturedPointerId = null;
-    }
+    capturedPointerIds.delete(pointerId);
   }) as typeof element.releasePointerCapture;
-  element.hasPointerCapture = ((pointerId: number) => capturedPointerId === pointerId) as typeof element.hasPointerCapture;
+  element.hasPointerCapture = ((pointerId: number) => capturedPointerIds.has(pointerId)) as typeof element.hasPointerCapture;
 
   let state = createViewerState({
     zoom: 10,
@@ -1791,6 +1923,17 @@ function dispatchPointer(
     button: 0,
     ...init
   }));
+}
+
+function dispatchTouchPointer(
+  element: HTMLElement,
+  type: string,
+  init: Partial<PointerEventInit> & { pointerId: number; clientX: number; clientY: number }
+): void {
+  dispatchPointer(element, type, {
+    pointerType: 'touch',
+    ...init
+  });
 }
 
 function dispatchWheel(

@@ -12,12 +12,13 @@ import type {
   ViewportRect,
   ViewerState
 } from '../types';
+import { clampDepthZoom } from '../depth';
 import {
   samePanePath,
   type ViewerPanePath,
   type ViewerPaneRenderInfo
 } from '../viewer-pane-layout';
-import { imageToScreen } from './image-geometry';
+import { imageToScreen, zoomAroundPoint } from './image-geometry';
 import {
   ThreeDAutoOrbitController,
   ThreeDKeyboardOrbitController,
@@ -44,7 +45,7 @@ import {
   zoomPanoramaFromKeyboard,
   zoomPanoramaFromWheel
 } from './panorama-mode';
-import { getPanoramaProjectionDiameter } from './panorama-geometry';
+import { clampPanoramaHfov, getPanoramaProjectionDiameter } from './panorama-geometry';
 import { resolveHoverPixel, resolveProbePixel } from './probe-mode';
 import {
   commitRoiFromDrag,
@@ -80,6 +81,19 @@ type PanePoint = {
   point: PointerPosition;
   inside: boolean;
 };
+interface ActiveTouchPointer {
+  pointerId: number;
+  elementPoint: PointerPosition;
+  pane: ViewerPaneRenderInfo;
+}
+
+interface TouchGestureState {
+  pointerIds: [number, number];
+  pane: ViewerPaneRenderInfo;
+  previousMidpoint: PointerPosition;
+  previousDistance: number;
+}
+
 const KEYBOARD_ZOOM_SPEED_STEPS_PER_SECOND = 3;
 const KEYBOARD_ZOOM_MAX_FRAME_MS = 50;
 
@@ -94,6 +108,7 @@ export class ViewerInteraction {
   private readonly keyboardZoom: ViewerKeyboardZoomController;
   private dragging = false;
   private movedDuringDrag = false;
+  private dragPointerId: number | null = null;
   private dragMode: DragMode = null;
   private previousPointer: PointerPosition | null = null;
   private lastPointerInElement: PointerPosition | null = null;
@@ -103,6 +118,8 @@ export class ViewerInteraction {
   private roiAnchorPixel: ImagePixel | null = null;
   private roiAdjustmentDrag: RoiAdjustmentDrag | null = null;
   private screenshotDrag: ScreenshotSelectionDrag | null = null;
+  private touchPointers = new Map<number, ActiveTouchPointer>();
+  private touchGesture: TouchGestureState | null = null;
 
   constructor(
     element: HTMLElement,
@@ -162,6 +179,7 @@ export class ViewerInteraction {
     this.element.addEventListener('pointerdown', this.onPointerDown);
     this.element.addEventListener('pointermove', this.onPointerMove);
     this.element.addEventListener('pointerup', this.onPointerUp);
+    this.element.addEventListener('pointercancel', this.onPointerCancel);
     this.element.addEventListener('pointerleave', this.onPointerLeave);
     this.element.addEventListener('contextmenu', this.onContextMenu);
     document.addEventListener('visibilitychange', this.onDocumentVisibilityChange);
@@ -172,6 +190,7 @@ export class ViewerInteraction {
     this.element.removeEventListener('pointerdown', this.onPointerDown);
     this.element.removeEventListener('pointermove', this.onPointerMove);
     this.element.removeEventListener('pointerup', this.onPointerUp);
+    this.element.removeEventListener('pointercancel', this.onPointerCancel);
     this.element.removeEventListener('pointerleave', this.onPointerLeave);
     this.element.removeEventListener('contextmenu', this.onContextMenu);
     document.removeEventListener('visibilitychange', this.onDocumentVisibilityChange);
@@ -413,6 +432,23 @@ export class ViewerInteraction {
       return;
     }
 
+    if (event.pointerType === 'touch' && this.touchPointers.size > 0) {
+      const panePoint = this.resolvePanePoint(event, {
+        activate: false,
+        preferDragPane: this.dragging
+      });
+      this.rememberTouchPointerFromPanePoint(event.pointerId, panePoint);
+      this.capturePointer(event.pointerId);
+      if (this.dragging) {
+        this.cancelDragForTouchGesture();
+      }
+      if (!this.getScreenshotSelection().active) {
+        this.startTouchGesture();
+      }
+      event.preventDefault();
+      return;
+    }
+
     const screenshotSelection = this.getScreenshotSelection();
     if (screenshotSelection.active) {
       if (!isScreenshotSelectionDragButton(event)) {
@@ -421,6 +457,9 @@ export class ViewerInteraction {
 
       const panePoint = this.resolvePanePoint(event, { activate: false });
       const point = panePoint.point;
+      if (event.pointerType === 'touch') {
+        this.rememberTouchPointerFromPanePoint(event.pointerId, panePoint);
+      }
       this.lastPointerInElement = point;
       if (event.target instanceof Element && event.target.closest('.screenshot-selection-controls')) {
         return;
@@ -435,7 +474,7 @@ export class ViewerInteraction {
       if (hit.regionId) {
         this.callbacks.onScreenshotSelectionActiveRegionChange?.(hit.regionId);
       }
-      this.dragging = true;
+      this.startDrag(event.pointerId);
       this.dragMode = 'screenshot';
       this.movedDuringDrag = false;
       this.previousPointer = point;
@@ -448,7 +487,7 @@ export class ViewerInteraction {
       if (hit.handle === 'move') {
         this.callbacks.onScreenshotSelectionSquareSnapChange?.(false);
       }
-      this.element.setPointerCapture(event.pointerId);
+      this.capturePointer(event.pointerId);
       return;
     }
 
@@ -465,6 +504,9 @@ export class ViewerInteraction {
 
     const panePoint = this.resolvePanePoint(event, { activate: true });
     const point = panePoint.point;
+    if (event.pointerType === 'touch') {
+      this.rememberTouchPointerFromPanePoint(event.pointerId, panePoint);
+    }
     this.dragPane = panePoint.pane;
     this.lastPointerInElement = point;
 
@@ -479,7 +521,7 @@ export class ViewerInteraction {
       const handle = state.roi ? resolveRoiAdjustmentHandle(point, state.roi, state, viewport) : null;
       this.setRoiInteractionState(createRoiInteractionState({ hoverHandle: handle }));
       if (handle) {
-        this.dragging = true;
+        this.startDrag(event.pointerId);
         this.dragMode = 'roi-adjust';
         this.movedDuringDrag = false;
         this.roiAdjustmentDrag = createRoiAdjustmentDrag(handle, point, state.roi!);
@@ -491,7 +533,7 @@ export class ViewerInteraction {
           hoverHandle: handle,
           activeHandle: handle
         }));
-        this.element.setPointerCapture(event.pointerId);
+        this.capturePointer(event.pointerId);
         return;
       }
     } else {
@@ -504,28 +546,43 @@ export class ViewerInteraction {
         return;
       }
 
-      this.dragging = true;
+      this.startDrag(event.pointerId);
       this.dragMode = 'roi';
       this.movedDuringDrag = false;
       this.roiAnchorPixel = anchorPixel;
       this.previousPointer = point;
       this.callbacks.onDraftRoi(createDraftRoiFromAnchor(anchorPixel));
       this.setRoiInteractionState(createRoiInteractionState());
-      this.element.setPointerCapture(event.pointerId);
+      this.capturePointer(event.pointerId);
       return;
     }
 
-    this.dragging = true;
+    this.startDrag(event.pointerId);
     this.dragMode = depthPanDrag ? 'depth-pan' : 'pan';
     this.movedDuringDrag = false;
     this.previousPointer = point;
     if (depthPanDrag) {
       event.preventDefault();
     }
-    this.element.setPointerCapture(event.pointerId);
+    this.capturePointer(event.pointerId);
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') {
+      this.updateTouchPointer(event);
+      if (this.touchGesture) {
+        if (this.isTouchGesturePointer(event.pointerId)) {
+          this.updateTouchGesture();
+        }
+        event.preventDefault();
+        return;
+      }
+    }
+
+    if (this.dragging && this.dragPointerId !== null && event.pointerId !== this.dragPointerId) {
+      return;
+    }
+
     const screenshotSelection = this.getScreenshotSelection();
     const panePoint = screenshotSelection.active || this.dragging
       ? this.resolvePanePoint(event, {
@@ -646,6 +703,26 @@ export class ViewerInteraction {
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') {
+      this.updateTouchPointer(event);
+      if (this.touchGesture) {
+        if (this.isTouchGesturePointer(event.pointerId)) {
+          this.finishTouchGesture();
+        }
+        this.forgetTouchPointer(event.pointerId);
+        this.releasePointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+      }
+      this.forgetTouchPointer(event.pointerId);
+      if (this.dragging && this.dragPointerId !== null && event.pointerId !== this.dragPointerId) {
+        this.releasePointerCapture(event.pointerId);
+        return;
+      }
+    } else if (this.dragging && this.dragPointerId !== null && event.pointerId !== this.dragPointerId) {
+      return;
+    }
+
     const screenshotSelection = this.getScreenshotSelection();
     if (screenshotSelection.active) {
       const panePoint = this.resolvePanePoint(event, {
@@ -767,6 +844,22 @@ export class ViewerInteraction {
     this.clearDrag(event.pointerId);
   };
 
+  private readonly onPointerCancel = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') {
+      this.updateTouchPointer(event);
+      if (this.touchGesture && this.isTouchGesturePointer(event.pointerId)) {
+        this.finishTouchGesture();
+      }
+      this.forgetTouchPointer(event.pointerId);
+    }
+
+    if (this.dragging && this.dragPointerId === event.pointerId) {
+      this.cancelDrag(event.pointerId);
+    } else {
+      this.releasePointerCapture(event.pointerId);
+    }
+  };
+
   private readonly onPointerLeave = (): void => {
     this.lastPointerInElement = null;
     this.callbacks.onHoverPixel(null);
@@ -789,14 +882,20 @@ export class ViewerInteraction {
     event.preventDefault();
   };
 
-  private clearDrag(pointerId: number): void {
+  private startDrag(pointerId: number): void {
+    this.dragging = true;
+    this.dragPointerId = pointerId;
+  }
+
+  private clearDrag(pointerId: number | null, options: { releasePointerCapture?: boolean } = {}): void {
     const wasDragging = this.dragging;
     const wasScreenshotResize = this.dragMode === 'screenshot' && this.screenshotDrag?.handle !== 'move';
     const wasScreenshotDrag = this.dragMode === 'screenshot';
-    if (this.dragging && this.element.hasPointerCapture(pointerId)) {
-      this.element.releasePointerCapture(pointerId);
+    if (options.releasePointerCapture !== false && pointerId !== null) {
+      this.releasePointerCapture(pointerId);
     }
     this.dragging = false;
+    this.dragPointerId = null;
     this.dragMode = null;
     this.movedDuringDrag = false;
     this.previousPointer = null;
@@ -816,6 +915,200 @@ export class ViewerInteraction {
       this.panoramaAutoRotate.setUserInteracting(false);
       this.threeDAutoOrbit.setUserInteracting(false);
     }
+  }
+
+  private cancelDrag(pointerId: number | null, options: { releasePointerCapture?: boolean } = {}): void {
+    const dragMode = this.dragMode;
+    if (dragMode === 'roi' || dragMode === 'roi-adjust') {
+      this.callbacks.onDraftRoi(null);
+    }
+    this.clearDrag(pointerId, options);
+    if (dragMode === 'roi' || dragMode === 'roi-adjust') {
+      this.setRoiInteractionState(createRoiInteractionState());
+    }
+  }
+
+  private cancelDragForTouchGesture(): void {
+    this.cancelDrag(this.dragPointerId, { releasePointerCapture: false });
+  }
+
+  private capturePointer(pointerId: number): void {
+    this.element.setPointerCapture(pointerId);
+  }
+
+  private releasePointerCapture(pointerId: number): void {
+    if (this.element.hasPointerCapture(pointerId)) {
+      this.element.releasePointerCapture(pointerId);
+    }
+  }
+
+  private rememberTouchPointerFromPanePoint(pointerId: number, panePoint: PanePoint): void {
+    this.touchPointers.set(pointerId, {
+      pointerId,
+      elementPoint: {
+        x: panePoint.point.x + panePoint.pane.rect.x,
+        y: panePoint.point.y + panePoint.pane.rect.y
+      },
+      pane: panePoint.pane
+    });
+  }
+
+  private updateTouchPointer(event: PointerEvent): void {
+    const pointer = this.touchPointers.get(event.pointerId);
+    if (!pointer) {
+      return;
+    }
+
+    pointer.elementPoint = this.getElementPoint(event);
+    if (!this.touchGesture) {
+      pointer.pane = this.resolvePaneAtElementPoint(pointer.elementPoint);
+    }
+  }
+
+  private forgetTouchPointer(pointerId: number): void {
+    this.touchPointers.delete(pointerId);
+    if (this.touchGesture?.pointerIds.includes(pointerId)) {
+      this.touchGesture = null;
+    }
+  }
+
+  private startTouchGesture(): void {
+    if (this.touchGesture || this.touchPointers.size < 2 || !this.callbacks.getImageSize()) {
+      return;
+    }
+
+    const pointers = [...this.touchPointers.values()].slice(0, 2);
+    const pane = this.dragPane ?? pointers[0]!.pane;
+    const sample = resolveTouchGestureSample(pointers[0]!, pointers[1]!, pane);
+    this.touchGesture = {
+      pointerIds: [pointers[0]!.pointerId, pointers[1]!.pointerId],
+      pane,
+      previousMidpoint: sample.midpoint,
+      previousDistance: sample.distance
+    };
+    this.lastPointerInElement = sample.midpoint;
+    this.callbacks.onHoverPixel(null);
+
+    const state = this.callbacks.getState();
+    if (state.viewerMode === 'panorama') {
+      this.panoramaAutoRotate.setUserInteracting(true);
+    }
+    if (state.viewerMode === '3d') {
+      this.threeDAutoOrbit.setUserInteracting(true);
+    }
+  }
+
+  private isTouchGesturePointer(pointerId: number): boolean {
+    return this.touchGesture?.pointerIds.includes(pointerId) ?? false;
+  }
+
+  private updateTouchGesture(): void {
+    const gesture = this.touchGesture;
+    const imageSize = this.callbacks.getImageSize();
+    if (!gesture || !imageSize) {
+      return;
+    }
+
+    const first = this.touchPointers.get(gesture.pointerIds[0]);
+    const second = this.touchPointers.get(gesture.pointerIds[1]);
+    if (!first || !second) {
+      this.finishTouchGesture();
+      return;
+    }
+
+    const previousMidpoint = gesture.previousMidpoint;
+    const previousDistance = gesture.previousDistance;
+    const sample = resolveTouchGestureSample(first, second, gesture.pane);
+    const deltaX = sample.midpoint.x - previousMidpoint.x;
+    const deltaY = sample.midpoint.y - previousMidpoint.y;
+    const scale = previousDistance > 0 && sample.distance > 0
+      ? sample.distance / previousDistance
+      : 1;
+    gesture.previousMidpoint = sample.midpoint;
+    gesture.previousDistance = sample.distance;
+    this.lastPointerInElement = sample.midpoint;
+
+    if (
+      Math.abs(deltaX) <= Number.EPSILON &&
+      Math.abs(deltaY) <= Number.EPSILON &&
+      Math.abs(scale - 1) <= Number.EPSILON
+    ) {
+      return;
+    }
+
+    const state = this.callbacks.getState();
+    const viewport = gesture.pane.viewport;
+    let nextView: Partial<ViewerState> | null = null;
+    let hoverState: ViewerState = state;
+    let shouldResolveHover = true;
+
+    if (state.viewerMode === 'image') {
+      const zoomedView = zoomAroundPoint(
+        state,
+        viewport,
+        previousMidpoint.x,
+        previousMidpoint.y,
+        state.zoom * scale
+      );
+      nextView = panImageFromDrag({ ...state, ...zoomedView }, deltaX, deltaY);
+      hoverState = { ...state, ...nextView };
+    } else if (state.viewerMode === 'panorama') {
+      this.panoramaAutoRotate.setUserInteracting(true);
+      const orbitView = orbitPanoramaFromDrag(state, viewport, deltaX, deltaY);
+      nextView = {
+        ...orbitView,
+        panoramaHfovDeg: clampPanoramaHfov(orbitView.panoramaHfovDeg / scale)
+      };
+      hoverState = { ...state, ...nextView };
+    } else if (state.viewerMode === '3d') {
+      this.threeDAutoOrbit.setUserInteracting(true);
+      const panView = panThreeDFromDrag(state, viewport, deltaX, deltaY);
+      nextView = {
+        ...panView,
+        depthZoom: clampDepthZoom(panView.depthZoom * scale)
+      };
+      hoverState = { ...state, ...nextView };
+      this.pendingDepthDragProbeState = hoverState;
+      shouldResolveHover = false;
+    }
+
+    if (!nextView) {
+      return;
+    }
+
+    this.movedDuringDrag = true;
+    this.callbacks.onViewChange(nextView);
+    if (shouldResolveHover) {
+      this.callbacks.onHoverPixel(
+        resolveProbePixel(sample.midpoint, hoverState, viewport, imageSize, this.callbacks.resolveDepthProbePixel)
+      );
+    }
+  }
+
+  private finishTouchGesture(): void {
+    const gesture = this.touchGesture;
+    if (!gesture) {
+      return;
+    }
+
+    const imageSize = this.callbacks.getImageSize();
+    if (imageSize && this.pendingDepthDragProbeState) {
+      this.callbacks.onHoverPixel(
+        resolveProbePixel(
+          gesture.previousMidpoint,
+          this.pendingDepthDragProbeState,
+          gesture.pane.viewport,
+          imageSize,
+          this.callbacks.resolveDepthProbePixel
+        )
+      );
+    }
+
+    this.touchGesture = null;
+    this.pendingDepthDragProbeState = null;
+    this.movedDuringDrag = false;
+    this.panoramaAutoRotate.setUserInteracting(false);
+    this.threeDAutoOrbit.setUserInteracting(false);
   }
 
   private updateRoiHover(point: PointerPosition, state: ViewerState, viewport: ViewportInfo): void {
@@ -977,6 +1270,30 @@ export class ViewerInteraction {
   private readonly onDocumentVisibilityChange = (): void => {
     this.panoramaAutoRotate.sync();
     this.threeDAutoOrbit.sync();
+  };
+}
+
+function resolveTouchGestureSample(
+  first: ActiveTouchPointer,
+  second: ActiveTouchPointer,
+  pane: ViewerPaneRenderInfo
+): { midpoint: PointerPosition; distance: number } {
+  const firstPoint = touchPointerToPanePoint(first, pane);
+  const secondPoint = touchPointerToPanePoint(second, pane);
+
+  return {
+    midpoint: {
+      x: (firstPoint.x + secondPoint.x) * 0.5,
+      y: (firstPoint.y + secondPoint.y) * 0.5
+    },
+    distance: Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y)
+  };
+}
+
+function touchPointerToPanePoint(pointer: ActiveTouchPointer, pane: ViewerPaneRenderInfo): PointerPosition {
+  return {
+    x: pointer.elementPoint.x - pane.rect.x,
+    y: pointer.elementPoint.y - pane.rect.y
   };
 }
 

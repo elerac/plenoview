@@ -2124,6 +2124,8 @@ body.is-resizing-panel-rows * {
   border: 1px solid var(--panel-border);
   border-radius: var(--panel-radius);
   overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
   background-color: var(--viewer-background);
   background-image: none;
 }
