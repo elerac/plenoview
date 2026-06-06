@@ -24,6 +24,32 @@
 
           return Math.max(range.min, Math.min(range.max, value));
         };
+        const readBootstrapParams = () => {
+          const searchParams = new URLSearchParams(window.location.search.startsWith('?')
+            ? window.location.search.slice(1)
+            : window.location.search);
+          const rawHash = window.location.hash.startsWith('#')
+            ? window.location.hash.slice(1)
+            : window.location.hash;
+          const hashParams = new URLSearchParams(rawHash.startsWith('?') ? rawHash.slice(1) : rawHash);
+
+          for (const [key, value] of hashParams) {
+            if (!searchParams.has(key)) {
+              searchParams.set(key, value);
+            }
+          }
+
+          return searchParams;
+        };
+
+        try {
+          const params = readBootstrapParams();
+          if (params.get('ui') === 'embed' || params.get('embed') === '1') {
+            document.documentElement.dataset.uiMode = 'embed';
+          }
+        } catch {
+          // Runtime bootstrap handles URL parsing failures after app boot.
+        }
 
         try {
           if (window.localStorage.getItem('plenoview:theme:v1') === 'spectrum-lattice') {

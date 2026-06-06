@@ -133,6 +133,14 @@ body {
   line-height: var(--type-ui-line-height);
 }
 
+:root[data-ui-mode='embed'] body {
+  background: var(--viewer-fullscreen-background);
+}
+
+:root[data-ui-mode='embed'] #app {
+  display: none;
+}
+
 body.embed-body {
   min-width: 0;
   min-height: 100vh;

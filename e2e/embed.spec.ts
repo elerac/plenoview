@@ -9,6 +9,9 @@ test('keeps the embed open-full button right-aligned without a custom name', asy
   const sourceLabel = page.locator('.embed-source-label');
   const openFullButton = page.getByRole('button', { name: 'Open full viewer', exact: true });
 
+  await expect(page.locator('#app-menu-bar')).toBeHidden();
+  await expect(page.locator('.embed-shell')).toBeVisible();
+  await expect(page.locator('#gl-canvas')).toBeVisible();
   await expect(sourceLabel).toBeHidden();
   await expect(sourceLabel).toHaveText('');
   await expect(openFullButton).toBeEnabled();
