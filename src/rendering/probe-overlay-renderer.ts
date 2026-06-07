@@ -29,6 +29,7 @@ export class ProbeOverlayRenderer implements Disposable {
   private depthSource: DepthSource | null = null;
   private depthGeometry: DepthSourceGeometry | null = null;
   private hasImage = false;
+  private probeMarkerEnabled = true;
   private disposed = false;
 
   constructor(overlayCanvas: HTMLCanvasElement) {
@@ -86,6 +87,14 @@ export class ProbeOverlayRenderer implements Disposable {
 
     this.depthSource = source;
     this.depthGeometry = geometry;
+  }
+
+  setProbeMarkerEnabled(enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.probeMarkerEnabled = enabled;
   }
 
   clearImage(): void {
@@ -146,7 +155,9 @@ export class ProbeOverlayRenderer implements Disposable {
         ctx.translate(pane.rect.x, pane.rect.y);
       }
 
-      const probe = resolveActiveProbePixel(state.lockedPixel, state.hoveredPixel);
+      const probe = this.probeMarkerEnabled
+        ? resolveActiveProbePixel(state.lockedPixel, state.hoveredPixel)
+        : null;
       if (state.viewerMode === '3d') {
         if (probe) {
           this.drawDepthProbeMarker(state, probe, pane.viewport);

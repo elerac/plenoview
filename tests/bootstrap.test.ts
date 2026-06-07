@@ -351,6 +351,7 @@ vi.mock('../src/renderer', () => ({
     readonly renderRulerOverlay = vi.fn();
     readonly setViewerPanes = vi.fn();
     readonly setRulersVisible = vi.fn();
+    readonly setProbeOverlayEnabled = vi.fn();
     readonly getViewport = vi.fn(() => ({ width: 320, height: 180 }));
     readonly clearImage = vi.fn();
     readonly setColormapTexture = vi.fn();
@@ -1206,6 +1207,30 @@ describe('bootstrap app lifecycle', () => {
     expect(mocks.interactionSetPanoramaAutoRotateConfig).toHaveBeenLastCalledWith({
       autoRotate: true,
       rotationSpeedDegPerSecond: 60
+    });
+
+    app.dispose();
+  });
+
+  it('clears incoming locked probe pixels when embed bottom panel is not probe', async () => {
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp({
+      mode: 'embed',
+      embedBottomPanel: 'none'
+    });
+    mocks.coreDispatch.mockClear();
+
+    app.applyState({
+      lockedPixel: { ix: 1, iy: 0 }
+    });
+
+    expect(mocks.coreDispatch).toHaveBeenCalledWith({
+      type: 'lockedPixelSet',
+      pixel: null
+    });
+    expect(mocks.coreDispatch).not.toHaveBeenCalledWith({
+      type: 'lockedPixelSet',
+      pixel: { ix: 1, iy: 0 }
     });
 
     app.dispose();

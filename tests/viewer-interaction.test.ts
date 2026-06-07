@@ -37,6 +37,27 @@ describe('viewer interaction roi gestures', () => {
     expect(harness.onCommitRoi).not.toHaveBeenCalled();
   });
 
+  it('skips probe hover, lock, and depth resolution when probes are disabled', () => {
+    const resolveDepthProbePixel = vi.fn(() => ({ ix: 1, iy: 0 }));
+    const harness = createHarness({
+      viewerMode: '3d'
+    }, {
+      probeEnabled: false,
+      resolveDepthProbePixel
+    });
+
+    dispatchPointer(harness.element, 'pointermove', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchPointer(harness.element, 'pointerdown', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchPointer(harness.element, 'pointerup', { pointerId: 1, clientX: 50, clientY: 50 });
+    dispatchWheel(harness.element, { clientX: 50, clientY: 50, deltaY: -100 });
+    harness.interaction.handleViewerKeyboardNavigation('right');
+
+    expect(harness.onViewChange).toHaveBeenCalled();
+    expect(resolveDepthProbePixel).not.toHaveBeenCalled();
+    expect(harness.onHoverPixel).not.toHaveBeenCalled();
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+  });
+
   it('maps pointer interaction through the pane-local viewport and activates that pane', () => {
     const harness = createHarness({}, {
       viewport: { width: 50, height: 100 },
@@ -1681,6 +1702,7 @@ function createHarness(
     screenshotRect?: { x: number; y: number; width: number; height: number } | null;
     screenshotRegions?: Array<{ id: string; rect: { x: number; y: number; width: number; height: number } }>;
     activeScreenshotRegionId?: string;
+    probeEnabled?: boolean;
     resolveDepthProbePixel?: (point: { x: number; y: number }, state: ViewerState, viewport: ViewportInfo) => ImagePixel | null;
   } = {}
 ) {
@@ -1786,6 +1808,7 @@ function createHarness(
     onViewChange,
     onHoverPixel,
     onToggleLockPixel,
+    isProbeEnabled: () => options.probeEnabled !== false,
     onDraftRoi,
     onCommitRoi,
     onRoiInteractionState,

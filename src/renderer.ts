@@ -144,6 +144,14 @@ export class WebGlExrRenderer implements Disposable {
     this.probeOverlayRenderer.setDepthSourceContext(source, geometry);
   }
 
+  setProbeOverlayEnabled(enabled: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.probeOverlayRenderer.setProbeMarkerEnabled(enabled);
+  }
+
   setColormapTexture(entryCount: number, rgba8: Uint8Array): void {
     if (this.disposed) {
       return;

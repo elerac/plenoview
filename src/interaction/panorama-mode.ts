@@ -51,7 +51,7 @@ interface PanoramaAutoRotateDependencies extends InteractionDependencies {
 
 type PanoramaKeyboardOrbitCallbacks = Pick<
   InteractionCallbacks,
-  'getState' | 'getViewport' | 'getImageSize' | 'onViewChange' | 'onHoverPixel'
+  'getState' | 'getViewport' | 'getImageSize' | 'onViewChange' | 'onHoverPixel' | 'isProbeEnabled'
 > & {
   getLastPointerInElement: () => PointerPosition | null;
 };
@@ -376,6 +376,9 @@ export class PanoramaKeyboardOrbitController {
 
     const nextState = { ...state, ...nextView };
     this.callbacks.onViewChange(nextView);
+    if (this.callbacks.isProbeEnabled?.() === false) {
+      return;
+    }
     this.callbacks.onHoverPixel(
       resolveHoverPixel(this.callbacks.getLastPointerInElement(), nextState, viewport, imageSize)
     );

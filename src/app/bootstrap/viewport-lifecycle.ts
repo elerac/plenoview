@@ -74,6 +74,9 @@ export function createViewerInteraction({
       );
     },
     resolveDepthProbePixel: (point, state, viewport) => {
+      if (ui.probeEnabled === false) {
+        return null;
+      }
       if (state.viewerMode !== '3d') {
         return null;
       }
@@ -122,6 +125,7 @@ export function createViewerInteraction({
         pixel
       });
     },
+    isProbeEnabled: () => ui.probeEnabled !== false,
     onDraftRoi: (roi) => {
       interactionCoordinator.enqueueDraftRoi(roi);
     },

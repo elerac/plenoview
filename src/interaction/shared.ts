@@ -61,6 +61,7 @@ export interface InteractionCallbacks {
   ) => void;
   onHoverPixel: (pixel: ImagePixel | null) => void;
   onToggleLockPixel: (pixel: ImagePixel | null) => void;
+  isProbeEnabled?: () => boolean;
   onDraftRoi: (roi: ViewerState['draftRoi']) => void;
   onCommitRoi: (roi: ViewerState['roi']) => void;
   onRoiInteractionState?: (state: ViewerRoiInteractionState) => void;

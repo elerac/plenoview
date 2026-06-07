@@ -35,6 +35,7 @@ interface CreateBootstrapServicesArgs {
   core: ViewerAppCore;
   ui: ViewerRuntimeUi;
   loadQueue: LoadQueueService;
+  probeEnabled?: boolean;
   hostKind: ViewerHost['kind'];
   pathFileProvider?: PathFileProvider | null;
   onPathSessionLoaded?: (entry: DesktopFileEntry) => void;
@@ -46,6 +47,7 @@ export function createBootstrapServices({
   core,
   ui,
   loadQueue,
+  probeEnabled = true,
   hostKind,
   pathFileProvider,
   onPathSessionLoaded,
@@ -59,6 +61,7 @@ export function createBootstrapServices({
     ui.rulerOverlaySvg,
     ui.rulerLabelOverlay
   );
+  renderer.setProbeOverlayEnabled(probeEnabled);
   renderer.setRulersVisible(core.getState().rulersVisible);
   const decodeMemoryReservationManager = new DecodeMemoryReservationManager();
   setDecodeMemoryReservationManager(decodeMemoryReservationManager);

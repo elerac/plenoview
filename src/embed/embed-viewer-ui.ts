@@ -108,6 +108,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
   readonly probeOverlayCanvas: HTMLCanvasElement;
   readonly rulerOverlaySvg: SVGSVGElement;
   readonly rulerLabelOverlay: HTMLElement;
+  readonly probeEnabled: boolean;
 
   private readonly root: HTMLElement;
   private readonly status: HTMLElement;
@@ -133,6 +134,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
 
   constructor(private readonly callbacks: EmbedViewerUiCallbacks) {
     this.bottomPanelMode = callbacks.bottomPanel ?? 'probe';
+    this.probeEnabled = this.bottomPanelMode === 'probe';
     document.body.replaceChildren();
     document.body.classList.add('embed-body');
 

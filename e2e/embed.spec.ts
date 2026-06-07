@@ -110,12 +110,28 @@ test('lets the parent page scroll over an unloaded deferred embed', async ({ pag
 });
 
 test('shows compact channel selection in the embed bottom panel', async ({ page }) => {
+  const lockedProbeState = encodeURIComponent(JSON.stringify({
+    lockedPixel: { ix: 0, iy: 0 }
+  }));
   await page.setViewportSize({ width: 640, height: 360 });
-  await gotoEmbed(page, '/app/?ui=embed&src=%2Fcbox_rgb.exr&bottomPanel=channels');
+  await gotoEmbed(page, `/app/?ui=embed&src=%2Fcbox_rgb.exr&bottomPanel=channels&state=${lockedProbeState}`);
 
   await expect(page.locator('.embed-probe')).toBeHidden();
   await expect(page.locator('.embed-channel-panel')).toBeVisible();
   await expect(page.locator('.embed-channel-panel [role="option"]').first()).toBeVisible();
+  await expectProbeOverlayCanvasTransparent(page);
+
+  const viewer = page.locator('#viewer-container');
+  const box = await viewer.boundingBox();
+  if (!box) {
+    throw new Error('Embed viewer was not visible.');
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await waitForEmbedFrames(page, 2);
+
+  await expect(page.locator('.embed-probe')).toBeHidden();
+  await expectProbeOverlayCanvasTransparent(page);
 });
 
 test('auto-rotates panorama embeds and ramps resume after user interaction', async ({ page }) => {
@@ -248,6 +264,43 @@ async function expectNoToolbarOverlap(page: Page): Promise<void> {
   expect(layout.sourceLeft).toBeGreaterThanOrEqual(EMBED_RIGHT_INSET_PX - 1);
   expect(layout.sourceRight).toBeLessThanOrEqual(layout.buttonLeft - EMBED_RIGHT_INSET_PX + 1);
   expect(layout.buttonRight).toBeLessThanOrEqual(layout.viewportRight - EMBED_RIGHT_INSET_PX + 1);
+}
+
+async function expectProbeOverlayCanvasTransparent(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const canvas = document.querySelector('#probe-overlay-canvas');
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        throw new Error('Probe overlay canvas was not found.');
+      }
+      const context = canvas.getContext('2d');
+      if (!context || canvas.width === 0 || canvas.height === 0) {
+        return false;
+      }
+
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let index = 3; index < image.data.length; index += 4) {
+        if (image.data[index] !== 0) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }).toBe(true);
+}
+
+async function waitForEmbedFrames(page: Page, count: number): Promise<void> {
+  await page.evaluate(async (frameCount) => {
+    const hooks = (window as unknown as {
+      __openExrViewerE2E?: {
+        waitForFrames(count?: number): Promise<void>;
+      };
+    }).__openExrViewerE2E;
+    if (!hooks) {
+      throw new Error('Plenoview E2E hooks are not available.');
+    }
+    await hooks.waitForFrames(frameCount);
+  }, count);
 }
 
 async function readEmbedPanoramaYaw(page: Page): Promise<number> {

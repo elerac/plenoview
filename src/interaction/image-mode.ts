@@ -20,7 +20,7 @@ const IMAGE_KEYBOARD_ZOOM_STEP = 1.25;
 
 type ImageKeyboardPanCallbacks = Pick<
   InteractionCallbacks,
-  'getState' | 'getViewport' | 'getImageSize' | 'onViewChange' | 'onHoverPixel'
+  'getState' | 'getViewport' | 'getImageSize' | 'onViewChange' | 'onHoverPixel' | 'isProbeEnabled'
 > & {
   getLastPointerInElement: () => PointerPosition | null;
 };
@@ -172,6 +172,9 @@ export class ImageKeyboardPanController {
 
     const nextState = { ...state, ...nextView };
     this.callbacks.onViewChange(nextView);
+    if (this.callbacks.isProbeEnabled?.() === false) {
+      return;
+    }
     this.callbacks.onHoverPixel(
       resolveHoverPixel(this.callbacks.getLastPointerInElement(), nextState, viewport, imageSize)
     );

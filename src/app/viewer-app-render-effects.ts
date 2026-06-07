@@ -37,7 +37,7 @@ export function applyRenderEffects(
     state: source.renderState
   })));
 
-  if (invalidation & ViewerRenderInvalidationFlags.ProbeReadout) {
+  if ((ui.probeEnabled ?? true) && (invalidation & ViewerRenderInvalidationFlags.ProbeReadout)) {
     ui.setProbeReadout(
       snapshot.probeReadout.mode,
       snapshot.probeReadout.sample,

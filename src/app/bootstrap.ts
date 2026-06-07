@@ -78,6 +78,8 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
 
   let services: BootstrapServices | null = null;
   let interaction: ViewerInteraction | null = null;
+  const embedBottomPanelMode = options.embedBottomPanel ?? 'probe';
+  const probeEnabled = options.mode !== 'embed' || embedBottomPanelMode === 'probe';
   let embedPanoramaAnimationConfig = normalizeEmbedPanoramaAnimationConfig(options.embedPanoramaAnimation);
   let embedThreeDAnimationConfig = normalizeEmbedThreeDAnimationConfig(options.embedThreeDAnimation);
   let resizeObserver: ResizeObserver | null = null;
@@ -140,7 +142,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
   };
   const ui: ViewerRuntimeUi = options.mode === 'embed'
     ? new EmbedViewerUi({
-        bottomPanel: options.embedBottomPanel ?? 'probe',
+        bottomPanel: embedBottomPanelMode,
         onChannelSelection: (selection) => {
           promoteActiveChannelThumbnail(core, () => getServices().channelThumbnailService, selection);
           void getServices().displayController.applyDisplaySelection(selection);
@@ -171,22 +173,22 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
       await getServices().sessionController.enqueueUrl(url, {
         displayName: loadOptions.name
       });
-      applyEmbedViewerStateSnapshot(core, loadOptions.state);
+      applyViewerStateSnapshot(core, loadOptions.state, probeEnabled);
     },
     loadGallery: async (galleryId, loadOptions = {}) => {
       await getServices().sessionController.enqueueGalleryImage(galleryId, {
         displayName: loadOptions.name
       });
-      applyEmbedViewerStateSnapshot(core, loadOptions.state);
+      applyViewerStateSnapshot(core, loadOptions.state, probeEnabled);
     },
     loadFile: async (file, loadOptions = {}) => {
       await getServices().sessionController.enqueueFiles([file], {
         displayName: loadOptions.name
       });
-      applyEmbedViewerStateSnapshot(core, loadOptions.state);
+      applyViewerStateSnapshot(core, loadOptions.state, probeEnabled);
     },
     applyState: (state) => {
-      applyEmbedViewerStateSnapshot(core, state);
+      applyViewerStateSnapshot(core, state, probeEnabled);
     },
     setError: (message) => {
       core.dispatch({ type: 'errorSet', message });
@@ -246,6 +248,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
       core,
       ui,
       loadQueue,
+      probeEnabled,
       hostKind: host.kind,
       pathFileProvider: host.pathFileProvider,
       onPathSessionLoaded: (entry) => {
@@ -390,6 +393,28 @@ function normalizeEmbedThreeDAnimationConfig(
     orbitPitchAmplitudeDeg: parseThreeDOrbitPitchAmplitude(
       config?.orbitPitchAmplitudeDeg ?? DEFAULT_THREE_D_ORBIT_PITCH_AMPLITUDE_DEG
     )
+  };
+}
+
+function applyViewerStateSnapshot(
+  core: ViewerAppCore,
+  state: EmbedViewerStateSnapshot | null | undefined,
+  probeEnabled: boolean
+): void {
+  applyEmbedViewerStateSnapshot(core, normalizeViewerStateSnapshotForProbeCapability(state, probeEnabled));
+}
+
+function normalizeViewerStateSnapshotForProbeCapability(
+  state: EmbedViewerStateSnapshot | null | undefined,
+  probeEnabled: boolean
+): EmbedViewerStateSnapshot | null | undefined {
+  if (probeEnabled || !state) {
+    return state;
+  }
+
+  return {
+    ...state,
+    lockedPixel: null
   };
 }
 

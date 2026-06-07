@@ -20,6 +20,7 @@ describe('EmbedViewerUi', () => {
   it('creates a single-pane viewer surface with inactive screenshot selection', () => {
     const ui = new EmbedViewerUi({ onOpenFull: vi.fn() });
 
+    expect(ui.probeEnabled).toBe(true);
     ui.setViewerViewportRect({
       left: 10,
       top: 20,
@@ -207,6 +208,7 @@ describe('EmbedViewerUi', () => {
     const panel = document.querySelector('.embed-channel-panel');
     const probe = document.querySelector('.embed-probe');
     const labels = Array.from(document.querySelectorAll('.channel-thumbnail-tile-label')).map((item) => item.textContent);
+    expect(ui.probeEnabled).toBe(false);
     expect(panel?.classList.contains('hidden')).toBe(false);
     expect(probe?.classList.contains('hidden')).toBe(true);
     expect(labels).toEqual(['R', 'G']);
@@ -239,6 +241,7 @@ describe('EmbedViewerUi', () => {
       }
     );
 
+    expect(ui.probeEnabled).toBe(false);
     expect(document.querySelector('.embed-probe')?.classList.contains('hidden')).toBe(true);
     expect(document.querySelector('.embed-channel-panel')?.classList.contains('hidden')).toBe(true);
 

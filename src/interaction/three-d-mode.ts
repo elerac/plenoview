@@ -80,7 +80,13 @@ interface ThreeDAutoOrbitPoint {
 
 type ThreeDKeyboardOrbitCallbacks = Pick<
   InteractionCallbacks,
-  'getState' | 'getViewport' | 'getImageSize' | 'resolveDepthProbePixel' | 'onViewChange' | 'onHoverPixel'
+  | 'getState'
+  | 'getViewport'
+  | 'getImageSize'
+  | 'resolveDepthProbePixel'
+  | 'onViewChange'
+  | 'onHoverPixel'
+  | 'isProbeEnabled'
 > & {
   getLastPointerInElement: () => PointerPosition | null;
 };
@@ -607,6 +613,9 @@ export class ThreeDKeyboardOrbitController {
 
     const nextState = { ...state, ...nextView };
     this.callbacks.onViewChange(nextView);
+    if (this.callbacks.isProbeEnabled?.() === false) {
+      return;
+    }
     this.callbacks.onHoverPixel(
       resolveHoverPixel(
         this.callbacks.getLastPointerInElement(),

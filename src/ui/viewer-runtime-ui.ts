@@ -51,6 +51,7 @@ export interface ScreenshotSelectionInteractionState {
 }
 
 export interface ViewerRuntimeUi extends Disposable {
+  readonly probeEnabled?: boolean;
   readonly viewerContainer: HTMLElement;
   readonly glCanvas: HTMLCanvasElement;
   readonly overlayCanvas: HTMLCanvasElement;

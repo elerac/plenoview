@@ -48,6 +48,21 @@ describe('probe overlay renderer', () => {
     expect(context.strokeRect).toHaveBeenCalledTimes(2);
   });
 
+  it('skips probe markers while keeping ROI drawing when probe markers are disabled', () => {
+    const { renderer, context } = createProbeOverlayHarness();
+
+    renderer.resize(128, 64);
+    renderer.setImagePresent(true);
+    renderer.setProbeMarkerEnabled(false);
+    renderer.render(createViewerState({
+      zoom: 16,
+      hoveredPixel: { ix: 0, iy: 0 },
+      roi: { x0: 1, y0: 1, x1: 2, y1: 2 }
+    }));
+
+    expect(context.strokeRect).toHaveBeenCalledTimes(1);
+  });
+
   it('suppresses ROI drawing in panorama mode', () => {
     const { renderer, context } = createProbeOverlayHarness();
 

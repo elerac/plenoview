@@ -32,8 +32,9 @@ function createSession(id: string, decoded = createDecodedImage()): OpenedImageS
   };
 }
 
-function createUiMock(): ViewerUi {
+function createUiMock(options: { probeEnabled?: boolean } = {}): ViewerUi {
   return {
+    probeEnabled: options.probeEnabled,
     setProbeReadout: vi.fn(),
     setSpectralReadout: vi.fn(),
     setRoiReadout: vi.fn(),
@@ -182,5 +183,26 @@ describe('viewer app render effects', () => {
     core.dispatch({ type: 'sessionClosed', sessionId: session.id });
 
     expect(renderer.clearImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips probe readout updates when the UI disables probes', () => {
+    const core = new ViewerAppCore();
+    const ui = createUiMock({ probeEnabled: false });
+    const renderer = createRendererMock();
+    const renderCache = createRenderCacheMock();
+    core.subscribeRender((transition) => {
+      applyRenderEffects(
+        core,
+        ui,
+        renderer as unknown as WebGlExrRenderer,
+        renderCache as unknown as RenderCacheService,
+        transition
+      );
+    });
+
+    core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
+    core.dispatch({ type: 'lockedPixelSet', pixel: { ix: 1, iy: 0 } });
+
+    expect(ui.setProbeReadout).not.toHaveBeenCalled();
   });
 });
