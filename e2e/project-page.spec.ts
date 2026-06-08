@@ -334,7 +334,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   );
   await expect(page.locator('.gallery-item').filter({ hasText: /AoLP/ })).toHaveCount(1);
   await expect(page.getByText(/angle of linear polarization/)).toHaveCount(0);
-  await expect(page.getByText('Stokes vector visualization', { exact: true })).toBeVisible();
+  await expect(page.getByText('Polarization visualization', { exact: true })).toBeVisible();
   await expect(page.locator('.gallery-item').filter({
     hasText: /Full-Stokes vector\s+images that include the circular/
   }).filter({
@@ -445,7 +445,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
   )).toEqual([
     'Source value inspection',
     'Screenshot export',
-    'Stokes vector visualization',
+    'Polarization visualization',
     'Spectral visualization',
     '3D view',
     'Panorama view',
@@ -521,7 +521,7 @@ test('serves the project page with app, desktop, and VS Code download calls to a
     state: null
   });
 
-  await expectGalleryCardLaunch(page, 'Stokes vector visualization', {
+  await expectGalleryCardLaunch(page, 'Polarization visualization', {
     accessibleName: /Stokes vector image with computed AoLP and an automatically applied dedicated colormap/,
     src: 'project-page/polanalyser-stokes-aolp-y.png'
   }, {
