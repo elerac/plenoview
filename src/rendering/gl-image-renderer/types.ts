@@ -1,4 +1,5 @@
 import type { DisplaySourceBinding } from '../../display/bindings';
+import type { DepthPointBudgetResolver } from '../../depth-point-budget';
 import type { DepthSource, DepthSourceGeometry } from '../../depth';
 import type { ExportImagePixels } from '../../export/export-pixels';
 import type { DecodedLayer, ImageRect, ViewerState, ViewportInfo, ViewportRect } from '../../types';
@@ -148,6 +149,7 @@ export interface GlImageRendererState {
   colormapEntryCount: number;
   invalidValueWarningPhase: number;
   activeBinding: DisplaySourceBinding;
+  resolveDepthPointBudget: DepthPointBudgetResolver;
   disposed: boolean;
 }
 

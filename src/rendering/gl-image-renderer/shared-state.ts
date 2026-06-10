@@ -1,4 +1,8 @@
 import { createEmptyDisplaySourceBinding } from '../../display/bindings';
+import {
+  createAdaptiveDepthPointBudgetResolver,
+  type DepthPointBudgetResolver
+} from '../../depth-point-budget';
 import { REQUIRED_TEXTURE_UNITS } from './constants';
 import { createColormapTexture } from './colormap-texture';
 import { createDepthProgram } from './depth-program';
@@ -8,7 +12,10 @@ import { configureDepthProgramSamplers, configureProgramSamplers } from './progr
 import { createZeroTexture } from './texture-store';
 import type { GlImageRendererState, LayerSourceTextures } from './types';
 
-export function createGlImageRendererState(glCanvas: HTMLCanvasElement): GlImageRendererState {
+export function createGlImageRendererState(
+  glCanvas: HTMLCanvasElement,
+  resolveDepthPointBudget: DepthPointBudgetResolver = createAdaptiveDepthPointBudgetResolver()
+): GlImageRendererState {
   const gl = glCanvas.getContext('webgl2', { antialias: false });
   if (!gl) {
     throw new Error('WebGL2 is required for this viewer.');
@@ -60,6 +67,7 @@ export function createGlImageRendererState(glCanvas: HTMLCanvasElement): GlImage
     colormapEntryCount: 0,
     invalidValueWarningPhase: 0,
     activeBinding: createEmptyDisplaySourceBinding(),
+    resolveDepthPointBudget,
     disposed: false
   };
 }

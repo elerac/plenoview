@@ -5,6 +5,10 @@ import {
   type DepthSource,
   type DepthSourceGeometry
 } from '../depth';
+import {
+  createAdaptiveDepthPointBudgetResolver,
+  type DepthPointBudgetResolver
+} from '../depth-point-budget';
 import { imageToScreen } from '../interaction/image-geometry';
 import type { Disposable } from '../lifecycle';
 import { resolveActiveProbePixel } from '../probe';
@@ -32,7 +36,10 @@ export class ProbeOverlayRenderer implements Disposable {
   private probeMarkerEnabled = true;
   private disposed = false;
 
-  constructor(overlayCanvas: HTMLCanvasElement) {
+  constructor(
+    overlayCanvas: HTMLCanvasElement,
+    private readonly resolveDepthPointBudget: DepthPointBudgetResolver = createAdaptiveDepthPointBudgetResolver()
+  ) {
     const overlayContext = overlayCanvas.getContext('2d');
     if (!overlayContext) {
       throw new Error('Unable to create probe overlay 2D canvas context.');
@@ -237,7 +244,8 @@ export class ProbeOverlayRenderer implements Disposable {
       depthTargetX: state.depthTargetX,
       depthTargetY: state.depthTargetY,
       depthTargetZ: state.depthTargetZ,
-      depthPointSizePx: state.depthPointSizePx
+      depthPointSizePx: state.depthPointSizePx,
+      maxPoints: this.resolveDepthPointBudget(viewport)
     });
     if (!projected) {
       return;

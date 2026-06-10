@@ -15,6 +15,10 @@ import { RenderCacheService } from '../../services/render-cache-service';
 import { ThumbnailService } from '../../services/thumbnail-service';
 import { DisplayController } from '../../controllers/display-controller';
 import { SessionController } from '../../controllers/session-controller';
+import {
+  createAdaptiveDepthPointBudgetResolver,
+  type DepthPointBudgetResolver
+} from '../../depth-point-budget';
 import type { ViewerRuntimeUi } from '../../ui/viewer-runtime-ui';
 import { ViewerAppCore } from '../viewer-app-core';
 import type { DesktopFileEntry, PathFileProvider, ViewerHost } from '../../platform';
@@ -29,6 +33,7 @@ export interface BootstrapServices {
   sessionController: SessionController;
   interactionCoordinator: ViewerInteractionCoordinator;
   displayController: DisplayController;
+  depthPointBudgetResolver: DepthPointBudgetResolver;
 }
 
 interface CreateBootstrapServicesArgs {
@@ -54,12 +59,14 @@ export function createBootstrapServices({
   onPathSessionLoadFailed,
   isDisposed
 }: CreateBootstrapServicesArgs): BootstrapServices {
+  const depthPointBudgetResolver = createAdaptiveDepthPointBudgetResolver();
   const renderer = new WebGlExrRenderer(
     ui.glCanvas,
     ui.overlayCanvas,
     ui.probeOverlayCanvas,
     ui.rulerOverlaySvg,
-    ui.rulerLabelOverlay
+    ui.rulerLabelOverlay,
+    depthPointBudgetResolver
   );
   renderer.setProbeOverlayEnabled(probeEnabled);
   renderer.setRulersVisible(core.getState().rulersVisible);
@@ -184,7 +191,8 @@ export function createBootstrapServices({
     invalidValueWarningRenderLoop,
     sessionController,
     interactionCoordinator,
-    displayController
+    displayController,
+    depthPointBudgetResolver
   };
 }
 

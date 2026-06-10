@@ -330,7 +330,8 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
     interaction = createViewerInteraction({
       core,
       ui,
-      interactionCoordinator: services.interactionCoordinator
+      interactionCoordinator: services.interactionCoordinator,
+      depthPointBudgetResolver: services.depthPointBudgetResolver
     });
     interaction.setPanoramaAutoRotateConfig(embedPanoramaAnimationConfig);
     interaction.setThreeDAutoOrbitConfig(embedThreeDAnimationConfig);

@@ -3,6 +3,10 @@ import {
   resolveDepthSourceForLayer
 } from '../../depth';
 import {
+  createAdaptiveDepthPointBudgetResolver,
+  type DepthPointBudgetResolver
+} from '../../depth-point-budget';
+import {
   computeFitView,
   isFitViewForViewport,
   preserveImagePanOnViewportChange,
@@ -23,6 +27,7 @@ interface CreateViewerInteractionArgs {
   core: ViewerAppCore;
   ui: ViewerRuntimeUi;
   interactionCoordinator: ViewerInteractionCoordinator;
+  depthPointBudgetResolver?: DepthPointBudgetResolver;
 }
 
 interface InitializeViewportLifecycleArgs {
@@ -36,7 +41,8 @@ interface InitializeViewportLifecycleArgs {
 export function createViewerInteraction({
   core,
   ui,
-  interactionCoordinator
+  interactionCoordinator,
+  depthPointBudgetResolver = createAdaptiveDepthPointBudgetResolver()
 }: CreateViewerInteractionArgs): ViewerInteraction {
   const depthProbeProjectionCache = new DepthProbeProjectionCache();
   return new ViewerInteraction(ui.viewerContainer, {
@@ -110,7 +116,8 @@ export function createViewerInteraction({
         depthTargetX: state.depthTargetX,
         depthTargetY: state.depthTargetY,
         depthTargetZ: state.depthTargetZ,
-        depthPointSizePx: state.depthPointSizePx
+        depthPointSizePx: state.depthPointSizePx,
+        maxPoints: depthPointBudgetResolver(viewport)
       });
     },
     onViewChange: (next) => {

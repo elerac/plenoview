@@ -3,6 +3,10 @@ import { resolveDisplayImageSize } from './display-size';
 import { OverlayRenderer } from './rendering/overlay-renderer';
 import { ProbeOverlayRenderer } from './rendering/probe-overlay-renderer';
 import { RulerOverlayRenderer } from './rendering/ruler-overlay-renderer';
+import {
+  createAdaptiveDepthPointBudgetResolver,
+  type DepthPointBudgetResolver
+} from './depth-point-budget';
 import type { ExportImagePixels } from './export/export-pixels';
 import type { Disposable } from './lifecycle';
 import type { DisplaySourceBinding } from './display/bindings';
@@ -27,11 +31,12 @@ export class WebGlExrRenderer implements Disposable {
     overlayCanvas: HTMLCanvasElement,
     probeOverlayCanvas: HTMLCanvasElement,
     rulerOverlaySvg: SVGSVGElement,
-    rulerLabelOverlay: HTMLElement
+    rulerLabelOverlay: HTMLElement,
+    resolveDepthPointBudget: DepthPointBudgetResolver = createAdaptiveDepthPointBudgetResolver()
   ) {
-    this.imageRenderer = new GlImageRenderer(glCanvas);
+    this.imageRenderer = new GlImageRenderer(glCanvas, resolveDepthPointBudget);
     this.overlayRenderer = new OverlayRenderer(overlayCanvas);
-    this.probeOverlayRenderer = new ProbeOverlayRenderer(probeOverlayCanvas);
+    this.probeOverlayRenderer = new ProbeOverlayRenderer(probeOverlayCanvas, resolveDepthPointBudget);
     this.rulerOverlayRenderer = new RulerOverlayRenderer(rulerOverlaySvg, rulerLabelOverlay);
   }
 

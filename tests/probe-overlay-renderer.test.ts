@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { DepthPointBudgetResolver } from '../src/depth-point-budget';
 import { ProbeOverlayRenderer } from '../src/rendering/probe-overlay-renderer';
 import { createLayerFromChannels, createViewerState } from './helpers/state-fixtures';
 
@@ -96,6 +97,31 @@ describe('probe overlay renderer', () => {
     }));
 
     expect(context.strokeRect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render 3D probe markers for pixels outside the active point budget sampling', () => {
+    const { renderer, context } = createProbeOverlayHarness({
+      resolveDepthPointBudget: () => 1
+    });
+    const layer = createLayerFromChannels({
+      Z: [1, 1, 1, 1]
+    });
+
+    renderer.resize(400, 400);
+    renderer.setImagePresent(true);
+    renderer.setSourceContext(4, 1, layer);
+    renderer.setDepthSourceContext(
+      { kind: 'scalarDepth', channelName: 'Z' },
+      { kind: 'scalarDepth', range: { min: 1, max: 1 } }
+    );
+    renderer.render(createViewerState({
+      viewerMode: '3d',
+      depthChannel: 'Z',
+      depthFocalLengthPx: 4,
+      hoveredPixel: { ix: 1, iy: 0 }
+    }));
+
+    expect(context.strokeRect).not.toHaveBeenCalled();
   });
 
   it('renders the 3D probe marker with the current depth target translation', () => {
@@ -300,7 +326,9 @@ describe('probe overlay renderer', () => {
   });
 });
 
-function createProbeOverlayHarness(): {
+function createProbeOverlayHarness(options: {
+  resolveDepthPointBudget?: DepthPointBudgetResolver;
+} = {}): {
   canvas: HTMLCanvasElement;
   renderer: ProbeOverlayRenderer;
   context: CanvasRenderingContext2D & {
@@ -332,7 +360,7 @@ function createProbeOverlayHarness(): {
   const canvas = document.createElement('canvas');
   return {
     canvas,
-    renderer: new ProbeOverlayRenderer(canvas),
+    renderer: new ProbeOverlayRenderer(canvas, options.resolveDepthPointBudget),
     context
   };
 }

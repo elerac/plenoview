@@ -156,7 +156,11 @@ export function renderDepthPass(
     return;
   }
 
-  const sampling = resolveDepthPointSampling(sourceSize.width, sourceSize.height);
+  const maxPoints = state.resolveDepthPointBudget({
+    width: options.viewportWidth ?? state.viewport.width,
+    height: options.viewportHeight ?? state.viewport.height
+  });
+  const sampling = resolveDepthPointSampling(sourceSize.width, sourceSize.height, maxPoints);
   if (sampling.pointCount <= 0) {
     return;
   }

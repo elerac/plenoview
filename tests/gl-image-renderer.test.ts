@@ -2,9 +2,14 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { __debugGetMaterializedChannel, __debugGetMaterializedChannelCount } from '../src/channel-storage';
-import { buildDisplaySourceBinding, getDisplaySourceBindingChannelNames } from '../src/display/bindings';
+import {
+  buildDisplaySourceBinding,
+  createEmptyDisplaySourceBinding,
+  getDisplaySourceBindingChannelNames
+} from '../src/display/bindings';
 import { resolveDisplaySourceModeUniformValue } from '../src/display/gpu-bindings';
 import { buildSelectedDisplayTexture } from '../src/display/materialize-cpu';
+import { CONSTRAINED_DEPTH_POINTS, type DepthPointBudgetResolver } from '../src/depth-point-budget';
 import { clampPanoramaProjectionPitch } from '../src/interaction/panorama-geometry';
 import { GlImageRenderer } from '../src/rendering/gl-image-renderer';
 import { createEmptyRoiInteractionState } from '../src/view-state';
@@ -396,6 +401,45 @@ describe('gl image renderer', () => {
     expect(depthVertexShaderSource).toContain('uniform vec2 uDepthCameraZRange;');
     expect(depthVertexShaderSource).toContain('mapDepthCameraZToNdc(cameraPoint.z)');
     expect(depthVertexShaderSource).not.toContain('cameraPoint.z * zoom');
+  });
+
+  it('uses the injected adaptive budget for 3D point-cloud sampling', () => {
+    const { renderer, gl } = createHarness({
+      resolveDepthPointBudget: () => CONSTRAINED_DEPTH_POINTS
+    });
+    const state = {
+      ...createInitialState(),
+      viewerMode: '3d' as const,
+      depthChannel: 'Z',
+      depthFocalLengthPx: null,
+      depthPointSizePx: 2,
+      hoveredPixel: null,
+      draftRoi: null,
+      roiInteraction: createEmptyRoiInteractionState()
+    };
+
+    renderer.setDisplaySelectionBindings(
+      'session-1',
+      0,
+      800,
+      600,
+      createEmptyDisplaySourceBinding()
+    );
+    renderer.setDepthSourceBinding(
+      'session-1',
+      0,
+      800,
+      600,
+      { kind: 'scalarDepth', channelName: 'Z' },
+      { kind: 'scalarDepth', range: { min: 1, max: 4 } }
+    );
+    renderer.resize(320, 180);
+
+    renderer.render(state);
+
+    expect(gl.drawArrays).toHaveBeenLastCalledWith(gl.POINTS, 0, 120_000);
+    expect(lastUniform2iValue(gl, 'uDepthGridSize')).toEqual([400, 300]);
+    expect(lastUniform1iValue(gl, 'uDepthSampleStep')).toBe(2);
   });
 
   it('renders XYZ position sources through the point-cloud pass', () => {
@@ -1115,7 +1159,9 @@ describe('gl image renderer', () => {
   });
 });
 
-function createHarness(): {
+function createHarness(options: {
+  resolveDepthPointBudget?: DepthPointBudgetResolver;
+} = {}): {
   renderer: GlImageRenderer;
   gl: ReturnType<typeof createWebGlContextMock>;
 } {
@@ -1128,7 +1174,7 @@ function createHarness(): {
   });
 
   const canvas = document.createElement('canvas');
-  const renderer = new GlImageRenderer(canvas);
+  const renderer = new GlImageRenderer(canvas, options.resolveDepthPointBudget);
   expect(getContext).toHaveBeenCalledWith('webgl2', { antialias: false });
   return {
     renderer,

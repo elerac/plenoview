@@ -1,5 +1,9 @@
 import { createEmptyDisplaySourceBinding, type DisplaySourceBinding } from '../../display/bindings';
 import type { ResidentChannelUpload } from '../../display-cache';
+import {
+  createAdaptiveDepthPointBudgetResolver,
+  type DepthPointBudgetResolver
+} from '../../depth-point-budget';
 import type { DepthSource, DepthSourceGeometry } from '../../depth';
 import type { ExportImagePixels } from '../../export/export-pixels';
 import type { ChannelRecognitionNameRules } from '../../channel-recognition-name-rules';
@@ -30,8 +34,11 @@ export class GlImageRenderer implements Disposable {
     return this.state.layerTexturesBySession;
   }
 
-  constructor(glCanvas: HTMLCanvasElement) {
-    this.state = createGlImageRendererState(glCanvas);
+  constructor(
+    glCanvas: HTMLCanvasElement,
+    resolveDepthPointBudget: DepthPointBudgetResolver = createAdaptiveDepthPointBudgetResolver()
+  ) {
+    this.state = createGlImageRendererState(glCanvas, resolveDepthPointBudget);
   }
 
   getViewport(): ViewportInfo {
