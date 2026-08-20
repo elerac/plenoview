@@ -18,7 +18,9 @@ describe('VS Code extension asset scripts', () => {
     expect(viteConfig).toContain("outDir: 'vscode-extension/media/plenoview'");
     expect(stageScript).toContain("'vscode-extension', 'media', 'plenoview'");
     expect(stageScript).toContain("'app', 'colormaps'");
+    expect(stageScript).toContain("'app', 'licenses'");
     expect(verifyScript).toContain("'vscode-extension', 'media', 'plenoview'");
     expect(verifyScript).toContain('must not contain bundled EXR files');
+    expect(verifyScript).toContain('verifyTinyExrLicenseAssets');
   });
 });

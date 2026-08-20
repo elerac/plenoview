@@ -1,6 +1,9 @@
-import { decodeRawExr } from './exr-runtime';
+import { decodeRawExr, type RawDecodedExrLayer } from './exr-runtime';
 import { parseExrMetadata } from './exr-metadata';
-import { createInterleavedChannelStorage } from './channel-storage';
+import {
+  createPlanarChannelStorage,
+  type FiniteValueRange
+} from './channel-storage';
 import type { DecodedExrImage, DecodedLayer, ExrMetadataEntry } from './types';
 
 interface Box2i {
@@ -23,56 +26,156 @@ export async function loadExr(bytes: Uint8Array): Promise<DecodedExrImage> {
   const metadataByLayer = parseExrMetadata(bytes);
   const decoded = await decodeRawExr(bytes);
 
-  const width = decoded.width;
-  const height = decoded.height;
-  const layers: DecodedLayer[] = [];
-
-  let decodeError: unknown;
-  try {
-    for (let layerIndex = 0; layerIndex < decoded.layerCount; layerIndex += 1) {
-      const channelNames = decoded.getLayerChannelNames(layerIndex);
-      const name = decoded.getLayerName(layerIndex) ?? null;
-      const metadata = metadataByLayer[layerIndex] ?? [];
-      const interleaved = readLayerInterleavedPixels(decoded, layerIndex, channelNames, width, height, metadata);
-
-      const layer: DecodedLayer = {
-        name,
-        channelNames,
-        channelStorage: createInterleavedChannelStorage(interleaved, channelNames),
-        analysis: {
-          displayLuminanceRangeBySelectionKey: {},
-          finiteRangeByChannel: {}
-        },
-        metadata
-      };
-
-      layers.push(layer);
-    }
-  } catch (error) {
-    decodeError = error;
-  } finally {
-    try {
-      decoded.free();
-    } catch (freeError) {
-      if (!decodeError) {
-        decodeError = freeError;
-      }
-    }
-  }
-
-  if (decodeError) {
-    throw decodeError;
-  }
-
-  if (layers.length === 0) {
+  if (decoded.layers.length === 0) {
     throw new Error('Decoded EXR has no layers.');
   }
 
+  const layers = decoded.layers.map((layer, layerIndex) => createDecodedLayer(
+    layer,
+    layerIndex,
+    decoded.width,
+    decoded.height,
+    metadataByLayer[layerIndex] ?? []
+  ));
+
   return {
-    width,
-    height,
+    width: decoded.width,
+    height: decoded.height,
     layers
   };
+}
+
+function createDecodedLayer(
+  rawLayer: RawDecodedExrLayer,
+  layerIndex: number,
+  width: number,
+  height: number,
+  metadata: ExrMetadataEntry[]
+): DecodedLayer {
+  const windows = getLayerWindows(metadata);
+  const rawPixelCount = rawLayer.width * rawLayer.height;
+  const outputPixelCount = width * height;
+  const cropped = hasCroppedDataWindow(windows, width, height) ||
+    rawLayer.width !== width || rawLayer.height !== height;
+  const pixelsByChannel: Record<string, Float32Array> = {};
+  const finiteRangeByChannel: Record<string, FiniteValueRange | null> = {};
+
+  validateLayerLayout(rawLayer, layerIndex, width, height, windows);
+
+  for (const channelName of rawLayer.channelNames) {
+    const sourcePixels = rawLayer.pixelsByChannel[channelName];
+    if (!sourcePixels || sourcePixels.length !== rawPixelCount) {
+      throw new Error(
+        `Invalid channel length for layer ${layerIndex} channel ${channelName}: expected ${rawPixelCount}, got ${sourcePixels?.length ?? 0}`
+      );
+    }
+
+    if (!cropped) {
+      if (sourcePixels.length !== outputPixelCount) {
+        throw new Error(
+          `Invalid channel length for layer ${layerIndex} channel ${channelName}: expected ${outputPixelCount}, got ${sourcePixels.length}`
+        );
+      }
+      pixelsByChannel[channelName] = sourcePixels;
+      finiteRangeByChannel[channelName] = rawLayer.finiteRangeByChannel[channelName] ?? null;
+      continue;
+    }
+
+    const padded = new Float32Array(outputPixelCount);
+    copyCroppedPlanarChannel(padded, sourcePixels, width, height, windows);
+    pixelsByChannel[channelName] = padded;
+    finiteRangeByChannel[channelName] = calculateFiniteRange(padded);
+  }
+
+  return {
+    name: rawLayer.name,
+    channelNames: rawLayer.channelNames,
+    channelStorage: createPlanarChannelStorage(pixelsByChannel, rawLayer.channelNames),
+    analysis: {
+      displayLuminanceRangeBySelectionKey: {},
+      finiteRangeByChannel
+    },
+    metadata
+  };
+}
+
+function validateLayerLayout(
+  rawLayer: RawDecodedExrLayer,
+  layerIndex: number,
+  width: number,
+  height: number,
+  windows: LayerWindows
+): void {
+  const dataWindow = windows.dataWindow;
+  if (!dataWindow && (rawLayer.width !== width || rawLayer.height !== height)) {
+    throw new Error(`Decoded EXR layer ${layerIndex} has cropped pixels but no dataWindow metadata.`);
+  }
+  if (dataWindow &&
+      (getBoxWidth(dataWindow) !== rawLayer.width || getBoxHeight(dataWindow) !== rawLayer.height)) {
+    throw new Error(
+      `Decoded EXR layer ${layerIndex} data window does not match its pixel dimensions.`
+    );
+  }
+  const displayWindow = windows.displayWindow;
+  if (displayWindow && (getBoxWidth(displayWindow) !== width || getBoxHeight(displayWindow) !== height)) {
+    throw new Error(
+      `Decoded EXR layer ${layerIndex} uses a different display size; multipart display sizes must match.`
+    );
+  }
+}
+
+function copyCroppedPlanarChannel(
+  destination: Float32Array,
+  source: Float32Array,
+  width: number,
+  height: number,
+  windows: LayerWindows
+): void {
+  const dataWindow = windows.dataWindow;
+  if (!dataWindow) {
+    return;
+  }
+  const dataWidth = getBoxWidth(dataWindow);
+  const dataHeight = getBoxHeight(dataWindow);
+  const displayMinX = windows.displayWindow?.minX ?? 0;
+  const displayMinY = windows.displayWindow?.minY ?? 0;
+
+  for (let row = 0; row < dataHeight; row += 1) {
+    const destinationY = dataWindow.minY - displayMinY + row;
+    if (destinationY < 0 || destinationY >= height) {
+      continue;
+    }
+    const sourceStart = row * dataWidth;
+    const unclippedDestinationX = dataWindow.minX - displayMinX;
+    const sourceOffset = Math.max(0, -unclippedDestinationX);
+    const destinationX = Math.max(0, unclippedDestinationX);
+    const copyLength = Math.min(
+      dataWidth - sourceOffset,
+      width - destinationX
+    );
+    if (copyLength <= 0) {
+      continue;
+    }
+    destination.set(
+      source.subarray(sourceStart + sourceOffset, sourceStart + sourceOffset + copyLength),
+      destinationY * width + destinationX
+    );
+  }
+}
+
+function calculateFiniteRange(pixels: Float32Array): FiniteValueRange | null {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let finiteCount = 0;
+  for (const value of pixels) {
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+    finiteCount += 1;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  return finiteCount > 0 ? { min, max } : null;
 }
 
 export function readLayerInterleavedPixels(

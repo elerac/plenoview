@@ -4,15 +4,16 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20 <26",
+    "node": ">=22 <26",
     "npm": ">=10"
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/verify-web-assets.mjs",
+    "build:tinyexr-wasm": "bash scripts/build-tinyexr-wasm.sh",
     "build:desktop-web": "vite build --mode desktop && node scripts/stage-desktop-assets.mjs && node scripts/verify-desktop-assets.mjs && node scripts/build-windows-thumbnail-provider.mjs",
     "build:vscode-web": "vite build --mode vscode && node scripts/stage-vscode-assets.mjs && node scripts/verify-vscode-assets.mjs",
-    "build:e2e": "VITE_E2E=true vite build",
+    "build:e2e": "VITE_E2E=true vite build && node scripts/verify-web-assets.mjs",
     "capture:thumbnail": "node scripts/capture-thumbnail.mjs",
     "capture:project-page": "npm run build:e2e && node scripts/capture-project-page-screenshots.mjs",
     "lint": "eslint src tests e2e playwright.config.ts vite.config.ts vitest.config.ts --max-warnings=0",
@@ -36,7 +37,6 @@
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
-    "exrs": "^1.0.3",
     "fflate": "^0.8.2"
   },
   "devDependencies": {

@@ -1,6 +1,10 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  verifyTinyExrLicenseAssets,
+  verifyTinyExrWasmAssets
+} from './verify-tinyexr-wasm-assets.mjs';
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(rootDir, 'vscode-extension', 'media', 'plenoview');
@@ -18,16 +22,14 @@ if (exrFiles.length > 0) {
 
 const hasScript = distFiles.some((file) => extname(file) === '.js');
 const hasStylesheet = distFiles.some((file) => extname(file) === '.css');
-const hasWasm = distFiles.some((file) => extname(file) === '.wasm');
 if (!hasScript) {
   throw new Error('VS Code extension media does not contain a JavaScript bundle.');
 }
 if (!hasStylesheet) {
   throw new Error('VS Code extension media does not contain a CSS bundle.');
 }
-if (!hasWasm) {
-  throw new Error('VS Code extension media does not contain a WASM asset.');
-}
+await verifyTinyExrWasmAssets(distFiles, 'VS Code extension media');
+await verifyTinyExrLicenseAssets(distFiles, 'VS Code extension media');
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 if (!manifest || !Array.isArray(manifest.colormaps)) {

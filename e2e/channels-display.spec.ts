@@ -74,6 +74,43 @@ test('carries exposure when opening and switching files @smoke', async ({ page }
   await expect(exposureValue).toHaveValue('-2.5');
 });
 
+test('loads the TinyEXR worker module once and reuses it for a second file @smoke', async ({ page }) => {
+  const wasmResponses: Array<{ url: string; contentType: string | undefined }> = [];
+  const pageErrors: string[] = [];
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname.endsWith('.wasm')) {
+      wasmResponses.push({
+        url: response.url(),
+        contentType: response.headers()['content-type']
+      });
+    }
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await gotoViewerApp(page);
+  const openedImages = page.locator('#opened-images-select');
+
+  await page.setInputFiles('#file-input', {
+    name: 'first.exr',
+    mimeType: 'image/exr',
+    buffer: buildScalarChannelExr()
+  });
+  await expect(openedImages.locator('option:checked')).toContainText('first.exr', { timeout: 30000 });
+
+  await page.setInputFiles('#file-input', {
+    name: 'second.exr',
+    mimeType: 'image/exr',
+    buffer: buildRgbAuxExr()
+  });
+  await expect(openedImages.locator('option:checked')).toContainText('second.exr', { timeout: 30000 });
+
+  expect(wasmResponses).toHaveLength(1);
+  expect(wasmResponses[0]?.url).toMatch(/\/tinyexr_wasm-[A-Za-z0-9_-]+\.wasm$/u);
+  expect(wasmResponses[0]?.contentType).toContain('application/wasm');
+  expect(wasmResponses.some((response) => /exrs/iu.test(response.url))).toBe(false);
+  expect(pageErrors).toEqual([]);
+});
+
 test('auto exposure updates in None mode and pauses while Colormap is active', async ({ page }) => {
   await gotoViewerApp(page);
 

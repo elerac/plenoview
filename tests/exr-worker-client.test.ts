@@ -91,7 +91,7 @@ describe('exr worker client', () => {
     expect(workers).toHaveLength(2);
 
     const request = workers[1]?.postMessage.mock.calls[0]?.[0] as PostedDecodeRequest;
-    expect(request.wasmUrl).toMatch(/exrs_raw_wasm_bindgen_bg\.wasm$/u);
+    expect(request.wasmUrl).toMatch(/tinyexr_wasm\.wasm$/u);
     expect(() => new URL(request.wasmUrl)).not.toThrow();
     workers[1]?.emitMessage({
       id: request.id,

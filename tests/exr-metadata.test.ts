@@ -5,15 +5,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CompressionMethod,
   ExrEncoder,
-  initSync,
   SamplePrecision
-} from '../src/vendor/exrs_raw_wasm_bindgen.js';
+} from './helpers/exr-fixture-encoder';
 import { parseExrMetadata } from '../src/exr-metadata';
 import { ExrMetadataEntry } from '../src/types';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-let exrEncoderInitialized = false;
-
 describe('EXR metadata parsing', () => {
   it('formats common single-part header attributes in curated order', () => {
     const bytes = createSinglePartMultichannelExr();
@@ -29,7 +26,7 @@ describe('EXR metadata parsing', () => {
       'channels',
       'type'
     ]);
-    expect(byKey.get('compression')).toBe('ZIP');
+    expect(byKey.get('compression')).toBe('NONE');
     expect(byKey.get('pixelAspectRatio')).toBe('1.000');
     expect(byKey.get('dataWindow')).toBe('[0,0]-[511,319]');
     expect(byKey.get('displayWindow')).toBe('[0,0]-[511,319]');
@@ -60,7 +57,7 @@ describe('EXR metadata parsing', () => {
 
     expect(parts).toHaveLength(2);
     expect(first.get('name')).toBe('beauty');
-    expect(first.get('compression')).toBe('ZIP');
+    expect(first.get('compression')).toBe('NONE');
     expect(first.get('channels')).toBe('3 (R, G, B)');
     expect(first.has('chunkCount')).toBe(false);
     expect(second.get('name')).toBe('depth');
@@ -154,11 +151,5 @@ function createMultipartExr(): Uint8Array {
 }
 
 function ensureExrEncoderInitialized(): void {
-  if (exrEncoderInitialized) {
-    return;
-  }
-
-  const wasmBytes = readFileSync(new URL('../src/vendor/exrs_raw_wasm_bindgen_bg.wasm', import.meta.url));
-  initSync({ module: wasmBytes });
-  exrEncoderInitialized = true;
+  // The independent TypeScript fixture writer has no runtime initialization.
 }
