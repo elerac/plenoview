@@ -6,7 +6,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 
 ## Features
 
-- OpenEXR decode via a browser-safe `exrs` WASM adapter with full layer/channel extraction.
+- OpenEXR decode via a browser-safe TinyEXR v3.2.0 WASM adapter with multipart, arbitrary-channel, cropped-window, subsampled-channel, scanline, and tiled image support.
 - Local EXR load via `File > Open...` or drag/drop (drag-and-drop supports multiple files and recursive folder drops in one action).
 - Recursive folder EXR load via `File > Open Folder...`; all `.exr` files under the selected folder are appended as sessions.
 - `File > Export...` exports the full active display to PNG at display image size with configurable PNG compression and current channel/stokes, exposure/gamma, colormap, and alpha settings applied.
@@ -95,13 +95,13 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 
 - Vite + Vanilla TypeScript
 - WebGL2 renderer
-- `exrs` (WASM OpenEXR decoder)
+- TinyEXR v3.2.0 (vendored WASM OpenEXR decoder)
 - Vitest (unit/integration-style tests)
 - Playwright (workflow E2E)
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22+
 - npm
 - Modern browser with WebGL2
 
@@ -135,7 +135,7 @@ The extension reuses the Plenoview viewer UI and supports local EXR file/folder 
 
 Prerequisites:
 
-- Node.js 20+ and npm 10+
+- Node.js 22+ and npm 10+
 - Rust stable (`rustc` and `cargo`)
 - Tauri platform prerequisites for your OS
 
@@ -337,7 +337,7 @@ Controller methods:
   }
   ```
 - Texture sampling uses `NEAREST` for both `MIN_FILTER` and `MAG_FILTER`.
-- EXR WASM is initialized through a local adapter module backed by a vendored wasm loader, avoiding app-level deep imports into `exrs` internals.
+- EXR WASM is initialized through a local adapter backed by the pinned TinyEXR v3.2.0 source snapshot. `npm run build:tinyexr-wasm` reproduces the committed module with Emscripten 6.0.7, and CI rejects stale generated artifacts.
 - EXR metadata is parsed directly from header bytes before pixel decode because the current WASM decoder only exposes dimensions, layers, channels, and pixel data. Metadata parse failures do not block image loading.
 - Performance path for large images/channel sets:
   - channel thumbnail DOM updates are throttled to selection/image changes only,

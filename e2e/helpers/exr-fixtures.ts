@@ -3,9 +3,8 @@ import { readFileSync } from 'node:fs';
 import {
   CompressionMethod,
   ExrEncoder,
-  initSync,
   SamplePrecision
-} from '../../src/vendor/exrs_raw_wasm_bindgen.js';
+} from '../../tests/helpers/exr-fixture-encoder';
 
 interface ColormapManifest {
   colormaps: Array<{
@@ -18,8 +17,6 @@ const colormapManifest = JSON.parse(
 ) as ColormapManifest;
 
 export const expectedColormapLabels = colormapManifest.colormaps.map((colormap) => colormap.label);
-
-let exrEncoderInitialized = false;
 
 export function buildScalarChannelExr(): Buffer {
   ensureExrEncoderInitialized();
@@ -428,11 +425,5 @@ export function buildRgbStokesExr(): Buffer {
 }
 
 function ensureExrEncoderInitialized(): void {
-  if (exrEncoderInitialized) {
-    return;
-  }
-
-  const wasmBytes = readFileSync(new URL('../../src/vendor/exrs_raw_wasm_bindgen_bg.wasm', import.meta.url));
-  initSync({ module: wasmBytes });
-  exrEncoderInitialized = true;
+  // The independent TypeScript fixture writer has no runtime initialization.
 }

@@ -5,6 +5,29 @@ on:
   workflow_dispatch:
 
 jobs:
+  tinyexr-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pinned Emscripten SDK
+        run: |
+          git init "$RUNNER_TEMP/emsdk"
+          git -C "$RUNNER_TEMP/emsdk" remote add origin https://github.com/emscripten-core/emsdk.git
+          git -C "$RUNNER_TEMP/emsdk" fetch --depth 1 origin e3a0604c3d130d6ab2c40e14a1861accd939a255
+          git -C "$RUNNER_TEMP/emsdk" checkout --detach FETCH_HEAD
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.7
+
+      - name: Rebuild pinned TinyEXR WASM
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          npm run build:tinyexr-wasm
+
+      - name: Verify generated artifacts are current
+        run: git diff --exit-code -- src/vendor/tinyexr_wasm.js src/vendor/tinyexr_wasm.wasm
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -14,7 +37,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

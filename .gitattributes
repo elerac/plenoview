@@ -1,0 +1,2 @@
+third_party/tinyexr/** -whitespace
+tests/fixtures/openexr-images/**/*.rst -whitespace
