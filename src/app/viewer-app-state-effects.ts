@@ -217,6 +217,7 @@ function scheduleActiveChannelThumbnailGeneration(
     exposureEv: state.sessionState.channelThumbnailExposureEv,
     displayGamma: state.sessionState.channelThumbnailDisplayGamma
   };
+  const jobs: Array<Parameters<ChannelThumbnailService['enqueue']>[0]> = [];
 
   for (const item of prioritizeSelectedChannelViewItem(
     buildChannelViewItems(layer.channelNames, {
@@ -247,12 +248,7 @@ function scheduleActiveChannelThumbnailGeneration(
     }
 
     const token = core.issueRequestId();
-    core.dispatch({
-      type: 'channelThumbnailRequested',
-      requestKey,
-      token
-    });
-    void channelThumbnailService.enqueue({
+    jobs.push({
       sessionId: activeSession.id,
       requestKey,
       contextKey: serializeChannelThumbnailContextKey(
@@ -267,7 +263,18 @@ function scheduleActiveChannelThumbnailGeneration(
       spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       channelRecognitionSettings: state.channelRecognitionSettings,
       channelRecognitionNameRules: state.channelRecognitionNameRules
-    }).catch(() => undefined);
+    });
+  }
+
+  if (jobs.length === 0) {
+    return;
+  }
+  core.dispatch({
+    type: 'channelThumbnailsRequested',
+    requests: jobs.map(({ requestKey, token }) => ({ requestKey, token }))
+  });
+  for (const job of jobs) {
+    void channelThumbnailService.enqueue(job).catch(() => undefined);
   }
 }
 

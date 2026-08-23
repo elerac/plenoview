@@ -24,6 +24,10 @@
       }
     ],
     "security": {
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp"
+      },
       "csp": "default-src 'self' customprotocol: asset: http://asset.localhost; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; connect-src 'self' ipc: http://ipc.localhost https://raw.githubusercontent.com https://dl.polyhaven.org https://huggingface.co https://*.hf.co; font-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; media-src 'none'; base-uri 'self'; form-action 'self'",
       "devCsp": "default-src 'self' customprotocol: asset: http://asset.localhost; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:5173 ws://localhost:5173 http://127.0.0.1:5173 ws://127.0.0.1:5173 https://raw.githubusercontent.com https://dl.polyhaven.org https://huggingface.co https://*.hf.co; font-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; media-src 'none'; base-uri 'self'; form-action 'self'"
     }

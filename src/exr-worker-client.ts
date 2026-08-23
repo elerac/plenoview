@@ -1,8 +1,11 @@
 import { loadExr } from './exr';
 import {
   configureExrRuntime,
-  resolveExrRuntimeWasmUrl
+  resolveExrRuntimeWasmUrl,
+  resolveThreadedExrRuntimeModuleUrl,
+  resolveThreadedExrRuntimeWasmUrl
 } from './exr-runtime';
+import threadedWasmModuleAssetUrl from './vendor/tinyexr_wasm_threaded.js?url';
 import ExrDecodeWorker from './exr-worker.ts?worker&inline';
 import {
   createAbortError,
@@ -43,6 +46,9 @@ interface DecodeWorkerRequest {
   filename: string | null;
   context: DecodeErrorContext;
   wasmUrl: string;
+  threadedWasmUrl: string;
+  threadedModuleUrl: string;
+  threadCount: number;
 }
 
 type DecodeWorkerResponse =
@@ -96,9 +102,18 @@ const decodeWorkersSupported = import.meta.env.MODE !== 'vscode';
 const queuedDecodes: DecodeRequest[] = [];
 const workerSlots: DecodeWorkerSlot[] = [];
 const exrWasmUrl = resolveExrRuntimeWasmUrl();
+const exrThreadedWasmUrl = resolveThreadedExrRuntimeWasmUrl();
+const exrThreadedModuleUrl = resolveThreadedExrRuntimeModuleUrl(
+  threadedWasmModuleAssetUrl
+);
 export const DECODE_MEMORY_PRESSURE_RETRY_DELAY_MS = 5000;
 
-configureExrRuntime({ wasmUrl: exrWasmUrl });
+configureExrRuntime({
+  wasmUrl: exrWasmUrl,
+  threadedWasmUrl: exrThreadedWasmUrl,
+  threadedModuleUrl: exrThreadedModuleUrl,
+  threadCount: 1
+});
 
 export function setDecodeMemoryReservationManager(manager: DecodeMemoryReservationManager): void {
   decodeMemoryReservationManager = manager;
@@ -515,7 +530,10 @@ function startDecodeRequest(slot: DecodeWorkerSlot, request: DecodeRequest): voi
         bytes: transferableBytes.bytes,
         filename: request.filename,
         context: request.context,
-        wasmUrl: exrWasmUrl
+        wasmUrl: exrWasmUrl,
+        threadedWasmUrl: exrThreadedWasmUrl,
+        threadedModuleUrl: exrThreadedModuleUrl,
+        threadCount: getRequestDecodeThreadCount(request)
       } satisfies DecodeWorkerRequest,
       transferableBytes.transferables
     );
@@ -531,6 +549,22 @@ function startDecodeRequest(slot: DecodeWorkerSlot, request: DecodeRequest): voi
     releaseDecodeWorkerSlot(slot);
     pumpDecodeQueue();
   }
+}
+
+function getRequestDecodeThreadCount(request: DecodeRequest): number {
+  if (request.reservationReason === 'folder-load' ||
+      request.reservationReason === 'background-load') {
+    return 1;
+  }
+  const hardwareConcurrency = typeof navigator !== 'undefined' &&
+    typeof navigator.hardwareConcurrency === 'number' &&
+    Number.isFinite(navigator.hardwareConcurrency)
+    ? Math.max(1, Math.floor(navigator.hardwareConcurrency))
+    : 1;
+  return Math.min(16, Math.max(
+    1,
+    Math.floor(hardwareConcurrency / Math.max(1, getActiveDecodeCount()))
+  ));
 }
 
 function attachAbortListener(request: DecodeRequest): void {

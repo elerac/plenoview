@@ -3,6 +3,7 @@ export interface TinyExrWasmModule {
   HEAPF32: Float32Array;
   _malloc(size: number): number;
   _free(pointer: number): void;
+  _pexr_set_num_threads(threads: number): void;
   _pexr_decode(data: number, size: number): number;
   _pexr_width(image: number): number;
   _pexr_height(image: number): number;
@@ -28,6 +29,7 @@ export interface TinyExrWasmModule {
 
 export interface TinyExrWasmOptions {
   locateFile?: (path: string, scriptDirectory: string) => string;
+  mainScriptUrlOrBlob?: string | Blob;
   instantiateWasm?: (
     imports: WebAssembly.Imports,
     receiveInstance: (instance: WebAssembly.Instance) => void

@@ -222,6 +222,91 @@ describe('channel thumbnail service', () => {
     ]);
   });
 
+  it('waits for two paints once, then yields one frame-length timer per queued job', async () => {
+    const session = createSession();
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const timerCallbacks: Array<() => void> = [];
+    const timerDelays: number[] = [];
+    const createThumbnailDataUrl = vi.fn(({ selection }) => (
+      serializeDisplaySelectionKey(selection)
+    ));
+    const service = new ChannelThumbnailService({
+      getSession: () => session,
+      onThumbnailReady: () => undefined,
+      windowLike: {
+        requestAnimationFrame: (callback) => {
+          frameCallbacks.push(callback);
+          return frameCallbacks.length;
+        },
+        cancelAnimationFrame: vi.fn(),
+        setTimeout: ((callback: TimerHandler, delay?: number) => {
+          timerCallbacks.push(callback as () => void);
+          timerDelays.push(delay ?? 0);
+          return timerCallbacks.length;
+        }) as typeof window.setTimeout,
+        clearTimeout: vi.fn()
+      },
+      createThumbnailDataUrl
+    });
+
+    const pending = Promise.all([
+      service.enqueue(createJob(session, 'R', 1)),
+      service.enqueue(createJob(session, 'G', 2)),
+      service.enqueue(createJob(session, 'B', 3))
+    ]);
+
+    expect(frameCallbacks).toHaveLength(1);
+    expect(createThumbnailDataUrl).not.toHaveBeenCalled();
+    frameCallbacks.shift()?.(0);
+    await flushMicrotasks();
+    expect(frameCallbacks).toHaveLength(1);
+    frameCallbacks.shift()?.(16);
+    await flushMicrotasks();
+
+    for (let completedJobs = 0; completedJobs < 3; completedJobs += 1) {
+      expect(timerCallbacks).toHaveLength(1);
+      expect(timerDelays[completedJobs]).toBe(16);
+      timerCallbacks.shift()?.();
+      await flushMicrotasks();
+      expect(createThumbnailDataUrl).toHaveBeenCalledTimes(completedJobs + 1);
+    }
+
+    await pending;
+    expect(timerDelays).toEqual([16, 16, 16]);
+    expect(frameCallbacks).toHaveLength(0);
+  });
+
+  it('stops queued work when disposed during the initial paint gate', async () => {
+    const session = createSession();
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const cancelAnimationFrame = vi.fn();
+    const createThumbnailDataUrl = vi.fn(() => 'thumb');
+    const onThumbnailReady = vi.fn();
+    const service = new ChannelThumbnailService({
+      getSession: () => session,
+      onThumbnailReady,
+      windowLike: {
+        requestAnimationFrame: (callback) => {
+          frameCallbacks.push(callback);
+          return frameCallbacks.length;
+        },
+        cancelAnimationFrame,
+        setTimeout,
+        clearTimeout
+      },
+      createThumbnailDataUrl
+    });
+
+    const pending = service.enqueue(createJob(session, 'R', 1));
+    expect(frameCallbacks).toHaveLength(1);
+    service.dispose();
+    await pending;
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+    expect(createThumbnailDataUrl).not.toHaveBeenCalled();
+    expect(onThumbnailReady).not.toHaveBeenCalled();
+  });
+
   it('skips discarded session jobs once the backing session is gone', async () => {
     const sessions = new Map<string, OpenedImageSession>([['session-1', createSession()]]);
     const onThumbnailReady = vi.fn();
@@ -338,3 +423,24 @@ describe('channel thumbnail service', () => {
     });
   });
 });
+
+function createJob(
+  session: OpenedImageSession,
+  channel: 'R' | 'G' | 'B',
+  token: number
+) {
+  return {
+    sessionId: session.id,
+    requestKey: `request-${channel}`,
+    contextKey: `context-${channel}`,
+    token,
+    stateSnapshot: session.state,
+    selection: createChannelMonoSelection(channel)
+  };
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 10; index += 1) {
+    await Promise.resolve();
+  }
+}

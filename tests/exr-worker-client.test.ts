@@ -92,7 +92,13 @@ describe('exr worker client', () => {
 
     const request = workers[1]?.postMessage.mock.calls[0]?.[0] as PostedDecodeRequest;
     expect(request.wasmUrl).toMatch(/tinyexr_wasm\.wasm$/u);
+    expect(request.threadedWasmUrl).toMatch(/tinyexr_wasm_threaded\.wasm$/u);
+    expect(request.threadedModuleUrl).toMatch(/tinyexr_wasm_threaded\.js$/u);
+    expect(request.threadCount).toBeGreaterThanOrEqual(1);
+    expect(request.threadCount).toBeLessThanOrEqual(16);
     expect(() => new URL(request.wasmUrl)).not.toThrow();
+    expect(() => new URL(request.threadedWasmUrl)).not.toThrow();
+    expect(() => new URL(request.threadedModuleUrl)).not.toThrow();
     workers[1]?.emitMessage({
       id: request.id,
       ok: true,
@@ -130,6 +136,37 @@ describe('exr worker client', () => {
       image: firstDecoded
     });
     await expect(first).resolves.toEqual(firstDecoded);
+  });
+
+  it('reserves inner threads for interactive decodes but keeps folder decodes serial', async () => {
+    vi.stubGlobal('navigator', { hardwareConcurrency: 12 });
+    setMaxDecodeWorkers(1);
+    const workers = installWorkerMock();
+
+    const interactive = loadExrOffMainThread(new Uint8Array([1]), {
+      filename: 'interactive.exr'
+    });
+    const interactiveRequest = workers[0]?.postMessage.mock.calls[0]?.[0] as PostedDecodeRequest;
+    expect(interactiveRequest.threadCount).toBe(12);
+    workers[0]?.emitMessage({
+      id: interactiveRequest.id,
+      ok: true,
+      image: createDecodedImage()
+    });
+    await interactive;
+
+    const folder = loadExrOffMainThread(new Uint8Array([2]), {
+      filename: 'folder.exr',
+      reservationReason: 'folder-load'
+    });
+    const folderRequest = workers[0]?.postMessage.mock.calls[1]?.[0] as PostedDecodeRequest;
+    expect(folderRequest.threadCount).toBe(1);
+    workers[0]?.emitMessage({
+      id: folderRequest.id,
+      ok: true,
+      image: createDecodedImage()
+    });
+    await folder;
   });
 
   it('keeps overflow decodes queued until a worker slot is available', async () => {
@@ -491,4 +528,7 @@ function createDecodedImage(width = 1): DecodedExrImage {
 interface PostedDecodeRequest {
   id: number;
   wasmUrl: string;
+  threadedWasmUrl: string;
+  threadedModuleUrl: string;
+  threadCount: number;
 }

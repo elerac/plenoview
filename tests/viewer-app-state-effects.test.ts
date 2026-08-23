@@ -124,6 +124,7 @@ describe('viewer app state effects', () => {
 
   it('schedules the currently selected channel thumbnail before the rest of the batch', () => {
     const core = new ViewerAppCore();
+    const requestBatches: Array<Array<{ requestKey: string; token: number }>> = [];
     const enqueue = vi.fn<ChannelThumbnailService['enqueue']>(() => Promise.resolve());
     const channelThumbnailService = {
       enqueue,
@@ -139,10 +140,19 @@ describe('viewer app state effects', () => {
     core.subscribeState((transition) => {
       applyChannelThumbnailEffects(transition, core, channelThumbnailService);
     });
+    core.subscribeState((transition) => {
+      if (transition.intent.type === 'channelThumbnailsRequested') {
+        requestBatches.push(transition.intent.requests);
+      }
+    });
 
     core.dispatch({ type: 'sessionLoaded', session });
 
     expect(enqueue).toHaveBeenCalled();
+    expect(requestBatches).toHaveLength(1);
+    expect(requestBatches[0]).toHaveLength(enqueue.mock.calls.length);
+    expect(Object.keys(core.getState().channelThumbnailsByRequestKey))
+      .toHaveLength(enqueue.mock.calls.length);
     expect(enqueue.mock.calls[0]?.[0].selection).toEqual(createChannelMonoSelection('G'));
   });
 

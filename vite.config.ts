@@ -14,6 +14,15 @@ export default defineConfig(({ mode }) => {
   const appOnlyBuild = desktopBuild || vscodeBuild;
   const tauriDevHost = process.env.TAURI_DEV_HOST;
   const tauriPlatform = process.env.TAURI_ENV_PLATFORM;
+  const crossOriginIsolated = Boolean(
+    tauriPlatform || process.env.VITE_CROSS_ORIGIN_ISOLATED === 'true'
+  );
+  const isolationHeaders = crossOriginIsolated
+    ? {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp'
+      }
+    : undefined;
   const buildInput = appOnlyBuild
     ? {
         app: appHtml
@@ -34,6 +43,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: Boolean(tauriPlatform || tauriDevHost),
       host: tauriDevHost || '127.0.0.1',
+      headers: isolationHeaders,
       hmr: tauriDevHost
         ? {
             protocol: 'ws',
@@ -44,6 +54,9 @@ export default defineConfig(({ mode }) => {
       watch: {
         ignored: ['**/src-tauri/**']
       }
+    },
+    preview: {
+      headers: isolationHeaders
     },
     envPrefix: ['VITE_', 'TAURI_ENV_*'],
     build: {

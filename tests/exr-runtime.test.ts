@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveExrRuntimeWasmUrl } from '../src/exr-runtime';
+import {
+  resolveExrRuntimeWasmUrl,
+  resolveThreadedExrRuntimeModuleUrl,
+  resolveThreadedExrRuntimeWasmUrl
+} from '../src/exr-runtime';
 
 describe('exr runtime', () => {
   it('resolves root-relative wasm asset URLs against the page origin', () => {
@@ -27,5 +31,18 @@ describe('exr runtime', () => {
         'http://127.0.0.1:4173/assets/app.js'
       )
     ).toBe('https://example.com/plenoview/assets/tinyexr_wasm.wasm');
+  });
+
+  it('resolves threaded module and wasm URLs before they enter the inline worker', () => {
+    const baseUrl = 'http://127.0.0.1:4173/assets/app.js';
+
+    expect(resolveThreadedExrRuntimeModuleUrl(
+      '/assets/tinyexr_wasm_threaded.js',
+      baseUrl
+    )).toBe('http://127.0.0.1:4173/assets/tinyexr_wasm_threaded.js');
+    expect(resolveThreadedExrRuntimeWasmUrl(
+      '/assets/tinyexr_wasm_threaded.wasm',
+      baseUrl
+    )).toBe('http://127.0.0.1:4173/assets/tinyexr_wasm_threaded.wasm');
   });
 });

@@ -312,7 +312,10 @@ export type ViewerIntent =
   | { type: 'activeSessionFitToViewport'; viewport: ViewportInfo; fitInsets?: ViewportInsets }
   | { type: 'thumbnailRequested'; sessionId: string; token: number }
   | { type: 'thumbnailReady'; sessionId: string; token: number; thumbnailDataUrl: string | null }
-  | { type: 'channelThumbnailRequested'; requestKey: string; token: number }
+  | {
+      type: 'channelThumbnailsRequested';
+      requests: Array<{ requestKey: string; token: number }>;
+    }
   | {
       type: 'channelThumbnailReady';
       sessionId: string;

@@ -12,7 +12,7 @@ const distFiles = await listFiles(distDir);
 
 await verifyTinyExrWasmAssets(distFiles, 'Web dist');
 await verifyTinyExrLicenseAssets(distFiles, 'Web dist');
-console.log('Verified web TinyEXR WASM asset.');
+console.log('Verified web TinyEXR WASM assets.');
 
 async function listFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });

@@ -49,14 +49,24 @@ export function thumbnailReducer(
           [intent.sessionId]: successResource(intent.sessionId, intent.thumbnailDataUrl)
         }
       };
-    case 'channelThumbnailRequested':
+    case 'channelThumbnailsRequested': {
+      if (intent.requests.length === 0) {
+        return state;
+      }
+      const channelThumbnailsByRequestKey = {
+        ...state.channelThumbnailsByRequestKey
+      };
+      for (const request of intent.requests) {
+        channelThumbnailsByRequestKey[request.requestKey] = pendingResource(
+          request.requestKey,
+          request.token
+        );
+      }
       return {
         ...state,
-        channelThumbnailsByRequestKey: {
-          ...state.channelThumbnailsByRequestKey,
-          [intent.requestKey]: pendingResource(intent.requestKey, intent.token)
-        }
+        channelThumbnailsByRequestKey
       };
+    }
     case 'channelThumbnailReady':
       if (!isPendingMatch(
         state.channelThumbnailsByRequestKey[intent.requestKey] ?? idleResource(),

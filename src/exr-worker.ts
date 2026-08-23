@@ -16,6 +16,9 @@ interface DecodeWorkerRequest {
   filename: string | null;
   context: DecodeErrorContext;
   wasmUrl: string;
+  threadedWasmUrl: string;
+  threadedModuleUrl: string;
+  threadCount: number;
 }
 
 type DecodeWorkerResponse =
@@ -43,7 +46,12 @@ worker.addEventListener('message', (event: MessageEvent<DecodeWorkerRequest>) =>
 
 async function decodeAndReply(request: DecodeWorkerRequest): Promise<void> {
   try {
-    configureExrRuntime({ wasmUrl: request.wasmUrl });
+    configureExrRuntime({
+      wasmUrl: request.wasmUrl,
+      threadedWasmUrl: request.threadedWasmUrl,
+      threadedModuleUrl: request.threadedModuleUrl,
+      threadCount: request.threadCount
+    });
     const image = convertDecodedImageToPlanar(await loadExr(request.bytes));
     worker.postMessage(
       {

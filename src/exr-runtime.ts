@@ -22,16 +22,44 @@ export interface RawDecodedExr {
   layers: RawDecodedExrLayer[];
 }
 
-let wasm: TinyExrWasmModule | null = null;
-let initializing: Promise<TinyExrWasmModule> | null = null;
+let serialWasm: TinyExrWasmModule | null = null;
+let threadedWasm: TinyExrWasmModule | null = null;
+let serialInitializing: Promise<TinyExrWasmModule> | null = null;
+let threadedInitializing: Promise<TinyExrWasmModule> | null = null;
 let configuredWasmUrl: string | null = null;
+let configuredThreadedWasmUrl: string | null = null;
+let configuredThreadedModuleUrl: string | null = null;
+let configuredThreadCount = 1;
+let threadedRuntimeUnavailable = false;
 
-export function configureExrRuntime(options: { wasmUrl?: string | null }): void {
+export function configureExrRuntime(options: {
+  wasmUrl?: string | null;
+  threadedWasmUrl?: string | null;
+  threadedModuleUrl?: string | null;
+  threadCount?: number | null;
+}): void {
   configuredWasmUrl = normalizeConfiguredWasmUrl(options.wasmUrl);
+  configuredThreadedWasmUrl = normalizeConfiguredWasmUrl(options.threadedWasmUrl);
+  configuredThreadedModuleUrl = normalizeConfiguredWasmUrl(options.threadedModuleUrl);
+  configuredThreadCount = normalizeThreadCount(options.threadCount);
 }
 
 export function resolveExrRuntimeWasmUrl(
   assetUrl: string = getDefaultWasmAssetUrl(),
+  baseUrl: string = import.meta.url
+): string {
+  return new URL(assetUrl, baseUrl).href;
+}
+
+export function resolveThreadedExrRuntimeWasmUrl(
+  assetUrl: string = getDefaultThreadedWasmAssetUrl(),
+  baseUrl: string = import.meta.url
+): string {
+  return new URL(assetUrl, baseUrl).href;
+}
+
+export function resolveThreadedExrRuntimeModuleUrl(
+  assetUrl: string,
   baseUrl: string = import.meta.url
 ): string {
   return new URL(assetUrl, baseUrl).href;
@@ -42,7 +70,19 @@ export async function decodeRawExr(bytes: Uint8Array): Promise<RawDecodedExr> {
     throw new Error(`TinyEXR input size is invalid: ${bytes.byteLength} bytes.`);
   }
 
-  const module = await ensureInitialized();
+  let threaded = canUseThreadedDecoder() &&
+    configuredThreadCount > 1 &&
+    !threadedRuntimeUnavailable;
+  let module: TinyExrWasmModule;
+  try {
+    module = await ensureInitialized(threaded);
+  } catch (error) {
+    if (!threaded) throw error;
+    threadedRuntimeUnavailable = true;
+    threaded = false;
+    module = await ensureInitialized(false);
+  }
+  module._pexr_set_num_threads(threaded ? configuredThreadCount : 1);
   const inputPointer = module._malloc(bytes.byteLength);
   if (!inputPointer) {
     throw new Error(`TinyEXR could not allocate ${bytes.byteLength} input bytes.`);
@@ -67,26 +107,58 @@ export async function decodeRawExr(bytes: Uint8Array): Promise<RawDecodedExr> {
   }
 }
 
-async function ensureInitialized(): Promise<TinyExrWasmModule> {
-  if (wasm) {
-    return wasm;
+async function ensureInitialized(threaded: boolean): Promise<TinyExrWasmModule> {
+  if (threaded) {
+    if (threadedWasm) return threadedWasm;
+    if (!threadedInitializing) {
+      const wasmUrl = configuredThreadedWasmUrl ?? resolveThreadedExrRuntimeWasmUrl();
+      const moduleUrl = configuredThreadedModuleUrl;
+      threadedInitializing = initializeBrowserWasm(true, wasmUrl, moduleUrl);
+    }
+    try {
+      threadedWasm = await threadedInitializing;
+      return threadedWasm;
+    } finally {
+      threadedInitializing = null;
+    }
   }
 
-  if (!initializing) {
+  if (serialWasm) return serialWasm;
+  if (!serialInitializing) {
     const wasmUrl = configuredWasmUrl ?? resolveExrRuntimeWasmUrl();
-    initializing = isBrowserRuntime()
-      ? createTinyExrWasm({
-          locateFile: (path) => path.endsWith('.wasm') ? wasmUrl : path
-        })
+    serialInitializing = isBrowserRuntime()
+      ? initializeBrowserWasm(false, wasmUrl, null)
       : initializeNodeWasm(wasmUrl);
   }
-
   try {
-    wasm = await initializing;
-    return wasm;
+    serialWasm = await serialInitializing;
+    return serialWasm;
   } finally {
-    initializing = null;
+    serialInitializing = null;
   }
+}
+
+async function initializeBrowserWasm(
+  threaded: boolean,
+  wasmUrl: string,
+  threadedModuleUrl: string | null
+): Promise<TinyExrWasmModule> {
+  if (!threaded) {
+    return await createTinyExrWasm({
+      locateFile: (path) => path.endsWith('.wasm') ? wasmUrl : path
+    });
+  }
+
+  if (!threadedModuleUrl) {
+    throw new Error('TinyEXR threaded module URL is unavailable.');
+  }
+  const { default: createTinyExrWasmThreaded } = await import(
+    /* @vite-ignore */ threadedModuleUrl
+  ) as typeof import('./vendor/tinyexr_wasm_threaded.js');
+  return await createTinyExrWasmThreaded({
+    locateFile: (path) => path.endsWith('.wasm') ? wasmUrl : path,
+    mainScriptUrlOrBlob: threadedModuleUrl
+  });
 }
 
 async function initializeNodeWasm(wasmUrl: string): Promise<TinyExrWasmModule> {
@@ -218,11 +290,30 @@ function readWasmString(module: TinyExrWasmModule, pointer: number): string {
   while (end < limit && module.HEAPU8[end] !== 0) {
     end += 1;
   }
-  return STRING_DECODER.decode(module.HEAPU8.subarray(pointer, end));
+  // TextDecoder rejects views backed by SharedArrayBuffer in Chromium. Names
+  // are capped above, so copy only this tiny slice out of threaded WASM memory.
+  return STRING_DECODER.decode(Uint8Array.from(module.HEAPU8.subarray(pointer, end)));
 }
 
 function getDefaultWasmAssetUrl(): string {
   return new URL('./vendor/tinyexr_wasm.wasm', import.meta.url).href;
+}
+
+function getDefaultThreadedWasmAssetUrl(): string {
+  return new URL('./vendor/tinyexr_wasm_threaded.wasm', import.meta.url).href;
+}
+
+function canUseThreadedDecoder(): boolean {
+  if (typeof window !== 'undefined' || typeof self === 'undefined') {
+    return false;
+  }
+  const workerGlobal = self as unknown as {
+    crossOriginIsolated?: unknown;
+    importScripts?: unknown;
+  };
+  return typeof workerGlobal.importScripts === 'function' &&
+    workerGlobal.crossOriginIsolated === true &&
+    typeof SharedArrayBuffer !== 'undefined';
 }
 
 function isBrowserRuntime(): boolean {
@@ -257,4 +348,11 @@ function normalizeConfiguredWasmUrl(value: string | null | undefined): string | 
 
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function normalizeThreadCount(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.min(16, Math.max(1, Math.floor(value)));
 }

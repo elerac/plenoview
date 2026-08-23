@@ -24,7 +24,7 @@ import type { DecodedLayer, OpenedImageSession, ViewerSessionState } from '../ty
 import type { ThumbnailWindowLike } from './thumbnail-service';
 
 const THUMBNAIL_IDLE_TIMEOUT_MS = 250;
-const THUMBNAIL_IDLE_FALLBACK_DELAY_MS = 64;
+const THUMBNAIL_IDLE_FALLBACK_DELAY_MS = 16;
 
 interface ChannelThumbnailJob {
   sessionId: string;
@@ -173,6 +173,7 @@ export class ChannelThumbnailService implements Disposable {
 
     this.processingPromise = (async () => {
       try {
+        await this.waitForNextPaint();
         while (this.jobs.length > 0) {
           throwIfAborted(this.abortController.signal, 'Channel thumbnail service has been disposed.');
 
@@ -257,8 +258,6 @@ export class ChannelThumbnailService implements Disposable {
   }
 
   private async runNonCriticalTask(task: () => void | Promise<void>): Promise<void> {
-    await this.waitForNextPaint();
-    throwIfAborted(this.abortController.signal, 'Channel thumbnail service has been disposed.');
     await this.waitForIdleSlot(THUMBNAIL_IDLE_TIMEOUT_MS);
     throwIfAborted(this.abortController.signal, 'Channel thumbnail service has been disposed.');
     await task();
