@@ -9240,6 +9240,77 @@ describe('opened files reordering', () => {
     });
   });
 
+  it('uses the transformed inner client box for pane layout and opened-file drop hit testing', () => {
+    installUiFixture();
+
+    const onOpenedImageSelected = vi.fn();
+    const onOpenedImageAssignedToViewerPane = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({
+      onOpenedImageSelected,
+      onOpenedImageAssignedToViewerPane
+    }));
+    ui.setOpenedImageOptions([
+      { id: 'session-1', label: 'first.exr' },
+      { id: 'session-2', label: 'second.exr' }
+    ], 'session-1');
+    mockDomRect(ui.viewerContainer, {
+      left: 300,
+      top: 40,
+      width: 204,
+      height: 104,
+      bottom: 144
+    });
+    Object.defineProperties(ui.viewerContainer, {
+      offsetWidth: { configurable: true, value: 102 },
+      offsetHeight: { configurable: true, value: 52 },
+      clientLeft: { configurable: true, value: 1 },
+      clientTop: { configurable: true, value: 1 },
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 50 }
+    });
+    ui.setViewerPaneLayout({
+      root: {
+        type: 'split',
+        orientation: 'vertical',
+        children: [
+          { type: 'leaf', sessionId: 'session-1' },
+          { type: 'leaf', sessionId: 'session-1' }
+        ]
+      },
+      activePanePath: [1]
+    });
+
+    expect(ui.getViewerPaneRenderInfos()).toEqual([
+      {
+        path: [0],
+        rect: { x: 0, y: 0, width: 100, height: 100 },
+        viewport: { width: 100, height: 100 },
+        active: false
+      },
+      {
+        path: [1],
+        rect: { x: 100, y: 0, width: 100, height: 100 },
+        viewport: { width: 100, height: 100 },
+        active: true
+      }
+    ]);
+
+    const rows = mockOpenedFilesListGeometry();
+    const secondRow = rows[1] as HTMLDivElement;
+    const dataTransfer = createMockDataTransfer();
+    secondRow.dispatchEvent(createOpenedFileDragEvent('dragstart', dataTransfer));
+    ui.viewerContainer.dispatchEvent(createOpenedFileDragEvent('drop', dataTransfer, {
+      clientX: 401,
+      clientY: 52
+    }));
+
+    expect(onOpenedImageSelected).not.toHaveBeenCalled();
+    expect(onOpenedImageAssignedToViewerPane).toHaveBeenCalledWith('session-2', {
+      path: [0],
+      viewport: { width: 100, height: 100 }
+    });
+  });
+
   it('uses a file icon fallback for the open-file native drag image without a thumbnail', () => {
     installUiFixture();
 

@@ -53,6 +53,8 @@ export function readExportPixels(
       warnInvalidValues: false,
       invalidValueWarningPhase: 0,
       ...exportRender.options,
+      outputPixelScaleX: 1,
+      outputPixelScaleY: 1,
       viewportLeft: 0,
       viewportTop: 0
     } as const;
@@ -79,7 +81,7 @@ export function readExportPixels(
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-    gl.viewport(0, 0, state.viewport.width, state.viewport.height);
+    gl.viewport(0, 0, state.glCanvas.width, state.glCanvas.height);
   }
 }
 

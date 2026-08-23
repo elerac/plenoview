@@ -6,6 +6,7 @@ uniform sampler2D uColormapTexture;
 uniform vec2 uViewport;
 uniform vec2 uViewportOrigin;
 uniform vec2 uOutputSize;
+uniform vec2 uOutputPixelScale;
 uniform vec2 uScreenOrigin;
 uniform vec2 uImageSize;
 uniform vec2 uPan;
@@ -83,6 +84,12 @@ struct DisplaySample {
 struct StokesRgbDisplaySample {
   vec3 value;
   bool invalidValue;
+};
+
+struct SourceCoordinate {
+  ivec2 pixel;
+  vec2 uv;
+  bool minifying;
 };
 
 bool isFiniteValue(float value) {
@@ -450,108 +457,163 @@ bool hasInvalidStokesDisplayValues(vec4 stokesR, vec4 stokesG, vec4 stokesB, vec
     isInvalidStokesDisplayValue(stokesB, value.b);
 }
 
-float readSource0(ivec2 pixel) {
-  return texelFetch(uSourceTextures[0], pixel, 0).r;
+float readSource0(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[0], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[0], source.pixel, 0).r;
 }
 
-float readSource1(ivec2 pixel) {
-  return texelFetch(uSourceTextures[1], pixel, 0).r;
+float readSource1(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[1], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[1], source.pixel, 0).r;
 }
 
-float readSource2(ivec2 pixel) {
-  return texelFetch(uSourceTextures[2], pixel, 0).r;
+float readSource2(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[2], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[2], source.pixel, 0).r;
 }
 
-float readSource3(ivec2 pixel) {
-  return texelFetch(uSourceTextures[3], pixel, 0).r;
+float readSource3(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[3], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[3], source.pixel, 0).r;
 }
 
-float readSource4(ivec2 pixel) {
-  return texelFetch(uSourceTextures[4], pixel, 0).r;
+float readSource4(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[4], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[4], source.pixel, 0).r;
 }
 
-float readSource5(ivec2 pixel) {
-  return texelFetch(uSourceTextures[5], pixel, 0).r;
+float readSource5(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[5], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[5], source.pixel, 0).r;
 }
 
-float readSource6(ivec2 pixel) {
-  return texelFetch(uSourceTextures[6], pixel, 0).r;
+float readSource6(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[6], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[6], source.pixel, 0).r;
 }
 
-float readSource7(ivec2 pixel) {
-  return texelFetch(uSourceTextures[7], pixel, 0).r;
+float readSource7(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[7], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[7], source.pixel, 0).r;
 }
 
-float readSource8(ivec2 pixel) {
-  return texelFetch(uSourceTextures[8], pixel, 0).r;
+float readSource8(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[8], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[8], source.pixel, 0).r;
 }
 
-float readSource9(ivec2 pixel) {
-  return texelFetch(uSourceTextures[9], pixel, 0).r;
+float readSource9(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[9], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[9], source.pixel, 0).r;
 }
 
-float readSource10(ivec2 pixel) {
-  return texelFetch(uSourceTextures[10], pixel, 0).r;
+float readSource10(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[10], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[10], source.pixel, 0).r;
 }
 
-float readSource11(ivec2 pixel) {
-  return texelFetch(uSourceTextures[11], pixel, 0).r;
+float readSource11(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[11], source.uv).r;
+  }
+  return texelFetch(uSourceTextures[11], source.pixel, 0).r;
 }
 
-vec3 readRgbSource0(ivec2 pixel) {
-  return texelFetch(uSourceTextures[0], pixel, 0).rgb;
+vec3 readRgbSource0(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[0], source.uv).rgb;
+  }
+  return texelFetch(uSourceTextures[0], source.pixel, 0).rgb;
 }
 
-vec3 readRgbSource1(ivec2 pixel) {
-  return texelFetch(uSourceTextures[1], pixel, 0).rgb;
+vec3 readRgbSource1(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[1], source.uv).rgb;
+  }
+  return texelFetch(uSourceTextures[1], source.pixel, 0).rgb;
 }
 
-vec3 readRgbSource2(ivec2 pixel) {
-  return texelFetch(uSourceTextures[2], pixel, 0).rgb;
+vec3 readRgbSource2(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[2], source.uv).rgb;
+  }
+  return texelFetch(uSourceTextures[2], source.pixel, 0).rgb;
 }
 
-vec3 readRgbSource3(ivec2 pixel) {
-  return texelFetch(uSourceTextures[3], pixel, 0).rgb;
+vec3 readRgbSource3(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[3], source.uv).rgb;
+  }
+  return texelFetch(uSourceTextures[3], source.pixel, 0).rgb;
 }
 
-vec4 readDirectStokesSample(ivec2 pixel) {
+vec4 readRgbaSource0(SourceCoordinate source) {
+  if (source.minifying) {
+    return texture(uSourceTextures[0], source.uv);
+  }
+  return texelFetch(uSourceTextures[0], source.pixel, 0);
+}
+
+vec4 readDirectStokesSample(SourceCoordinate source) {
   return vec4(
-    readSource0(pixel),
-    readSource1(pixel),
-    readSource2(pixel),
-    readSource3(pixel)
+    readSource0(source),
+    readSource1(source),
+    readSource2(source),
+    readSource3(source)
   );
 }
 
-vec4 readRgbLuminanceStokesSample(ivec2 pixel) {
+vec4 readRgbLuminanceStokesSample(SourceCoordinate source) {
   return vec4(
     computeRec709Luminance(
-      readSource0(pixel),
-      readSource4(pixel),
-      readSource8(pixel)
+      readSource0(source),
+      readSource4(source),
+      readSource8(source)
     ),
     computeRec709Luminance(
-      readSource1(pixel),
-      readSource5(pixel),
-      readSource9(pixel)
+      readSource1(source),
+      readSource5(source),
+      readSource9(source)
     ),
     computeRec709Luminance(
-      readSource2(pixel),
-      readSource6(pixel),
-      readSource10(pixel)
+      readSource2(source),
+      readSource6(source),
+      readSource10(source)
     ),
     computeRec709Luminance(
-      readSource3(pixel),
-      readSource7(pixel),
-      readSource11(pixel)
+      readSource3(source),
+      readSource7(source),
+      readSource11(source)
     )
   );
 }
 
-StokesRgbDisplaySample readRgbStokesDisplaySample(ivec2 pixel) {
-  vec4 stokesR = vec4(readSource0(pixel), readSource1(pixel), readSource2(pixel), readSource3(pixel));
-  vec4 stokesG = vec4(readSource4(pixel), readSource5(pixel), readSource6(pixel), readSource7(pixel));
-  vec4 stokesB = vec4(readSource8(pixel), readSource9(pixel), readSource10(pixel), readSource11(pixel));
+StokesRgbDisplaySample readRgbStokesDisplaySample(SourceCoordinate source) {
+  vec4 stokesR = vec4(readSource0(source), readSource1(source), readSource2(source), readSource3(source));
+  vec4 stokesG = vec4(readSource4(source), readSource5(source), readSource6(source), readSource7(source));
+  vec4 stokesB = vec4(readSource8(source), readSource9(source), readSource10(source), readSource11(source));
   vec3 value = vec3(
     computeStokesDisplayValue(uStokesParameter, stokesR.x, stokesR.y, stokesR.z, stokesR.w),
     computeStokesDisplayValue(uStokesParameter, stokesG.x, stokesG.y, stokesG.z, stokesG.w),
@@ -560,11 +622,11 @@ StokesRgbDisplaySample readRgbStokesDisplaySample(ivec2 pixel) {
   return StokesRgbDisplaySample(value, hasInvalidStokesDisplayValues(stokesR, stokesG, stokesB, value));
 }
 
-vec4 readSpectralStokesRgbComponentSample(ivec2 pixel, int componentIndex) {
-  vec3 s0 = readRgbSource0(pixel);
-  vec3 s1 = readRgbSource1(pixel);
-  vec3 s2 = readRgbSource2(pixel);
-  vec3 s3 = readRgbSource3(pixel);
+vec4 readSpectralStokesRgbComponentSample(SourceCoordinate source, int componentIndex) {
+  vec3 s0 = readRgbSource0(source);
+  vec3 s1 = readRgbSource1(source);
+  vec3 s2 = readRgbSource2(source);
+  vec3 s3 = readRgbSource3(source);
   if (componentIndex == 0) {
     return vec4(s0.r, s1.r, s2.r, s3.r);
   }
@@ -574,11 +636,11 @@ vec4 readSpectralStokesRgbComponentSample(ivec2 pixel, int componentIndex) {
   return vec4(s0.b, s1.b, s2.b, s3.b);
 }
 
-vec4 readSpectralStokesRgbLuminanceSample(ivec2 pixel) {
-  vec3 s0 = readRgbSource0(pixel);
-  vec3 s1 = readRgbSource1(pixel);
-  vec3 s2 = readRgbSource2(pixel);
-  vec3 s3 = readRgbSource3(pixel);
+vec4 readSpectralStokesRgbLuminanceSample(SourceCoordinate source) {
+  vec3 s0 = readRgbSource0(source);
+  vec3 s1 = readRgbSource1(source);
+  vec3 s2 = readRgbSource2(source);
+  vec3 s3 = readRgbSource3(source);
   return vec4(
     computeRec709Luminance(s0.r, s0.g, s0.b),
     computeRec709Luminance(s1.r, s1.g, s1.b),
@@ -587,10 +649,10 @@ vec4 readSpectralStokesRgbLuminanceSample(ivec2 pixel) {
   );
 }
 
-StokesRgbDisplaySample readSpectralStokesRgbDisplaySample(ivec2 pixel) {
-  vec4 stokesR = readSpectralStokesRgbComponentSample(pixel, 0);
-  vec4 stokesG = readSpectralStokesRgbComponentSample(pixel, 1);
-  vec4 stokesB = readSpectralStokesRgbComponentSample(pixel, 2);
+StokesRgbDisplaySample readSpectralStokesRgbDisplaySample(SourceCoordinate source) {
+  vec4 stokesR = readSpectralStokesRgbComponentSample(source, 0);
+  vec4 stokesG = readSpectralStokesRgbComponentSample(source, 1);
+  vec4 stokesB = readSpectralStokesRgbComponentSample(source, 2);
   vec3 value = vec3(
     computeStokesDisplayValue(uStokesParameter, stokesR.x, stokesR.y, stokesR.z, stokesR.w),
     computeStokesDisplayValue(uStokesParameter, stokesG.x, stokesG.y, stokesG.z, stokesG.w),
@@ -603,10 +665,10 @@ DisplaySample createEmptySample() {
   return DisplaySample(vec3(0.0), 1.0, vec4(0.0), false);
 }
 
-DisplaySample readDisplaySample(ivec2 pixel) {
+DisplaySample readDisplaySample(SourceCoordinate source) {
   if (uDisplayMode == DISPLAY_MODE_CHANNEL_RGB) {
-    vec3 rgb = vec3(readSource0(pixel), readSource1(pixel), readSource2(pixel));
-    float alpha = readSource3(pixel);
+    vec3 rgb = vec3(readSource0(source), readSource1(source), readSource2(source));
+    float alpha = readSource3(source);
     return DisplaySample(
       sanitizeDisplayColor(rgb),
       uUseImageAlpha ? sanitizeAlphaValue(alpha) : 1.0,
@@ -616,8 +678,8 @@ DisplaySample readDisplaySample(ivec2 pixel) {
   }
 
   if (uDisplayMode == DISPLAY_MODE_CHANNEL_NORMAL_MAP) {
-    vec3 normal = vec3(readSource0(pixel), readSource1(pixel), readSource2(pixel));
-    float alpha = readSource3(pixel);
+    vec3 normal = vec3(readSource0(source), readSource1(source), readSource2(source));
+    float alpha = readSource3(source);
     return DisplaySample(
       mapNormalToDisplayColor(normal),
       uUseImageAlpha ? sanitizeAlphaValue(alpha) : 1.0,
@@ -627,8 +689,8 @@ DisplaySample readDisplaySample(ivec2 pixel) {
   }
 
   if (uDisplayMode == DISPLAY_MODE_CHANNEL_MONO) {
-    float value = readSource0(pixel);
-    float alpha = readSource3(pixel);
+    float value = readSource0(source);
+    float alpha = readSource3(source);
     return DisplaySample(
       vec3(sanitizeDisplayValue(value)),
       uUseImageAlpha ? sanitizeAlphaValue(alpha) : 1.0,
@@ -638,7 +700,7 @@ DisplaySample readDisplaySample(ivec2 pixel) {
   }
 
   if (uDisplayMode == DISPLAY_MODE_SPECTRAL_RGB) {
-    vec3 spectralRgb = texelFetch(uSourceTextures[0], pixel, 0).rgb;
+    vec3 spectralRgb = readRgbSource0(source);
     return DisplaySample(
       sanitizeDisplayColor(spectralRgb),
       1.0,
@@ -648,7 +710,7 @@ DisplaySample readDisplaySample(ivec2 pixel) {
   }
 
   if (uDisplayMode == DISPLAY_MODE_MUELLER_MATRIX) {
-    vec4 mueller = texelFetch(uSourceTextures[0], pixel, 0);
+    vec4 mueller = readRgbaSource0(source);
     return DisplaySample(
       sanitizeDisplayColor(mueller.rgb),
       sanitizeAlphaValue(mueller.a),
@@ -658,29 +720,29 @@ DisplaySample readDisplaySample(ivec2 pixel) {
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_DIRECT) {
-    vec4 stokes = readDirectStokesSample(pixel);
+    vec4 stokes = readDirectStokesSample(source);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
     return DisplaySample(vec3(value), 1.0, stokes, isInvalidStokesDisplayValue(stokes, value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_RGB) {
-    StokesRgbDisplaySample stokesRgb = readRgbStokesDisplaySample(pixel);
+    StokesRgbDisplaySample stokesRgb = readRgbStokesDisplaySample(source);
     return DisplaySample(stokesRgb.value, 1.0, vec4(0.0), stokesRgb.invalidValue);
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_RGB_LUMINANCE) {
-    vec4 stokes = readRgbLuminanceStokesSample(pixel);
+    vec4 stokes = readRgbLuminanceStokesSample(source);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
     return DisplaySample(vec3(value), 1.0, stokes, isInvalidStokesDisplayValue(stokes, value));
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_SPECTRAL_RGB) {
-    StokesRgbDisplaySample stokesRgb = readSpectralStokesRgbDisplaySample(pixel);
+    StokesRgbDisplaySample stokesRgb = readSpectralStokesRgbDisplaySample(source);
     return DisplaySample(stokesRgb.value, 1.0, vec4(0.0), stokesRgb.invalidValue);
   }
 
   if (uDisplayMode == DISPLAY_MODE_STOKES_SPECTRAL_RGB_LUMINANCE) {
-    vec4 stokes = readSpectralStokesRgbLuminanceSample(pixel);
+    vec4 stokes = readSpectralStokesRgbLuminanceSample(source);
     float value = computeStokesDisplayValue(uStokesParameter, stokes.x, stokes.y, stokes.z, stokes.w);
     return DisplaySample(vec3(value), 1.0, stokes, isInvalidStokesDisplayValue(stokes, value));
   }
@@ -689,16 +751,32 @@ DisplaySample readDisplaySample(ivec2 pixel) {
 }
 
 void main() {
-  vec2 screen = uScreenOrigin + vec2(gl_FragCoord.x - 0.5, uOutputSize.y - gl_FragCoord.y - 0.5);
-  vec2 imagePos = uPan + (screen - uViewport * 0.5) / uZoom;
-
-  if (imagePos.x < 0.0 || imagePos.y < 0.0 || imagePos.x >= uImageSize.x || imagePos.y >= uImageSize.y) {
+  vec2 pixelScale = max(uOutputPixelScale, vec2(1.0e-6));
+  vec2 screen = uScreenOrigin + vec2(
+    (gl_FragCoord.x - 0.5) / pixelScale.x,
+    uOutputSize.y - (gl_FragCoord.y + 0.5) / pixelScale.y
+  );
+  if (uImageSize.x <= 0.0 || uImageSize.y <= 0.0) {
     outColor = backgroundColor(screen);
     return;
   }
 
-  ivec2 pixel = ivec2(floor(imagePos));
-  DisplaySample displaySample = readDisplaySample(pixel);
+  vec2 imagePos = uPan + (screen - uViewport * 0.5) / uZoom;
+  vec2 samplePos = imagePos + vec2(0.5) / (uZoom * pixelScale);
+  bool outsideImage = samplePos.x < 0.0 || samplePos.y < 0.0 ||
+    samplePos.x >= uImageSize.x || samplePos.y >= uImageSize.y;
+  ivec2 maxPixel = max(ivec2(uImageSize) - ivec2(1), ivec2(0));
+  ivec2 pixel = clamp(ivec2(floor(samplePos)), ivec2(0), maxPixel);
+  float effectiveZoom = uZoom * min(pixelScale.x, pixelScale.y);
+  bool minifying = effectiveZoom < 1.0;
+  vec2 sourceUv = samplePos / uImageSize;
+  SourceCoordinate source = SourceCoordinate(pixel, sourceUv, minifying);
+  DisplaySample displaySample = readDisplaySample(source);
+  if (outsideImage) {
+    outColor = backgroundColor(screen);
+    return;
+  }
+
   vec3 linear = displaySample.linear;
   float imageAlpha = displaySample.alpha;
 

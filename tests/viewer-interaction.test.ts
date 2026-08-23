@@ -81,6 +81,47 @@ describe('viewer interaction roi gestures', () => {
     expect(harness.onToggleLockPixel).toHaveBeenCalledWith({ ix: 5, iy: 5 });
   });
 
+  it('maps the first content point past a transformed client border to pane origin', () => {
+    const resolveDepthProbePixel = vi.fn(() => ({ ix: 0, iy: 0 }));
+    const harness = createHarness({
+      viewerMode: '3d'
+    }, {
+      resolveDepthProbePixel
+    });
+    Object.defineProperties(harness.element, {
+      getBoundingClientRect: {
+        configurable: true,
+        value: () => ({
+          left: 0,
+          top: 0,
+          width: 204,
+          height: 204,
+          right: 204,
+          bottom: 204,
+          x: 0,
+          y: 0,
+          toJSON: () => ({})
+        })
+      },
+      offsetWidth: { configurable: true, value: 102 },
+      offsetHeight: { configurable: true, value: 102 },
+      clientLeft: { configurable: true, value: 1 },
+      clientTop: { configurable: true, value: 1 }
+    });
+
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      clientX: 2,
+      clientY: 2
+    });
+
+    expect(resolveDepthProbePixel).toHaveBeenCalledWith(
+      { x: 0, y: 0 },
+      expect.objectContaining({ viewerMode: '3d' }),
+      { width: 100, height: 100 }
+    );
+  });
+
   it('keeps active pane selection on hover and wheel until a pane is clicked', () => {
     const harness = createHarness({}, {
       viewport: { width: 50, height: 100 },

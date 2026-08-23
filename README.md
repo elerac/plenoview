@@ -336,7 +336,7 @@ Controller methods:
     ]
   }
   ```
-- Texture sampling uses `NEAREST` for both `MIN_FILTER` and `MAG_FILTER`.
+- The 2D image view renders at the display's native pixel density and uses derivative-selected trilinear mipmapped minification with exact nearest-neighbor magnification, matching tev's sharp pixel-inspection behavior. Browsers without `OES_texture_float_linear` fall back to nearest sampling for 32-bit float textures.
 - EXR WASM is initialized through a local adapter backed by the pinned TinyEXR v3.2.0 source snapshot. `npm run build:tinyexr-wasm` reproduces the committed module with Emscripten 6.0.7, and CI rejects stale generated artifacts.
 - EXR metadata is parsed directly from header bytes before pixel decode because the current WASM decoder only exposes dimensions, layers, channels, and pixel data. Metadata parse failures do not block image loading.
 - Performance path for large images/channel sets:

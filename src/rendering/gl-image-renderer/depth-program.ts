@@ -47,9 +47,18 @@ void main() {
     discard;
   }
 
-  vec2 screen = uScreenOrigin + vec2(gl_FragCoord.x - 0.5, uOutputSize.y - gl_FragCoord.y - 0.5);
+  vec2 pixelScale = max(uOutputPixelScale, vec2(1.0e-6));
+  vec2 screen = uScreenOrigin + vec2(
+    (gl_FragCoord.x - 0.5) / pixelScale.x,
+    uOutputSize.y - (gl_FragCoord.y + 0.5) / pixelScale.y
+  );
   ivec2 pixel = ivec2(vDepthPixel);
-  DisplaySample displaySample = readDisplaySample(pixel);
+  SourceCoordinate source = SourceCoordinate(
+    pixel,
+    (vec2(pixel) + vec2(0.5)) / uImageSize,
+    false
+  );
+  DisplaySample displaySample = readDisplaySample(source);
   vec3 linear = displaySample.linear;
   float imageAlpha = displaySample.alpha;
 

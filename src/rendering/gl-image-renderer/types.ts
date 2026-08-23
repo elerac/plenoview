@@ -8,6 +8,7 @@ export interface CommonUniforms {
   viewport: WebGLUniformLocation;
   viewportOrigin: WebGLUniformLocation;
   outputSize: WebGLUniformLocation;
+  outputPixelScale: WebGLUniformLocation;
   screenOrigin: WebGLUniformLocation;
   imageSize: WebGLUniformLocation;
   exposure: WebGLUniformLocation;
@@ -99,6 +100,8 @@ export interface RenderPassOptions {
   viewportTop?: number;
   outputWidth?: number;
   outputHeight?: number;
+  outputPixelScaleX?: number;
+  outputPixelScaleY?: number;
   screenOriginX?: number;
   screenOriginY?: number;
   depthOutputOriginX?: number;
@@ -126,6 +129,7 @@ export interface ReadExportPixelsArgs {
 export interface GlImageRendererState {
   glCanvas: HTMLCanvasElement;
   gl: WebGL2RenderingContext;
+  smoothFloatMinification: boolean;
   vao: WebGLVertexArrayObject;
   zeroTexture: WebGLTexture;
   colormapTexture: WebGLTexture;
@@ -135,6 +139,7 @@ export interface GlImageRendererState {
   layerTexturesBySession: Map<string, Map<number, LayerSourceTextures>>;
   exportSourceSurface: ExportSurface | null;
   viewport: ViewportInfo;
+  outputPixelScale: { x: number; y: number };
   viewportOrigin: { left: number; top: number };
   imageSize: { width: number; height: number } | null;
   depthSourceSize: { width: number; height: number } | null;

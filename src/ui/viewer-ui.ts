@@ -109,7 +109,7 @@ import { ViewerBackgroundController } from './viewer-background-controller';
 import { ViewerStatePanel } from './viewer-state-panel';
 import { WindowPreviewController } from './window-preview-controller';
 import { syncSelectOptions } from './render-helpers';
-import type { ViewportClientRect } from '../interaction/image-geometry';
+import { readElementClientRect, type ViewportClientRect } from '../interaction/image-geometry';
 import type { ThemeId } from '../theme';
 import {
   DEFAULT_VIEWER_BACKGROUND_ID,
@@ -1113,7 +1113,7 @@ export class ViewerUi implements Disposable {
   }
 
   private resolveViewerPaneAtClientPoint(clientX: number, clientY: number): ViewerPaneRenderInfo {
-    const rect = this.elements.viewerContainer.getBoundingClientRect();
+    const rect = readElementClientRect(this.elements.viewerContainer);
     return this.resolveViewerPaneAtPoint({
       x: clientX - rect.left,
       y: clientY - rect.top
@@ -2683,7 +2683,7 @@ export class ViewerUi implements Disposable {
   }
 
   private readViewerViewport(): ViewportInfo {
-    const rect = this.elements.viewerContainer.getBoundingClientRect();
+    const rect = readElementClientRect(this.elements.viewerContainer);
     return {
       width: Math.max(1, Math.floor(Number.isFinite(rect.width) ? rect.width : 1)),
       height: Math.max(1, Math.floor(Number.isFinite(rect.height) ? rect.height : 1))
@@ -3218,7 +3218,7 @@ export class ViewerUi implements Disposable {
     this.clearViewerKeyboardNavigationInput();
     this.topMenuController.closeAll(false);
 
-    const viewerRect = this.elements.viewerContainer.getBoundingClientRect();
+    const viewerRect = readElementClientRect(this.elements.viewerContainer);
     const menu = this.elements.viewerContextMenu;
     menu.classList.remove('hidden');
 

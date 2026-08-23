@@ -32,6 +32,8 @@ import {
   type MuellerMatrixElement
 } from '../../mueller';
 import type { ResidentChannelUpload } from '../../display-cache';
+import { buildNextFloatMipLevel } from '../float-mipmap';
+import { predictTextureStorageBytes } from '../texture-memory';
 import type { DepthSource, DepthSourceGeometry } from '../../depth';
 import type { ChannelRecognitionNameRules } from '../../channel-recognition-name-rules';
 import type { DecodedLayer } from '../../types';
@@ -42,7 +44,10 @@ import {
 } from './constants';
 import type { GlImageRendererState, LayerSourceTextures } from './types';
 
-export function createZeroTexture(gl: WebGL2RenderingContext): WebGLTexture {
+export function createZeroTexture(
+  gl: WebGL2RenderingContext,
+  smoothFloatMinification: boolean
+): WebGLTexture {
   const zeroTexture = gl.createTexture();
   if (!zeroTexture) {
     throw new Error('Failed to create zero texture.');
@@ -50,18 +55,16 @@ export function createZeroTexture(gl: WebGL2RenderingContext): WebGLTexture {
 
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, zeroTexture);
-  configureSourceTexture(gl);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.R32F,
-    1,
-    1,
-    0,
-    gl.RED,
-    gl.FLOAT,
-    new Float32Array([0])
-  );
+  configureSourceTexture(gl, smoothFloatMinification);
+  uploadFloatTextureLevels(gl, {
+    internalFormat: gl.R32F,
+    format: gl.RED,
+    width: 1,
+    height: 1,
+    components: 1,
+    pixels: new Float32Array([0]),
+    includeMipmaps: smoothFloatMinification
+  });
 
   return zeroTexture;
 }
@@ -79,102 +82,108 @@ export function ensureLayerChannelsResident(
   const layerTextures = getOrCreateLayerSourceTextures(state, sessionId, layerIndex, width, height, layer);
   const uploads: ResidentChannelUpload[] = [];
 
-  for (const channelName of channelNames) {
-    if (!channelName || layerTextures.textureByChannel.has(channelName)) {
-      continue;
-    }
-
-    const spectralSeriesKey = parseSpectralRgbSourceName(channelName);
-    if (spectralSeriesKey !== null) {
-      uploads.push(uploadSpectralRgbSourceTexture(
-        state,
-        layerTextures,
-        width,
-        height,
-        layer,
-        channelName,
-        spectralSeriesKey,
-        channelRecognitionNameRules
-      ));
-      continue;
-    }
-
-    const spectralStokesComponent = parseSpectralStokesRgbSourceName(channelName);
-    if (spectralStokesComponent !== null) {
-      uploads.push(uploadSpectralStokesRgbSourceTexture(
-        state,
-        layerTextures,
-        width,
-        height,
-        layer,
-        channelName,
-        spectralStokesComponent,
-        channelRecognitionNameRules
-      ));
-      continue;
-    }
-
-    const muellerMatrixSource = parseMuellerMatrixSourceName(channelName);
-    if (muellerMatrixSource !== null) {
-      uploads.push(uploadMuellerMatrixSourceTexture(
-        state,
-        layerTextures,
-        width,
-        height,
-        layer,
-        channelName,
-        muellerMatrixSource,
-        channelRecognitionNameRules
-      ));
-      continue;
-    }
-
-    if (layer.channelStorage.channelIndexByName[channelName] === undefined) {
-      continue;
-    }
-
-    const denseChannel = getChannelDenseArray(layer, channelName);
-    if (!denseChannel) {
-      continue;
-    }
-
-    const materializedBytes = layer.channelStorage.kind === 'interleaved-f32' ? denseChannel.byteLength : 0;
-    let texture: WebGLTexture | null = null;
-    try {
-      texture = state.gl.createTexture();
-      if (!texture) {
-        throw new Error('Failed to create source texture.');
+  try {
+    for (const channelName of channelNames) {
+      if (!channelName || layerTextures.textureByChannel.has(channelName)) {
+        continue;
       }
 
-      state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
-      configureSourceTexture(state.gl);
-      state.gl.texImage2D(
-        state.gl.TEXTURE_2D,
-        0,
-        state.gl.R32F,
-        width,
-        height,
-        0,
-        state.gl.RED,
-        state.gl.FLOAT,
-        denseChannel
-      );
-      layerTextures.textureByChannel.set(channelName, texture);
-      uploads.push({
-        channelName,
-        textureBytes: predictR32fTextureBytes(width, height),
-        materializedBytes,
-        resourceKind: 'source-texture'
-      });
-    } catch (error) {
-      if (texture) {
-        state.gl.deleteTexture(texture);
+      const spectralSeriesKey = parseSpectralRgbSourceName(channelName);
+      if (spectralSeriesKey !== null) {
+        uploads.push(uploadSpectralRgbSourceTexture(
+          state,
+          layerTextures,
+          width,
+          height,
+          layer,
+          channelName,
+          spectralSeriesKey,
+          channelRecognitionNameRules
+        ));
+        continue;
       }
-      if (layer.channelStorage.kind === 'interleaved-f32') {
-        discardMaterializedChannel(layer, channelName);
+
+      const spectralStokesComponent = parseSpectralStokesRgbSourceName(channelName);
+      if (spectralStokesComponent !== null) {
+        uploads.push(uploadSpectralStokesRgbSourceTexture(
+          state,
+          layerTextures,
+          width,
+          height,
+          layer,
+          channelName,
+          spectralStokesComponent,
+          channelRecognitionNameRules
+        ));
+        continue;
       }
-      throw error;
+
+      const muellerMatrixSource = parseMuellerMatrixSourceName(channelName);
+      if (muellerMatrixSource !== null) {
+        uploads.push(uploadMuellerMatrixSourceTexture(
+          state,
+          layerTextures,
+          width,
+          height,
+          layer,
+          channelName,
+          muellerMatrixSource,
+          channelRecognitionNameRules
+        ));
+        continue;
+      }
+
+      if (layer.channelStorage.channelIndexByName[channelName] === undefined) {
+        continue;
+      }
+
+      const denseChannel = getChannelDenseArray(layer, channelName);
+      if (!denseChannel) {
+        continue;
+      }
+
+      const materializedBytes = layer.channelStorage.kind === 'interleaved-f32' ? denseChannel.byteLength : 0;
+      let texture: WebGLTexture | null = null;
+      try {
+        texture = state.gl.createTexture();
+        if (!texture) {
+          throw new Error('Failed to create source texture.');
+        }
+
+        state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
+        configureSourceTexture(state.gl, state.smoothFloatMinification);
+        uploadFloatTextureLevels(state.gl, {
+          internalFormat: state.gl.R32F,
+          format: state.gl.RED,
+          width,
+          height,
+          components: 1,
+          pixels: denseChannel,
+          includeMipmaps: state.smoothFloatMinification
+        });
+        layerTextures.textureByChannel.set(channelName, texture);
+        uploads.push({
+          channelName,
+          textureBytes: predictR32fTextureBytes(width, height, state.smoothFloatMinification),
+          materializedBytes,
+          resourceKind: 'source-texture'
+        });
+      } catch (error) {
+        if (texture) {
+          state.gl.deleteTexture(texture);
+        }
+        if (layer.channelStorage.kind === 'interleaved-f32') {
+          discardMaterializedChannel(layer, channelName);
+        }
+        throw error;
+      }
     }
+  } catch (error) {
+    for (const upload of uploads) {
+      discardChannelSourceTexture(state, sessionId, layerIndex, upload.channelName);
+    }
+    pruneEmptyLayerSourceTextures(state, sessionId, layerIndex, layerTextures);
+    throw error;
   }
 
   return uploads;
@@ -200,22 +209,24 @@ function uploadMuellerMatrixSourceTexture(
     }
 
     state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
-    configureSourceTexture(state.gl);
-    state.gl.texImage2D(
-      state.gl.TEXTURE_2D,
-      0,
-      state.gl.RGBA32F,
-      displaySize.width,
-      displaySize.height,
-      0,
-      state.gl.RGBA,
-      state.gl.FLOAT,
-      pixels
-    );
+    configureSourceTexture(state.gl, state.smoothFloatMinification);
+    uploadFloatTextureLevels(state.gl, {
+      internalFormat: state.gl.RGBA32F,
+      format: state.gl.RGBA,
+      width: displaySize.width,
+      height: displaySize.height,
+      components: 4,
+      pixels,
+      includeMipmaps: state.smoothFloatMinification
+    });
     layerTextures.textureByChannel.set(sourceName, texture);
     return {
       channelName: sourceName,
-      textureBytes: predictRgba32fTextureBytes(displaySize.width, displaySize.height),
+      textureBytes: predictRgba32fTextureBytes(
+        displaySize.width,
+        displaySize.height,
+        state.smoothFloatMinification
+      ),
       materializedBytes: 0,
       resourceKind: 'derived-texture'
     };
@@ -310,22 +321,20 @@ function uploadSpectralStokesRgbSourceTexture(
     }
 
     state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
-    configureSourceTexture(state.gl);
-    state.gl.texImage2D(
-      state.gl.TEXTURE_2D,
-      0,
-      state.gl.RGBA32F,
+    configureSourceTexture(state.gl, state.smoothFloatMinification);
+    uploadFloatTextureLevels(state.gl, {
+      internalFormat: state.gl.RGBA32F,
+      format: state.gl.RGBA,
       width,
       height,
-      0,
-      state.gl.RGBA,
-      state.gl.FLOAT,
-      pixels
-    );
+      components: 4,
+      pixels,
+      includeMipmaps: state.smoothFloatMinification
+    });
     layerTextures.textureByChannel.set(sourceName, texture);
     return {
       channelName: sourceName,
-      textureBytes: predictRgba32fTextureBytes(width, height),
+      textureBytes: predictRgba32fTextureBytes(width, height, state.smoothFloatMinification),
       materializedBytes: 0,
       resourceKind: 'derived-texture'
     };
@@ -388,22 +397,20 @@ function uploadSpectralRgbSourceTexture(
     }
 
     state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
-    configureSourceTexture(state.gl);
-    state.gl.texImage2D(
-      state.gl.TEXTURE_2D,
-      0,
-      state.gl.RGBA32F,
+    configureSourceTexture(state.gl, state.smoothFloatMinification);
+    uploadFloatTextureLevels(state.gl, {
+      internalFormat: state.gl.RGBA32F,
+      format: state.gl.RGBA,
       width,
       height,
-      0,
-      state.gl.RGBA,
-      state.gl.FLOAT,
-      pixels
-    );
+      components: 4,
+      pixels,
+      includeMipmaps: state.smoothFloatMinification
+    });
     layerTextures.textureByChannel.set(sourceName, texture);
     return {
       channelName: sourceName,
-      textureBytes: predictRgba32fTextureBytes(width, height),
+      textureBytes: predictRgba32fTextureBytes(width, height, state.smoothFloatMinification),
       materializedBytes: 0,
       resourceKind: 'derived-texture'
     };
@@ -571,19 +578,136 @@ export function discardChannelSourceTexture(
   }
 }
 
-function configureSourceTexture(gl: WebGL2RenderingContext): void {
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+function configureSourceTexture(
+  gl: WebGL2RenderingContext,
+  smoothFloatMinification: boolean
+): void {
+  gl.texParameteri(
+    gl.TEXTURE_2D,
+    gl.TEXTURE_MIN_FILTER,
+    smoothFloatMinification ? gl.LINEAR_MIPMAP_LINEAR : gl.NEAREST
+  );
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
 
-function predictR32fTextureBytes(width: number, height: number): number {
-  return Math.max(0, width * height * Float32Array.BYTES_PER_ELEMENT);
+interface FloatTextureUpload {
+  internalFormat: number;
+  format: number;
+  width: number;
+  height: number;
+  components: number;
+  pixels: Float32Array;
+  includeMipmaps: boolean;
 }
 
-function predictRgba32fTextureBytes(width: number, height: number): number {
-  return Math.max(0, width * height * 4 * Float32Array.BYTES_PER_ELEMENT);
+function uploadFloatTextureLevels(
+  gl: WebGL2RenderingContext,
+  upload: FloatTextureUpload
+): void {
+  validateFloatTextureUpload(gl, upload);
+  let level = 0;
+  let levelWidth = upload.width;
+  let levelHeight = upload.height;
+  let levelPixels = upload.pixels;
+
+  while (true) {
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      level,
+      upload.internalFormat,
+      levelWidth,
+      levelHeight,
+      0,
+      upload.format,
+      gl.FLOAT,
+      levelPixels
+    );
+    const uploadError = gl.getError();
+    if (uploadError !== gl.NO_ERROR) {
+      throw new Error(
+        `Failed to upload float source texture mip level ${level} ` +
+        `(WebGL error 0x${uploadError.toString(16)}).`
+      );
+    }
+
+    if (!upload.includeMipmaps) {
+      return;
+    }
+    const nextLevel = buildNextFloatMipLevel(
+      levelPixels,
+      levelWidth,
+      levelHeight,
+      upload.components
+    );
+    if (!nextLevel) {
+      return;
+    }
+    level += 1;
+    levelWidth = nextLevel.width;
+    levelHeight = nextLevel.height;
+    levelPixels = nextLevel.pixels;
+  }
+}
+
+function validateFloatTextureUpload(
+  gl: WebGL2RenderingContext,
+  upload: FloatTextureUpload
+): void {
+  if (
+    !Number.isInteger(upload.width) ||
+    !Number.isInteger(upload.height) ||
+    !Number.isInteger(upload.components) ||
+    upload.width <= 0 ||
+    upload.height <= 0 ||
+    upload.components <= 0 ||
+    upload.pixels.length !== upload.width * upload.height * upload.components
+  ) {
+    throw new RangeError('Float texture dimensions do not match the source data.');
+  }
+
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+  if (
+    Number.isFinite(maxTextureSize) &&
+    maxTextureSize > 0 &&
+    (upload.width > maxTextureSize || upload.height > maxTextureSize)
+  ) {
+    throw new RangeError(`Float texture dimensions must be ${maxTextureSize} px or smaller.`);
+  }
+}
+
+function predictR32fTextureBytes(
+  width: number,
+  height: number,
+  includeMipmaps: boolean
+): number {
+  return predictTextureStorageBytes(width, height, Float32Array.BYTES_PER_ELEMENT, includeMipmaps);
+}
+
+function predictRgba32fTextureBytes(
+  width: number,
+  height: number,
+  includeMipmaps: boolean
+): number {
+  return predictTextureStorageBytes(width, height, 4 * Float32Array.BYTES_PER_ELEMENT, includeMipmaps);
+}
+
+function pruneEmptyLayerSourceTextures(
+  state: GlImageRendererState,
+  sessionId: string,
+  layerIndex: number,
+  layerTextures: LayerSourceTextures
+): void {
+  const sessionLayers = state.layerTexturesBySession.get(sessionId);
+  if (sessionLayers?.get(layerIndex) !== layerTextures || layerTextures.textureByChannel.size > 0) {
+    return;
+  }
+
+  sessionLayers.delete(layerIndex);
+  if (sessionLayers.size === 0) {
+    state.layerTexturesBySession.delete(sessionId);
+  }
 }
 
 function getOrCreateLayerSourceTextures(

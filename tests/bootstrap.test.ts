@@ -103,6 +103,8 @@ const mocks = vi.hoisted(() => {
   const coreDispatch = vi.fn();
   const uiDispose = vi.fn();
   const rendererDispose = vi.fn();
+  const rendererResize = vi.fn();
+  const uiSetViewerViewportRect = vi.fn();
   const interactionDestroy = vi.fn();
   const interactionSetViewerKeyboardNavigationInput = vi.fn();
   const interactionSetViewerKeyboardZoomInput = vi.fn();
@@ -171,6 +173,14 @@ const mocks = vi.hoisted(() => {
     width: 320,
     height: 180
   };
+  const viewerLayoutBox = {
+    offsetWidth: 0,
+    offsetHeight: 0,
+    clientLeft: 0,
+    clientTop: 0,
+    clientWidth: 0,
+    clientHeight: 0
+  };
   const coreState = createCoreState();
   let uiCallbacks: Record<string, unknown> | null = null;
   let resizeObserverCallback: ResizeObserverCallback | null = null;
@@ -190,6 +200,8 @@ const mocks = vi.hoisted(() => {
     coreDispatch,
     uiDispose,
     rendererDispose,
+    rendererResize,
+    uiSetViewerViewportRect,
     interactionDestroy,
     interactionSetViewerKeyboardNavigationInput,
     interactionSetViewerKeyboardZoomInput,
@@ -223,6 +235,7 @@ const mocks = vi.hoisted(() => {
     interactionCoordinatorGetState,
     interactionCoordinatorEnqueueViewPatch,
     viewerRect,
+    viewerLayoutBox,
     sessionResetActiveSessionViewState,
     getUiCallbacks: () => uiCallbacks,
     setUiCallbacks: (callbacks: Record<string, unknown> | null) => {
@@ -278,6 +291,14 @@ vi.mock('../src/ui/viewer-ui', () => ({
       this.viewerContainer = Object.assign(document.createElement('div'), {
         getBoundingClientRect: () => ({ ...mocks.viewerRect })
       });
+      Object.defineProperties(this.viewerContainer, {
+        offsetWidth: { configurable: true, get: () => mocks.viewerLayoutBox.offsetWidth },
+        offsetHeight: { configurable: true, get: () => mocks.viewerLayoutBox.offsetHeight },
+        clientLeft: { configurable: true, get: () => mocks.viewerLayoutBox.clientLeft },
+        clientTop: { configurable: true, get: () => mocks.viewerLayoutBox.clientTop },
+        clientWidth: { configurable: true, get: () => mocks.viewerLayoutBox.clientWidth },
+        clientHeight: { configurable: true, get: () => mocks.viewerLayoutBox.clientHeight }
+      });
       mocks.setViewerContainer(this.viewerContainer);
       mocks.setUiCallbacks(callbacks);
     }
@@ -306,6 +327,7 @@ vi.mock('../src/ui/viewer-ui', () => ({
     readonly getViewerPaneRenderInfos = vi.fn(() => [this.getActiveViewerPane()]);
     readonly resolveViewerPaneAtPoint = vi.fn(() => this.getActiveViewerPane());
     readonly setViewerViewportRect = vi.fn((rect: { left: number; top: number }) => {
+      mocks.uiSetViewerViewportRect(rect);
       this.viewerContainer.style.setProperty('--viewer-checker-offset-x', `${-rect.left}px`);
       this.viewerContainer.style.setProperty('--viewer-checker-offset-y', `${-rect.top}px`);
     });
@@ -343,7 +365,7 @@ vi.mock('../src/ui/viewer-ui', () => ({
 vi.mock('../src/renderer', () => ({
   WebGlExrRenderer: class {
     readonly dispose = mocks.rendererDispose;
-    readonly resize = vi.fn();
+    readonly resize = mocks.rendererResize;
     readonly render = vi.fn();
     readonly renderImage = vi.fn();
     readonly renderValueOverlay = vi.fn();
@@ -387,7 +409,25 @@ vi.mock('../src/interaction/image-geometry', () => {
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
   }
 
+  function readElementClientRect(element: HTMLElement) {
+    const rect = element.getBoundingClientRect();
+    const hasLayoutBox = element.offsetWidth > 0 && element.offsetHeight > 0;
+    const scaleX = hasLayoutBox ? rect.width / element.offsetWidth : 1;
+    const scaleY = hasLayoutBox ? rect.height / element.offsetHeight : 1;
+    const left = hasLayoutBox ? rect.left + element.clientLeft * scaleX : rect.left;
+    const top = hasLayoutBox ? rect.top + element.clientTop * scaleY : rect.top;
+    const width = hasLayoutBox ? element.clientWidth * scaleX : rect.width;
+    const height = hasLayoutBox ? element.clientHeight * scaleY : rect.height;
+    return {
+      left: Number.isFinite(left) ? left : 0,
+      top: Number.isFinite(top) ? top : 0,
+      width: Number.isFinite(width) ? width : 0,
+      height: Number.isFinite(height) ? height : 0
+    };
+  }
+
   return {
+    readElementClientRect: vi.fn(readElementClientRect),
     computeFitView: vi.fn(computeMockFitView),
     isFitViewForViewport: vi.fn((view, viewport, width, height, fitInsets) => {
       const fitView = computeMockFitView(viewport, width, height, fitInsets);
@@ -544,6 +584,12 @@ afterEach(() => {
   mocks.viewerRect.top = 0;
   mocks.viewerRect.width = 320;
   mocks.viewerRect.height = 180;
+  mocks.viewerLayoutBox.offsetWidth = 0;
+  mocks.viewerLayoutBox.offsetHeight = 0;
+  mocks.viewerLayoutBox.clientLeft = 0;
+  mocks.viewerLayoutBox.clientTop = 0;
+  mocks.viewerLayoutBox.clientWidth = 0;
+  mocks.viewerLayoutBox.clientHeight = 0;
   mocks.setResizeObserverCallback(null);
   mocks.setViewerContainer(null);
   mocks.rendererReadExportPixels.mockImplementation(() => ({
@@ -882,6 +928,85 @@ describe('bootstrap app lifecycle', () => {
 
     app.dispose();
     expect(mocks.uiDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('resizes for output-scale changes even when the viewer CSS bounds are unchanged', async () => {
+    class ResizeObserverMock {
+      constructor(callback: ResizeObserverCallback) {
+        mocks.setResizeObserverCallback(callback);
+      }
+
+      observe(): void {}
+      disconnect(): void {}
+    }
+
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    vi.stubGlobal('devicePixelRatio', 1);
+    const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp();
+    const resizeListener = addEventListenerSpy.mock.calls
+      .filter(([type]) => type === 'resize')
+      .at(-1)?.[1];
+
+    expect(resizeListener).toBeTypeOf('function');
+    expect(mocks.rendererResize).toHaveBeenCalledTimes(1);
+    expect(mocks.rendererResize).toHaveBeenLastCalledWith(320, 180, 0, 0);
+
+    vi.stubGlobal('devicePixelRatio', 2);
+    window.dispatchEvent(new Event('resize'));
+
+    expect(mocks.rendererResize).toHaveBeenCalledTimes(2);
+    expect(mocks.rendererResize).toHaveBeenLastCalledWith(320, 180, 0, 0);
+
+    app.dispose();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', resizeListener);
+    mocks.rendererResize.mockClear();
+    window.dispatchEvent(new Event('resize'));
+    expect(mocks.rendererResize).not.toHaveBeenCalled();
+  });
+
+  it('uses the transformed inner client box for bordered viewer viewport geometry', async () => {
+    class ResizeObserverMock {
+      constructor(callback: ResizeObserverCallback) {
+        mocks.setResizeObserverCallback(callback);
+      }
+
+      observe(): void {}
+      disconnect(): void {}
+    }
+
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    Object.assign(mocks.viewerRect, {
+      left: 10,
+      top: 20,
+      width: 204,
+      height: 104
+    });
+    Object.assign(mocks.viewerLayoutBox, {
+      offsetWidth: 102,
+      offsetHeight: 52,
+      clientLeft: 1,
+      clientTop: 1,
+      clientWidth: 100,
+      clientHeight: 50
+    });
+
+    const { bootstrapApp } = await import('../src/app/bootstrap');
+    const app = await bootstrapApp();
+
+    expect(mocks.uiSetViewerViewportRect).toHaveBeenLastCalledWith({
+      left: 12,
+      top: 22,
+      width: 200,
+      height: 100
+    });
+    expect(mocks.rendererResize).toHaveBeenLastCalledWith(200, 100, 12, 22);
+
+    app.dispose();
   });
 
   it('preserves image alignment when the viewer container shifts during resize', async () => {

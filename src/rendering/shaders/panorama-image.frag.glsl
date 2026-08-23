@@ -6,6 +6,7 @@ uniform sampler2D uColormapTexture;
 uniform vec2 uViewport;
 uniform vec2 uViewportOrigin;
 uniform vec2 uOutputSize;
+uniform vec2 uOutputPixelScale;
 uniform vec2 uScreenOrigin;
 uniform vec2 uImageSize;
 uniform float uExposure;
@@ -738,14 +739,18 @@ float panoramaScreenRadiusToTheta(float radius, float hfovDeg) {
 }
 
 void main() {
-  vec2 screen = uScreenOrigin + vec2(gl_FragCoord.x - 0.5, uOutputSize.y - gl_FragCoord.y - 0.5);
+  vec2 pixelScale = max(uOutputPixelScale, vec2(1.0e-6));
+  vec2 screen = uScreenOrigin + vec2(
+    (gl_FragCoord.x - 0.5) / pixelScale.x,
+    uOutputSize.y - (gl_FragCoord.y + 0.5) / pixelScale.y
+  );
 
   if (uImageSize.x <= 0.0 || uImageSize.y <= 0.0) {
     outColor = backgroundColor(screen);
     return;
   }
 
-  vec2 samplePosition = screen + vec2(0.5);
+  vec2 samplePosition = screen + vec2(0.5) / pixelScale;
   float projectionDiameter = max(panoramaProjectionDiameter(uViewport, uPanoramaHfovDeg), 1e-6);
   vec2 radial = (samplePosition - uViewport * 0.5) / (projectionDiameter * 0.5);
   float radius = length(radial);

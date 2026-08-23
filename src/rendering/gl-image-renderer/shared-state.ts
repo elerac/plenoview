@@ -21,6 +21,8 @@ export function createGlImageRendererState(
     throw new Error('WebGL2 is required for this viewer.');
   }
 
+  const smoothFloatMinification = gl.getExtension('OES_texture_float_linear') !== null;
+
   const maxTextureUnits = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) as number;
   if (maxTextureUnits < REQUIRED_TEXTURE_UNITS) {
     throw new Error(`WebGL2 must expose at least ${REQUIRED_TEXTURE_UNITS} texture units.`);
@@ -38,7 +40,7 @@ export function createGlImageRendererState(
   gl.bindVertexArray(vao);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
-  const zeroTexture = createZeroTexture(gl);
+  const zeroTexture = createZeroTexture(gl, smoothFloatMinification);
   const colormapTexture = createColormapTexture(gl);
 
   configureProgramSamplers(gl, imageProgram.program);
@@ -48,6 +50,7 @@ export function createGlImageRendererState(
   return {
     glCanvas,
     gl,
+    smoothFloatMinification,
     vao,
     zeroTexture,
     colormapTexture,
@@ -57,6 +60,7 @@ export function createGlImageRendererState(
     layerTexturesBySession: new Map<string, Map<number, LayerSourceTextures>>(),
     exportSourceSurface: null,
     viewport: { width: 1, height: 1 },
+    outputPixelScale: { x: 1, y: 1 },
     viewportOrigin: { left: 0, top: 0 },
     imageSize: null,
     depthSourceSize: null,

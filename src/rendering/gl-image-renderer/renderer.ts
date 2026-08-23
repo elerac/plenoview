@@ -53,7 +53,13 @@ export class GlImageRenderer implements Disposable {
     this.panes = panes.map(clonePaneRenderInfo);
   }
 
-  resize(width: number, height: number, left = 0, top = 0): void {
+  resize(
+    width: number,
+    height: number,
+    left = 0,
+    top = 0,
+    pixelRatio = readOutputPixelRatio()
+  ): void {
     if (this.state.disposed) {
       return;
     }
@@ -67,9 +73,14 @@ export class GlImageRenderer implements Disposable {
       top: Number.isFinite(top) ? top : 0
     };
 
-    this.state.glCanvas.width = this.state.viewport.width;
-    this.state.glCanvas.height = this.state.viewport.height;
-    this.state.gl.viewport(0, 0, this.state.viewport.width, this.state.viewport.height);
+    const normalizedPixelRatio = normalizeOutputPixelRatio(pixelRatio);
+    this.state.glCanvas.width = Math.max(1, Math.round(this.state.viewport.width * normalizedPixelRatio));
+    this.state.glCanvas.height = Math.max(1, Math.round(this.state.viewport.height * normalizedPixelRatio));
+    this.state.outputPixelScale = {
+      x: this.state.glCanvas.width / this.state.viewport.width,
+      y: this.state.glCanvas.height / this.state.viewport.height
+    };
+    this.state.gl.viewport(0, 0, this.state.glCanvas.width, this.state.glCanvas.height);
   }
 
   ensureLayerChannelsResident(
@@ -202,7 +213,7 @@ export class GlImageRenderer implements Disposable {
     }
 
     this.state.gl.bindFramebuffer(this.state.gl.FRAMEBUFFER, null);
-    this.state.gl.viewport(0, 0, this.state.viewport.width, this.state.viewport.height);
+    this.state.gl.viewport(0, 0, this.state.glCanvas.width, this.state.glCanvas.height);
     this.state.gl.clearColor(0, 0, 0, 0);
     this.state.gl.clear(this.state.gl.COLOR_BUFFER_BIT);
   }
@@ -263,6 +274,14 @@ export class GlImageRenderer implements Disposable {
     this.state.gl.deleteProgram(this.state.panoramaProgram.program);
     this.state.gl.deleteProgram(this.state.depthProgram.program);
   }
+}
+
+function readOutputPixelRatio(): number {
+  return typeof window === 'undefined' ? 1 : window.devicePixelRatio;
+}
+
+function normalizeOutputPixelRatio(pixelRatio: number): number {
+  return Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
 }
 
 function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {

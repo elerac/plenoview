@@ -57,7 +57,7 @@ export function render(
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   if (options.clear !== false) {
     gl.disable(gl.SCISSOR_TEST);
-    gl.viewport(0, 0, state.viewport.width, state.viewport.height);
+    gl.viewport(0, 0, state.glCanvas.width, state.glCanvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
@@ -70,9 +70,12 @@ export function render(
         continue;
       }
 
-      const glY = state.viewport.height - rect.y - rect.height;
-      gl.viewport(rect.x, glY, rect.width, rect.height);
-      gl.scissor(rect.x, glY, rect.width, rect.height);
+      const outputRect = scalePaneRect(rect, state);
+      const glY = state.glCanvas.height - outputRect.y - outputRect.height;
+      gl.viewport(outputRect.x, glY, outputRect.width, outputRect.height);
+      gl.scissor(outputRect.x, glY, outputRect.width, outputRect.height);
+      const outputPixelScaleX = outputRect.width / rect.width;
+      const outputPixelScaleY = outputRect.height / rect.height;
       const options = {
         ...DEFAULT_RENDER_PASS_OPTIONS,
         ...resolveViewerBackgroundOptions(viewerState.viewerBackground),
@@ -82,8 +85,10 @@ export function render(
         viewportTop: state.viewportOrigin.top + rect.y,
         outputWidth: rect.width,
         outputHeight: rect.height,
-        screenOriginX: -rect.x,
-        screenOriginY: glY,
+        outputPixelScaleX,
+        outputPixelScaleY,
+        screenOriginX: -outputRect.x / outputPixelScaleX,
+        screenOriginY: glY / outputPixelScaleY,
         depthOutputOriginX: 0,
         depthOutputOriginY: 0
       };
@@ -97,7 +102,7 @@ export function render(
     }
   } finally {
     gl.disable(gl.SCISSOR_TEST);
-    gl.viewport(0, 0, state.viewport.width, state.viewport.height);
+    gl.viewport(0, 0, state.glCanvas.width, state.glCanvas.height);
   }
 }
 
@@ -211,7 +216,11 @@ export function renderDepthPass(
     normalizeDepthTarget(viewerState.depthTargetY),
     normalizeDepthTarget(viewerState.depthTargetZ)
   );
-  gl.uniform1f(program.uniforms.depthPointSizePx, depthPointSizePx);
+  const outputPixelScale = Math.min(
+    options.outputPixelScaleX ?? state.outputPixelScale.x,
+    options.outputPixelScaleY ?? state.outputPixelScale.y
+  );
+  gl.uniform1f(program.uniforms.depthPointSizePx, depthPointSizePx * outputPixelScale);
   gl.uniform2f(
     program.uniforms.depthOutputOrigin,
     options.depthOutputOriginX ?? options.screenOriginX ?? 0,
@@ -269,6 +278,11 @@ function setCommonUniforms(
     uniforms.outputSize,
     options.outputWidth ?? options.viewportWidth ?? state.viewport.width,
     options.outputHeight ?? options.viewportHeight ?? state.viewport.height
+  );
+  gl.uniform2f(
+    uniforms.outputPixelScale,
+    options.outputPixelScaleX ?? state.outputPixelScale.x,
+    options.outputPixelScaleY ?? state.outputPixelScale.y
   );
   gl.uniform2f(
     uniforms.screenOrigin,
@@ -378,6 +392,22 @@ function normalizePaneRect(
   return width > 0 && height > 0
     ? { x: x0, y: y0, width, height }
     : null;
+}
+
+function scalePaneRect(
+  rect: { x: number; y: number; width: number; height: number },
+  state: GlImageRendererState
+): { x: number; y: number; width: number; height: number } {
+  const x0 = Math.round(rect.x * state.outputPixelScale.x);
+  const y0 = Math.round(rect.y * state.outputPixelScale.y);
+  const x1 = Math.round((rect.x + rect.width) * state.outputPixelScale.x);
+  const y1 = Math.round((rect.y + rect.height) * state.outputPixelScale.y);
+  return {
+    x: x0,
+    y: y0,
+    width: Math.max(1, x1 - x0),
+    height: Math.max(1, y1 - y0)
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {

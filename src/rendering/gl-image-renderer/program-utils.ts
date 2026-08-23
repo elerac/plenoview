@@ -24,6 +24,7 @@ export function getCommonUniforms(gl: WebGL2RenderingContext, program: WebGLProg
     viewport: getRequiredUniformLocation(gl, program, 'uViewport'),
     viewportOrigin: getRequiredUniformLocation(gl, program, 'uViewportOrigin'),
     outputSize: getRequiredUniformLocation(gl, program, 'uOutputSize'),
+    outputPixelScale: getRequiredUniformLocation(gl, program, 'uOutputPixelScale'),
     screenOrigin: getRequiredUniformLocation(gl, program, 'uScreenOrigin'),
     imageSize: getRequiredUniformLocation(gl, program, 'uImageSize'),
     exposure: getRequiredUniformLocation(gl, program, 'uExposure'),

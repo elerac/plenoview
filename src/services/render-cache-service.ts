@@ -45,7 +45,8 @@ import {
   isSpectralStokesRgbSourceName,
   pickDefaultSpectralRgbSelection
 } from '../spectral';
-import { isMuellerMatrixSourceName } from '../mueller';
+import { isMuellerMatrixSourceName, resolveMuellerMatrixDisplaySize } from '../mueller';
+import { predictTextureStorageBytes } from '../rendering/texture-memory';
 import {
   buildDisplayAutoExposureRevisionKey,
   buildDisplayImageStatsRevisionKey,
@@ -2321,7 +2322,12 @@ export class RenderCacheService implements Disposable {
 }
 
 function predictChannelTextureBytes(width: number, height: number): number {
-  return Math.max(0, width * height * Float32Array.BYTES_PER_ELEMENT);
+  return predictTextureStorageBytes(
+    width,
+    height,
+    Float32Array.BYTES_PER_ELEMENT,
+    true
+  );
 }
 
 function predictRetainedChannelBytes(
@@ -2332,11 +2338,17 @@ function predictRetainedChannelBytes(
 ): number {
   const perChannelTextureBytes = predictChannelTextureBytes(width, height);
   const perChannelMaterializedBytes = layer.channelStorage.kind === 'interleaved-f32'
-    ? predictChannelTextureBytes(width, height)
+    ? Math.max(0, width * height * Float32Array.BYTES_PER_ELEMENT)
     : 0;
   return channelNames.reduce((total, channelName) => {
     if (isMuellerMatrixSourceName(channelName)) {
-      return total + perChannelTextureBytes * 64;
+      const displaySize = resolveMuellerMatrixDisplaySize(width, height);
+      return total + predictTextureStorageBytes(
+        displaySize.width,
+        displaySize.height,
+        4 * Float32Array.BYTES_PER_ELEMENT,
+        true
+      );
     }
 
     if (isDerivedDisplaySourceName(channelName)) {

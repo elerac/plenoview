@@ -10,6 +10,23 @@ export interface ViewportClientRect {
   height: number;
 }
 
+export function readElementClientRect(element: HTMLElement): ViewportClientRect {
+  const rect = element.getBoundingClientRect();
+  const hasLayoutBox = element.offsetWidth > 0 && element.offsetHeight > 0;
+  const scaleX = hasLayoutBox ? rect.width / element.offsetWidth : 1;
+  const scaleY = hasLayoutBox ? rect.height / element.offsetHeight : 1;
+  const left = hasLayoutBox ? rect.left + element.clientLeft * scaleX : rect.left;
+  const top = hasLayoutBox ? rect.top + element.clientTop * scaleY : rect.top;
+  const width = hasLayoutBox ? element.clientWidth * scaleX : rect.width;
+  const height = hasLayoutBox ? element.clientHeight * scaleY : rect.height;
+  return {
+    left: Number.isFinite(left) ? left : 0,
+    top: Number.isFinite(top) ? top : 0,
+    width: Number.isFinite(width) ? width : 0,
+    height: Number.isFinite(height) ? height : 0
+  };
+}
+
 type ImageViewTransform = Pick<ViewerViewState, 'zoom' | 'panX' | 'panY'>;
 
 const FIT_VIEW_EPSILON = 1e-6;

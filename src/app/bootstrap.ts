@@ -82,7 +82,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
   const probeEnabled = options.mode !== 'embed' || embedBottomPanelMode === 'probe';
   let embedPanoramaAnimationConfig = normalizeEmbedPanoramaAnimationConfig(options.embedPanoramaAnimation);
   let embedThreeDAnimationConfig = normalizeEmbedThreeDAnimationConfig(options.embedThreeDAnimation);
-  let resizeObserver: ResizeObserver | null = null;
+  let resizeObserver: ReturnType<typeof initializeViewportLifecycle> | null = null;
   let cleanupE2EHooks: () => void = () => {};
   const unsubscribers: Array<() => void> = [];
   let disposed = false;

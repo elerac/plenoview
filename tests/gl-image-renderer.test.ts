@@ -117,6 +117,83 @@ describe('gl image renderer', () => {
     expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
   });
 
+  it('uses trilinear mipmapped minification with nearest magnification when float-linear filtering is supported', () => {
+    const { renderer, gl } = createHarness({ floatLinearSupported: true });
+    const layer = createLayerFromChannels({
+      R: [1, 2]
+    });
+    gl.texParameteri.mockClear();
+    gl.texImage2D.mockClear();
+
+    const uploads = renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R']);
+
+    expect(gl.getExtension).toHaveBeenCalledWith('OES_texture_float_linear');
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.LINEAR_MIPMAP_LINEAR
+    );
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MAG_FILTER,
+      gl.NEAREST
+    );
+    expect(gl.texImage2D).toHaveBeenCalledTimes(2);
+    expect(gl.texImage2D.mock.calls[0]).toEqual([
+      gl.TEXTURE_2D,
+      0,
+      gl.R32F,
+      2,
+      1,
+      0,
+      gl.RED,
+      gl.FLOAT,
+      new Float32Array([1, 2])
+    ]);
+    expect(gl.texImage2D.mock.calls[1]).toEqual([
+      gl.TEXTURE_2D,
+      1,
+      gl.R32F,
+      1,
+      1,
+      0,
+      gl.RED,
+      gl.FLOAT,
+      new Float32Array([1.5])
+    ]);
+    expect(uploads).toEqual([
+      { channelName: 'R', textureBytes: 12, materializedBytes: 0, resourceKind: 'source-texture' }
+    ]);
+  });
+
+  it('falls back to nearest minification without mipmaps when float-linear filtering is unsupported', () => {
+    const { renderer, gl } = createHarness({ floatLinearSupported: false });
+    const layer = createLayerFromChannels({
+      R: [1, 2]
+    });
+    gl.texParameteri.mockClear();
+    gl.texImage2D.mockClear();
+
+    const uploads = renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R']);
+
+    expect(gl.getExtension).toHaveBeenCalledWith('OES_texture_float_linear');
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.NEAREST
+    );
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MAG_FILTER,
+      gl.NEAREST
+    );
+    expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+    expect(gl.texImage2D.mock.calls[0]?.[1]).toBe(0);
+    expect(uploads).toEqual([
+      { channelName: 'R', textureBytes: 8, materializedBytes: 0, resourceKind: 'source-texture' }
+    ]);
+  });
+
   it('uploads spectral RGB as a derived RGBA32F source texture', () => {
     const { renderer, gl } = createHarness();
     const layer = createLayerFromChannels({
@@ -203,6 +280,83 @@ describe('gl image renderer', () => {
     }).toThrow('upload failed');
 
     expect(gl.deleteTexture).toHaveBeenCalledTimes(1);
+    expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
+    expect(getLayerTextureChannels(renderer, 'session-1', 0)).toEqual([]);
+  });
+
+  it('cleans up a source texture and materialized data when WebGL reports an upload error', () => {
+    const { renderer, gl } = createHarness();
+    const layer = createInterleavedLayerFromChannels({
+      R: [1, 2]
+    });
+    let pendingError: number = gl.NO_ERROR;
+    gl.texImage2D.mockImplementationOnce(() => {
+      pendingError = 0x0502;
+    });
+    gl.getError.mockImplementation(() => {
+      const error = pendingError;
+      pendingError = gl.NO_ERROR;
+      return error;
+    });
+
+    expect(() => {
+      renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R']);
+    }).toThrow(/WebGL error 0x502/);
+
+    expect(gl.getError).toHaveBeenCalled();
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(1);
+    expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
+    expect(getLayerTextureChannels(renderer, 'session-1', 0)).toEqual([]);
+  });
+
+  it('cleans up a source texture and materialized data when a mip-level upload fails', () => {
+    const { renderer, gl } = createHarness({ floatLinearSupported: true });
+    const layer = createInterleavedLayerFromChannels({
+      R: [1, 2]
+    });
+    gl.texImage2D.mockClear();
+    gl.texImage2D
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new Error('mip-level upload failed');
+      });
+
+    expect(() => {
+      renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R']);
+    }).toThrow('mip-level upload failed');
+
+    expect(gl.texImage2D).toHaveBeenCalledTimes(2);
+    expect(gl.texImage2D.mock.calls.at(-1)?.[1]).toBe(1);
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(1);
+    expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
+    expect(getLayerTextureChannels(renderer, 'session-1', 0)).toEqual([]);
+  });
+
+  it('rolls back earlier channel uploads when a later channel mip-level upload fails', () => {
+    const { renderer, gl } = createHarness({ floatLinearSupported: true });
+    const layer = createInterleavedLayerFromChannels({
+      R: [1, 2],
+      G: [3, 4]
+    });
+    gl.texImage2D.mockClear();
+    gl.texImage2D
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new Error('G mip-level upload failed');
+      });
+
+    expect(() => {
+      renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R', 'G']);
+    }).toThrow('G mip-level upload failed');
+
+    expect(gl.texImage2D.mock.calls.map((call) => call[1])).toEqual([0, 1, 0, 1]);
+    const sourceTextures = gl.createTexture.mock.results.slice(-2).map((result) => result.value);
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(2);
+    expect(gl.deleteTexture.mock.calls.map((call) => call[0])).toEqual(
+      expect.arrayContaining(sourceTextures)
+    );
     expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
     expect(getLayerTextureChannels(renderer, 'session-1', 0)).toEqual([]);
   });
@@ -332,6 +486,41 @@ describe('gl image renderer', () => {
     expect(lastUniform2fValue(gl, 'uViewport')).toEqual([160, 180]);
   });
 
+  it('renders logical pane coordinates into a high-density canvas backing store', () => {
+    const { renderer, gl, canvas } = createHarness();
+    const state = {
+      ...createInitialState(),
+      hoveredPixel: null,
+      draftRoi: null,
+      roiInteraction: createEmptyRoiInteractionState()
+    };
+
+    renderer.resize(320, 180, 12, 8, 2);
+
+    expect(canvas.width).toBe(640);
+    expect(canvas.height).toBe(360);
+    expect(gl.viewport).toHaveBeenCalledWith(0, 0, 640, 360);
+
+    vi.mocked(gl.viewport).mockClear();
+    vi.mocked(gl.scissor).mockClear();
+    renderer.setPanes([
+      {
+        path: [0],
+        rect: { x: 20, y: 30, width: 100, height: 50 },
+        viewport: { width: 100, height: 50 },
+        active: true
+      }
+    ]);
+
+    renderer.render(state);
+
+    expect(gl.viewport).toHaveBeenCalledWith(40, 200, 200, 100);
+    expect(gl.scissor).toHaveBeenCalledWith(40, 200, 200, 100);
+    expect(lastUniform2fValue(gl, 'uViewport')).toEqual([100, 50]);
+    expect(lastUniform2fValue(gl, 'uOutputSize')).toEqual([100, 50]);
+    expect(lastUniform2fValue(gl, 'uOutputPixelScale')).toEqual([2, 2]);
+  });
+
   it('renders 3D mode through the point-cloud pass', () => {
     const { renderer, gl } = createHarness();
     const layer = createInterleavedLayerFromChannels({
@@ -401,6 +590,9 @@ describe('gl image renderer', () => {
     expect(depthVertexShaderSource).toContain('uniform vec2 uDepthCameraZRange;');
     expect(depthVertexShaderSource).toContain('mapDepthCameraZToNdc(cameraPoint.z)');
     expect(depthVertexShaderSource).not.toContain('cameraPoint.z * zoom');
+    const depthFragmentShaderSource = getDepthFragmentShaderSource(gl);
+    expect(depthFragmentShaderSource).toContain('SourceCoordinate source = SourceCoordinate(');
+    expect(depthFragmentShaderSource).toContain('DisplaySample displaySample = readDisplaySample(source);');
   });
 
   it('uses the injected adaptive budget for 3D point-cloud sampling', () => {
@@ -847,7 +1039,7 @@ describe('gl image renderer', () => {
       2,
       buildDisplaySourceBinding(layer, state.displaySelection)
     );
-    renderer.resize(320, 180);
+    renderer.resize(320, 180, 0, 0, 2);
     gl.readPixels.mockImplementation((_x, _y, width, height, _format, _type, data: Uint8ClampedArray) => {
       expect(width).toBe(2);
       expect(height).toBe(1);
@@ -868,7 +1060,7 @@ describe('gl image renderer', () => {
       data: new Uint8ClampedArray([10, 20, 30, 128, 40, 50, 60, 255])
     });
     expect(gl.viewport).toHaveBeenCalledWith(0, 0, 2, 1);
-    expect(gl.viewport).toHaveBeenLastCalledWith(0, 0, 320, 180);
+    expect(gl.viewport).toHaveBeenLastCalledWith(0, 0, 640, 360);
     expect(lastUniform2fValue(gl, 'uViewport')).toEqual([2, 1]);
     expect(lastUniform2fValue(gl, 'uPan')).toEqual([2, 1]);
     expect(lastUniform1fValue(gl, 'uZoom')).toBe(0.5);
@@ -1198,11 +1390,15 @@ describe('gl image renderer', () => {
 
 function createHarness(options: {
   resolveDepthPointBudget?: DepthPointBudgetResolver;
+  floatLinearSupported?: boolean;
 } = {}): {
   renderer: GlImageRenderer;
   gl: ReturnType<typeof createWebGlContextMock>;
+  canvas: HTMLCanvasElement;
 } {
-  const gl = createWebGlContextMock();
+  const gl = createWebGlContextMock({
+    floatLinearSupported: options.floatLinearSupported ?? false
+  });
   const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((contextId) => {
     if (contextId === 'webgl2') {
       return gl;
@@ -1215,7 +1411,8 @@ function createHarness(options: {
   expect(getContext).toHaveBeenCalledWith('webgl2', { antialias: false });
   return {
     renderer,
-    gl
+    gl,
+    canvas
   };
 }
 
@@ -1306,8 +1503,22 @@ function getDepthVertexShaderSource(gl: ReturnType<typeof createWebGlContextMock
   return source ?? '';
 }
 
-function createWebGlContextMock(): WebGL2RenderingContext & {
+function getDepthFragmentShaderSource(gl: ReturnType<typeof createWebGlContextMock>): string {
+  const shaderSource = gl.shaderSource as unknown as ReturnType<typeof vi.fn>;
+  const source = shaderSource.mock.calls
+    .map((call) => call[1] as string)
+    .find((candidate) => candidate.includes('flat in int vDepthValid'));
+  expect(source).toBeTruthy();
+  return source ?? '';
+}
+
+function createWebGlContextMock(options: {
+  floatLinearSupported: boolean;
+}): WebGL2RenderingContext & {
   texImage2D: ReturnType<typeof vi.fn>;
+  texParameteri: ReturnType<typeof vi.fn>;
+  getExtension: ReturnType<typeof vi.fn>;
+  getError: ReturnType<typeof vi.fn>;
   createTexture: ReturnType<typeof vi.fn>;
   createFramebuffer: ReturnType<typeof vi.fn>;
   createRenderbuffer: ReturnType<typeof vi.fn>;
@@ -1350,6 +1561,7 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     FRAGMENT_SHADER: 0x8b30,
     COMPILE_STATUS: 0x8b81,
     LINK_STATUS: 0x8b82,
+    NO_ERROR: 0,
     TEXTURE0: 0x84c0,
     TEXTURE_2D: 0x0de1,
     UNPACK_ALIGNMENT: 0x0cf5,
@@ -1359,6 +1571,7 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     TEXTURE_WRAP_T: 0x2803,
     NEAREST: 0x2600,
     LINEAR: 0x2601,
+    LINEAR_MIPMAP_LINEAR: 0x2703,
     CLAMP_TO_EDGE: 0x812f,
     RGBA8: 0x8058,
     RGBA32F: 0x8814,
@@ -1428,6 +1641,13 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     readPixels: vi.fn(),
     viewport: vi.fn(),
     getUniformLocation: vi.fn((_program, name: string) => ({ name })),
+    getError: vi.fn(() => 0),
+    getExtension: vi.fn((extensionName: string) => {
+      if (extensionName === 'OES_texture_float_linear' && options.floatLinearSupported) {
+        return {};
+      }
+      return null;
+    }),
     getParameter: vi.fn((parameter) => {
       if (parameter === 16) {
         return 16;
@@ -1440,6 +1660,9 @@ function createWebGlContextMock(): WebGL2RenderingContext & {
     deleteVertexArray: vi.fn()
   } as unknown as WebGL2RenderingContext & {
     texImage2D: ReturnType<typeof vi.fn>;
+    texParameteri: ReturnType<typeof vi.fn>;
+    getExtension: ReturnType<typeof vi.fn>;
+    getError: ReturnType<typeof vi.fn>;
     createTexture: ReturnType<typeof vi.fn>;
     createFramebuffer: ReturnType<typeof vi.fn>;
     createRenderbuffer: ReturnType<typeof vi.fn>;

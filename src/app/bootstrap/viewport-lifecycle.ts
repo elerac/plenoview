@@ -10,6 +10,7 @@ import {
   computeFitView,
   isFitViewForViewport,
   preserveImagePanOnViewportChange,
+  readElementClientRect,
   type ViewportClientRect
 } from '../../interaction/image-geometry';
 import { resolveDisplayImageSize } from '../../display-size';
@@ -179,8 +180,9 @@ export function initializeViewportLifecycle({
   renderer,
   interactionCoordinator,
   isDisposed
-}: InitializeViewportLifecycleArgs): ResizeObserver {
+}: InitializeViewportLifecycleArgs): { disconnect(): void } {
   let activePaneClientRect: ViewportClientRect | null = null;
+  let renderedPixelRatio = readDevicePixelRatio();
 
   const renderCurrentView = (): void => {
     if (selectActiveSession(core.getState())) {
@@ -198,7 +200,7 @@ export function initializeViewportLifecycle({
     }
   };
 
-  const resizeObserver = new ResizeObserver(() => {
+  const resizeViewport = (): void => {
     if (isDisposed()) {
       return;
     }
@@ -240,9 +242,18 @@ export function initializeViewportLifecycle({
     renderer.resize(rect.width, rect.height, rect.left, rect.top);
     renderer.setViewerPanes(ui.getViewerPaneRenderInfos());
     renderCurrentView();
-  });
+    renderedPixelRatio = readDevicePixelRatio();
+  };
+
+  const resizeObserver = new ResizeObserver(resizeViewport);
+  const handleOutputScaleChange = (): void => {
+    if (readDevicePixelRatio() !== renderedPixelRatio) {
+      resizeViewport();
+    }
+  };
 
   resizeObserver.observe(ui.viewerContainer);
+  window.addEventListener('resize', handleOutputScaleChange);
 
   const rect = readViewportClientRect(ui.viewerContainer);
   ui.setViewerViewportRect(rect);
@@ -251,7 +262,18 @@ export function initializeViewportLifecycle({
   renderer.setViewerPanes(ui.getViewerPaneRenderInfos());
   renderCurrentView();
 
-  return resizeObserver;
+  return {
+    disconnect: () => {
+      window.removeEventListener('resize', handleOutputScaleChange);
+      resizeObserver.disconnect();
+    }
+  };
+}
+
+function readDevicePixelRatio(): number {
+  return Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+    ? window.devicePixelRatio
+    : 1;
 }
 
 function resolveActivePaneClientRect(ui: ViewerRuntimeUi, containerRect: ViewportClientRect): ViewportClientRect {
@@ -265,13 +287,7 @@ function resolveActivePaneClientRect(ui: ViewerRuntimeUi, containerRect: Viewpor
 }
 
 export function readViewportClientRect(element: HTMLElement): ViewportClientRect {
-  const rect = element.getBoundingClientRect();
-  return {
-    left: Number.isFinite(rect.left) ? rect.left : 0,
-    top: Number.isFinite(rect.top) ? rect.top : 0,
-    width: Number.isFinite(rect.width) ? rect.width : 0,
-    height: Number.isFinite(rect.height) ? rect.height : 0
-  };
+  return readElementClientRect(element);
 }
 
 function viewportInfoFromClientRect(rect: ViewportClientRect): ViewportInfo {

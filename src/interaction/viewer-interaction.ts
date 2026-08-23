@@ -18,7 +18,7 @@ import {
   type ViewerPanePath,
   type ViewerPaneRenderInfo
 } from '../viewer-pane-layout';
-import { imageToScreen, zoomAroundPoint } from './image-geometry';
+import { imageToScreen, readElementClientRect, zoomAroundPoint } from './image-geometry';
 import {
   ThreeDAutoOrbitController,
   ThreeDKeyboardOrbitController,
@@ -1172,7 +1172,7 @@ export class ViewerInteraction {
   }
 
   private getElementPoint(event: MouseEvent): PointerPosition {
-    const rect = this.element.getBoundingClientRect();
+    const rect = readElementClientRect(this.element);
     return {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top
