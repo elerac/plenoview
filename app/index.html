@@ -1490,8 +1490,17 @@
         }
 
         const rect = viewerContainer.getBoundingClientRect();
-        const left = Number.isFinite(rect.left) ? rect.left : 0;
-        const top = Number.isFinite(rect.top) ? rect.top : 0;
+        const hasLayoutBox = viewerContainer.offsetWidth > 0 && viewerContainer.offsetHeight > 0;
+        const scaleX = hasLayoutBox ? rect.width / viewerContainer.offsetWidth : 1;
+        const scaleY = hasLayoutBox ? rect.height / viewerContainer.offsetHeight : 1;
+        const contentLeft = hasLayoutBox
+          ? rect.left + viewerContainer.clientLeft * scaleX
+          : rect.left;
+        const contentTop = hasLayoutBox
+          ? rect.top + viewerContainer.clientTop * scaleY
+          : rect.top;
+        const left = Number.isFinite(contentLeft) ? contentLeft : 0;
+        const top = Number.isFinite(contentTop) ? contentTop : 0;
         viewerContainer.style.setProperty('--viewer-checker-offset-x', `${-left}px`);
         viewerContainer.style.setProperty('--viewer-checker-offset-y', `${-top}px`);
       })();

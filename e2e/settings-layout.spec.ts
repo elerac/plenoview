@@ -419,10 +419,10 @@ async function readInitialPanelLayout(page: Page): Promise<{
 }
 
 async function readViewerCheckerOffsetState(page: Page): Promise<{
-  rectLeft: number;
-  rectTop: number;
-  rectWidth: number;
-  rectHeight: number;
+  viewportLeft: number;
+  viewportTop: number;
+  viewportWidth: number;
+  viewportHeight: number;
   checkerOffsetX: number;
   checkerOffsetY: number;
   checkerBackgroundPosition: string;
@@ -437,13 +437,16 @@ async function readViewerCheckerOffsetState(page: Page): Promise<{
     }
 
     const rect = viewer.getBoundingClientRect();
+    const hasLayoutBox = viewer.offsetWidth > 0 && viewer.offsetHeight > 0;
+    const scaleX = hasLayoutBox ? rect.width / viewer.offsetWidth : 1;
+    const scaleY = hasLayoutBox ? rect.height / viewer.offsetHeight : 1;
     const style = getComputedStyle(viewer);
     const checkerStyle = getComputedStyle(viewer, '::after');
     return {
-      rectLeft: rect.left,
-      rectTop: rect.top,
-      rectWidth: rect.width,
-      rectHeight: rect.height,
+      viewportLeft: hasLayoutBox ? rect.left + viewer.clientLeft * scaleX : rect.left,
+      viewportTop: hasLayoutBox ? rect.top + viewer.clientTop * scaleY : rect.top,
+      viewportWidth: hasLayoutBox ? viewer.clientWidth * scaleX : rect.width,
+      viewportHeight: hasLayoutBox ? viewer.clientHeight * scaleY : rect.height,
       checkerOffsetX: Number.parseFloat(style.getPropertyValue('--viewer-checker-offset-x')),
       checkerOffsetY: Number.parseFloat(style.getPropertyValue('--viewer-checker-offset-y')),
       checkerBackgroundPosition: checkerStyle.backgroundPosition,
@@ -624,10 +627,10 @@ async function readInitialEmptyAppState(page: Page): Promise<{
 }
 
 function expectCheckerOffsetAnchoredToViewport(state: Awaited<ReturnType<typeof readViewerCheckerOffsetState>>): void {
-  expect(state.rectLeft).toBeGreaterThan(0);
-  expect(state.rectTop).toBeGreaterThan(0);
-  expect(Math.abs(state.checkerOffsetX + state.rectLeft)).toBeLessThanOrEqual(0.01);
-  expect(Math.abs(state.checkerOffsetY + state.rectTop)).toBeLessThanOrEqual(0.01);
+  expect(state.viewportLeft).toBeGreaterThan(0);
+  expect(state.viewportTop).toBeGreaterThan(0);
+  expect(Math.abs(state.checkerOffsetX + state.viewportLeft)).toBeLessThanOrEqual(0.01);
+  expect(Math.abs(state.checkerOffsetY + state.viewportTop)).toBeLessThanOrEqual(0.01);
   expect(state.checkerBackgroundPosition).not.toBe('0px 0px');
 }
 
@@ -676,8 +679,8 @@ test('anchors the default checkerboard while colormap initialization is pending'
   try {
     const state = await readViewerCheckerOffsetState(page);
     expectCheckerOffsetAnchoredToViewport(state);
-    expect(state.glCanvasWidth).toBe(Math.floor(state.rectWidth));
-    expect(state.glCanvasHeight).toBe(Math.floor(state.rectHeight));
+    expect(state.glCanvasWidth).toBe(Math.floor(state.viewportWidth));
+    expect(state.glCanvasHeight).toBe(Math.floor(state.viewportHeight));
   } finally {
     await releaseManifest();
   }

@@ -155,9 +155,16 @@ function parseCssColorAlpha(color: string): number {
 
 async function expectViewerCheckerBackground(viewer: Locator): Promise<void> {
   const background = await viewer.evaluate((element) => {
+    if (!(element instanceof HTMLElement)) {
+      throw new Error('Expected the viewer container to be an HTML element.');
+    }
+
     const style = getComputedStyle(element);
     const checkerStyle = getComputedStyle(element, '::after');
     const rect = element.getBoundingClientRect();
+    const hasLayoutBox = element.offsetWidth > 0 && element.offsetHeight > 0;
+    const scaleX = hasLayoutBox ? rect.width / element.offsetWidth : 1;
+    const scaleY = hasLayoutBox ? rect.height / element.offsetHeight : 1;
     return {
       color: style.backgroundColor,
       image: checkerStyle.backgroundImage,
@@ -166,8 +173,8 @@ async function expectViewerCheckerBackground(viewer: Locator): Promise<void> {
       position: checkerStyle.backgroundPosition,
       offsetX: style.getPropertyValue('--viewer-checker-offset-x').trim(),
       offsetY: style.getPropertyValue('--viewer-checker-offset-y').trim(),
-      rectLeft: rect.left,
-      rectTop: rect.top
+      contentLeft: hasLayoutBox ? rect.left + element.clientLeft * scaleX : rect.left,
+      contentTop: hasLayoutBox ? rect.top + element.clientTop * scaleY : rect.top
     };
   });
 
@@ -177,8 +184,8 @@ async function expectViewerCheckerBackground(viewer: Locator): Promise<void> {
   expect(background.opacity).toBe('1');
   expect(background.size).toBe('32px 32px');
   expect(background.position).toBeTruthy();
-  expect(Number.parseFloat(background.offsetX)).toBeCloseTo(-background.rectLeft, 2);
-  expect(Number.parseFloat(background.offsetY)).toBeCloseTo(-background.rectTop, 2);
+  expect(Number.parseFloat(background.offsetX)).toBeCloseTo(-background.contentLeft, 2);
+  expect(Number.parseFloat(background.offsetY)).toBeCloseTo(-background.contentTop, 2);
 }
 
 test('boots an empty app shell with menu actions gated until an image opens @smoke', async ({ page }) => {
