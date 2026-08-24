@@ -738,6 +738,72 @@ float panoramaScreenRadiusToTheta(float radius, float hfovDeg) {
   return mix(perspectiveTheta, equidistantTheta, blend);
 }
 
+bool usesCubemapCrossProjection() {
+  return abs(uImageSize.x * 3.0 - uImageSize.y * 4.0) < 0.5;
+}
+
+ivec2 cubemapDirectionToPixel(vec3 ray) {
+  vec3 absoluteRay = abs(ray);
+  ivec2 face;
+  vec2 local;
+
+  if (absoluteRay.z >= absoluteRay.x && absoluteRay.z >= absoluteRay.y) {
+    face.y = 1;
+    if (ray.z >= 0.0) {
+      face.x = 1;
+      local = vec2(ray.x, ray.y) / absoluteRay.z;
+    } else {
+      face.x = 3;
+      local = vec2(-ray.x, ray.y) / absoluteRay.z;
+    }
+  } else if (absoluteRay.x >= absoluteRay.y) {
+    face.y = 1;
+    if (ray.x >= 0.0) {
+      face.x = 2;
+      local = vec2(-ray.z, ray.y) / absoluteRay.x;
+    } else {
+      face.x = 0;
+      local = vec2(ray.z, ray.y) / absoluteRay.x;
+    }
+  } else if (ray.y < 0.0) {
+    face = ivec2(1, 0);
+    local = vec2(ray.x, ray.z) / absoluteRay.y;
+  } else {
+    face = ivec2(1, 2);
+    local = vec2(ray.x, -ray.z) / absoluteRay.y;
+  }
+
+  if (abs(local.x) < 1e-6) {
+    local.x = 0.0;
+  }
+  if (abs(local.y) < 1e-6) {
+    local.y = 0.0;
+  }
+
+  int faceSize = int(uImageSize.x) / 4;
+  vec2 facePixel = clamp(
+    floor((local * 0.5 + 0.5) * float(faceSize)),
+    vec2(0.0),
+    vec2(float(faceSize - 1))
+  );
+  return face * faceSize + ivec2(facePixel);
+}
+
+ivec2 panoramaDirectionToPixel(vec3 ray) {
+  if (usesCubemapCrossProjection()) {
+    return cubemapDirectionToPixel(ray);
+  }
+
+  float longitude = atan(ray.x, ray.z);
+  float latitude = asin(clamp(ray.y, -1.0, 1.0));
+  float u = fract(0.5 + longitude / (2.0 * PI));
+  float v = clamp(0.5 + latitude / PI, 0.0, 1.0 - 1e-7);
+  return ivec2(
+    int(floor(u * uImageSize.x)),
+    int(clamp(floor(v * uImageSize.y), 0.0, uImageSize.y - 1.0))
+  );
+}
+
 void main() {
   vec2 pixelScale = max(uOutputPixelScale, vec2(1.0e-6));
   vec2 screen = uScreenOrigin + vec2(
@@ -765,14 +831,7 @@ void main() {
   ray = rotatePitch(ray, uPanoramaPitchDeg * DEG_TO_RAD);
   ray = rotateYaw(ray, uPanoramaYawDeg * DEG_TO_RAD);
 
-  float longitude = atan(ray.x, ray.z);
-  float latitude = asin(clamp(ray.y, -1.0, 1.0));
-  float u = fract(0.5 + longitude / (2.0 * PI));
-  float v = clamp(0.5 + latitude / PI, 0.0, 1.0 - 1e-7);
-  ivec2 pixel = ivec2(
-    int(floor(u * uImageSize.x)),
-    int(clamp(floor(v * uImageSize.y), 0.0, uImageSize.y - 1.0))
-  );
+  ivec2 pixel = panoramaDirectionToPixel(ray);
 
   DisplaySample displaySample = readDisplaySample(pixel);
   vec3 linear = displaySample.linear;

@@ -90,4 +90,12 @@ describe('shader source regressions', () => {
 
     expect(source).toContain('vec2 samplePosition = screen + vec2(0.5) / pixelScale;');
   });
+
+  it('selects horizontal-cross cubemap sampling from the source aspect ratio', () => {
+    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+
+    expect(source).toContain('abs(uImageSize.x * 3.0 - uImageSize.y * 4.0) < 0.5');
+    expect(source).toContain('ivec2 cubemapDirectionToPixel(vec3 ray)');
+    expect(source).toContain('ivec2 pixel = panoramaDirectionToPixel(ray);');
+  });
 });

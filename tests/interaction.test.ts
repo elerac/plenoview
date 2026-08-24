@@ -22,6 +22,7 @@ import {
   normalizePanoramaYaw,
   orbitPanorama,
   projectPanoramaPixelToScreen,
+  resolvePanoramaProjection,
   screenToPanoramaPixel,
   zoomPanorama
 } from '../src/interaction/panorama-geometry';
@@ -192,6 +193,61 @@ describe('interaction math', () => {
     expect(
       screenToPanoramaPixel(400, 200, { ...panoramaState, panoramaYawDeg: 90 }, viewport, 400, 200)
     ).toEqual({ ix: 300, iy: 100 });
+  });
+
+  it('selects cubemap cross projection only for an exact 4:3 image aspect ratio', () => {
+    expect(resolvePanoramaProjection(4096, 3072)).toBe('cubemap-cross');
+    expect(resolvePanoramaProjection(400, 300)).toBe('cubemap-cross');
+    expect(resolvePanoramaProjection(400, 200)).toBe('equirectangular');
+    expect(resolvePanoramaProjection(401, 300)).toBe('equirectangular');
+    expect(resolvePanoramaProjection(0, 0)).toBe('equirectangular');
+  });
+
+  it('maps panorama rays to the six faces of a horizontal-cross cubemap', () => {
+    const viewport = { width: 100, height: 100 };
+    const cubemapState = {
+      ...state,
+      viewerMode: 'panorama' as const,
+      panoramaYawDeg: 0,
+      panoramaPitchDeg: 0,
+      panoramaHfovDeg: 180
+    };
+
+    expect(screenToPanoramaPixel(50, 50, cubemapState, viewport, 400, 300)).toEqual({ ix: 150, iy: 150 });
+    expect(screenToPanoramaPixel(0, 50, cubemapState, viewport, 400, 300)).toEqual({ ix: 50, iy: 150 });
+    expect(screenToPanoramaPixel(100, 50, cubemapState, viewport, 400, 300)).toEqual({ ix: 250, iy: 150 });
+    expect(screenToPanoramaPixel(50, 0, cubemapState, viewport, 400, 300)).toEqual({ ix: 150, iy: 50 });
+    expect(screenToPanoramaPixel(50, 100, cubemapState, viewport, 400, 300)).toEqual({ ix: 150, iy: 250 });
+    expect(
+      screenToPanoramaPixel(50, 50, { ...cubemapState, panoramaYawDeg: 180 }, viewport, 400, 300)
+    ).toEqual({ ix: 350, iy: 150 });
+  });
+
+  it('roundtrips cubemap face pixels and rejects unused cross cells', () => {
+    const viewport = { width: 200, height: 200 };
+    const cubemapState = {
+      panoramaYawDeg: 90,
+      panoramaPitchDeg: 0,
+      panoramaHfovDeg: 90
+    };
+    const pixel = screenToPanoramaPixel(100, 100, cubemapState, viewport, 400, 300);
+    const projected = pixel
+      ? projectPanoramaPixelToScreen(pixel.ix, pixel.iy, cubemapState, viewport, 400, 300)
+      : null;
+
+    expect(pixel).toEqual({ ix: 250, iy: 150 });
+    expect(projected).not.toBeNull();
+    expect(
+      screenToPanoramaPixel(
+        projected?.centerX ?? 0,
+        projected?.centerY ?? 0,
+        cubemapState,
+        viewport,
+        400,
+        300
+      )
+    ).toEqual(pixel);
+    expect(projectPanoramaPixelToScreen(50, 50, cubemapState, viewport, 400, 300)).toBeNull();
   });
 
   it('maps max panorama hfov to a square-viewport hemisphere', () => {

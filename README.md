@@ -14,7 +14,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 - `File > Export Batch...` exports selected file/channel combinations as a ZIP of PNG images.
 - `File > Export Colormap...` exports any registered colormap as a standalone PNG gradient with configurable colormap, size, orientation, and filename.
 - Right-click `Copy Image` copies the current display image to the clipboard.
-- `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, an equirectangular panorama projection suitable for 360-degree environment maps and HDRIs, and a point-cloud view for RGB plus depth or position data.
+- `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, a panorama projection for equirectangular and horizontal-cross cubemap environment maps, and a point-cloud view for RGB plus depth or position data.
 - `View > Rulers` toggles pixel rulers in `Image viewer`.
 - `Window` controls include normal/full-screen preview plus single-pane, vertical split, and horizontal split viewer layouts.
 - Top-bar quick actions include Auto Fit, Auto Exposure, invalid-value warning, screenshot export, Metadata, app fullscreen, and the Settings gear.
@@ -51,7 +51,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 - Zoom range: `0.03125x` to `512x`, wheel zoom anchored to cursor.
 - Pan with left mouse drag.
 - Panorama viewer:
-  - Projects the current display texture onto a sphere using equirectangular sampling.
+  - Projects the current display texture onto a sphere using equirectangular sampling for 2:1 images or horizontal-cross cubemap sampling for 4:3 images.
   - Left drag orbits the camera; `W/A/S/D` also orbit yaw/pitch; mouse wheel changes horizontal FOV from `1` to `180` degrees, with the widest range transitioning to a hemispherical projection.
   - The Inspector probe remains available through panorama ray-to-pixel lookup.
   - Existing ROIs remain stored but cannot be created or edited until you return to `Image viewer`.
@@ -311,7 +311,7 @@ Controller methods:
 ## Implementation Notes
 
 - Display path: normal RGB uses `linear * 2^EV`, then display-gamma encode for screen; colormap mode maps display luminance through the selected `.npy` LUT after colormap EV/gamma, range, zero-center, and reverse settings. Channel-display alpha is composited over the viewer checkerboard on screen in both RGB and colormap modes; exports preserve image alpha when present. When split component entries are selected, separate `R`, `G`, and `B` channel choices duplicate the selected source into RGB, so display luminance equals that channel value. Grouped XYZ uses the same direct component display path as RGB, and grouped UV binds `U` and `V` to red and green while leaving blue at zero. Split component Stokes entries derive the selected parameter from only the chosen component's Stokes channels before duplicating the scalar into RGB. Grouped RGB Stokes entries derive `R`, `G`, and `B` independently in `None`, but collapse to the existing Rec.709-derived mono path in `Colormap`. For angle Stokes modulation, the LUT color is converted to HSV, its value component is multiplied by the clamped paired degree value, and the result is converted back to RGB; AoLP can instead multiply HSV saturation when `S` modulation is selected.
-- Panorama path: the same display texture is reused, but the fragment shader interprets it as an equirectangular environment map, casts a view ray from yaw/pitch/HFOV, and fetches the matching source pixel with nearest-neighbor sampling before applying the normal RGB or colormap display transform.
+- Panorama path: the same display texture is reused. The image aspect ratio selects equirectangular sampling (the default, normally 2:1) or a 4x3 horizontal-cross cubemap (4:3); the fragment shader casts a view ray from yaw/pitch/HFOV and fetches the matching source pixel with nearest-neighbor sampling before applying the normal RGB or colormap display transform.
 - Colormap authoring in Python:
   ```python
   import numpy as np

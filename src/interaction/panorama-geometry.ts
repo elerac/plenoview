@@ -13,6 +13,8 @@ const PANORAMA_MAX_SEED_SEARCH_RADIUS = 128;
 const PANORAMA_WIDE_ANGLE_INVERSION_STEPS = 32;
 const PANORAMA_MAX_CAMERA_THETA_RAD = Math.PI * 0.5;
 const RADIANS_PER_DEGREE = Math.PI / 180;
+const CUBEMAP_CROSS_COLUMNS = 4;
+const CUBEMAP_CROSS_ROWS = 3;
 
 type PanoramaCameraState = Pick<
   ViewerState,
@@ -24,6 +26,19 @@ export interface PanoramaProjectedPixel {
   centerY: number;
   width: number;
   height: number;
+}
+
+export type PanoramaProjection = 'equirectangular' | 'cubemap-cross';
+
+export function resolvePanoramaProjection(
+  imageWidth: number,
+  imageHeight: number
+): PanoramaProjection {
+  return imageWidth > 0 &&
+    imageHeight > 0 &&
+    imageWidth * CUBEMAP_CROSS_ROWS === imageHeight * CUBEMAP_CROSS_COLUMNS
+    ? 'cubemap-cross'
+    : 'equirectangular';
 }
 
 export function clampPanoramaHfov(hfovDeg: number): number {
@@ -118,15 +133,7 @@ export function screenToPanoramaPixel(
     return null;
   }
 
-  const longitude = Math.atan2(ray.x, ray.z);
-  const latitude = Math.asin(clamp(ray.y, -1, 1));
-  const u = fract(0.5 + longitude / (2 * Math.PI));
-  const v = clamp(0.5 + latitude / Math.PI, 0, 1 - Number.EPSILON);
-
-  return {
-    ix: Math.floor(u * imageWidth) % imageWidth,
-    iy: Math.min(imageHeight - 1, Math.max(0, Math.floor(v * imageHeight)))
-  };
+  return panoramaDirectionToPixel(ray, imageWidth, imageHeight);
 }
 
 export function projectPanoramaPixelToScreen(
@@ -148,13 +155,20 @@ export function projectPanoramaPixelToScreen(
     return null;
   }
 
-  // Suppress seam and pole-adjacent labels where the local footprint is ambiguous.
-  if (pixelX === 0 || pixelX === imageWidth - 1 || pixelY === 0 || pixelY === imageHeight - 1) {
+  // Equirectangular seam and pole-adjacent footprints are ambiguous. Cubemap outer-edge
+  // texels belong to real faces and are handled by the face-aware inverse mapping below.
+  if (
+    resolvePanoramaProjection(imageWidth, imageHeight) === 'equirectangular' &&
+    (pixelX === 0 || pixelX === imageWidth - 1 || pixelY === 0 || pixelY === imageHeight - 1)
+  ) {
     return null;
   }
 
-  const approximateCenter = projectPanoramaDirectionToScreen(
-    panoramaTexelToDirection(pixelX + 0.5, pixelY + 0.5, imageWidth, imageHeight),
+  const approximateCenter = projectPanoramaTexelToScreen(
+    pixelX + 0.5,
+    pixelY + 0.5,
+    imageWidth,
+    imageHeight,
     state,
     viewport
   );
@@ -224,12 +238,98 @@ function screenToPanoramaDirection(
   return rotateYaw(pitched, state.panoramaYawDeg * RADIANS_PER_DEGREE);
 }
 
+function panoramaDirectionToPixel(
+  direction: { x: number; y: number; z: number },
+  imageWidth: number,
+  imageHeight: number
+): ImagePixel {
+  if (resolvePanoramaProjection(imageWidth, imageHeight) === 'cubemap-cross') {
+    return cubemapDirectionToPixel(direction, imageWidth);
+  }
+
+  const longitude = Math.atan2(direction.x, direction.z);
+  const latitude = Math.asin(clamp(direction.y, -1, 1));
+  const u = fract(0.5 + longitude / (2 * Math.PI));
+  const v = clamp(0.5 + latitude / Math.PI, 0, 1 - Number.EPSILON);
+
+  return {
+    ix: Math.floor(u * imageWidth) % imageWidth,
+    iy: Math.min(imageHeight - 1, Math.max(0, Math.floor(v * imageHeight)))
+  };
+}
+
+function cubemapDirectionToPixel(
+  direction: { x: number; y: number; z: number },
+  imageWidth: number
+): ImagePixel {
+  const absX = Math.abs(direction.x);
+  const absY = Math.abs(direction.y);
+  const absZ = Math.abs(direction.z);
+  let faceColumn: number;
+  let faceRow: number;
+  let localX: number;
+  let localY: number;
+
+  if (absZ >= absX && absZ >= absY) {
+    faceRow = 1;
+    if (direction.z >= 0) {
+      faceColumn = 1;
+      localX = direction.x / absZ;
+      localY = direction.y / absZ;
+    } else {
+      faceColumn = 3;
+      localX = -direction.x / absZ;
+      localY = direction.y / absZ;
+    }
+  } else if (absX >= absY) {
+    faceRow = 1;
+    if (direction.x >= 0) {
+      faceColumn = 2;
+      localX = -direction.z / absX;
+      localY = direction.y / absX;
+    } else {
+      faceColumn = 0;
+      localX = direction.z / absX;
+      localY = direction.y / absX;
+    }
+  } else if (direction.y < 0) {
+    faceColumn = 1;
+    faceRow = 0;
+    localX = direction.x / absY;
+    localY = direction.z / absY;
+  } else {
+    faceColumn = 1;
+    faceRow = 2;
+    localX = direction.x / absY;
+    localY = -direction.z / absY;
+  }
+
+  localX = snapCubemapLocalCoordinate(localX);
+  localY = snapCubemapLocalCoordinate(localY);
+
+  const faceSize = imageWidth / CUBEMAP_CROSS_COLUMNS;
+  const faceX = clampInteger(Math.floor((localX * 0.5 + 0.5) * faceSize), 0, faceSize - 1);
+  const faceY = clampInteger(Math.floor((localY * 0.5 + 0.5) * faceSize), 0, faceSize - 1);
+  return {
+    ix: faceColumn * faceSize + faceX,
+    iy: faceRow * faceSize + faceY
+  };
+}
+
+function snapCubemapLocalCoordinate(value: number): number {
+  return Math.abs(value) < 1e-6 ? 0 : value;
+}
+
 function panoramaTexelToDirection(
   texelX: number,
   texelY: number,
   imageWidth: number,
   imageHeight: number
-): { x: number; y: number; z: number } {
+): { x: number; y: number; z: number } | null {
+  if (resolvePanoramaProjection(imageWidth, imageHeight) === 'cubemap-cross') {
+    return cubemapTexelToDirection(texelX, texelY, imageWidth);
+  }
+
   const u = clamp(texelX / imageWidth, 0, 1);
   const v = clamp(texelY / imageHeight, 0, 1);
   const longitude = (u - 0.5) * 2 * Math.PI;
@@ -241,6 +341,58 @@ function panoramaTexelToDirection(
     y: Math.sin(latitude),
     z: Math.cos(longitude) * cosLatitude
   };
+}
+
+function cubemapTexelToDirection(
+  texelX: number,
+  texelY: number,
+  imageWidth: number
+): { x: number; y: number; z: number } | null {
+  const faceSize = imageWidth / CUBEMAP_CROSS_COLUMNS;
+  const faceColumn = Math.floor(texelX / faceSize);
+  const faceRow = Math.floor(texelY / faceSize);
+  const localX = ((texelX - faceColumn * faceSize) / faceSize) * 2 - 1;
+  const localY = ((texelY - faceRow * faceSize) / faceSize) * 2 - 1;
+  let direction: { x: number; y: number; z: number } | null = null;
+
+  if (faceRow === 0 && faceColumn === 1) {
+    direction = { x: localX, y: -1, z: localY };
+  } else if (faceRow === 1) {
+    if (faceColumn === 0) {
+      direction = { x: -1, y: localY, z: localX };
+    } else if (faceColumn === 1) {
+      direction = { x: localX, y: localY, z: 1 };
+    } else if (faceColumn === 2) {
+      direction = { x: 1, y: localY, z: -localX };
+    } else if (faceColumn === 3) {
+      direction = { x: -localX, y: localY, z: -1 };
+    }
+  } else if (faceRow === 2 && faceColumn === 1) {
+    direction = { x: localX, y: 1, z: -localY };
+  }
+
+  if (!direction) {
+    return null;
+  }
+
+  const length = Math.hypot(direction.x, direction.y, direction.z);
+  return {
+    x: direction.x / length,
+    y: direction.y / length,
+    z: direction.z / length
+  };
+}
+
+function projectPanoramaTexelToScreen(
+  texelX: number,
+  texelY: number,
+  imageWidth: number,
+  imageHeight: number,
+  state: PanoramaCameraState,
+  viewport: ViewportInfo
+): { x: number; y: number } | null {
+  const direction = panoramaTexelToDirection(texelX, texelY, imageWidth, imageHeight);
+  return direction ? projectPanoramaDirectionToScreen(direction, state, viewport) : null;
 }
 
 function projectPanoramaDirectionToScreen(
@@ -456,29 +608,41 @@ function resolvePanoramaSeedSearchRadius(
 ): number {
   const neighborCenters = [
     pixelX > 0
-      ? projectPanoramaDirectionToScreen(
-          panoramaTexelToDirection(pixelX - 0.5, pixelY + 0.5, imageWidth, imageHeight),
+      ? projectPanoramaTexelToScreen(
+          pixelX - 0.5,
+          pixelY + 0.5,
+          imageWidth,
+          imageHeight,
           state,
           viewport
         )
       : null,
     pixelX + 1 < imageWidth
-      ? projectPanoramaDirectionToScreen(
-          panoramaTexelToDirection(pixelX + 1.5, pixelY + 0.5, imageWidth, imageHeight),
+      ? projectPanoramaTexelToScreen(
+          pixelX + 1.5,
+          pixelY + 0.5,
+          imageWidth,
+          imageHeight,
           state,
           viewport
         )
       : null,
     pixelY > 0
-      ? projectPanoramaDirectionToScreen(
-          panoramaTexelToDirection(pixelX + 0.5, pixelY - 0.5, imageWidth, imageHeight),
+      ? projectPanoramaTexelToScreen(
+          pixelX + 0.5,
+          pixelY - 0.5,
+          imageWidth,
+          imageHeight,
           state,
           viewport
         )
       : null,
     pixelY + 1 < imageHeight
-      ? projectPanoramaDirectionToScreen(
-          panoramaTexelToDirection(pixelX + 0.5, pixelY + 1.5, imageWidth, imageHeight),
+      ? projectPanoramaTexelToScreen(
+          pixelX + 0.5,
+          pixelY + 1.5,
+          imageWidth,
+          imageHeight,
           state,
           viewport
         )
