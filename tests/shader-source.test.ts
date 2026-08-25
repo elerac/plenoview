@@ -104,6 +104,40 @@ describe('shader source regressions', () => {
     expect(source).toContain('ivec2 pixel = panoramaDirectionToPixel(ray);');
   });
 
+  it('filters power-of-two cubemap-cross lighting without sampling across face boundaries', () => {
+    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+
+    expect(source).toContain('bool usesMipmappedCubemapCrossProjection()');
+    expect(source).toContain('uniform bool uSourceTextureMipmapsAvailable;');
+    expect(source).toContain('return uSourceTextureMipmapsAvailable && (');
+    expect(source).toContain('(faceSize & (faceSize - 1)) == 0');
+    expect(source).toContain('vec2 cubemapFaceSafeUvAtMip(');
+    expect(source).toContain('vec2(mipFaceSize - 0.5)');
+    expect(source).toContain('float uvClampMip = ceil(clampedLod);');
+    expect(source).toContain(
+      'cubemapFaceSafeUvAtMip(face, local, uvClampMip),'
+    );
+    expect(source).toContain('clampedLod\n    );');
+    expect(source).toContain('lod <= 0.0 ||');
+  });
+
+  it('derives cubemap environment LOD from per-face texel solid angle', () => {
+    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+
+    expect(source).toContain(
+      'float majorAxis = max(abs(ray.x), max(abs(ray.y), abs(ray.z)));'
+    );
+    expect(source).toContain(
+      'texelSolidAngle = 4.0 * majorAxis * majorAxis * majorAxis /'
+    );
+    expect(source).toContain(
+      'resolvedMaximumLod = min(resolvedMaximumLod, log2(faceSize));'
+    );
+    expect(source).not.toContain(
+      'if (usesCubemapCrossProjection()) {\n    return 0.0;\n  }'
+    );
+  });
+
   it('provides the spherical-harmonics sphere and floor environment-lighting scene', () => {
     const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
 
@@ -153,6 +187,7 @@ describe('shader source regressions', () => {
     expect(source).toContain('float evaluateRoughPlasticSmithG1(');
     expect(source).toContain('float evaluateRoughPlasticMicrofacetDistribution(');
     expect(source).toContain('float resolveEnvironmentSampleLod(');
+    expect(source).toContain('const int ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT = 256;');
     expect(source).toContain('const int ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT = 128;');
     expect(source).toContain('ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP /');
     expect(source).toContain('vec3 sampleRoughPlasticMicrofacetNormal(vec2 sampleValue, float alpha)');

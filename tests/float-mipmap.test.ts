@@ -63,6 +63,51 @@ describe('float mipmap generation', () => {
     });
   });
 
+  it('keeps power-of-two horizontal-cross cubemap faces isolated down to one texel per face', () => {
+    const faceSize = 4;
+    const width = faceSize * 4;
+    const height = faceSize * 3;
+    const unusedValue = 1000;
+    const source = new Float32Array(width * height).fill(unusedValue);
+    const faces = [
+      { column: 1, row: 0, value: 1 },
+      { column: 0, row: 1, value: 2 },
+      { column: 1, row: 1, value: 3 },
+      { column: 2, row: 1, value: 4 },
+      { column: 3, row: 1, value: 5 },
+      { column: 1, row: 2, value: 6 }
+    ] as const;
+
+    for (const face of faces) {
+      for (let localY = 0; localY < faceSize; localY += 1) {
+        for (let localX = 0; localX < faceSize; localX += 1) {
+          const x = face.column * faceSize + localX;
+          const y = face.row * faceSize + localY;
+          source[y * width + x] = face.value;
+        }
+      }
+    }
+
+    const twoTexelsPerFace = buildNextFloatMipLevel(source, width, height, 1);
+    expect(twoTexelsPerFace).not.toBeNull();
+    const oneTexelPerFace = buildNextFloatMipLevel(
+      twoTexelsPerFace!.pixels,
+      twoTexelsPerFace!.width,
+      twoTexelsPerFace!.height,
+      1
+    );
+
+    expect(oneTexelPerFace).toEqual({
+      width: 4,
+      height: 3,
+      pixels: new Float32Array([
+        unusedValue, 1, unusedValue, unusedValue,
+        2, 3, 4, 5,
+        unusedValue, 6, unusedValue, unusedValue
+      ])
+    });
+  });
+
   it.each([
     { width: 2, height: 1 },
     { width: 1, height: 2 }

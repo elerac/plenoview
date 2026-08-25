@@ -319,6 +319,10 @@ function setPanoramaUniforms(
   const gl = state.gl;
   const program = state.panoramaProgram;
   setCommonUniforms(state, program.uniforms, viewerState, options);
+  gl.uniform1i(
+    program.uniforms.sourceTextureMipmapsAvailable,
+    state.smoothFloatMinification ? 1 : 0
+  );
   gl.uniform1f(program.uniforms.panoramaYawDeg, viewerState.panoramaYawDeg);
   gl.uniform1f(
     program.uniforms.panoramaPitchDeg,

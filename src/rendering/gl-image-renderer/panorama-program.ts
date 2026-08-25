@@ -13,6 +13,11 @@ export function createPanoramaProgram(gl: WebGL2RenderingContext): ProgramBundle
     program,
     uniforms: {
       ...getCommonUniforms(gl, program),
+      sourceTextureMipmapsAvailable: getRequiredUniformLocation(
+        gl,
+        program,
+        'uSourceTextureMipmapsAvailable'
+      ),
       panoramaYawDeg: getRequiredUniformLocation(gl, program, 'uPanoramaYawDeg'),
       panoramaPitchDeg: getRequiredUniformLocation(gl, program, 'uPanoramaPitchDeg'),
       panoramaHfovDeg: getRequiredUniformLocation(gl, program, 'uPanoramaHfovDeg'),

@@ -41,6 +41,7 @@ export interface ImageUniforms extends CommonUniforms {
 }
 
 export interface PanoramaUniforms extends CommonUniforms {
+  sourceTextureMipmapsAvailable: WebGLUniformLocation;
   panoramaYawDeg: WebGLUniformLocation;
   panoramaPitchDeg: WebGLUniformLocation;
   panoramaHfovDeg: WebGLUniformLocation;

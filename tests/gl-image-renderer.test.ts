@@ -1222,7 +1222,7 @@ describe('gl image renderer', () => {
   });
 
   it('renders screenshot exports through the panorama pass when panorama mode is active', () => {
-    const { renderer, gl } = createHarness();
+    const { renderer, gl } = createHarness({ floatLinearSupported: true });
     const layer = createInterleavedLayerFromChannels({
       R: [1, 0, 0, 1],
       G: [0, 1, 0, 1],
@@ -1282,6 +1282,7 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uPanoramaPitchDeg')).toBeCloseTo(clampPanoramaProjectionPitch(90), 7);
     expect(lastUniform1fValue(gl, 'uPanoramaHfovDeg')).toBe(90);
     expect(lastUniform1iValue(gl, 'uPanoramaDisplayMode')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uSourceTextureMipmapsAvailable')).toBe(1);
     expect(lastUniform3fvValue(gl, 'uEnvironmentShIrradiance[0]')).toEqual(
       environmentShIrradiance
     );

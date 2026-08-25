@@ -9,6 +9,7 @@ uniform vec2 uOutputSize;
 uniform vec2 uOutputPixelScale;
 uniform vec2 uScreenOrigin;
 uniform vec2 uImageSize;
+uniform bool uSourceTextureMipmapsAvailable;
 uniform float uExposure;
 uniform float uDisplayGamma;
 uniform bool uUseColormap;
@@ -79,7 +80,7 @@ const int ENVIRONMENT_SURFACE_FLOOR = 0;
 const int ENVIRONMENT_SURFACE_SPHERE = 1;
 const int MICROFACET_DISTRIBUTION_BECKMANN = 0;
 const int MICROFACET_DISTRIBUTION_GGX = 1;
-const int ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT = 48;
+const int ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT = 256;
 const int ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT = 128;
 const float ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP = 4.0;
 const int STOKES_DEGREE_MODULATION_MODE_VALUE = 0;
@@ -1019,10 +1020,26 @@ bool usesCubemapCrossProjection() {
   return abs(uImageSize.x * 3.0 - uImageSize.y * 4.0) < 0.5;
 }
 
-ivec2 cubemapDirectionToPixel(vec3 ray) {
+bool usesMipmappedCubemapCrossProjection() {
+  if (!usesCubemapCrossProjection()) {
+    return false;
+  }
+
+  int imageWidth = int(uImageSize.x);
+  int imageHeight = int(uImageSize.y);
+  int faceSize = imageWidth / 4;
+  return faceSize > 0 &&
+    imageWidth == faceSize * 4 &&
+    imageHeight == faceSize * 3 &&
+    (faceSize & (faceSize - 1)) == 0;
+}
+
+void resolveCubemapFaceAndLocal(
+  vec3 ray,
+  out ivec2 face,
+  out vec2 local
+) {
   vec3 absoluteRay = abs(ray);
-  ivec2 face;
-  vec2 local;
 
   if (absoluteRay.z >= absoluteRay.x && absoluteRay.z >= absoluteRay.y) {
     face.y = 1;
@@ -1056,6 +1073,12 @@ ivec2 cubemapDirectionToPixel(vec3 ray) {
   if (abs(local.y) < 1e-6) {
     local.y = 0.0;
   }
+}
+
+ivec2 cubemapDirectionToPixel(vec3 ray) {
+  ivec2 face;
+  vec2 local;
+  resolveCubemapFaceAndLocal(ray, face, local);
 
   int faceSize = int(uImageSize.x) / 4;
   vec2 facePixel = clamp(
@@ -1089,19 +1112,7 @@ vec2 equirectangularDirectionToUv(vec3 direction) {
   );
 }
 
-vec3 sampleEnvironmentRadiance(vec3 direction, float lod) {
-  vec3 ray = normalize(direction);
-  ivec2 pixel = panoramaDirectionToPixel(ray);
-
-  // Cross layouts are atlases, so ordinary 2D mipmaps bleed unrelated faces
-  // into one another. Keep their existing face-safe level-zero lookup until a
-  // dedicated cubemap prefilter is available.
-  if (usesCubemapCrossProjection()) {
-    return readDisplaySample(pixel).linear;
-  }
-
-  vec2 uv = equirectangularDirectionToUv(ray);
-
+vec3 sampleFilteredEnvironmentRadiance(vec2 uv, float lod) {
   // The source textures carry CPU-built float mip levels when linear float
   // filtering is available. Sampling those levels keeps deterministic
   // rough-lobe integration stable without blurring the panorama background.
@@ -1122,7 +1133,68 @@ vec3 sampleEnvironmentRadiance(vec3 direction, float lod) {
     return sanitizeDisplayColor(textureLod(uSourceTextures[0], uv, lod).rgb);
   }
 
-  return readDisplaySample(pixel).linear;
+  return vec3(0.0);
+}
+
+bool supportsFilteredEnvironmentRadiance() {
+  return uSourceTextureMipmapsAvailable && (
+    uDisplayMode == DISPLAY_MODE_CHANNEL_RGB ||
+    uDisplayMode == DISPLAY_MODE_CHANNEL_MONO ||
+    uDisplayMode == DISPLAY_MODE_SPECTRAL_RGB ||
+    uDisplayMode == DISPLAY_MODE_MUELLER_MATRIX
+  );
+}
+
+vec2 cubemapFaceSafeUvAtMip(ivec2 face, vec2 local, float mipLevel) {
+  float faceSize = uImageSize.x * 0.25;
+  float mipFaceSize = max(faceSize * exp2(-mipLevel), 1.0);
+  vec2 mipImageSize = vec2(4.0, 3.0) * mipFaceSize;
+  vec2 facePixel = clamp(
+    (local * 0.5 + 0.5) * mipFaceSize,
+    vec2(0.5),
+    vec2(mipFaceSize - 0.5)
+  );
+  return (vec2(face) * mipFaceSize + facePixel) / mipImageSize;
+}
+
+vec3 sampleEnvironmentRadiance(vec3 direction, float lod) {
+  vec3 ray = normalize(direction);
+  ivec2 pixel = panoramaDirectionToPixel(ray);
+
+  if (usesCubemapCrossProjection()) {
+    // The level-zero path stays texel-exact for path tracing and panorama
+    // display. A power-of-two face size guarantees every CPU-built mip level
+    // down to one texel per face keeps atlas boundaries aligned.
+    if (
+      lod <= 0.0 ||
+      !usesMipmappedCubemapCrossProjection() ||
+      !supportsFilteredEnvironmentRadiance()
+    ) {
+      return readDisplaySample(pixel).linear;
+    }
+
+    ivec2 face;
+    vec2 local;
+    resolveCubemapFaceAndLocal(ray, face, local);
+    float maximumMip = log2(max(uImageSize.x * 0.25, 1.0));
+    float clampedLod = clamp(lod, 0.0, maximumMip);
+    // Trilinear filtering reads floor(LOD) and ceil(LOD). Clamping for the
+    // coarser level keeps both footprints inside this face with one lookup.
+    float uvClampMip = ceil(clampedLod);
+    return sampleFilteredEnvironmentRadiance(
+      cubemapFaceSafeUvAtMip(face, local, uvClampMip),
+      clampedLod
+    );
+  }
+
+  if (!supportsFilteredEnvironmentRadiance()) {
+    return readDisplaySample(pixel).linear;
+  }
+
+  return sampleFilteredEnvironmentRadiance(
+    equirectangularDirectionToUv(ray),
+    lod
+  );
 }
 
 float roughPlasticRadicalInverse(int index) {
@@ -1220,16 +1292,26 @@ float resolveEnvironmentSampleLod(
   float sampleCount,
   float maximumLod
 ) {
-  if (usesCubemapCrossProjection()) {
-    return 0.0;
-  }
-
   vec3 ray = normalize(direction);
-  float latitudeScale = max(sqrt(max(0.0, 1.0 - ray.y * ray.y)), 1.0e-3);
-  float texelSolidAngle =
-    (2.0 * PI / max(uImageSize.x, 1.0)) *
-    (PI / max(uImageSize.y, 1.0)) *
-    latitudeScale;
+  float texelSolidAngle;
+  float resolvedMaximumLod = maximumLod;
+  if (usesCubemapCrossProjection()) {
+    if (!usesMipmappedCubemapCrossProjection()) {
+      return 0.0;
+    }
+
+    float faceSize = max(uImageSize.x * 0.25, 1.0);
+    float majorAxis = max(abs(ray.x), max(abs(ray.y), abs(ray.z)));
+    texelSolidAngle = 4.0 * majorAxis * majorAxis * majorAxis /
+      (faceSize * faceSize);
+    resolvedMaximumLod = min(resolvedMaximumLod, log2(faceSize));
+  } else {
+    float latitudeScale = max(sqrt(max(0.0, 1.0 - ray.y * ray.y)), 1.0e-3);
+    texelSolidAngle =
+      (2.0 * PI / max(uImageSize.x, 1.0)) *
+      (PI / max(uImageSize.y, 1.0)) *
+      latitudeScale;
+  }
   // A mip texel's nominal solid angle describes its full box footprint, while
   // its reconstruction radius reaches only halfway toward adjacent samples.
   // Four-times the area makes neighboring finite-sample footprints overlap,
@@ -1239,7 +1321,7 @@ float resolveEnvironmentSampleLod(
   return clamp(
     0.5 * log2(max(sampleSolidAngle / max(texelSolidAngle, 1.0e-8), 1.0)),
     0.0,
-    maximumLod
+    resolvedMaximumLod
   );
 }
 
