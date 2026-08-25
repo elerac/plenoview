@@ -266,6 +266,12 @@ export function createViewerUi({
         patch
       });
     },
+    onEnvironmentSphereMaterialChange: (patch) => {
+      core.dispatch({
+        type: 'environmentSphereMaterialEdited',
+        patch
+      });
+    },
     onAutoFitImageOnSelectChange: (enabled) => {
       core.dispatch({ type: 'autoFitImageOnSelectSet', enabled });
     },
@@ -379,6 +385,12 @@ export function createViewerUi({
     },
     onViewerModeChange: (mode) => {
       getDisplayController().setViewerMode(mode);
+    },
+    onPanoramaDisplayModeChange: (mode) => {
+      getDisplayController().setPanoramaDisplayMode(mode);
+    },
+    onPanoramaLightingMethodChange: (method) => {
+      getDisplayController().setPanoramaLightingMethod(method);
     },
     onLayerChange: (layerIndex) => {
       getDisplayController().setActiveLayer(layerIndex);

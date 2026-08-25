@@ -16,6 +16,10 @@ import {
   serializeDepthSource
 } from '../depth';
 import { sameDisplaySelection } from '../display-model';
+import {
+  createDefaultEnvironmentSphereMaterial,
+  sameEnvironmentSphereMaterial
+} from '../environment-sphere-material';
 import { resolveDisplayImageSize } from '../display-size';
 import { resolveDisplaySelectionForLayer } from '../display-selection';
 import {
@@ -843,6 +847,9 @@ function buildViewerStateReadout(
   return {
     hasActiveImage: Boolean(activeSession),
     viewerMode: renderState.viewerMode,
+    panoramaDisplayMode: renderState.panoramaDisplayMode ?? 'image',
+    panoramaLightingMethod: renderState.panoramaLightingMethod ?? 'sphericalHarmonics',
+    environmentSphereMaterial: renderState.environmentSphereMaterial,
     view: {
       zoom: renderState.zoom,
       panX: renderState.panX,
@@ -995,6 +1002,13 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
   const next = b.renderState;
   const sharesCommonInputs = (
     previous.viewerMode === next.viewerMode &&
+    (previous.panoramaDisplayMode ?? 'image') === (next.panoramaDisplayMode ?? 'image') &&
+    (previous.panoramaLightingMethod ?? 'sphericalHarmonics') ===
+      (next.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    sameEnvironmentSphereMaterial(
+      previous.environmentSphereMaterial,
+      next.environmentSphereMaterial
+    ) &&
     previous.viewerBackground === next.viewerBackground &&
     previous.exposureEv === next.exposureEv &&
     previous.displayGamma === next.displayGamma &&
@@ -1044,6 +1058,7 @@ function samePaneValueOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
   const next = b.renderState;
   return (
     previous.viewerMode === next.viewerMode &&
+    (previous.panoramaDisplayMode ?? 'image') === (next.panoramaDisplayMode ?? 'image') &&
     sameDisplaySelection(previous.displaySelection, next.displaySelection) &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
     sameOptionalChannelRecognitionSettings(
@@ -1064,6 +1079,7 @@ function samePaneProbeOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
   const next = b.renderState;
   return (
     previous.viewerMode === next.viewerMode &&
+    (previous.panoramaDisplayMode ?? 'image') === (next.panoramaDisplayMode ?? 'image') &&
     previous.maskInvalidStokesVectors === next.maskInvalidStokesVectors &&
     sameOptionalChannelRecognitionSettings(
       previous.channelRecognitionSettings,
@@ -1084,7 +1100,9 @@ function samePaneProbeOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRende
 }
 
 function samePaneRulerOverlayInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource): boolean {
-  return a.renderState.viewerMode === b.renderState.viewerMode && sameViewState(a.renderState, b.renderState);
+  return a.renderState.viewerMode === b.renderState.viewerMode &&
+    (a.renderState.panoramaDisplayMode ?? 'image') === (b.renderState.panoramaDisplayMode ?? 'image') &&
+    sameViewState(a.renderState, b.renderState);
 }
 
 function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): boolean {
@@ -1093,6 +1111,10 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.displayGamma === b.displayGamma &&
     a.viewerBackground === b.viewerBackground &&
     a.viewerMode === b.viewerMode &&
+    (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
+    (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
+      (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.visualizationMode === b.visualizationMode &&
     a.activeColormapId === b.activeColormapId &&
     a.colormapExposureEv === b.colormapExposureEv &&
@@ -1131,6 +1153,9 @@ function stateLikeSessionState(): ViewerAppState['sessionState'] {
     displayGamma: DEFAULT_DISPLAY_GAMMA,
     channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
     viewerMode: 'image',
+    panoramaDisplayMode: 'image',
+    panoramaLightingMethod: 'sphericalHarmonics',
+    environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,
     colormapExposureEv: 0,

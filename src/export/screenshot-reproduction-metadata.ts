@@ -11,8 +11,16 @@ import type {
   PngCompressionLevel,
   ViewerState,
 } from '../types';
+import {
+  resolvePanoramaDisplayMode,
+  resolvePanoramaLightingMethod
+} from '../panorama-lighting';
+import {
+  cloneEnvironmentSphereMaterial,
+  type EnvironmentSphereMaterial
+} from '../environment-sphere-material';
 
-const SCREENSHOT_REPRODUCTION_METADATA_SCHEMA_VERSION = 3;
+const SCREENSHOT_REPRODUCTION_METADATA_SCHEMA_VERSION = 4;
 const APP_NAME = 'plenoview';
 
 export interface ScreenshotReproductionMetadataBatchContext {
@@ -37,7 +45,7 @@ export interface BuildScreenshotReproductionMetadataArgs {
 }
 
 export interface ScreenshotReproductionMetadataV2 {
-  schemaVersion: 3;
+  schemaVersion: 4;
   app: {
     name: string;
   };
@@ -61,6 +69,9 @@ export interface ScreenshotReproductionMetadataV2 {
   };
   viewer: {
     viewerMode: ViewerState['viewerMode'];
+    panoramaDisplayMode: NonNullable<ViewerState['panoramaDisplayMode']>;
+    panoramaLightingMethod: NonNullable<ViewerState['panoramaLightingMethod']>;
+    environmentSphereMaterial: EnvironmentSphereMaterial;
     zoom: number;
     panX: number;
     panY: number;
@@ -141,6 +152,9 @@ export function buildScreenshotReproductionMetadata({
     },
     viewer: {
       viewerMode: renderState.viewerMode,
+      panoramaDisplayMode: resolvePanoramaDisplayMode(renderState.panoramaDisplayMode),
+      panoramaLightingMethod: resolvePanoramaLightingMethod(renderState.panoramaLightingMethod),
+      environmentSphereMaterial: cloneEnvironmentSphereMaterial(renderState.environmentSphereMaterial),
       zoom: renderState.zoom,
       panX: renderState.panX,
       panY: renderState.panY,

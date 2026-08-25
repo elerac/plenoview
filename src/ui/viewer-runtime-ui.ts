@@ -12,6 +12,8 @@ import type {
   StokesAolpDegreeModulationMode,
   VisualizationMode,
   ViewerMode,
+  PanoramaDisplayMode,
+  PanoramaLightingMethod,
   ViewportRect
 } from '../types';
 import type { ProbeColorPreview } from '../probe';
@@ -95,6 +97,8 @@ export interface ViewerRuntimeUi extends Disposable {
   setColormapExposure(exposureEv: number): void;
   setColormapGamma(gamma: number): void;
   setViewerMode(mode: ViewerMode): void;
+  setPanoramaDisplayMode(mode: PanoramaDisplayMode): void;
+  setPanoramaLightingMethod?(method: PanoramaLightingMethod): void;
   setThreeDModeAvailable(available: boolean): void;
   setVisualizationMode(mode: VisualizationMode): void;
   setStokesDegreeModulationControl(

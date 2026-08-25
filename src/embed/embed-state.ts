@@ -1,5 +1,10 @@
 import type { ViewerAppCore } from '../app/viewer-app-core';
 import type { ViewerAppState } from '../app/viewer-app-types';
+import {
+  cloneEnvironmentSphereMaterial,
+  normalizeEnvironmentSphereMaterialValue,
+  type EnvironmentSphereMaterial
+} from '../environment-sphere-material';
 import type {
   DisplayLuminanceRange,
   DisplaySelection,
@@ -10,6 +15,9 @@ import type {
 
 export interface EmbedViewerStateSnapshot {
   viewerMode?: ViewerSessionState['viewerMode'];
+  panoramaDisplayMode?: ViewerSessionState['panoramaDisplayMode'];
+  panoramaLightingMethod?: ViewerSessionState['panoramaLightingMethod'];
+  environmentSphereMaterial?: EnvironmentSphereMaterial;
   visualizationMode?: ViewerSessionState['visualizationMode'];
   activeLayer?: number;
   displaySelection?: DisplaySelection | null;
@@ -33,6 +41,9 @@ export function createEmbedViewerStateSnapshot(state: ViewerAppState): EmbedView
   const view = state.interactionState.view;
   return {
     viewerMode: session.viewerMode,
+    panoramaDisplayMode: session.panoramaDisplayMode,
+    panoramaLightingMethod: session.panoramaLightingMethod,
+    environmentSphereMaterial: cloneEnvironmentSphereMaterial(session.environmentSphereMaterial),
     visualizationMode: session.visualizationMode,
     activeLayer: session.activeLayer,
     displaySelection: cloneJsonValue(session.displaySelection),
@@ -100,6 +111,24 @@ export function applyEmbedViewerStateSnapshot(
 
   if (isViewerMode(snapshot.viewerMode)) {
     core.dispatch({ type: 'viewerModeSet', viewerMode: snapshot.viewerMode });
+  }
+  if (isPanoramaDisplayMode(snapshot.panoramaDisplayMode)) {
+    core.dispatch({
+      type: 'panoramaDisplayModeSet',
+      panoramaDisplayMode: snapshot.panoramaDisplayMode
+    });
+  }
+  if (isPanoramaLightingMethod(snapshot.panoramaLightingMethod)) {
+    core.dispatch({
+      type: 'panoramaLightingMethodSet',
+      panoramaLightingMethod: snapshot.panoramaLightingMethod
+    });
+  }
+  if (snapshot.environmentSphereMaterial) {
+    core.dispatch({
+      type: 'environmentSphereMaterialEdited',
+      patch: snapshot.environmentSphereMaterial
+    });
   }
   if (isNonNegativeInteger(snapshot.activeLayer)) {
     core.dispatch({ type: 'activeLayerSet', activeLayer: snapshot.activeLayer });
@@ -170,8 +199,16 @@ function normalizeEmbedViewerStateSnapshot(value: unknown): EmbedViewerStateSnap
   }
 
   const record = value as Record<string, unknown>;
+  const environmentSphereMaterial = normalizeEnvironmentSphereMaterialValue(record.environmentSphereMaterial);
   return {
     viewerMode: isViewerMode(record.viewerMode) ? record.viewerMode : undefined,
+    panoramaDisplayMode: isPanoramaDisplayMode(record.panoramaDisplayMode)
+      ? record.panoramaDisplayMode
+      : undefined,
+    panoramaLightingMethod: isPanoramaLightingMethod(record.panoramaLightingMethod)
+      ? record.panoramaLightingMethod
+      : undefined,
+    environmentSphereMaterial: environmentSphereMaterial ?? undefined,
     visualizationMode: record.visualizationMode === 'rgb' || record.visualizationMode === 'colormap'
       ? record.visualizationMode
       : undefined,
@@ -253,6 +290,18 @@ function normalizeDisplaySelection(value: unknown): DisplaySelection | null | un
 
 function isViewerMode(value: unknown): value is ViewerSessionState['viewerMode'] {
   return value === 'image' || value === 'panorama' || value === '3d';
+}
+
+function isPanoramaDisplayMode(
+  value: unknown
+): value is NonNullable<ViewerSessionState['panoramaDisplayMode']> {
+  return value === 'image' || value === 'environmentLighting';
+}
+
+function isPanoramaLightingMethod(
+  value: unknown
+): value is NonNullable<ViewerSessionState['panoramaLightingMethod']> {
+  return value === 'sphericalHarmonics' || value === 'pathTracing';
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

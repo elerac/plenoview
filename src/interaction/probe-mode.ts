@@ -2,6 +2,7 @@ import type { ImagePixel, ViewerState, ViewportInfo } from '../types';
 import { screenToImage } from './image-geometry';
 import { screenToPanoramaPixel } from './panorama-geometry';
 import type { DepthProbePixelResolver, ImageSize, PointerPosition } from './shared';
+import { resolvePanoramaDisplayMode } from '../panorama-lighting';
 
 export function resolveProbePixel(
   point: PointerPosition,
@@ -12,6 +13,13 @@ export function resolveProbePixel(
 ): ImagePixel | null {
   if (state.viewerMode === '3d') {
     return resolveDepthProbePixel?.(point, state, viewport) ?? null;
+  }
+
+  if (
+    state.viewerMode === 'panorama' &&
+    resolvePanoramaDisplayMode(state.panoramaDisplayMode) === 'environmentLighting'
+  ) {
+    return null;
   }
 
   return state.viewerMode === 'panorama'

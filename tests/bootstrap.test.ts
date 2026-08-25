@@ -2153,6 +2153,14 @@ describe('bootstrap app lifecycle', () => {
       };
       viewer: {
         viewerMode: string;
+        environmentSphereMaterial: {
+          diffuseReflectance: { r: number; g: number; b: number };
+          alpha: number;
+          intIor: number;
+          extIor: number;
+          distribution: string;
+          nonlinear: boolean;
+        };
         panX: number;
         panY: number;
         panoramaHfovDeg: number;
@@ -2164,7 +2172,7 @@ describe('bootstrap app lifecycle', () => {
       display: { activeLayer: number; layerName: string; displaySelection: typeof rgbSelection; exposureEv: number };
     };
 
-    expect(metadata.schemaVersion).toBe(3);
+    expect(metadata.schemaVersion).toBe(4);
     expect(metadata.export).toMatchObject({
       pngFilename: 'image-screenshot.png',
       jsonFilename: 'image-screenshot.json',
@@ -2182,6 +2190,14 @@ describe('bootstrap app lifecycle', () => {
     });
     expect(metadata.viewer).toMatchObject({
       viewerMode: 'panorama',
+      environmentSphereMaterial: {
+        diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
+        alpha: 0.1,
+        intIor: 1.49,
+        extIor: 1.000277,
+        distribution: 'beckmann',
+        nonlinear: false
+      },
       panX: 12,
       panY: 6,
       panoramaHfovDeg: 80,

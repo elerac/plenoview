@@ -36,6 +36,7 @@ interface InitializeViewportLifecycleArgs {
   ui: ViewerRuntimeUi;
   renderer: WebGlExrRenderer;
   interactionCoordinator: ViewerInteractionCoordinator;
+  onRenderCurrentView?: () => void;
   isDisposed: () => boolean;
 }
 
@@ -179,6 +180,7 @@ export function initializeViewportLifecycle({
   ui,
   renderer,
   interactionCoordinator,
+  onRenderCurrentView,
   isDisposed
 }: InitializeViewportLifecycleArgs): { disconnect(): void } {
   let activePaneClientRect: ViewportClientRect | null = null;
@@ -198,6 +200,7 @@ export function initializeViewportLifecycle({
     } else {
       renderer.clearImage();
     }
+    onRenderCurrentView?.();
   };
 
   const resizeViewport = (): void => {

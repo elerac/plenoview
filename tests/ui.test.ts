@@ -1700,6 +1700,84 @@ describe('viewer state inspector', () => {
     ]);
   });
 
+  it('shows and commits sphere material controls only for environment lighting', () => {
+    installUiFixture();
+
+    const onEnvironmentSphereMaterialChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onEnvironmentSphereMaterialChange }));
+    const readout = {
+      hasActiveImage: true,
+      viewerMode: 'panorama' as const,
+      panoramaDisplayMode: 'image' as const,
+      environmentSphereMaterial: {
+        diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
+        alpha: 0.15,
+        intIor: 1.6,
+        extIor: 1.000277,
+        distribution: 'beckmann' as const,
+        nonlinear: false
+      },
+      view: {
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        panoramaYawDeg: 30,
+        panoramaPitchDeg: 5,
+        panoramaHfovDeg: 80
+      }
+    };
+
+    ui.setViewerStateReadout(readout);
+    const materialFields = document.getElementById('viewer-state-environment-material-fields') as HTMLDivElement;
+    const diffuseR = document.getElementById('viewer-state-environment-diffuse-r-input') as HTMLInputElement;
+    const diffuseG = document.getElementById('viewer-state-environment-diffuse-g-input') as HTMLInputElement;
+    const alpha = document.getElementById('viewer-state-environment-alpha-input') as HTMLInputElement;
+    const intIor = document.getElementById('viewer-state-environment-int-ior-input') as HTMLInputElement;
+    const distribution = document.getElementById('viewer-state-environment-distribution-select') as HTMLSelectElement;
+    const nonlinear = document.getElementById('viewer-state-environment-nonlinear-checkbox') as HTMLInputElement;
+
+    expect(materialFields.classList.contains('hidden')).toBe(true);
+    expect(diffuseR.disabled).toBe(true);
+
+    ui.setViewerStateReadout({
+      ...readout,
+      panoramaDisplayMode: 'environmentLighting'
+    });
+
+    expect(materialFields.classList.contains('hidden')).toBe(false);
+    expect(diffuseR.disabled).toBe(false);
+    expect(diffuseR.value).toBe('0.2');
+    expect(diffuseG.value).toBe('0.3');
+    expect(alpha.value).toBe('0.15');
+    expect(intIor.value).toBe('1.6');
+    expect(distribution.value).toBe('beckmann');
+    expect(nonlinear.checked).toBe(false);
+
+    diffuseR.value = '-1';
+    diffuseR.dispatchEvent(new Event('blur'));
+    alpha.value = '0';
+    alpha.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    intIor.value = '1.7';
+    intIor.dispatchEvent(new Event('blur'));
+    distribution.value = 'ggx';
+    distribution.dispatchEvent(new Event('change'));
+    nonlinear.checked = true;
+    nonlinear.dispatchEvent(new Event('change'));
+
+    expect(onEnvironmentSphereMaterialChange.mock.calls).toEqual([
+      [{ diffuseReflectance: { r: 0 } }],
+      [{ alpha: 0.001 }],
+      [{ intIor: 1.7 }],
+      [{ distribution: 'ggx' }],
+      [{ nonlinear: true }]
+    ]);
+
+    diffuseG.value = '';
+    diffuseG.dispatchEvent(new Event('blur'));
+    expect(diffuseG.getAttribute('aria-invalid')).toBe('true');
+    expect(onEnvironmentSphereMaterialChange).toHaveBeenCalledTimes(5);
+  });
+
   it('renders auto depth focal as a full numeric value without committing manual state on unchanged blur', () => {
     installUiFixture();
 
@@ -3710,14 +3788,25 @@ describe('view menu', () => {
     const ui = new ViewerUi(createUiCallbacks());
     const imageItem = document.getElementById('image-viewer-menu-item') as HTMLButtonElement;
     const panoramaItem = document.getElementById('panorama-viewer-menu-item') as HTMLButtonElement;
+    const panoramaImageItem = document.getElementById('panorama-image-menu-item') as HTMLButtonElement;
+    const environmentLightingItem = document.getElementById('environment-lighting-menu-item') as HTMLButtonElement;
+    const environmentPathTracingItem = document.getElementById(
+      'environment-path-tracing-menu-item'
+    ) as HTMLButtonElement;
 
     expect(imageItem.disabled).toBe(true);
     expect(panoramaItem.disabled).toBe(true);
+    expect(panoramaImageItem.disabled).toBe(true);
+    expect(environmentLightingItem.disabled).toBe(true);
+    expect(environmentPathTracingItem.disabled).toBe(true);
 
     ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
 
     expect(imageItem.disabled).toBe(false);
     expect(panoramaItem.disabled).toBe(false);
+    expect(panoramaImageItem.disabled).toBe(false);
+    expect(environmentLightingItem.disabled).toBe(false);
+    expect(environmentPathTracingItem.disabled).toBe(false);
   });
 
   it('keeps full screen preview disabled until an image is active', () => {
@@ -3736,21 +3825,53 @@ describe('view menu', () => {
     expect(previewItem.disabled).toBe(false);
   });
 
-  it('tracks checked state and dispatches panorama mode changes', () => {
+  it('tracks and dispatches panorama image, SH, and path-traced lighting choices', () => {
     installUiFixture();
 
     const onViewerModeChange = vi.fn();
-    const ui = new ViewerUi(createUiCallbacks({ onViewerModeChange }));
+    const onPanoramaDisplayModeChange = vi.fn();
+    const onPanoramaLightingMethodChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({
+      onViewerModeChange,
+      onPanoramaDisplayModeChange,
+      onPanoramaLightingMethodChange
+    }));
     ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
     ui.setViewerMode('panorama');
 
     const imageItem = document.getElementById('image-viewer-menu-item') as HTMLButtonElement;
     const panoramaItem = document.getElementById('panorama-viewer-menu-item') as HTMLButtonElement;
+    const panoramaImageItem = document.getElementById('panorama-image-menu-item') as HTMLButtonElement;
+    const environmentLightingItem = document.getElementById('environment-lighting-menu-item') as HTMLButtonElement;
+    const environmentPathTracingItem = document.getElementById(
+      'environment-path-tracing-menu-item'
+    ) as HTMLButtonElement;
     expect(imageItem.getAttribute('aria-checked')).toBe('false');
-    expect(panoramaItem.getAttribute('aria-checked')).toBe('true');
+    expect(panoramaItem.getAttribute('aria-current')).toBe('true');
+    expect(panoramaImageItem.getAttribute('aria-checked')).toBe('true');
+    expect(environmentLightingItem.getAttribute('aria-checked')).toBe('false');
+    expect(environmentPathTracingItem.getAttribute('aria-checked')).toBe('false');
 
-    panoramaItem.click();
+    ui.setPanoramaDisplayMode('environmentLighting');
+    expect(panoramaImageItem.getAttribute('aria-checked')).toBe('false');
+    expect(environmentLightingItem.getAttribute('aria-checked')).toBe('true');
+
+    ui.setPanoramaLightingMethod('pathTracing');
+    expect(environmentLightingItem.getAttribute('aria-checked')).toBe('false');
+    expect(environmentPathTracingItem.getAttribute('aria-checked')).toBe('true');
+
+    environmentPathTracingItem.click();
+    expect(onPanoramaLightingMethodChange).toHaveBeenLastCalledWith('pathTracing');
+    expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('environmentLighting');
+
+    environmentLightingItem.click();
+    expect(onPanoramaLightingMethodChange).toHaveBeenLastCalledWith('sphericalHarmonics');
+    expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('environmentLighting');
     expect(onViewerModeChange).toHaveBeenCalledWith('panorama');
+
+    panoramaImageItem.click();
+    expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('image');
+    expect(onViewerModeChange).toHaveBeenCalledTimes(3);
   });
 
   it('requests browser fullscreen and updates checked state when full screen preview is selected', async () => {
@@ -12199,6 +12320,7 @@ function createUiCallbacksBase() {
     }),
     getScreenshotFitRect: (): ViewportRect | null => null,
     onViewerModeChange: () => {},
+    onPanoramaDisplayModeChange: () => {},
     onLayerChange: () => {},
     onRgbGroupChange: () => {},
     onColormapChange: () => {},

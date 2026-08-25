@@ -6,6 +6,10 @@ import type { ChannelRecognitionSettingId, ChannelRecognitionSettings } from '..
 import type { ChannelRecognitionNameRules } from '../channel-recognition-name-rules';
 import type { ViewerBackgroundId } from '../viewer-background-settings';
 import type { ProbeColorPreview } from '../probe';
+import type {
+  EnvironmentSphereMaterial,
+  EnvironmentSphereMaterialPatch
+} from '../environment-sphere-material';
 import type { SpectralChannel, SpectralPlotPoint } from '../spectral';
 import type {
   DecodedLayer,
@@ -91,6 +95,9 @@ export interface ImageStatsReadoutModel {
 export interface ViewerStateReadoutModel {
   hasActiveImage: boolean;
   viewerMode: ViewerSessionState['viewerMode'];
+  panoramaDisplayMode?: NonNullable<ViewerSessionState['panoramaDisplayMode']>;
+  panoramaLightingMethod?: NonNullable<ViewerSessionState['panoramaLightingMethod']>;
+  environmentSphereMaterial?: EnvironmentSphereMaterial;
   view: Pick<
     ViewerViewState,
     'zoom' | 'panX' | 'panY' | 'panoramaYawDeg' | 'panoramaPitchDeg' | 'panoramaHfovDeg'
@@ -234,6 +241,9 @@ export type ViewerIntent =
   | { type: 'colormapExposureSet'; exposureEv: number }
   | { type: 'colormapGammaSet'; gamma: number }
   | { type: 'viewerModeSet'; viewerMode: ViewerSessionState['viewerMode'] }
+  | { type: 'panoramaDisplayModeSet'; panoramaDisplayMode: NonNullable<ViewerSessionState['panoramaDisplayMode']> }
+  | { type: 'panoramaLightingMethodSet'; panoramaLightingMethod: NonNullable<ViewerSessionState['panoramaLightingMethod']> }
+  | { type: 'environmentSphereMaterialEdited'; patch: EnvironmentSphereMaterialPatch }
   | { type: 'activeLayerSet'; activeLayer: number }
   | {
       type: 'displaySelectionSet';
@@ -391,6 +401,8 @@ export interface ViewerUiSnapshot {
   colormapExposureEv: number;
   colormapGamma: number;
   viewerMode: ViewerSessionState['viewerMode'];
+  panoramaDisplayMode: NonNullable<ViewerSessionState['panoramaDisplayMode']>;
+  panoramaLightingMethod: NonNullable<ViewerSessionState['panoramaLightingMethod']>;
   threeDModeAvailable?: boolean;
   visualizationMode: ViewerSessionState['visualizationMode'];
   stokesDegreeModulationControl: StokesDegreeModulationControlModel | null;

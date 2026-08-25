@@ -2,6 +2,10 @@ import { sameDisplayLuminanceRange } from '../colormap-range';
 import { sameChannelRecognitionSettings } from '../channel-recognition-settings';
 import { sameChannelRecognitionNameRules } from '../channel-recognition-name-rules';
 import { sameDisplaySelection } from '../display-model';
+import {
+  DEFAULT_ENVIRONMENT_SPHERE_MATERIAL,
+  sameEnvironmentSphereMaterial
+} from '../environment-sphere-material';
 import { sameImageRoi } from '../roi';
 import type { ProbeColorPreview, ProbeDisplayValue } from '../probe';
 import type { ExportImageBatchTarget, ImageStats, PixelSample, ViewerSessionState } from '../types';
@@ -27,6 +31,10 @@ export function sameViewerSessionState(a: ViewerSessionState, b: ViewerSessionSt
     a.displayGamma === b.displayGamma &&
     a.channelThumbnailDisplayGamma === b.channelThumbnailDisplayGamma &&
     a.viewerMode === b.viewerMode &&
+    (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
+    (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
+      (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.visualizationMode === b.visualizationMode &&
     a.activeColormapId === b.activeColormapId &&
     a.colormapExposureEv === b.colormapExposureEv &&
@@ -293,6 +301,13 @@ export function sameViewerStateReadout(
   return (
     a.hasActiveImage === b.hasActiveImage &&
     a.viewerMode === b.viewerMode &&
+    (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
+    (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
+      (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    sameEnvironmentSphereMaterial(
+      a.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL,
+      b.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL
+    ) &&
     sameViewerStateReadoutView(a.view, b.view) &&
     sameDepthReadout(a.depth, b.depth)
   );

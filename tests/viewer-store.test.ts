@@ -27,6 +27,15 @@ describe('viewer store', () => {
       top: true
     });
     expect(createInitialState().stokesAolpDegreeModulationMode).toBe('value');
+    expect(createInitialState().panoramaLightingMethod).toBe('sphericalHarmonics');
+    expect(createInitialState().environmentSphereMaterial).toEqual({
+      diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
+      alpha: 0.1,
+      intIor: 1.49,
+      extIor: 1.000277,
+      distribution: 'beckmann',
+      nonlinear: false
+    });
   });
 
   it('re-resolves display channels when switching to a layer without the current mapping', () => {

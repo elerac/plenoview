@@ -8,12 +8,21 @@ import type { DepthSource, DepthSourceGeometry } from '../../depth';
 import type { ExportImagePixels } from '../../export/export-pixels';
 import type { ChannelRecognitionNameRules } from '../../channel-recognition-name-rules';
 import type { Disposable } from '../../lifecycle';
+import type { EnvironmentImportanceSamplingTable } from '../../panorama-lighting';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../../types';
 import type { ViewerPaneRenderInfo } from '../../viewer-pane-layout';
 import { REQUIRED_TEXTURE_UNITS } from './constants';
 import { clearColormapTexture, setColormapTexture } from './colormap-texture';
+import {
+  clearEnvironmentImportanceTextureState,
+  setEnvironmentImportanceTexture
+} from './environment-importance-texture';
 import { deleteExportSurface, readExportPixels } from './export-surface';
 import { render } from './render-pass';
+import {
+  clearPathTracingSurfaces,
+  prunePathTracingSurfaces
+} from './path-tracing-surface';
 import { createGlImageRendererState } from './shared-state';
 import {
   discardChannelMaterializedBuffer,
@@ -51,6 +60,12 @@ export class GlImageRenderer implements Disposable {
 
   setPanes(panes: readonly ViewerPaneRenderInfo[]): void {
     this.panes = panes.map(clonePaneRenderInfo);
+    prunePathTracingSurfaces(
+      this.state,
+      new Set(this.panes.length > 0
+        ? this.panes.map(pane => serializePanePath(pane.path))
+        : ['root'])
+    );
   }
 
   resize(
@@ -64,6 +79,8 @@ export class GlImageRenderer implements Disposable {
       return;
     }
 
+    const previousCanvasWidth = this.state.glCanvas.width;
+    const previousCanvasHeight = this.state.glCanvas.height;
     this.state.viewport = {
       width: Math.max(1, Math.floor(width)),
       height: Math.max(1, Math.floor(height))
@@ -76,6 +93,12 @@ export class GlImageRenderer implements Disposable {
     const normalizedPixelRatio = normalizeOutputPixelRatio(pixelRatio);
     this.state.glCanvas.width = Math.max(1, Math.round(this.state.viewport.width * normalizedPixelRatio));
     this.state.glCanvas.height = Math.max(1, Math.round(this.state.viewport.height * normalizedPixelRatio));
+    if (
+      this.state.glCanvas.width !== previousCanvasWidth ||
+      this.state.glCanvas.height !== previousCanvasHeight
+    ) {
+      clearPathTracingSurfaces(this.state);
+    }
     this.state.outputPixelScale = {
       x: this.state.glCanvas.width / this.state.viewport.width,
       y: this.state.glCanvas.height / this.state.viewport.height
@@ -113,13 +136,20 @@ export class GlImageRenderer implements Disposable {
     layerIndex: number,
     width: number,
     height: number,
-    binding: DisplaySourceBinding
+    binding: DisplaySourceBinding,
+    sourceRevisionKey?: string
   ): void {
     if (this.state.disposed) {
       return;
     }
 
     setDisplaySelectionBindings(this.state, sessionId, layerIndex, width, height, binding);
+    this.state.activeSourceRevisionKey = [
+      sessionId,
+      layerIndex,
+      sourceRevisionKey ?? binding.mode,
+      ...binding.slots
+    ].join(':');
   }
 
   setDepthSourceBinding(
@@ -153,6 +183,27 @@ export class GlImageRenderer implements Disposable {
     this.state.invalidValueWarningPhase = phase >= 0.5 ? 1 : 0;
   }
 
+  setEnvironmentShIrradiance(coefficients: ArrayLike<number>): void {
+    if (this.state.disposed) {
+      return;
+    }
+
+    this.state.environmentShIrradiance.fill(0);
+    const length = Math.min(this.state.environmentShIrradiance.length, coefficients.length);
+    for (let index = 0; index < length; index += 1) {
+      const value = coefficients[index];
+      this.state.environmentShIrradiance[index] = Number.isFinite(value) ? value : 0;
+    }
+  }
+
+  setEnvironmentImportanceSampling(table: EnvironmentImportanceSamplingTable): void {
+    if (this.state.disposed) {
+      return;
+    }
+
+    setEnvironmentImportanceTexture(this.state, table);
+  }
+
   clearColormapTexture(): void {
     if (this.state.disposed) {
       return;
@@ -167,6 +218,7 @@ export class GlImageRenderer implements Disposable {
     }
 
     discardSessionTextures(this.state, sessionId);
+    clearPathTracingSurfaces(this.state);
   }
 
   discardLayerSourceTextures(sessionId: string, layerIndex: number): void {
@@ -175,6 +227,7 @@ export class GlImageRenderer implements Disposable {
     }
 
     discardLayerSourceTextures(this.state, sessionId, layerIndex);
+    clearPathTracingSurfaces(this.state);
   }
 
   discardChannelMaterializedBuffer(sessionId: string, layerIndex: number, channelName: string): void {
@@ -204,6 +257,10 @@ export class GlImageRenderer implements Disposable {
     this.state.activeDepthTextures = null;
     this.state.activeDepthGeometry = null;
     this.state.activeBinding = createEmptyDisplaySourceBinding();
+    this.state.activeSourceRevisionKey = '';
+    this.state.environmentShIrradiance.fill(0);
+    clearEnvironmentImportanceTextureState(this.state);
+    clearPathTracingSurfaces(this.state);
     this.clearFramebuffer();
   }
 
@@ -226,20 +283,20 @@ export class GlImageRenderer implements Disposable {
     return readExportPixels(this.state, args);
   }
 
-  render(state: ViewerState): void {
+  render(state: ViewerState): boolean {
     if (this.state.disposed) {
-      return;
+      return false;
     }
 
-    render(this.state, state, this.panes);
+    return render(this.state, state, this.panes);
   }
 
-  renderPane(state: ViewerState, pane: ViewerPaneRenderInfo): void {
+  renderPane(state: ViewerState, pane: ViewerPaneRenderInfo): boolean {
     if (this.state.disposed) {
-      return;
+      return false;
     }
 
-    render(this.state, state, [pane], { clear: false });
+    return render(this.state, state, [pane], { clear: false });
   }
 
   dispose(): void {
@@ -259,6 +316,10 @@ export class GlImageRenderer implements Disposable {
     this.state.activeDepthGeometry = null;
     this.state.colormapEntryCount = 0;
     this.state.activeBinding = createEmptyDisplaySourceBinding();
+    this.state.activeSourceRevisionKey = '';
+    this.state.environmentShIrradiance.fill(0);
+    clearEnvironmentImportanceTextureState(this.state);
+    clearPathTracingSurfaces(this.state);
     deleteExportSurface(this.state.gl, this.state.exportSourceSurface);
     this.state.exportSourceSurface = null;
     this.state.gl.bindVertexArray(null);
@@ -269,9 +330,11 @@ export class GlImageRenderer implements Disposable {
     }
     this.state.gl.deleteTexture(this.state.zeroTexture);
     this.state.gl.deleteTexture(this.state.colormapTexture);
+    this.state.gl.deleteTexture(this.state.environmentImportanceTexture);
     this.state.gl.deleteVertexArray(this.state.vao);
     this.state.gl.deleteProgram(this.state.imageProgram.program);
     this.state.gl.deleteProgram(this.state.panoramaProgram.program);
+    this.state.gl.deleteProgram(this.state.pathTracingPresentProgram.program);
     this.state.gl.deleteProgram(this.state.depthProgram.program);
   }
 }
@@ -291,4 +354,8 @@ function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {
     viewport: { ...pane.viewport },
     active: pane.active
   };
+}
+
+function serializePanePath(path: readonly number[]): string {
+  return path.length === 0 ? 'root' : path.join('.');
 }

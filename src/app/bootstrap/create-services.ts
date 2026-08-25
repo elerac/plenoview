@@ -11,6 +11,7 @@ import { resolveRulerFitInsets } from '../../ruler-layout';
 import { ChannelThumbnailService } from '../../services/channel-thumbnail-service';
 import { InvalidValueWarningRenderLoop } from '../../services/invalid-value-warning-render-loop';
 import { LoadQueueService } from '../../services/load-queue';
+import { PathTracingRenderLoop } from '../../services/path-tracing-render-loop';
 import { RenderCacheService } from '../../services/render-cache-service';
 import { ThumbnailService } from '../../services/thumbnail-service';
 import { DisplayController } from '../../controllers/display-controller';
@@ -30,6 +31,7 @@ export interface BootstrapServices {
   thumbnailService: ThumbnailService;
   channelThumbnailService: ChannelThumbnailService;
   invalidValueWarningRenderLoop: InvalidValueWarningRenderLoop;
+  pathTracingRenderLoop: PathTracingRenderLoop;
   sessionController: SessionController;
   interactionCoordinator: ViewerInteractionCoordinator;
   displayController: DisplayController;
@@ -148,6 +150,11 @@ export function createBootstrapServices({
     renderCache,
     getPanes: () => ui.getViewerPaneRenderInfos()
   });
+  const pathTracingRenderLoop = new PathTracingRenderLoop({
+    renderer,
+    renderCache,
+    getPanes: () => ui.getViewerPaneRenderInfos()
+  });
   const sessionController = new SessionController({
     core,
     loadQueue,
@@ -189,6 +196,7 @@ export function createBootstrapServices({
     thumbnailService,
     channelThumbnailService,
     invalidValueWarningRenderLoop,
+    pathTracingRenderLoop,
     sessionController,
     interactionCoordinator,
     displayController,
@@ -203,6 +211,7 @@ export function disposeBootstrapServices(services: Partial<BootstrapServices>): 
   services.thumbnailService?.dispose();
   services.channelThumbnailService?.dispose();
   services.invalidValueWarningRenderLoop?.dispose();
+  services.pathTracingRenderLoop?.dispose();
   services.renderCache?.dispose();
   services.renderer?.dispose();
   disposeDecodeWorker();

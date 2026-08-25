@@ -31,6 +31,10 @@ import {
   selectActiveSession,
   selectStokesDegreeModulationControl
 } from './viewer-app-selectors';
+import {
+  resolvePanoramaDisplayMode,
+  resolvePanoramaLightingMethod
+} from '../panorama-lighting';
 
 export const enum ViewerUiInvalidationFlags {
   None = 0,
@@ -113,6 +117,8 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       colormapExposureEv: state.sessionState.colormapExposureEv,
       colormapGamma: state.sessionState.colormapGamma,
       viewerMode: state.sessionState.viewerMode,
+      panoramaDisplayMode: resolvePanoramaDisplayMode(state.sessionState.panoramaDisplayMode),
+      panoramaLightingMethod: resolvePanoramaLightingMethod(state.sessionState.panoramaLightingMethod),
       threeDModeAvailable: Boolean(
         activeSession &&
         hasDepthChannelCandidate(
@@ -231,6 +237,8 @@ export function computeViewerUiInvalidation(
 
   if (
     previous.viewerMode !== next.viewerMode ||
+    previous.panoramaDisplayMode !== next.panoramaDisplayMode ||
+    previous.panoramaLightingMethod !== next.panoramaLightingMethod ||
     previous.shouldClearImageBrowserPanels !== next.shouldClearImageBrowserPanels
   ) {
     flags |= ViewerUiInvalidationFlags.ViewerMode;
@@ -573,6 +581,8 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     a.colormapExposureEv === b.colormapExposureEv &&
     a.colormapGamma === b.colormapGamma &&
     a.viewerMode === b.viewerMode &&
+    a.panoramaDisplayMode === b.panoramaDisplayMode &&
+    a.panoramaLightingMethod === b.panoramaLightingMethod &&
     a.threeDModeAvailable === b.threeDModeAvailable &&
     a.visualizationMode === b.visualizationMode &&
     sameStokesControl(a.stokesDegreeModulationControl, b.stokesDegreeModulationControl) &&

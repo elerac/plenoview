@@ -24,7 +24,11 @@ import {
   resolveDepthChannelForLayer
 } from '../../depth';
 import { computeFitView } from '../../interaction/image-geometry';
-import { DEFAULT_PANORAMA_HFOV_DEG } from '../../interaction/panorama-geometry';
+import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
+import {
+  DEFAULT_PANORAMA_HFOV_DEG,
+  clampPanoramaPitchForDisplayMode
+} from '../../interaction/panorama-geometry';
 import { cloneImageRoi } from '../../roi';
 import { samePixel } from '../../view-state';
 import { buildViewerStateForLayer } from '../../viewer-store';
@@ -133,6 +137,52 @@ export function displayReducer(
       }, {
         syncInteractionView: true,
         clearHover: true
+      });
+    }
+    case 'panoramaDisplayModeSet': {
+      if (
+        !selectActiveSession(state) ||
+        (state.sessionState.panoramaDisplayMode ?? 'image') === intent.panoramaDisplayMode
+      ) {
+        return state;
+      }
+      return patchSessionState(state, {
+        panoramaDisplayMode: intent.panoramaDisplayMode,
+        ...(intent.panoramaDisplayMode === 'environmentLighting'
+          ? {
+              panoramaPitchDeg: clampPanoramaPitchForDisplayMode(
+                state.sessionState.panoramaPitchDeg,
+                intent.panoramaDisplayMode
+              )
+            }
+          : {})
+      }, {
+        syncInteractionView: intent.panoramaDisplayMode === 'environmentLighting',
+        clearHover: true
+      });
+    }
+    case 'panoramaLightingMethodSet': {
+      if (
+        !selectActiveSession(state) ||
+        (state.sessionState.panoramaLightingMethod ?? 'sphericalHarmonics') === intent.panoramaLightingMethod
+      ) {
+        return state;
+      }
+      return patchSessionState(state, {
+        panoramaLightingMethod: intent.panoramaLightingMethod
+      }, {
+        clearHover: true
+      });
+    }
+    case 'environmentSphereMaterialEdited': {
+      if (!selectActiveSession(state)) {
+        return state;
+      }
+      return patchSessionState(state, {
+        environmentSphereMaterial: normalizeEnvironmentSphereMaterial(
+          intent.patch,
+          state.sessionState.environmentSphereMaterial
+        )
       });
     }
     case 'activeLayerSet': {
@@ -369,7 +419,11 @@ export function displayReducer(
       if (!selectActiveSession(state)) {
         return state;
       }
-      const patch = normalizeViewerViewPatch(intent.patch, state.sessionState.depthChannel);
+      const patch = normalizeViewerViewPatch(
+        intent.patch,
+        state.sessionState.depthChannel,
+        state.sessionState.panoramaDisplayMode
+      );
       return patch ? patchSessionState(state, patch, {
         syncInteractionView: true,
         clearHover: true
@@ -409,14 +463,22 @@ export function displayReducer(
       });
     }
     case 'interactionStatePublished': {
-      const interactionState = cloneInteractionState(intent.interactionState, state.sessionState.depthChannel);
+      const interactionState = cloneInteractionState(
+        intent.interactionState,
+        state.sessionState.depthChannel,
+        state.sessionState.panoramaDisplayMode
+      );
       return sameInteractionState(state.interactionState, interactionState) ? state : {
         ...state,
         interactionState
       };
     }
     case 'viewStateCommitted': {
-      const patch = normalizeViewerViewPatch(intent.view, state.sessionState.depthChannel);
+      const patch = normalizeViewerViewPatch(
+        intent.view,
+        state.sessionState.depthChannel,
+        state.sessionState.panoramaDisplayMode
+      );
       if (!patch || sameViewCommit(state.sessionState, { ...state.sessionState, ...patch })) {
         return state;
       }

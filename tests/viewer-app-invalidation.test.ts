@@ -112,6 +112,92 @@ describe('viewer app lanes', () => {
     expect(createRenderFlags(state, state)).toBe(ViewerRenderInvalidationFlags.None);
   });
 
+  it('invalidates viewer-mode UI and panorama rendering when the panorama display choice changes', () => {
+    const initialState = createActiveState();
+    const state: ViewerAppState = {
+      ...initialState,
+      sessionState: {
+        ...initialState.sessionState,
+        viewerMode: 'panorama',
+        panoramaDisplayMode: 'image'
+      }
+    };
+    const nextState: ViewerAppState = {
+      ...state,
+      sessionState: {
+        ...state.sessionState,
+        panoramaDisplayMode: 'environmentLighting'
+      }
+    };
+    const uiFlags = createUiFlags(state, nextState);
+    const renderFlags = createRenderFlags(state, nextState);
+
+    expect(hasUiFlag(uiFlags, ViewerUiInvalidationFlags.ViewerMode)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderValueOverlay)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderProbeOverlay)).toBe(true);
+    expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderRulerOverlay)).toBe(false);
+  });
+
+  it('invalidates panorama UI and rendering when the environment lighting method changes', () => {
+    const initialState = createActiveState();
+    const state: ViewerAppState = {
+      ...initialState,
+      sessionState: {
+        ...initialState.sessionState,
+        viewerMode: 'panorama',
+        panoramaDisplayMode: 'environmentLighting',
+        panoramaLightingMethod: 'sphericalHarmonics'
+      }
+    };
+    const nextState: ViewerAppState = {
+      ...state,
+      sessionState: {
+        ...state.sessionState,
+        panoramaLightingMethod: 'pathTracing'
+      }
+    };
+
+    expect(hasUiFlag(
+      createUiFlags(state, nextState),
+      ViewerUiInvalidationFlags.ViewerMode
+    )).toBe(true);
+    expect(hasRenderFlag(
+      createRenderFlags(state, nextState),
+      ViewerRenderInvalidationFlags.RenderImage
+    )).toBe(true);
+  });
+
+  it('rerenders the environment sphere material without preparing image resources', () => {
+    const initialState = createActiveState();
+    const state: ViewerAppState = {
+      ...initialState,
+      sessionState: {
+        ...initialState.sessionState,
+        viewerMode: 'panorama',
+        panoramaDisplayMode: 'environmentLighting'
+      }
+    };
+    const nextState: ViewerAppState = {
+      ...state,
+      sessionState: {
+        ...state.sessionState,
+        environmentSphereMaterial: {
+          ...state.sessionState.environmentSphereMaterial,
+          alpha: 0.35
+        }
+      }
+    };
+    const flags = createRenderFlags(state, nextState);
+
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.ViewerStateReadout)).toBe(true);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.ResourcePrepare)).toBe(false);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderValueOverlay)).toBe(false);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderProbeOverlay)).toBe(false);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderRulerOverlay)).toBe(false);
+  });
+
   it('exposes auto-fit selection mode through the UI lane only', () => {
     const state = createActiveState();
     const nextState = {

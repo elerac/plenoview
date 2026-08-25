@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildLoadedSession, buildReloadedSession, buildReloadedSessionState } from '../src/app/session-resource';
+import {
+  buildLoadedSession,
+  buildReloadedSession,
+  buildReloadedSessionState,
+  buildResetSessionBaseState,
+  buildSwitchedSessionState
+} from '../src/app/session-resource';
 import { MUELLER_MATRIX_ELEMENTS } from '../src/mueller';
 import { createInitialState } from '../src/viewer-store';
 import { createImage, createLayerFromChannels, createMuellerMatrixSelection } from './helpers/state-fixtures';
@@ -133,6 +139,38 @@ describe('session resource display names', () => {
 });
 
 describe('session resource auto-fit handling', () => {
+  it('carries environment sphere material across session switches and resets', () => {
+    const decoded = createSizedImage(2, 2);
+    const storedState = createInitialState();
+    const session: OpenedImageSession = {
+      id: 'session-2',
+      filename: 'second.exr',
+      displayName: 'second.exr',
+      fileSizeBytes: 16,
+      source: { kind: 'url', url: '/second.exr' },
+      decoded,
+      state: storedState
+    };
+    const currentState = {
+      ...createInitialState(),
+      environmentSphereMaterial: {
+        ...createInitialState().environmentSphereMaterial,
+        diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
+        alpha: 0.35,
+        distribution: 'ggx' as const,
+        nonlinear: true
+      }
+    };
+
+    const switched = buildSwitchedSessionState(session, currentState, decoded);
+    const reset = buildResetSessionBaseState(session, currentState, '0');
+
+    expect(switched.environmentSphereMaterial).toEqual(currentState.environmentSphereMaterial);
+    expect(switched.environmentSphereMaterial).not.toBe(currentState.environmentSphereMaterial);
+    expect(reset.environmentSphereMaterial).toEqual(currentState.environmentSphereMaterial);
+    expect(reset.environmentSphereMaterial).not.toBe(currentState.environmentSphereMaterial);
+  });
+
   it('preserves the carried image view when loading with auto-fit disabled', () => {
     const session = buildLoadedSession({
       sessionId: 'session-2',

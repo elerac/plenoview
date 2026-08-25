@@ -73,6 +73,8 @@ import type {
   ImageRoi,
   OpenedImageDropPlacement,
   PixelSample,
+  PanoramaDisplayMode,
+  PanoramaLightingMethod,
   RoiStats,
   StokesAolpDegreeModulationMode,
   ViewerKeyboardNavigationInput,
@@ -85,6 +87,7 @@ import type {
   VisualizationMode
 } from '../types';
 import type { ProbeColorPreview } from '../probe';
+import type { EnvironmentSphereMaterialPatch } from '../environment-sphere-material';
 import { ProbeReadoutController, type ProbeCoordinateImageSize } from './probe-readout';
 import { setRoiReadout } from './roi-readout';
 import { SpectralPlotPanel } from './spectral-plot-panel';
@@ -331,6 +334,7 @@ export interface UiCallbacks {
   onDepthSettingsChange?: (
     patch: Partial<Pick<ViewerSessionState, 'depthChannel' | 'depthFocalLengthPx' | 'depthPointSizePx'>>
   ) => void;
+  onEnvironmentSphereMaterialChange?: (patch: EnvironmentSphereMaterialPatch) => void;
   onAutoFitImageOnSelectChange: (enabled: boolean) => void;
   onAutoFitImage: () => void;
   onAutoExposureChange: (enabled: boolean) => void;
@@ -344,6 +348,8 @@ export interface UiCallbacks {
   getScreenshotSelectionContext: () => ScreenshotSelectionContext;
   getScreenshotFitRect: () => ViewportRect | null;
   onViewerModeChange: (mode: ViewerMode) => void;
+  onPanoramaDisplayModeChange?: (mode: PanoramaDisplayMode) => void;
+  onPanoramaLightingMethodChange?: (method: PanoramaLightingMethod) => void;
   onLayerChange: (layerIndex: number) => void;
   onRgbGroupChange: (mapping: DisplaySelection) => void;
   onColormapChange: (colormapId: string | null) => void;
@@ -445,6 +451,8 @@ export class ViewerUi implements Disposable {
   private spectralRgbGroupingEnabled = DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED;
   private invalidValueWarningEnabled = DEFAULT_INVALID_VALUE_WARNING_ENABLED;
   private viewerMode: ViewerMode = 'image';
+  private panoramaDisplayMode: PanoramaDisplayMode = 'image';
+  private panoramaLightingMethod: PanoramaLightingMethod = 'sphericalHarmonics';
   private threeDModeAvailable = false;
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
@@ -733,6 +741,9 @@ export class ViewerUi implements Disposable {
       },
       onDepthSettingsChange: (patch) => {
         this.callbacks.onDepthSettingsChange?.(patch);
+      },
+      onEnvironmentSphereMaterialChange: (patch) => {
+        this.callbacks.onEnvironmentSphereMaterialChange?.(patch);
       }
     });
     this.dragDropController = new DragDropController(this.elements, {
@@ -1163,9 +1174,29 @@ export class ViewerUi implements Disposable {
     }
     this.viewerMode = mode;
     this.elements.imageViewerMenuItem.setAttribute('aria-checked', mode === 'image' ? 'true' : 'false');
-    this.elements.panoramaViewerMenuItem.setAttribute('aria-checked', mode === 'panorama' ? 'true' : 'false');
+    this.elements.panoramaViewerMenuItem.classList.toggle('is-active', mode === 'panorama');
+    this.elements.panoramaViewerMenuItem.setAttribute('aria-current', mode === 'panorama' ? 'true' : 'false');
     this.elements.threeDViewerMenuItem.setAttribute('aria-checked', mode === '3d' ? 'true' : 'false');
+    this.updatePanoramaDisplayModeMenuItems();
     this.updateAutoFitImageButtonDisabled();
+  }
+
+  setPanoramaDisplayMode(mode: PanoramaDisplayMode): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.panoramaDisplayMode = mode;
+    this.updatePanoramaDisplayModeMenuItems();
+  }
+
+  setPanoramaLightingMethod(method: PanoramaLightingMethod): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.panoramaLightingMethod = method;
+    this.updatePanoramaDisplayModeMenuItems();
   }
 
   setThreeDModeAvailable(available: boolean): void {
@@ -1892,6 +1923,21 @@ export class ViewerUi implements Disposable {
         return;
       case 'viewerModePanorama':
         if (!this.elements.panoramaViewerMenuItem.disabled) {
+          this.callbacks.onPanoramaDisplayModeChange?.('image');
+          this.callbacks.onViewerModeChange('panorama');
+        }
+        return;
+      case 'viewerModeEnvironmentLighting':
+        if (!this.elements.environmentLightingMenuItem.disabled) {
+          this.callbacks.onPanoramaLightingMethodChange?.('sphericalHarmonics');
+          this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
+          this.callbacks.onViewerModeChange('panorama');
+        }
+        return;
+      case 'viewerModeEnvironmentPathTracing':
+        if (!this.elements.environmentPathTracingMenuItem.disabled) {
+          this.callbacks.onPanoramaLightingMethodChange?.('pathTracing');
+          this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
           this.callbacks.onViewerModeChange('panorama');
         }
         return;
@@ -1946,6 +1992,8 @@ export class ViewerUi implements Disposable {
       metadata: !this.elements.appMetadataButton.disabled,
       viewerModeImage: !this.elements.imageViewerMenuItem.disabled,
       viewerModePanorama: !this.elements.panoramaViewerMenuItem.disabled,
+      viewerModeEnvironmentLighting: !this.elements.environmentLightingMenuItem.disabled,
+      viewerModeEnvironmentPathTracing: !this.elements.environmentPathTracingMenuItem.disabled,
       viewerMode3d: !this.elements.threeDViewerMenuItem.disabled,
       toggleRulers: this.openedImageCount > 0 && !this.isViewerLoadBlocked,
       windowPreviewNormal: true,
@@ -2751,8 +2799,31 @@ export class ViewerUi implements Disposable {
     const disabled = this.isViewerLoadBlocked || this.openedImageCount === 0;
     this.elements.imageViewerMenuItem.disabled = disabled;
     this.elements.panoramaViewerMenuItem.disabled = disabled;
+    this.elements.panoramaImageMenuItem.disabled = disabled;
+    this.elements.environmentLightingMenuItem.disabled = disabled;
+    this.elements.environmentPathTracingMenuItem.disabled = disabled;
     this.elements.threeDViewerMenuItem.disabled = disabled || !this.threeDModeAvailable;
     this.notifyDesktopCommandStateChanged();
+  }
+
+  private updatePanoramaDisplayModeMenuItems(): void {
+    const panoramaActive = this.viewerMode === 'panorama';
+    this.elements.panoramaImageMenuItem.setAttribute(
+      'aria-checked',
+      panoramaActive && this.panoramaDisplayMode === 'image' ? 'true' : 'false'
+    );
+    this.elements.environmentLightingMenuItem.setAttribute(
+      'aria-checked',
+      panoramaActive &&
+        this.panoramaDisplayMode === 'environmentLighting' &&
+        this.panoramaLightingMethod === 'sphericalHarmonics' ? 'true' : 'false'
+    );
+    this.elements.environmentPathTracingMenuItem.setAttribute(
+      'aria-checked',
+      panoramaActive &&
+        this.panoramaDisplayMode === 'environmentLighting' &&
+        this.panoramaLightingMethod === 'pathTracing' ? 'true' : 'false'
+    );
   }
 
   private updateWindowPaneMenuItemsDisabled(): void {
@@ -2987,12 +3058,35 @@ export class ViewerUi implements Disposable {
       this.callbacks.onViewerModeChange('image');
     });
 
-    this.disposables.addEventListener(this.elements.panoramaViewerMenuItem, 'click', () => {
-      if (this.elements.panoramaViewerMenuItem.disabled) {
+    this.disposables.addEventListener(this.elements.panoramaImageMenuItem, 'click', () => {
+      if (this.elements.panoramaImageMenuItem.disabled) {
         return;
       }
 
       this.topMenuController.closeAll();
+      this.callbacks.onPanoramaDisplayModeChange?.('image');
+      this.callbacks.onViewerModeChange('panorama');
+    });
+
+    this.disposables.addEventListener(this.elements.environmentLightingMenuItem, 'click', () => {
+      if (this.elements.environmentLightingMenuItem.disabled) {
+        return;
+      }
+
+      this.topMenuController.closeAll();
+      this.callbacks.onPanoramaLightingMethodChange?.('sphericalHarmonics');
+      this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
+      this.callbacks.onViewerModeChange('panorama');
+    });
+
+    this.disposables.addEventListener(this.elements.environmentPathTracingMenuItem, 'click', () => {
+      if (this.elements.environmentPathTracingMenuItem.disabled) {
+        return;
+      }
+
+      this.topMenuController.closeAll();
+      this.callbacks.onPanoramaLightingMethodChange?.('pathTracing');
+      this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
       this.callbacks.onViewerModeChange('panorama');
     });
 

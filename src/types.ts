@@ -7,10 +7,13 @@ import type { ChannelStorage, FiniteValueRange } from './channel-storage';
 import type { ChannelRecognitionSettings } from './channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from './channel-recognition-name-rules';
 import type { ViewerBackgroundId } from './viewer-background-settings';
+import type { EnvironmentSphereMaterial } from './environment-sphere-material';
 
 export type VisualizationMode = 'rgb' | 'colormap';
 export type ColormapRangeMode = 'alwaysAuto' | 'oneTime';
 export type ViewerMode = 'image' | 'panorama' | '3d';
+export type PanoramaDisplayMode = 'image' | 'environmentLighting';
+export type PanoramaLightingMethod = 'sphericalHarmonics' | 'pathTracing';
 export type OpenedImageDropPlacement = 'before' | 'after';
 export type ViewerKeyboardNavigationDirection = 'up' | 'left' | 'down' | 'right';
 export type ViewerKeyboardZoomDirection = 'in' | 'out';
@@ -167,6 +170,9 @@ export interface ViewerSessionState extends ViewerViewState {
   displayGamma: number;
   channelThumbnailDisplayGamma: number;
   viewerMode: ViewerMode;
+  panoramaDisplayMode?: PanoramaDisplayMode;
+  panoramaLightingMethod?: PanoramaLightingMethod;
+  environmentSphereMaterial: EnvironmentSphereMaterial;
   visualizationMode: VisualizationMode;
   activeColormapId: string | null;
   colormapExposureEv: number;

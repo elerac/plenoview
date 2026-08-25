@@ -56,6 +56,22 @@ describe('session state', () => {
     expect('hoveredPixel' in cloned).toBe(false);
   });
 
+  it('deep-clones environment sphere material state', () => {
+    const state = createViewerSessionState({
+      environmentSphereMaterial: {
+        ...createViewerSessionState().environmentSphereMaterial,
+        diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 }
+      }
+    });
+    const cloned = cloneViewerSessionState(state);
+
+    expect(cloned.environmentSphereMaterial).toEqual(state.environmentSphereMaterial);
+    expect(cloned.environmentSphereMaterial).not.toBe(state.environmentSphereMaterial);
+    expect(cloned.environmentSphereMaterial.diffuseReflectance).not.toBe(
+      state.environmentSphereMaterial.diffuseReflectance
+    );
+  });
+
   it('preserves free rotation when cloning position depth session state', () => {
     const cloned = cloneViewerSessionState(createViewerSessionState({
       depthChannel: '__position:P',

@@ -698,6 +698,10 @@ output {
   color: var(--text-dim);
 }
 
+.app-menu-submenu-trigger.is-active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .app-menu-submenu-dropdown {
   top: -5px;
   left: calc(100% - 1px);
@@ -4139,6 +4143,29 @@ body.is-resizing-panel-rows * {
   color: var(--text-dim);
   font-size: var(--type-label-size);
   line-height: var(--type-label-line-height);
+}
+
+.viewer-state-environment-material-fields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(4rem, auto) minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.viewer-state-environment-material-fields h3 {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+  color: var(--text);
+  font-size: var(--type-ui-size);
+  font-weight: 600;
+}
+
+.viewer-state-checkbox {
+  justify-self: start;
 }
 
 .viewer-state-input {

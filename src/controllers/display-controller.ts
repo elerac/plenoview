@@ -77,6 +77,8 @@ import {
 import type { RestorableVisualizationState } from '../app/viewer-app-types';
 import type {
   DisplayLuminanceRange,
+  PanoramaDisplayMode,
+  PanoramaLightingMethod,
   StokesAolpDegreeModulationMode,
   ViewerMode,
   VisualizationMode
@@ -702,6 +704,28 @@ export class DisplayController implements Disposable {
     this.core.dispatch({
       type: 'viewerModeSet',
       viewerMode: mode
+    });
+  }
+
+  setPanoramaDisplayMode(mode: PanoramaDisplayMode): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.core.dispatch({
+      type: 'panoramaDisplayModeSet',
+      panoramaDisplayMode: mode
+    });
+  }
+
+  setPanoramaLightingMethod(method: PanoramaLightingMethod): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.core.dispatch({
+      type: 'panoramaLightingMethodSet',
+      panoramaLightingMethod: method
     });
   }
 

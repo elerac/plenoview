@@ -12,6 +12,7 @@ import {
 import {
   clampPanoramaHfov,
   clampPanoramaPitch,
+  clampPanoramaPitchForDisplayMode,
   normalizePanoramaYaw
 } from '../../interaction/panorama-geometry';
 import { cloneImageRoi, sameImageRoi } from '../../roi';
@@ -143,7 +144,8 @@ export function updateActiveSessionStoredState(
 
 export function normalizeViewerViewPatch(
   patch: Partial<ViewerViewState>,
-  depthSource: DepthRotationSource = null
+  depthSource: DepthRotationSource = null,
+  panoramaDisplayMode?: ViewerSessionState['panoramaDisplayMode']
 ): Partial<ViewerViewState> | null {
   const normalized: Partial<ViewerViewState> = {};
   if (patch.zoom !== undefined && Number.isFinite(patch.zoom)) {
@@ -159,7 +161,9 @@ export function normalizeViewerViewPatch(
     normalized.panoramaYawDeg = normalizePanoramaYaw(patch.panoramaYawDeg);
   }
   if (patch.panoramaPitchDeg !== undefined && Number.isFinite(patch.panoramaPitchDeg)) {
-    normalized.panoramaPitchDeg = clampPanoramaPitch(patch.panoramaPitchDeg);
+    normalized.panoramaPitchDeg = panoramaDisplayMode === undefined
+      ? clampPanoramaPitch(patch.panoramaPitchDeg)
+      : clampPanoramaPitchForDisplayMode(patch.panoramaPitchDeg, panoramaDisplayMode);
   }
   if (patch.panoramaHfovDeg !== undefined && Number.isFinite(patch.panoramaHfovDeg)) {
     normalized.panoramaHfovDeg = clampPanoramaHfov(patch.panoramaHfovDeg);
@@ -188,10 +192,18 @@ export function normalizeViewerViewPatch(
 
 export function cloneInteractionState(
   state: ViewerAppState['interactionState'],
-  depthSource: DepthRotationSource = null
+  depthSource: DepthRotationSource = null,
+  panoramaDisplayMode?: ViewerSessionState['panoramaDisplayMode']
 ): ViewerAppState['interactionState'] {
+  const view = pickViewState(state.view, depthSource);
+  if (panoramaDisplayMode !== undefined) {
+    view.panoramaPitchDeg = clampPanoramaPitchForDisplayMode(
+      view.panoramaPitchDeg,
+      panoramaDisplayMode
+    );
+  }
   return {
-    view: pickViewState(state.view, depthSource),
+    view,
     hoveredPixel: state.hoveredPixel ? { ...state.hoveredPixel } : null,
     draftRoi: cloneImageRoi(state.draftRoi),
     roiInteraction: { ...(state.roiInteraction ?? createEmptyRoiInteractionState()) }

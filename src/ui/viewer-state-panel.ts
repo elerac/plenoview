@@ -14,17 +14,26 @@ import {
   normalizePanoramaYaw
 } from '../interaction/panorama-geometry';
 import { DisposableBag, type Disposable } from '../lifecycle';
+import {
+  createDefaultEnvironmentSphereMaterial,
+  normalizeEnvironmentSphereMaterial,
+  type EnvironmentSphereDiffuseReflectance,
+  type EnvironmentSphereMaterialPatch
+} from '../environment-sphere-material';
 import type { ViewerStateReadoutModel } from '../app/viewer-app-types';
 import type { ViewerSessionState, ViewerViewState } from '../types';
 import type { ViewerStatePanelElements } from './elements';
 
 type ViewerStateField = keyof ViewerViewState;
+type EnvironmentDiffuseField = keyof EnvironmentSphereDiffuseReflectance;
+type EnvironmentMaterialNumberField = 'alpha' | 'intIor' | 'extIor';
 
 interface ViewerStatePanelCallbacks {
   onViewerViewStateChange: (patch: Partial<ViewerViewState>) => void;
   onDepthSettingsChange: (
     patch: Partial<Pick<ViewerSessionState, 'depthChannel' | 'depthFocalLengthPx' | 'depthPointSizePx'>>
   ) => void;
+  onEnvironmentSphereMaterialChange: (patch: EnvironmentSphereMaterialPatch) => void;
 }
 
 export class ViewerStatePanel implements Disposable {
@@ -32,6 +41,9 @@ export class ViewerStatePanel implements Disposable {
   private readout: ViewerStateReadoutModel = {
     hasActiveImage: false,
     viewerMode: 'image',
+    panoramaDisplayMode: 'image',
+    panoramaLightingMethod: 'sphericalHarmonics',
+    environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     view: {
       zoom: 1,
       panX: 0,
@@ -67,6 +79,14 @@ export class ViewerStatePanel implements Disposable {
     this.bindInput(this.elements.viewerStateYawInput, 'panoramaYawDeg');
     this.bindInput(this.elements.viewerStatePitchInput, 'panoramaPitchDeg');
     this.bindInput(this.elements.viewerStateHfovInput, 'panoramaHfovDeg');
+    this.bindEnvironmentDiffuseInput(this.elements.viewerStateEnvironmentDiffuseRInput, 'r');
+    this.bindEnvironmentDiffuseInput(this.elements.viewerStateEnvironmentDiffuseGInput, 'g');
+    this.bindEnvironmentDiffuseInput(this.elements.viewerStateEnvironmentDiffuseBInput, 'b');
+    this.bindEnvironmentMaterialNumberInput(this.elements.viewerStateEnvironmentAlphaInput, 'alpha');
+    this.bindEnvironmentMaterialNumberInput(this.elements.viewerStateEnvironmentIntIorInput, 'intIor');
+    this.bindEnvironmentMaterialNumberInput(this.elements.viewerStateEnvironmentExtIorInput, 'extIor');
+    this.bindEnvironmentDistributionSelect();
+    this.bindEnvironmentNonlinearCheckbox();
     this.bindInput(this.elements.viewerStateDepthYawInput, 'depthYawDeg');
     this.bindInput(this.elements.viewerStateDepthPitchInput, 'depthPitchDeg');
     this.bindInput(this.elements.viewerStateDepthZoomInput, 'depthZoom');
@@ -85,15 +105,22 @@ export class ViewerStatePanel implements Disposable {
     }
 
     const normalizedDepth = normalizeDepthReadout(readout.depth);
+    const panoramaDisplayMode = readout.panoramaDisplayMode ?? 'image';
+    const panoramaLightingMethod = readout.panoramaLightingMethod ?? 'sphericalHarmonics';
+    const environmentSphereMaterial = normalizeEnvironmentSphereMaterial(readout.environmentSphereMaterial);
     this.readout = {
       hasActiveImage: readout.hasActiveImage,
       viewerMode: readout.viewerMode,
+      panoramaDisplayMode,
+      panoramaLightingMethod,
+      environmentSphereMaterial,
       view: normalizeViewReadout(readout.view, getDepthReadoutRotationSource(normalizedDepth)),
       depth: normalizedDepth
     };
 
     const imageFieldsActive = readout.hasActiveImage && readout.viewerMode === 'image';
     const panoramaFieldsActive = readout.hasActiveImage && readout.viewerMode === 'panorama';
+    const environmentMaterialFieldsActive = panoramaFieldsActive && panoramaDisplayMode === 'environmentLighting';
     const depthFieldsActive = readout.hasActiveImage && readout.viewerMode === '3d';
     this.elements.viewerStateEmptyState.classList.toggle('hidden', readout.hasActiveImage);
     this.elements.viewerStateImageFields.classList.toggle(
@@ -103,6 +130,10 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStatePanoramaFields.classList.toggle(
       'hidden',
       !panoramaFieldsActive
+    );
+    this.elements.viewerStateEnvironmentMaterialFields.classList.toggle(
+      'hidden',
+      !environmentMaterialFieldsActive
     );
     this.elements.viewerStateDepthFields.classList.toggle(
       'hidden',
@@ -118,6 +149,14 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStateYawInput.disabled = !panoramaFieldsActive;
     this.elements.viewerStatePitchInput.disabled = !panoramaFieldsActive;
     this.elements.viewerStateHfovInput.disabled = !panoramaFieldsActive;
+    this.elements.viewerStateEnvironmentDiffuseRInput.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentDiffuseGInput.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentDiffuseBInput.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentAlphaInput.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentIntIorInput.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentExtIorInput.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentDistributionSelect.disabled = !environmentMaterialFieldsActive;
+    this.elements.viewerStateEnvironmentNonlinearCheckbox.disabled = !environmentMaterialFieldsActive;
     this.elements.viewerStateDepthChannelSelect.disabled = !depthFieldsActive || normalizedDepth.channelOptions.length === 0;
     const depthFocalVisible = depthFieldsActive && normalizedDepth.sourceKind !== 'xyzPosition';
     this.elements.viewerStateDepthFocalLabel.classList.toggle('hidden', !depthFocalVisible);
@@ -137,6 +176,32 @@ export class ViewerStatePanel implements Disposable {
     this.elements.viewerStateYawInput.value = formatViewerStateNumber(readout.view.panoramaYawDeg, 'panoramaYawDeg');
     this.elements.viewerStatePitchInput.value = formatViewerStateNumber(readout.view.panoramaPitchDeg, 'panoramaPitchDeg');
     this.elements.viewerStateHfovInput.value = formatViewerStateNumber(readout.view.panoramaHfovDeg, 'panoramaHfovDeg');
+    this.elements.viewerStateEnvironmentDiffuseRInput.value = formatEnvironmentMaterialNumber(
+      environmentSphereMaterial.diffuseReflectance.r,
+      'diffuse'
+    );
+    this.elements.viewerStateEnvironmentDiffuseGInput.value = formatEnvironmentMaterialNumber(
+      environmentSphereMaterial.diffuseReflectance.g,
+      'diffuse'
+    );
+    this.elements.viewerStateEnvironmentDiffuseBInput.value = formatEnvironmentMaterialNumber(
+      environmentSphereMaterial.diffuseReflectance.b,
+      'diffuse'
+    );
+    this.elements.viewerStateEnvironmentAlphaInput.value = formatEnvironmentMaterialNumber(
+      environmentSphereMaterial.alpha,
+      'alpha'
+    );
+    this.elements.viewerStateEnvironmentIntIorInput.value = formatEnvironmentMaterialNumber(
+      environmentSphereMaterial.intIor,
+      'ior'
+    );
+    this.elements.viewerStateEnvironmentExtIorInput.value = formatEnvironmentMaterialNumber(
+      environmentSphereMaterial.extIor,
+      'ior'
+    );
+    this.elements.viewerStateEnvironmentDistributionSelect.value = environmentSphereMaterial.distribution;
+    this.elements.viewerStateEnvironmentNonlinearCheckbox.checked = environmentSphereMaterial.nonlinear;
     const depth = normalizedDepth;
     this.setDepthChannelOptions(depth.channelOptions, depth.channel);
     const focalDisplayValue = formatDepthFocalInputValue(depth);
@@ -205,6 +270,110 @@ export class ViewerStatePanel implements Disposable {
     const patch: Partial<ViewerViewState> = {};
     patch[field] = normalized;
     this.callbacks.onViewerViewStateChange(patch);
+  }
+
+  private bindEnvironmentDiffuseInput(input: HTMLInputElement, field: EnvironmentDiffuseField): void {
+    this.bindEnvironmentNumberInput(input, () => this.commitEnvironmentDiffuseInput(input, field));
+  }
+
+  private bindEnvironmentMaterialNumberInput(
+    input: HTMLInputElement,
+    field: EnvironmentMaterialNumberField
+  ): void {
+    this.bindEnvironmentNumberInput(input, () => this.commitEnvironmentMaterialNumberInput(input, field));
+  }
+
+  private bindEnvironmentNumberInput(input: HTMLInputElement, commit: () => void): void {
+    this.disposables.addEventListener(input, 'keydown', (event) => {
+      if (event.key !== 'Enter') {
+        return;
+      }
+
+      event.preventDefault();
+      commit();
+    });
+    this.disposables.addEventListener(input, 'blur', commit);
+  }
+
+  private commitEnvironmentDiffuseInput(input: HTMLInputElement, field: EnvironmentDiffuseField): void {
+    const value = this.readEnvironmentNumberInput(input);
+    if (value === null) {
+      return;
+    }
+
+    const material = normalizeEnvironmentSphereMaterial(this.readout.environmentSphereMaterial);
+    const normalized = normalizeEnvironmentSphereMaterial({
+      diffuseReflectance: { [field]: value }
+    }, material).diffuseReflectance[field];
+    input.removeAttribute('aria-invalid');
+    input.value = formatEnvironmentMaterialNumber(normalized, 'diffuse');
+    if (material.diffuseReflectance[field] !== normalized) {
+      this.callbacks.onEnvironmentSphereMaterialChange({
+        diffuseReflectance: { [field]: normalized }
+      });
+    }
+  }
+
+  private commitEnvironmentMaterialNumberInput(
+    input: HTMLInputElement,
+    field: EnvironmentMaterialNumberField
+  ): void {
+    const value = this.readEnvironmentNumberInput(input);
+    if (value === null) {
+      return;
+    }
+
+    const material = normalizeEnvironmentSphereMaterial(this.readout.environmentSphereMaterial);
+    const normalizedMaterial = normalizeEnvironmentSphereMaterial({ [field]: value }, material);
+    const normalized = normalizedMaterial[field];
+    input.removeAttribute('aria-invalid');
+    input.value = formatEnvironmentMaterialNumber(normalized, field === 'alpha' ? 'alpha' : 'ior');
+    if (material[field] !== normalized) {
+      this.callbacks.onEnvironmentSphereMaterialChange({ [field]: normalized });
+    }
+  }
+
+  private readEnvironmentNumberInput(input: HTMLInputElement): number | null {
+    if (this.disposed || input.disabled || !this.readout.hasActiveImage) {
+      return null;
+    }
+
+    const text = input.value.trim();
+    const value = Number(text);
+    if (!text || !Number.isFinite(value)) {
+      input.setAttribute('aria-invalid', 'true');
+      return null;
+    }
+    return value;
+  }
+
+  private bindEnvironmentDistributionSelect(): void {
+    this.disposables.addEventListener(this.elements.viewerStateEnvironmentDistributionSelect, 'change', () => {
+      const select = this.elements.viewerStateEnvironmentDistributionSelect;
+      if (this.disposed || select.disabled || !this.readout.hasActiveImage) {
+        return;
+      }
+
+      const distribution = select.value === 'ggx' ? 'ggx' : 'beckmann';
+      const material = normalizeEnvironmentSphereMaterial(this.readout.environmentSphereMaterial);
+      if (material.distribution !== distribution) {
+        this.callbacks.onEnvironmentSphereMaterialChange({ distribution });
+      }
+    });
+  }
+
+  private bindEnvironmentNonlinearCheckbox(): void {
+    this.disposables.addEventListener(this.elements.viewerStateEnvironmentNonlinearCheckbox, 'change', () => {
+      const checkbox = this.elements.viewerStateEnvironmentNonlinearCheckbox;
+      if (this.disposed || checkbox.disabled || !this.readout.hasActiveImage) {
+        return;
+      }
+
+      const material = normalizeEnvironmentSphereMaterial(this.readout.environmentSphereMaterial);
+      if (material.nonlinear !== checkbox.checked) {
+        this.callbacks.onEnvironmentSphereMaterialChange({ nonlinear: checkbox.checked });
+      }
+    });
   }
 
   private bindDepthChannelSelect(): void {
@@ -315,6 +484,13 @@ export class ViewerStatePanel implements Disposable {
       this.elements.viewerStateYawInput,
       this.elements.viewerStatePitchInput,
       this.elements.viewerStateHfovInput,
+      this.elements.viewerStateEnvironmentDiffuseRInput,
+      this.elements.viewerStateEnvironmentDiffuseGInput,
+      this.elements.viewerStateEnvironmentDiffuseBInput,
+      this.elements.viewerStateEnvironmentAlphaInput,
+      this.elements.viewerStateEnvironmentIntIorInput,
+      this.elements.viewerStateEnvironmentExtIorInput,
+      this.elements.viewerStateEnvironmentNonlinearCheckbox,
       this.elements.viewerStateDepthFocalInput,
       this.elements.viewerStateDepthYawInput,
       this.elements.viewerStateDepthPitchInput,
@@ -404,6 +580,13 @@ function formatViewerStateNumber(value: number, field: ViewerStateField): string
     default:
       throw new Error(`Unknown viewer state field: ${field satisfies never}`);
   }
+}
+
+function formatEnvironmentMaterialNumber(
+  value: number,
+  field: 'diffuse' | 'alpha' | 'ior'
+): string {
+  return formatCompactNumber(value, field === 'ior' ? 6 : 3);
 }
 
 function normalizeDepthReadout(

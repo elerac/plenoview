@@ -7,6 +7,8 @@ const shaderFiles = [
 ] as const;
 const flatImageShaderPath = '../src/rendering/shaders/exr-image.frag.glsl';
 const panoramaImageShaderPath = '../src/rendering/shaders/panorama-image.frag.glsl';
+const pathTracingPresentShaderPath =
+  '../src/rendering/shaders/path-tracing-present.frag.glsl';
 
 describe('shader source regressions', () => {
   it.each(shaderFiles)('%s avoids dynamic sampler indexing and reserved sample identifiers', (path) => {
@@ -14,6 +16,7 @@ describe('shader source regressions', () => {
 
     expect(source).not.toMatch(/uSourceTextures\[(?!\d+\])/);
     expect(source).not.toMatch(/\bDisplaySample\s+sample\b/);
+    expect(source).not.toMatch(/\b(?:bool|int|uint|float|vec[234])\s+sample\b/);
     expect(source).not.toMatch(/\bsample\./);
     expect(source).toContain('uniform float uDisplayGamma;');
     expect(source).toContain('uniform float uColormapExposure;');
@@ -88,7 +91,9 @@ describe('shader source regressions', () => {
   it('centers panorama samples in logical pixels under high-density output scaling', () => {
     const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
 
-    expect(source).toContain('vec2 samplePosition = screen + vec2(0.5) / pixelScale;');
+    expect(source).toContain('vec2 pixelSample = pathTracing');
+    expect(source).toContain(': vec2(0.5);');
+    expect(source).toContain('vec2 samplePosition = screen + pixelSample / pixelScale;');
   });
 
   it('selects horizontal-cross cubemap sampling from the source aspect ratio', () => {
@@ -97,5 +102,111 @@ describe('shader source regressions', () => {
     expect(source).toContain('abs(uImageSize.x * 3.0 - uImageSize.y * 4.0) < 0.5');
     expect(source).toContain('ivec2 cubemapDirectionToPixel(vec3 ray)');
     expect(source).toContain('ivec2 pixel = panoramaDirectionToPixel(ray);');
+  });
+
+  it('provides the spherical-harmonics sphere and floor environment-lighting scene', () => {
+    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+
+    expect(source).toContain('uniform int uPanoramaDisplayMode;');
+    expect(source).toContain('uniform vec3 uEnvironmentShIrradiance[36];');
+    expect(source).toContain('uniform vec3 uEnvironmentSphereDiffuseReflectance;');
+    expect(source).toContain('uniform float uEnvironmentSphereAlpha;');
+    expect(source).toContain('uniform float uEnvironmentSphereIntIor;');
+    expect(source).toContain('uniform float uEnvironmentSphereExtIor;');
+    expect(source).toContain('uniform int uEnvironmentSphereDistribution;');
+    expect(source).toContain('uniform bool uEnvironmentSphereNonlinear;');
+    expect(source).toContain('const int PANORAMA_DISPLAY_MODE_ENVIRONMENT_LIGHTING = 1;');
+    expect(source).toContain('vec3 evaluateEnvironmentIrradiance(vec3 normal)');
+    expect(source).toContain('basis[0] = 0.28209479177387814;');
+    expect(source).toContain('basis[8] = 0.5462742152960396 * (x2 - y2);');
+    expect(source).toContain(
+      'basis[24] = 0.6258357354491761 * (x4 - 6.0 * x2 * y2 + y4);'
+    );
+    expect(source).toContain(
+      'basis[35] = 0.6563820568401701 * x * (x4 - 10.0 * x2 * y2 + 5.0 * y4);'
+    );
+    expect(source).toContain('coefficientIndex < 36');
+    expect(source).toContain(
+      'irradiance += uEnvironmentShIrradiance[coefficientIndex] * basis[coefficientIndex];'
+    );
+    expect(source).toContain('const vec3 ENVIRONMENT_SPHERE_CENTER = vec3(0.0, 0.0, 3.5);');
+    expect(source).toContain('const vec3 ENVIRONMENT_FLOOR_CENTER = vec3(0.0, 1.0, 3.5);');
+    expect(source).toContain('const float ENVIRONMENT_FLOOR_RADIUS = 2.75;');
+    expect(source).toContain('const float ENVIRONMENT_CAMERA_ORBIT_RADIUS = 3.5;');
+    expect(source).toContain('const float MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG = -15.0;');
+    expect(source).toContain('vec3 originToCenter = rayOrigin - center;');
+    expect(source).toContain('vec3 point = rayOrigin + rayDirection * distance;');
+    expect(source).toContain('void resolveEnvironmentOrbitCamera(');
+    expect(source).toContain('void resolveEnvironmentOrbitBasis(');
+    expect(source).toContain('right = rotateYaw(vec3(1.0, 0.0, 0.0), yaw);');
+    expect(source).toContain(
+      'rayOrigin = ENVIRONMENT_SPHERE_CENTER - forward * ENVIRONMENT_CAMERA_ORBIT_RADIUS;'
+    );
+    expect(source).toContain('resolveEnvironmentOrbitCamera(cameraRay, rayOrigin, ray);');
+    expect(source).toContain('uPanoramaPitchDeg,');
+    expect(source).toContain('MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG');
+    expect(source).toContain(
+      'if (uPanoramaDisplayMode == PANORAMA_DISPLAY_MODE_ENVIRONMENT_LIGHTING)'
+    );
+    expect(source).toContain('vec3 evaluateEnvironmentRoughPlastic(');
+    expect(source).toContain('float evaluateDielectricFresnel(float cosThetaI, float eta)');
+    expect(source).toContain('float evaluateRoughPlasticSmithG1(');
+    expect(source).toContain('float evaluateRoughPlasticMicrofacetDistribution(');
+    expect(source).toContain('float resolveEnvironmentSampleLod(');
+    expect(source).toContain('const int ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT = 128;');
+    expect(source).toContain('ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP /');
+    expect(source).toContain('vec3 sampleRoughPlasticMicrofacetNormal(vec2 sampleValue, float alpha)');
+    expect(source).toContain(
+      'specular += sampleEnvironmentRadiance(wi, environmentLod) * sampleWeight;'
+    );
+    expect(source).toContain(
+      'transmittedIrradiance += sampleEnvironmentRadiance(wi, environmentLod)'
+    );
+    expect(source).toContain('vec2 equirectangularDirectionToUv(vec3 direction)');
+    expect(source).toContain('return readDisplaySample(pixel).linear;');
+    expect(source).toContain('roughPlasticRadicalInverse(sampleIndex) + offset');
+    expect(source).toContain(
+      'buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);'
+    );
+    expect(source).not.toContain('0.6180339887498949');
+    expect(source).not.toContain('abs(normal.z) < 0.999');
+    expect(source).toContain('textureLod(uSourceTextures[0], uv, lod)');
+    expect(source).toContain('surfaceType == ENVIRONMENT_SURFACE_SPHERE');
+    expect(source).toContain(
+      'ENVIRONMENT_COMPARISON_SPHERE_DIFFUSE_REFLECTANCE[sphereIndex]'
+    );
+    expect(source).toContain('const int ENVIRONMENT_COMPARISON_SPHERE_COUNT = 6;');
+    expect(source).toContain('const float ENVIRONMENT_COMPARISON_SPHERE_RADIUS = 0.3;');
+    expect(source).toContain('const float ENVIRONMENT_COMPARISON_SPHERE_ALPHA[6]');
+    expect(source).toContain('sphereAlpha = uEnvironmentSphereAlpha;');
+    expect(source).toContain('sceneMaterialAlpha');
+    expect(source).not.toContain('lightingNormal');
+    expect(source).toContain(
+      'sceneAlbedo * evaluateEnvironmentIrradiance(sceneNormal) * (sceneVisibility / PI)'
+    );
+    expect(source).toContain('albedo = mix(vec3(0.34), vec3(0.43), checker);');
+    expect(source).not.toContain('radialFade');
+  });
+
+  it('provides progressive multi-bounce path tracing with environment NEE and MIS', () => {
+    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const presentSource = readFileSync(
+      new URL(pathTracingPresentShaderPath, import.meta.url),
+      'utf8'
+    );
+
+    expect(source).toContain('uniform sampler2D uPathTracingPreviousTexture;');
+    expect(source).toContain('uniform sampler2D uEnvironmentImportanceTexture;');
+    expect(source).toContain('const int PATH_TRACING_MAX_BOUNCES = 6;');
+    expect(source).toContain(
+      'for (int bounce = 0; bounce < PATH_TRACING_MAX_BOUNCES; bounce += 1)'
+    );
+    expect(source).toContain('vec3 samplePathTracingDirectEnvironment(');
+    expect(source).toContain('bool sampleEnvironmentImportance(');
+    expect(source).toContain('float pathTracingPowerHeuristic(');
+    expect(source).toContain('float survivalProbability = clamp(');
+    expect(source).toContain('outColor = mix(previous, pathSample,');
+    expect(presentSource).toContain('vec3 linear = alpha > 1.0e-6');
+    expect(presentSource).toContain('accumulated.rgb / alpha');
   });
 });

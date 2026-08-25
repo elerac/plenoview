@@ -5,6 +5,7 @@ export const MAX_PANORAMA_HFOV_DEG = 180;
 export const DEFAULT_PANORAMA_HFOV_DEG = 100;
 export const MAX_PANORAMA_PITCH_DEG = 90;
 export const PANORAMA_PROJECTION_PITCH_EPSILON_DEG = 1e-4;
+export const MIN_ENVIRONMENT_LIGHTING_ORBIT_PITCH_DEG = -15;
 
 const PANORAMA_PERSPECTIVE_HFOV_LIMIT_DEG = 120;
 const PANORAMA_MAX_PROJECTED_ASPECT_RATIO = 4;
@@ -47,6 +48,16 @@ export function clampPanoramaHfov(hfovDeg: number): number {
 
 export function clampPanoramaPitch(pitchDeg: number): number {
   return Math.min(MAX_PANORAMA_PITCH_DEG, Math.max(-MAX_PANORAMA_PITCH_DEG, pitchDeg));
+}
+
+export function clampPanoramaPitchForDisplayMode(
+  pitchDeg: number,
+  panoramaDisplayMode: ViewerState['panoramaDisplayMode']
+): number {
+  const clampedPitchDeg = clampPanoramaPitch(pitchDeg);
+  return panoramaDisplayMode === 'environmentLighting'
+    ? Math.max(MIN_ENVIRONMENT_LIGHTING_ORBIT_PITCH_DEG, clampedPitchDeg)
+    : clampedPitchDeg;
 }
 
 export function clampPanoramaProjectionPitch(pitchDeg: number): number {
@@ -92,8 +103,9 @@ export function orbitPanorama(
   const nextYawDeg = normalizePanoramaYaw(
     state.panoramaYawDeg - (deltaScreenX / projectionDiameter) * state.panoramaHfovDeg
   );
-  const nextPitchDeg = clampPanoramaPitch(
-    state.panoramaPitchDeg - (deltaScreenY / viewport.height) * verticalFovDeg
+  const nextPitchDeg = clampPanoramaPitchForDisplayMode(
+    state.panoramaPitchDeg - (deltaScreenY / viewport.height) * verticalFovDeg,
+    state.panoramaDisplayMode
   );
 
   return {

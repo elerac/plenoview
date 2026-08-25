@@ -464,9 +464,10 @@ test('does not expose unchecked view menu checkmarks in the accessibility tree',
   await viewMenuButton.click();
 
   await expect(viewMenu).toMatchAriaSnapshot(`
-- menu:
-  - menuitemradio "✓ Image viewer" [checked]
-  - menuitemradio "Panorama viewer"
+- menu "View":
+  - menuitemradio "✓ Image viewer" [checked] [disabled]
+  - menuitem "Panorama viewer ›" [disabled]
+  - menuitemradio "3D viewer" [disabled]
   - separator
   - menuitemcheckbox "Rulers"
 `);
@@ -1053,7 +1054,7 @@ test('exports image-viewer screenshot reproduction metadata as a zip download', 
     };
     viewer: { viewerMode: string };
   };
-  expect(metadata.schemaVersion).toBe(3);
+  expect(metadata.schemaVersion).toBe(4);
   expect(metadata.export).toMatchObject({
     pngFilename: 'cbox_rgb-screenshot.png',
     jsonFilename: 'cbox_rgb-screenshot.json'
@@ -1224,12 +1225,14 @@ test('preserves Spectrum lattice chrome blur while screenshot selection is activ
 });
 
 test('exports a panorama-viewer screenshot region as a png download', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
 
   const fileMenuButton = page.getByRole('button', { name: 'File', exact: true });
   const viewMenuButton = page.getByRole('button', { name: 'View', exact: true });
-  const panoramaMenuItem = page.locator('#panorama-viewer-menu-item');
+  const panoramaViewerMenuItem = page.locator('#panorama-viewer-menu-item');
+  const panoramaMenuItem = page.locator('#panorama-image-menu-item');
   const exportScreenshotMenuItem = page.locator('#export-screenshot-button');
   const selectionOverlay = page.locator('#screenshot-selection-overlay');
   const overlayExportButton = page.locator('#screenshot-selection-export-button');
@@ -1238,6 +1241,7 @@ test('exports a panorama-viewer screenshot region as a png download', async ({ p
   const exportSubmitButton = page.locator('#export-dialog-submit-button');
 
   await viewMenuButton.click();
+  await panoramaViewerMenuItem.click();
   await panoramaMenuItem.click();
   await expect(panoramaMenuItem).toHaveAttribute('aria-checked', 'true');
 

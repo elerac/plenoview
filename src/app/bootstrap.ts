@@ -351,6 +351,7 @@ export async function bootstrapApp(options: BootstrapAppOptions = {}): Promise<A
       ui,
       renderer: services.renderer,
       interactionCoordinator: services.interactionCoordinator,
+      onRenderCurrentView: () => services?.pathTracingRenderLoop.wake(),
       isDisposed
     });
 

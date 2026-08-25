@@ -44,6 +44,46 @@ export interface PanoramaUniforms extends CommonUniforms {
   panoramaYawDeg: WebGLUniformLocation;
   panoramaPitchDeg: WebGLUniformLocation;
   panoramaHfovDeg: WebGLUniformLocation;
+  panoramaDisplayMode: WebGLUniformLocation;
+  panoramaLightingMethod: WebGLUniformLocation;
+  pathTracingPass: WebGLUniformLocation;
+  pathTracingSampleIndex: WebGLUniformLocation;
+  pathTracingBlendWeight: WebGLUniformLocation;
+  pathTracingPreviousTexture: WebGLUniformLocation;
+  environmentImportanceTexture: WebGLUniformLocation;
+  environmentImportanceTextureSize: WebGLUniformLocation;
+  environmentImportanceGridSize: WebGLUniformLocation;
+  environmentImportanceEntryCount: WebGLUniformLocation;
+  environmentImportanceProjection: WebGLUniformLocation;
+  environmentShIrradiance: WebGLUniformLocation;
+  environmentSphereDiffuseReflectance: WebGLUniformLocation;
+  environmentSphereAlpha: WebGLUniformLocation;
+  environmentSphereIntIor: WebGLUniformLocation;
+  environmentSphereExtIor: WebGLUniformLocation;
+  environmentSphereDistribution: WebGLUniformLocation;
+  environmentSphereNonlinear: WebGLUniformLocation;
+}
+
+export interface PathTracingPresentUniforms {
+  outputOriginPx: WebGLUniformLocation;
+  outputSize: WebGLUniformLocation;
+  outputPixelScale: WebGLUniformLocation;
+  viewportOrigin: WebGLUniformLocation;
+  exposure: WebGLUniformLocation;
+  displayGamma: WebGLUniformLocation;
+  backgroundMode: WebGLUniformLocation;
+  backgroundColor: WebGLUniformLocation;
+  alphaOutputMode: WebGLUniformLocation;
+}
+
+export interface PathTracingAccumulationSurface {
+  framebuffers: readonly [WebGLFramebuffer, WebGLFramebuffer];
+  textures: readonly [WebGLTexture, WebGLTexture];
+  width: number;
+  height: number;
+  readIndex: 0 | 1;
+  sampleCount: number;
+  signature: string;
 }
 
 export interface DepthUniforms extends CommonUniforms {
@@ -63,7 +103,7 @@ export interface DepthUniforms extends CommonUniforms {
   depthPositionBoundsMax: WebGLUniformLocation;
 }
 
-export interface ProgramBundle<TUniforms extends CommonUniforms> {
+export interface ProgramBundle<TUniforms> {
   program: WebGLProgram;
   uniforms: TUniforms;
 }
@@ -135,6 +175,16 @@ export interface GlImageRendererState {
   colormapTexture: WebGLTexture;
   imageProgram: ProgramBundle<ImageUniforms>;
   panoramaProgram: ProgramBundle<PanoramaUniforms>;
+  pathTracingPresentProgram: ProgramBundle<PathTracingPresentUniforms>;
+  pathTracingFloatAccumulationSupported: boolean;
+  pathTracingSurfaces: Map<string, PathTracingAccumulationSurface>;
+  activeSourceRevisionKey: string;
+  environmentImportanceTexture: WebGLTexture;
+  environmentImportanceTextureSize: { width: number; height: number };
+  environmentImportanceGridSize: { width: number; height: number };
+  environmentImportanceEntryCount: number;
+  environmentImportanceProjection: number;
+  environmentShIrradiance: Float32Array;
   depthProgram: ProgramBundle<DepthUniforms>;
   layerTexturesBySession: Map<string, Map<number, LayerSourceTextures>>;
   exportSourceSurface: ExportSurface | null;

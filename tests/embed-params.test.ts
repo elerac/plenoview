@@ -77,6 +77,35 @@ describe('embed params', () => {
     });
   });
 
+  it('round-trips and normalizes environment sphere material state', () => {
+    const state = {
+      panoramaDisplayMode: 'environmentLighting' as const,
+      panoramaLightingMethod: 'pathTracing' as const,
+      environmentSphereMaterial: {
+        diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
+        alpha: 0.25,
+        intIor: 1.6,
+        extIor: 1,
+        distribution: 'ggx' as const,
+        nonlinear: true
+      }
+    };
+
+    expect(decodeEmbedViewerState(encodeEmbedViewerState(state))).toMatchObject(state);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({
+      environmentSphereMaterial: {
+        ...state.environmentSphereMaterial,
+        diffuseReflectance: { r: -1, g: 0.3, b: 2 },
+        alpha: 0,
+        intIor: 8
+      }
+    }))?.environmentSphereMaterial).toMatchObject({
+      diffuseReflectance: { r: 0, g: 0.3, b: 1 },
+      alpha: 0.001,
+      intIor: 4
+    });
+  });
+
   it('builds static-hosting friendly full viewer URLs', () => {
     const url = buildFullViewerUrl({
       baseUrl: '/plenoview/app/',

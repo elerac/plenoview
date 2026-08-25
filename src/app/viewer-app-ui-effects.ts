@@ -54,6 +54,8 @@ export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransiti
 
   if (invalidation & ViewerUiInvalidationFlags.ViewerMode) {
     ui.setViewerMode(snapshot.viewerMode);
+    ui.setPanoramaDisplayMode(snapshot.panoramaDisplayMode);
+    ui.setPanoramaLightingMethod?.(snapshot.panoramaLightingMethod);
     ui.setThreeDModeAvailable(Boolean(snapshot.threeDModeAvailable));
   }
 

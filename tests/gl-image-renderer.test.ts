@@ -67,9 +67,9 @@ describe('gl image renderer', () => {
       { channelName: 'Z', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' },
       { channelName: 'A', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' }
     ]);
-    expect(texImageCallsAfterFirstUpload).toBe(5);
-    expect(gl.texImage2D).toHaveBeenCalledTimes(7);
-    expect(gl.createTexture).toHaveBeenCalledTimes(7);
+    expect(texImageCallsAfterFirstUpload).toBe(6);
+    expect(gl.texImage2D).toHaveBeenCalledTimes(8);
+    expect(gl.createTexture).toHaveBeenCalledTimes(8);
   });
 
   it('uploads interleaved source textures from lazily materialized dense channel buffers', () => {
@@ -89,13 +89,13 @@ describe('gl image renderer', () => {
       { channelName: 'B', textureBytes: 8, materializedBytes: 8, resourceKind: 'source-texture' }
     ]);
     expect(__debugGetMaterializedChannelCount(layer)).toBe(3);
-    expect(gl.texImage2D.mock.calls[2]?.[8]).toBe(
+    expect(gl.texImage2D.mock.calls[3]?.[8]).toBe(
       __debugGetMaterializedChannel(layer, 'R')
     );
-    expect(gl.texImage2D.mock.calls[3]?.[8]).toBe(
+    expect(gl.texImage2D.mock.calls[4]?.[8]).toBe(
       __debugGetMaterializedChannel(layer, 'G')
     );
-    expect(gl.texImage2D.mock.calls[4]?.[8]).toBe(
+    expect(gl.texImage2D.mock.calls[5]?.[8]).toBe(
       __debugGetMaterializedChannel(layer, 'B')
     );
   });
@@ -117,7 +117,7 @@ describe('gl image renderer', () => {
     expect(__debugGetMaterializedChannelCount(layer)).toBe(0);
   });
 
-  it('uses trilinear mipmapped minification with nearest magnification when float-linear filtering is supported', () => {
+  it('uses seam-safe trilinear filtering for panorama-compatible float textures', () => {
     const { renderer, gl } = createHarness({ floatLinearSupported: true });
     const layer = createLayerFromChannels({
       R: [1, 2]
@@ -136,7 +136,17 @@ describe('gl image renderer', () => {
     expect(gl.texParameteri).toHaveBeenCalledWith(
       gl.TEXTURE_2D,
       gl.TEXTURE_MAG_FILTER,
-      gl.NEAREST
+      gl.LINEAR
+    );
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_S,
+      gl.REPEAT
+    );
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_T,
+      gl.CLAMP_TO_EDGE
     );
     expect(gl.texImage2D).toHaveBeenCalledTimes(2);
     expect(gl.texImage2D.mock.calls[0]).toEqual([
@@ -186,6 +196,11 @@ describe('gl image renderer', () => {
       gl.TEXTURE_2D,
       gl.TEXTURE_MAG_FILTER,
       gl.NEAREST
+    );
+    expect(gl.texParameteri).toHaveBeenCalledWith(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_S,
+      gl.REPEAT
     );
     expect(gl.texImage2D).toHaveBeenCalledTimes(1);
     expect(gl.texImage2D.mock.calls[0]?.[1]).toBe(0);
@@ -409,8 +424,8 @@ describe('gl image renderer', () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.deleteTexture).toHaveBeenCalledTimes(2);
-    expect(gl.deleteProgram).toHaveBeenCalledTimes(3);
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(3);
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(4);
     expect(gl.deleteVertexArray).toHaveBeenCalledTimes(1);
   });
 
@@ -923,6 +938,92 @@ describe('gl image renderer', () => {
     expect(lastUniform1iValue(gl, 'uAlphaOutputMode')).toBe(0);
   });
 
+  it('progressively accumulates path tracing and resets only for radiance-changing state', () => {
+    const { renderer, gl } = createHarness({ floatAccumulationSupported: true });
+    const layer = createInterleavedLayerFromChannels({
+      R: [1, 0.5],
+      G: [0.5, 0.25],
+      B: [0.25, 0.125]
+    });
+    const state = {
+      ...createInitialState(),
+      viewerMode: 'panorama' as const,
+      panoramaDisplayMode: 'environmentLighting' as const,
+      panoramaLightingMethod: 'pathTracing' as const,
+      displaySelection: createChannelRgbSelection('R', 'G', 'B'),
+      hoveredPixel: null,
+      draftRoi: null,
+      roiInteraction: createEmptyRoiInteractionState()
+    };
+    renderer.resize(100, 80, 0, 0, 1);
+    renderer.ensureLayerChannelsResident('session-1', 0, 2, 1, layer, ['R', 'G', 'B']);
+    renderer.setDisplaySelectionBindings(
+      'session-1',
+      0,
+      2,
+      1,
+      buildDisplaySourceBinding(layer, state.displaySelection),
+      'revision-1'
+    );
+    renderer.setEnvironmentImportanceSampling({
+      projection: 'equirectangular',
+      gridWidth: 2,
+      gridHeight: 1,
+      entryCount: 2,
+      rgba32f: new Float32Array([
+        1, 0, 0.5, 0,
+        1, 1, 0.5, 0
+      ])
+    });
+
+    expect(renderer.render(state)).toBe(true);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(1);
+    expect(lastUniform2iValue(gl, 'uEnvironmentImportanceGridSize')).toEqual([2, 1]);
+    expect(lastUniform1iValue(gl, 'uEnvironmentImportanceEntryCount')).toBe(2);
+    expect(renderer.render(state)).toBe(true);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(2);
+
+    renderer.render({ ...state, exposureEv: 2, displayGamma: 1.8 });
+    expect(readRootPathTracingSampleCount(renderer)).toBe(3);
+
+    renderer.setDisplaySelectionBindings(
+      'session-1',
+      0,
+      2,
+      1,
+      buildDisplaySourceBinding(layer, state.displaySelection),
+      'revision-2'
+    );
+    renderer.render(state);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(1);
+
+    renderer.render({ ...state, panoramaYawDeg: 15 });
+    expect(readRootPathTracingSampleCount(renderer)).toBe(1);
+
+    const changedMaterialState = {
+      ...state,
+      panoramaYawDeg: 15,
+      environmentSphereMaterial: {
+        ...state.environmentSphereMaterial,
+        alpha: 0.3
+      }
+    };
+    renderer.render(changedMaterialState);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(1);
+
+    setRootPathTracingSampleCount(renderer, 1023);
+    expect(renderer.render(changedMaterialState)).toBe(false);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(1024);
+
+    renderer.setPanes([{
+      path: [1],
+      rect: { x: 0, y: 0, width: 100, height: 80 },
+      viewport: { width: 100, height: 80 },
+      active: true
+    }]);
+    expect(readRootPathTracingSampleCount(renderer)).toBeUndefined();
+  });
+
   it('keeps the renderer-owned invalid value warning phase across ordinary redraws', () => {
     const { renderer, gl } = createHarness();
     const layer = createInterleavedLayerFromChannels({
@@ -1130,9 +1231,18 @@ describe('gl image renderer', () => {
     const state = {
       ...createInitialState(),
       viewerMode: 'panorama' as const,
+      panoramaDisplayMode: 'environmentLighting' as const,
       panoramaYawDeg: 17,
       panoramaPitchDeg: 90,
       panoramaHfovDeg: 90,
+      environmentSphereMaterial: {
+        diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
+        alpha: 0.25,
+        intIor: 1.6,
+        extIor: 1.1,
+        distribution: 'ggx' as const,
+        nonlinear: true
+      },
       displaySelection: createChannelRgbSelection('R', 'G', 'B'),
       hoveredPixel: null,
       draftRoi: null,
@@ -1147,6 +1257,11 @@ describe('gl image renderer', () => {
       2,
       buildDisplaySourceBinding(layer, state.displaySelection)
     );
+    const environmentShIrradiance = Float32Array.from(
+      { length: 108 },
+      (_, index) => index + 0.25
+    );
+    renderer.setEnvironmentShIrradiance(environmentShIrradiance);
 
     renderer.readExportPixels({
       state,
@@ -1166,6 +1281,20 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uPanoramaYawDeg')).toBe(17);
     expect(lastUniform1fValue(gl, 'uPanoramaPitchDeg')).toBeCloseTo(clampPanoramaProjectionPitch(90), 7);
     expect(lastUniform1fValue(gl, 'uPanoramaHfovDeg')).toBe(90);
+    expect(lastUniform1iValue(gl, 'uPanoramaDisplayMode')).toBe(1);
+    expect(lastUniform3fvValue(gl, 'uEnvironmentShIrradiance[0]')).toEqual(
+      environmentShIrradiance
+    );
+    expect(lastUniform3fValue(gl, 'uEnvironmentSphereDiffuseReflectance')).toEqual([
+      0.2,
+      0.3,
+      0.4
+    ]);
+    expect(lastUniform1fValue(gl, 'uEnvironmentSphereAlpha')).toBe(0.25);
+    expect(lastUniform1fValue(gl, 'uEnvironmentSphereIntIor')).toBe(1.6);
+    expect(lastUniform1fValue(gl, 'uEnvironmentSphereExtIor')).toBe(1.1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentSphereDistribution')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentSphereNonlinear')).toBe(1);
   });
 
   it('renders screenshot exports through the depth point-cloud pass when 3D mode is active', () => {
@@ -1391,13 +1520,15 @@ describe('gl image renderer', () => {
 function createHarness(options: {
   resolveDepthPointBudget?: DepthPointBudgetResolver;
   floatLinearSupported?: boolean;
+  floatAccumulationSupported?: boolean;
 } = {}): {
   renderer: GlImageRenderer;
   gl: ReturnType<typeof createWebGlContextMock>;
   canvas: HTMLCanvasElement;
 } {
   const gl = createWebGlContextMock({
-    floatLinearSupported: options.floatLinearSupported ?? false
+    floatLinearSupported: options.floatLinearSupported ?? false,
+    floatAccumulationSupported: options.floatAccumulationSupported ?? false
   });
   const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((contextId) => {
     if (contextId === 'webgl2') {
@@ -1425,6 +1556,28 @@ function getLayerTextureChannels(renderer: GlImageRenderer, sessionId: string, l
     textureByChannel: Map<string, unknown>;
   } | undefined;
   return [...(layerTextures?.textureByChannel.keys() ?? [])];
+}
+
+function readRootPathTracingSampleCount(renderer: GlImageRenderer): number | undefined {
+  const state = (renderer as unknown as {
+    state: {
+      pathTracingSurfaces: Map<string, { sampleCount: number }>;
+    };
+  }).state;
+  return state.pathTracingSurfaces.get('root')?.sampleCount;
+}
+
+function setRootPathTracingSampleCount(renderer: GlImageRenderer, sampleCount: number): void {
+  const state = (renderer as unknown as {
+    state: {
+      pathTracingSurfaces: Map<string, { sampleCount: number }>;
+    };
+  }).state;
+  const surface = state.pathTracingSurfaces.get('root');
+  if (!surface) {
+    throw new Error('Expected root path-tracing surface.');
+  }
+  surface.sampleCount = sampleCount;
 }
 
 function lastUniform1iValue(
@@ -1479,6 +1632,17 @@ function lastUniform3fValue(
   return [lastCall[1] as number, lastCall[2] as number, lastCall[3] as number];
 }
 
+function lastUniform3fvValue(
+  gl: ReturnType<typeof createWebGlContextMock>,
+  uniformName: string
+): Float32Array | undefined {
+  const calls = gl.uniform3fv.mock.calls.filter((call) => {
+    const [location] = call as [{ name?: string } | null, ...unknown[]];
+    return location?.name === uniformName;
+  });
+  return calls.at(-1)?.[1] as Float32Array | undefined;
+}
+
 function lastUniform2iValue(
   gl: ReturnType<typeof createWebGlContextMock>,
   uniformName: string
@@ -1514,6 +1678,7 @@ function getDepthFragmentShaderSource(gl: ReturnType<typeof createWebGlContextMo
 
 function createWebGlContextMock(options: {
   floatLinearSupported: boolean;
+  floatAccumulationSupported: boolean;
 }): WebGL2RenderingContext & {
   texImage2D: ReturnType<typeof vi.fn>;
   texParameteri: ReturnType<typeof vi.fn>;
@@ -1531,6 +1696,7 @@ function createWebGlContextMock(options: {
   uniform1f: ReturnType<typeof vi.fn>;
   uniform2f: ReturnType<typeof vi.fn>;
   uniform3f: ReturnType<typeof vi.fn>;
+  uniform3fv: ReturnType<typeof vi.fn>;
   uniform2i: ReturnType<typeof vi.fn>;
   clearColor: ReturnType<typeof vi.fn>;
   clear: ReturnType<typeof vi.fn>;
@@ -1572,6 +1738,7 @@ function createWebGlContextMock(options: {
     NEAREST: 0x2600,
     LINEAR: 0x2601,
     LINEAR_MIPMAP_LINEAR: 0x2703,
+    REPEAT: 0x2901,
     CLAMP_TO_EDGE: 0x812f,
     RGBA8: 0x8058,
     RGBA32F: 0x8814,
@@ -1583,6 +1750,7 @@ function createWebGlContextMock(options: {
     TRIANGLES: 0x0004,
     POINTS: 0x0000,
     FRAMEBUFFER: 0x8d40,
+    FRAMEBUFFER_BINDING: 0x8ca6,
     READ_FRAMEBUFFER: 0x8ca8,
     DRAW_FRAMEBUFFER: 0x8ca9,
     RENDERBUFFER: 0x8d41,
@@ -1631,6 +1799,7 @@ function createWebGlContextMock(options: {
     uniform1f: vi.fn(),
     uniform2f: vi.fn(),
     uniform3f: vi.fn(),
+    uniform3fv: vi.fn(),
     uniform2i: vi.fn(),
     clearColor: vi.fn(),
     clear: vi.fn(),
@@ -1646,9 +1815,15 @@ function createWebGlContextMock(options: {
       if (extensionName === 'OES_texture_float_linear' && options.floatLinearSupported) {
         return {};
       }
+      if (extensionName === 'EXT_color_buffer_float' && options.floatAccumulationSupported) {
+        return {};
+      }
       return null;
     }),
     getParameter: vi.fn((parameter) => {
+      if (parameter === 0x8ca6) {
+        return null;
+      }
       if (parameter === 16) {
         return 16;
       }
@@ -1671,6 +1846,7 @@ function createWebGlContextMock(options: {
     uniform1f: ReturnType<typeof vi.fn>;
     uniform2f: ReturnType<typeof vi.fn>;
     uniform3f: ReturnType<typeof vi.fn>;
+    uniform3fv: ReturnType<typeof vi.fn>;
     uniform2i: ReturnType<typeof vi.fn>;
     blitFramebuffer: ReturnType<typeof vi.fn>;
     deleteTexture: ReturnType<typeof vi.fn>;

@@ -14,7 +14,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 - `File > Export Batch...` exports selected file/channel combinations as a ZIP of PNG images.
 - `File > Export Colormap...` exports any registered colormap as a standalone PNG gradient with configurable colormap, size, orientation, and filename.
 - Right-click `Copy Image` copies the current display image to the clipboard.
-- `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, a panorama projection for equirectangular and horizontal-cross cubemap environment maps, and a point-cloud view for RGB plus depth or position data.
+- `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, panorama tools for equirectangular and horizontal-cross cubemap environment maps, and a point-cloud view for RGB plus depth or position data. The `Panorama viewer` submenu offers the source `Panorama image`, `Environment lighting (SH)`, and `Environment lighting (path tracing)`.
 - `View > Rulers` toggles pixel rulers in `Image viewer`.
 - `Window` controls include normal/full-screen preview plus single-pane, vertical split, and horizontal split viewer layouts.
 - Top-bar quick actions include Auto Fit, Auto Exposure, invalid-value warning, screenshot export, Metadata, app fullscreen, and the Settings gear.
@@ -51,9 +51,12 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 - Zoom range: `0.03125x` to `512x`, wheel zoom anchored to cursor.
 - Pan with left mouse drag.
 - Panorama viewer:
-  - Projects the current display texture onto a sphere using equirectangular sampling for 2:1 images or horizontal-cross cubemap sampling for 4:3 images.
-  - Left drag orbits the camera; `W/A/S/D` also orbit yaw/pitch; mouse wheel changes horizontal FOV from `1` to `180` degrees, with the widest range transitioning to a hemispherical projection.
-  - The Inspector probe remains available through panorama ray-to-pixel lookup.
+  - `Panorama image` projects the current display texture onto a sphere using equirectangular sampling for 2:1 images or horizontal-cross cubemap sampling for 4:3 images.
+  - `Environment lighting (SH)` projects the active linear RGB display into fifth-degree (`L=5`, 36 coefficients per channel) spherical harmonics and uses the resulting diffuse irradiance to light a user-controlled center sphere and six smaller color/roughness comparison spheres above a circular floor. Rays that miss the scene retain the panorama as a background.
+  - `Environment lighting (path tracing)` renders the same camera, analytic sphere/floor geometry, panorama, and material controls with a progressive six-bounce WebGL2 path tracer. It uses HDR luminance/solid-angle importance sampling, direct environment sampling with multiple importance sampling, and Russian roulette. Float ping-pong accumulation advances to 1024 samples per pixel, resumes across exposure/gamma changes, and resets when the source, camera, viewport, or material changes.
+  - The sphere uses a Mitsuba-inspired `roughplastic` material. In SH mode, its coated diffuse and Beckmann/GGX dielectric reflection sample the original HDR environment directly with deterministic quadrature while the floor uses lower-cost SH diffuse lighting. Path-tracing mode samples that same rough-plastic BSDF and the floor's Lambertian BSDF stochastically. Material controls expose diffuse RGB, microfacet `alpha`, interior/exterior IOR, distribution, and nonlinear internal-scattering compensation.
+  - Left drag orbits the camera; `W/A/S/D` also orbit yaw/pitch; mouse wheel changes horizontal FOV from `1` to `180` degrees, with the widest range transitioning to a hemispherical projection. In `Environment lighting`, these controls orbit the camera around the sphere while keeping it centered; the scene, environment map, and SH lighting remain fixed in world space, and the lower pitch is limited before the camera can pass beneath the floor.
+  - The Inspector probe remains available through panorama ray-to-pixel lookup in `Panorama image`; scene geometry disables image-pixel probing in `Environment lighting`.
   - Existing ROIs remain stored but cannot be created or edited until you return to `Image viewer`.
   - Panorama mode does not draw on-canvas pixel value overlays.
   - On-canvas probe rectangles remain hidden in panorama mode.
@@ -290,7 +293,9 @@ Controller methods:
 - Right-click viewer menu > `Copy Image`: copy the current display image to the clipboard.
 - Settings dialog > `Display Cache Budget`: use `Automatic` or choose a fixed retained display residency budget from `64`, `128`, `256`, `512`, or `1024` MB. The memory breakdown also shows decoded pixels, GPU textures, CPU materialized buffers, analysis cache, and total tracked memory. The value persists in `localStorage`.
 - Settings dialog: configure theme, spectrum lattice motion, spectral grouping default, Stokes defaults/visibility, invalid Stokes masking, auto exposure percentile, and image load workers.
-- `View > Image viewer` / `Panorama viewer`: switch between planar image viewing and spherical panorama viewing.
+- `View > Image viewer` / `Panorama viewer > Panorama image`: switch between planar image viewing and spherical panorama viewing.
+- `View > Panorama viewer > Environment lighting (SH)`: preview the panorama's spherical-harmonics lighting on a sphere and circular floor.
+- `View > Panorama viewer > Environment lighting (path tracing)`: progressively path trace the same scene and controls with indirect light and environment shadows.
 - `View > Rulers`: toggle pixel rulers in Image viewer.
 - `Window > Full Screen Preview`: show the viewer in browser fullscreen/fallback preview mode.
 - `Window > Single Pane` / `Split Vertically` / `Split Horizontally`: reset or split the viewer panes. `Cmd+D` splits vertically, and `Cmd+Shift+D` splits horizontally.
@@ -311,7 +316,7 @@ Controller methods:
 ## Implementation Notes
 
 - Display path: normal RGB uses `linear * 2^EV`, then display-gamma encode for screen; colormap mode maps display luminance through the selected `.npy` LUT after colormap EV/gamma, range, zero-center, and reverse settings. Channel-display alpha is composited over the viewer checkerboard on screen in both RGB and colormap modes; exports preserve image alpha when present. When split component entries are selected, separate `R`, `G`, and `B` channel choices duplicate the selected source into RGB, so display luminance equals that channel value. Grouped XYZ uses the same direct component display path as RGB, and grouped UV binds `U` and `V` to red and green while leaving blue at zero. Split component Stokes entries derive the selected parameter from only the chosen component's Stokes channels before duplicating the scalar into RGB. Grouped RGB Stokes entries derive `R`, `G`, and `B` independently in `None`, but collapse to the existing Rec.709-derived mono path in `Colormap`. For angle Stokes modulation, the LUT color is converted to HSV, its value component is multiplied by the clamped paired degree value, and the result is converted back to RGB; AoLP can instead multiply HSV saturation when `S` modulation is selected.
-- Panorama path: the same display texture is reused. The image aspect ratio selects equirectangular sampling (the default, normally 2:1) or a 4x3 horizontal-cross cubemap (4:3); the fragment shader casts a view ray from yaw/pitch/HFOV and fetches the matching source pixel with nearest-neighbor sampling before applying the normal RGB or colormap display transform.
+- Panorama path: the same display texture is reused. The image aspect ratio selects equirectangular sampling (the default, normally 2:1) or a 4x3 horizontal-cross cubemap (4:3); the fragment shader casts a view ray from yaw/pitch/HFOV and fetches the matching source pixel with nearest-neighbor sampling before applying the normal RGB or colormap display transform. SH environment lighting solid-angle samples that source into 36 RGB real-SH coefficients (`L=5`), applies the Lambertian band convolution, and evaluates the irradiance over analytic sphere and disk intersections. Path-traced environment lighting keeps those analytic intersections, builds a compact CPU-side HDR alias table, and accumulates unbiased RGBA32F samples on the GPU when `EXT_color_buffer_float` is available; unsupported or failed float targets fall back to a stable direct path sample.
 - Colormap authoring in Python:
   ```python
   import numpy as np

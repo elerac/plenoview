@@ -73,6 +73,77 @@ function createImageStats(): ImageStats {
 }
 
 describe('viewer app core', () => {
+  it('stores the selected panorama display and lighting methods independently of viewer mode', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
+
+    expect(core.getState().sessionState.panoramaDisplayMode).toBe('image');
+    expect(core.getState().sessionState.panoramaLightingMethod).toBe('sphericalHarmonics');
+
+    core.dispatch({ type: 'panoramaDisplayModeSet', panoramaDisplayMode: 'environmentLighting' });
+    core.dispatch({ type: 'panoramaLightingMethodSet', panoramaLightingMethod: 'pathTracing' });
+    expect(core.getState().sessionState.panoramaDisplayMode).toBe('environmentLighting');
+    expect(core.getState().sessionState.panoramaLightingMethod).toBe('pathTracing');
+    expect(core.getState().sessionState.viewerMode).toBe('image');
+
+    core.dispatch({ type: 'viewerModeSet', viewerMode: 'panorama' });
+    expect(core.getState().sessionState).toMatchObject({
+      viewerMode: 'panorama',
+      panoramaDisplayMode: 'environmentLighting',
+      panoramaLightingMethod: 'pathTracing'
+    });
+  });
+
+  it('normalizes environment sphere material edits', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
+
+    expect(core.getState().sessionState.environmentSphereMaterial).toMatchObject({
+      diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
+      alpha: 0.1,
+      intIor: 1.49,
+      extIor: 1.000277,
+      distribution: 'beckmann',
+      nonlinear: false
+    });
+
+    core.dispatch({
+      type: 'environmentSphereMaterialEdited',
+      patch: {
+        diffuseReflectance: { r: -1, g: 0.3, b: 2 },
+        alpha: 0,
+        intIor: 8,
+        extIor: 1.2,
+        distribution: 'ggx',
+        nonlinear: true
+      }
+    });
+
+    expect(core.getState().sessionState.environmentSphereMaterial).toEqual({
+      diffuseReflectance: { r: 0, g: 0.3, b: 1 },
+      alpha: 0.001,
+      intIor: 4,
+      extIor: 1.2,
+      distribution: 'ggx',
+      nonlinear: true
+    });
+  });
+
+  it('clamps environment-lighting pitch before the orbit camera passes below the floor', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
+    core.dispatch({ type: 'viewerStateEdited', patch: { panoramaPitchDeg: -80 } });
+    expect(core.getState().sessionState.panoramaPitchDeg).toBe(-80);
+
+    core.dispatch({ type: 'panoramaDisplayModeSet', panoramaDisplayMode: 'environmentLighting' });
+    expect(core.getState().sessionState.panoramaPitchDeg).toBe(-15);
+    expect(core.getState().interactionState.view.panoramaPitchDeg).toBe(-15);
+
+    core.dispatch({ type: 'viewerStateEdited', patch: { panoramaPitchDeg: -90 } });
+    expect(core.getState().sessionState.panoramaPitchDeg).toBe(-15);
+    expect(core.getState().interactionState.view.panoramaPitchDeg).toBe(-15);
+  });
+
   it('toggles auto-fit selected images as application state', () => {
     const core = new ViewerAppCore();
 

@@ -71,7 +71,12 @@ interface NativeMenuState {
   };
   view: {
     image: NativeMenuItemState;
-    panorama: NativeMenuItemState;
+    panorama: {
+      trigger: NativeMenuItemState;
+      image: NativeMenuItemState;
+      environmentLighting: NativeMenuItemState;
+      environmentPathTracing: NativeMenuItemState;
+    };
     threeD: NativeMenuItemState;
     rulers: NativeMenuItemState;
   };
@@ -529,7 +534,21 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks, options: { 
     text: menuState.viewLabel,
     items: [
       await checkedCommandItem('viewerModeImage', menuState.view.image),
-      await checkedCommandItem('viewerModePanorama', menuState.view.panorama),
+      await Submenu.new({
+        text: menuState.view.panorama.trigger.text,
+        enabled: menuState.view.panorama.trigger.enabled && isEnabled('viewerModePanorama'),
+        items: [
+          await checkedCommandItem('viewerModePanorama', menuState.view.panorama.image),
+          await checkedCommandItem(
+            'viewerModeEnvironmentLighting',
+            menuState.view.panorama.environmentLighting
+          ),
+          await checkedCommandItem(
+            'viewerModeEnvironmentPathTracing',
+            menuState.view.panorama.environmentPathTracing
+          )
+        ]
+      }),
       await checkedCommandItem('viewerMode3d', menuState.view.threeD),
       await separator(),
       await checkedCommandItem('toggleRulers', menuState.view.rulers)
@@ -622,7 +641,18 @@ function readNativeMenuState(): NativeMenuState {
     },
     view: {
       image: readButtonState('image-viewer-menu-item', 'Image viewer'),
-      panorama: readButtonState('panorama-viewer-menu-item', 'Panorama viewer'),
+      panorama: {
+        trigger: readButtonState('panorama-viewer-menu-item', 'Panorama viewer'),
+        image: readButtonState('panorama-image-menu-item', 'Panorama image'),
+        environmentLighting: readButtonState(
+          'environment-lighting-menu-item',
+          'Environment lighting (SH)'
+        ),
+        environmentPathTracing: readButtonState(
+          'environment-path-tracing-menu-item',
+          'Environment lighting (path tracing)'
+        )
+      },
       threeD: readButtonState('three-d-viewer-menu-item', '3D viewer'),
       rulers: readButtonState('rulers-menu-item', 'Rulers')
     },

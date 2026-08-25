@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DISPLAY_GAMMA } from '../src/color';
+import { createDefaultEnvironmentSphereMaterial } from '../src/environment-sphere-material';
 import {
   clampZoom,
   computeFitView,
@@ -18,6 +19,7 @@ import {
 import {
   clampPanoramaHfov,
   clampPanoramaPitch,
+  MIN_ENVIRONMENT_LIGHTING_ORBIT_PITCH_DEG,
   getPanoramaVerticalFovDeg,
   normalizePanoramaYaw,
   orbitPanorama,
@@ -26,6 +28,7 @@ import {
   screenToPanoramaPixel,
   zoomPanorama
 } from '../src/interaction/panorama-geometry';
+import { resolveProbePixel } from '../src/interaction/probe-mode';
 import { ViewerState } from '../src/types';
 import { createEmptyRoiInteractionState } from '../src/view-state';
 import { createChannelMonoSelection, createChannelRgbSelection } from './helpers/state-fixtures';
@@ -36,6 +39,7 @@ const state: ViewerState = {
   displayGamma: DEFAULT_DISPLAY_GAMMA,
   channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
   viewerMode: 'image',
+  environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
   visualizationMode: 'rgb',
   activeColormapId: null,
   colormapExposureEv: 0,
@@ -72,6 +76,15 @@ const state: ViewerState = {
 };
 
 describe('interaction math', () => {
+  it('disables source-pixel probes over the environment-lighting scene', () => {
+    expect(resolveProbePixel(
+      { x: 320, y: 240 },
+      { ...state, viewerMode: 'panorama', panoramaDisplayMode: 'environmentLighting' },
+      { width: 640, height: 480 },
+      { width: 1024, height: 512 }
+    )).toBeNull();
+  });
+
   it('clamps zoom bounds', () => {
     expect(clampZoom(0.001)).toBe(0.03125);
     expect(clampZoom(999)).toBe(512);
@@ -711,6 +724,23 @@ describe('interaction math', () => {
 
     expect(next.panoramaPitchDeg).toBe(90);
     expect(clampPanoramaPitch(999)).toBe(90);
+  });
+
+  it('keeps the environment-lighting orbit camera above the floor', () => {
+    const viewport = { width: 100, height: 100 };
+    const next = orbitPanorama(
+      {
+        ...state,
+        viewerMode: 'panorama',
+        panoramaDisplayMode: 'environmentLighting',
+        panoramaPitchDeg: 0
+      },
+      viewport,
+      0,
+      1000
+    );
+
+    expect(next.panoramaPitchDeg).toBe(MIN_ENVIRONMENT_LIGHTING_ORBIT_PITCH_DEG);
   });
 
   it('clamps panorama hfov while zooming', () => {

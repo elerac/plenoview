@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { __debugGetMaterializedChannelCount } from '../src/channel-storage';
 import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
 import { DEFAULT_DISPLAY_GAMMA, computeRec709Luminance, linearToDisplayGammaByte } from '../src/color';
+import { createDefaultEnvironmentSphereMaterial } from '../src/environment-sphere-material';
 import {
   mapValueToColormapRgbBytes,
   type ColormapLut
@@ -27,6 +28,7 @@ function createThumbnailState(
     displayGamma: DEFAULT_DISPLAY_GAMMA,
     channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
     viewerMode: 'image',
+    environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,
     colormapExposureEv: 0,

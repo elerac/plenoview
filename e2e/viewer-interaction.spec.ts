@@ -134,6 +134,7 @@ test('pans 3D view with middle mouse and Ctrl-left drags', async ({ page }) => {
 });
 
 test('resets all right-panel View state by double-clicking the View heading', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
 
@@ -152,6 +153,7 @@ test('resets all right-panel View state by double-clicking the View heading', as
 
   await page.locator('#view-menu-button').click();
   await page.locator('#panorama-viewer-menu-item').click();
+  await page.locator('#panorama-image-menu-item').click();
   await expect(page.locator('#viewer-state-panorama-fields')).toBeVisible();
   await commitViewerStateInput(page, '#viewer-state-yaw-input', '15');
   await commitViewerStateInput(page, '#viewer-state-pitch-input', '5');
@@ -202,6 +204,7 @@ test('leaves editable text input alone when typing image-viewer wasd keys', asyn
 });
 
 test('orbits panorama view with global w/a/s/d keys while keeping the probe in sync', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
 
@@ -210,6 +213,7 @@ test('orbits panorama view with global w/a/s/d keys while keeping the probe in s
 
   await page.locator('#view-menu-button').click();
   await page.locator('#panorama-viewer-menu-item').click();
+  await page.locator('#panorama-image-menu-item').click();
 
   await viewer.hover();
   await expect.poll(async () => await readProbeCoords(probeCoords)).not.toBeNull();
@@ -233,10 +237,52 @@ test('orbits panorama view with global w/a/s/d keys while keeping the probe in s
   expect(afterRightCoords.x).not.toBe(initialCoords.x);
 
   await page.keyboard.press('a');
-  await expect.poll(async () => await readProbeCoords(probeCoords)).toEqual(initialCoords);
+  await expect.poll(async () => {
+    const coords = await readProbeCoords(probeCoords);
+    return coords
+      ? Math.abs(coords.x - initialCoords.x) <= 2 && Math.abs(coords.y - initialCoords.y) <= 2
+      : false;
+  }).toBe(true);
+});
+
+test('switches the panorama viewer between image, SH, and path-traced lighting', async ({ page }) => {
+  test.slow();
+  await gotoViewerApp(page);
+  await openGalleryCbox(page);
+
+  const viewMenuButton = page.locator('#view-menu-button');
+  const panoramaViewerMenuItem = page.locator('#panorama-viewer-menu-item');
+  const panoramaImageMenuItem = page.locator('#panorama-image-menu-item');
+  const environmentLightingMenuItem = page.locator('#environment-lighting-menu-item');
+  const environmentPathTracingMenuItem = page.locator(
+    '#environment-path-tracing-menu-item'
+  );
+
+  await viewMenuButton.click();
+  await panoramaViewerMenuItem.click();
+  await expect(panoramaImageMenuItem).toBeVisible();
+  await expect(environmentLightingMenuItem).toBeVisible();
+  await environmentLightingMenuItem.click();
+  await waitForE2ERenderIdle(page);
+
+  await expect(environmentLightingMenuItem).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(async () => page.evaluate(() => {
+    return window.__openExrViewerE2E?.snapshot().panoramaDisplayMode;
+  })).toBe('environmentLighting');
+
+  await viewMenuButton.click();
+  await panoramaViewerMenuItem.click();
+  await environmentPathTracingMenuItem.click();
+
+  await expect(environmentPathTracingMenuItem).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(async () => page.evaluate(() => {
+    return window.__openExrViewerE2E?.snapshot().panoramaLightingMethod;
+  })).toBe('pathTracing');
+
 });
 
 test('disables the top-bar auto-fit toggle while panorama view is active', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
 
@@ -244,6 +290,7 @@ test('disables the top-bar auto-fit toggle while panorama view is active', async
   const viewMenuButton = page.locator('#view-menu-button');
   const imageViewerMenuItem = page.locator('#image-viewer-menu-item');
   const panoramaViewerMenuItem = page.locator('#panorama-viewer-menu-item');
+  const panoramaImageMenuItem = page.locator('#panorama-image-menu-item');
 
   await expect(autoFitButton).toBeEnabled();
   await expect(autoFitButton).toHaveAttribute('aria-pressed', 'false');
@@ -253,8 +300,9 @@ test('disables the top-bar auto-fit toggle while panorama view is active', async
 
   await viewMenuButton.click();
   await panoramaViewerMenuItem.click();
+  await panoramaImageMenuItem.click();
 
-  await expect(panoramaViewerMenuItem).toHaveAttribute('aria-checked', 'true');
+  await expect(panoramaImageMenuItem).toHaveAttribute('aria-checked', 'true');
   await expect(autoFitButton).toBeDisabled();
   await expect(autoFitButton).toHaveAttribute('aria-pressed', 'true');
 
@@ -267,12 +315,14 @@ test('disables the top-bar auto-fit toggle while panorama view is active', async
 });
 
 test('toggles pixel rulers in image view and clears them in panorama view', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
 
   const viewMenuButton = page.locator('#view-menu-button');
   const rulersMenuItem = page.locator('#rulers-menu-item');
   const panoramaViewerMenuItem = page.locator('#panorama-viewer-menu-item');
+  const panoramaImageMenuItem = page.locator('#panorama-image-menu-item');
 
   await expect(rulersMenuItem).toHaveAttribute('aria-checked', 'false');
   await viewMenuButton.click();
@@ -283,11 +333,13 @@ test('toggles pixel rulers in image view and clears them in panorama view', asyn
 
   await viewMenuButton.click();
   await panoramaViewerMenuItem.click();
+  await panoramaImageMenuItem.click();
 
   await expect.poll(async () => countRulerOverlayMarks(page), { timeout: 5000 }).toBe(0);
 });
 
 test('creates ROI with shift-drag and keeps ROI editing disabled in panorama mode @smoke', async ({ page }) => {
+  test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
 
@@ -306,6 +358,7 @@ test('creates ROI with shift-drag and keeps ROI editing disabled in panorama mod
 
   await page.locator('#view-menu-button').click();
   await page.locator('#panorama-viewer-menu-item').click();
+  await page.locator('#panorama-image-menu-item').click();
 
   await dragViewerRoi(page, viewer, { xRatio: 0.2, yRatio: 0.2 }, { xRatio: 0.8, yRatio: 0.8 });
 

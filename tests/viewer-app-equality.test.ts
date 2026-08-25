@@ -46,6 +46,26 @@ describe('viewer app equality helpers', () => {
     expect(sameViewerSessionState(base, changed)).toBe(false);
   });
 
+  it('compares environment sphere materials structurally', () => {
+    const base = createViewerSessionState();
+    const same = createViewerSessionState({
+      environmentSphereMaterial: {
+        ...base.environmentSphereMaterial,
+        diffuseReflectance: { ...base.environmentSphereMaterial.diffuseReflectance }
+      }
+    });
+    const changed = createViewerSessionState({
+      environmentSphereMaterial: {
+        ...base.environmentSphereMaterial,
+        alpha: 0.25,
+        diffuseReflectance: { ...base.environmentSphereMaterial.diffuseReflectance }
+      }
+    });
+
+    expect(sameViewerSessionState(base, same)).toBe(true);
+    expect(sameViewerSessionState(base, changed)).toBe(false);
+  });
+
   it('ignores unused file thumbnail data while comparing export batch targets', () => {
     const selection = {
       kind: 'channelRgb' as const,

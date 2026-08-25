@@ -1,6 +1,10 @@
 import { computeFitView } from '../interaction/image-geometry';
 import { DEFAULT_DISPLAY_GAMMA } from '../color';
 import {
+  cloneEnvironmentSphereMaterial,
+  createDefaultEnvironmentSphereMaterial
+} from '../environment-sphere-material';
+import {
   DEFAULT_DEPTH_POINT_SIZE_PX,
   DEFAULT_DEPTH_TARGET,
   DEFAULT_DEPTH_ZOOM,
@@ -155,6 +159,9 @@ export function createClearedViewerState(_defaultColormapId: string): ViewerSess
     displayGamma: DEFAULT_DISPLAY_GAMMA,
     channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
     viewerMode: 'image',
+    panoramaDisplayMode: 'image',
+    panoramaLightingMethod: 'sphericalHarmonics',
+    environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,
     colormapExposureEv: 0,
@@ -331,6 +338,9 @@ export function buildSwitchedSessionState(
     {
       ...cloneViewerSessionState(nextSession.state),
       viewerMode: currentState.viewerMode,
+      panoramaDisplayMode: currentState.panoramaDisplayMode ?? 'image',
+      panoramaLightingMethod: currentState.panoramaLightingMethod ?? 'sphericalHarmonics',
+      environmentSphereMaterial: cloneEnvironmentSphereMaterial(currentState.environmentSphereMaterial),
       ...nextImageCamera,
       ...nextPanoramaCamera,
       ...nextDepthCamera,
@@ -478,7 +488,10 @@ export function buildResetSessionBaseState(
   const resetBaseState = buildViewerStateForLayer(
     {
       ...createClearedViewerState(defaultColormapId),
-      viewerMode: currentState.viewerMode
+      viewerMode: currentState.viewerMode,
+      panoramaDisplayMode: currentState.panoramaDisplayMode ?? 'image',
+      panoramaLightingMethod: currentState.panoramaLightingMethod ?? 'sphericalHarmonics',
+      environmentSphereMaterial: cloneEnvironmentSphereMaterial(currentState.environmentSphereMaterial)
     },
     activeSession.decoded,
     0,

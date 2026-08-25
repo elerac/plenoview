@@ -1,5 +1,9 @@
 import { DEFAULT_DISPLAY_GAMMA } from './color';
 import {
+  createDefaultEnvironmentSphereMaterial,
+  sameEnvironmentSphereMaterial
+} from './environment-sphere-material';
+import {
   clampDepthZoom,
   DEFAULT_DEPTH_POINT_SIZE_PX,
   DEFAULT_DEPTH_TARGET,
@@ -26,6 +30,9 @@ const SESSION_STATE_KEYS = [
   'displayGamma',
   'channelThumbnailDisplayGamma',
   'viewerMode',
+  'panoramaDisplayMode',
+  'panoramaLightingMethod',
+  'environmentSphereMaterial',
   'visualizationMode',
   'activeColormapId',
   'colormapExposureEv',
@@ -64,6 +71,9 @@ export function createInitialState(): ViewerSessionState {
     displayGamma: DEFAULT_DISPLAY_GAMMA,
     channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
     viewerMode: 'image',
+    panoramaDisplayMode: 'image',
+    panoramaLightingMethod: 'sphericalHarmonics',
+    environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,
     colormapExposureEv: 0,
@@ -219,5 +229,13 @@ function pickSessionStatePatch(
 
 function hasStateChanges(state: ViewerSessionState, patch: Partial<ViewerSessionState>): boolean {
   const entries = Object.entries(patch) as Array<[keyof ViewerSessionState, ViewerSessionState[keyof ViewerSessionState]]>;
-  return entries.some(([key, value]) => state[key] !== value);
+  return entries.some(([key, value]) => {
+    if (key === 'environmentSphereMaterial') {
+      return !sameEnvironmentSphereMaterial(
+        state.environmentSphereMaterial,
+        value as ViewerSessionState['environmentSphereMaterial']
+      );
+    }
+    return state[key] !== value;
+  });
 }

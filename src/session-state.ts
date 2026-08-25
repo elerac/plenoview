@@ -7,6 +7,7 @@ import {
 } from './depth';
 import { cloneDisplaySelection } from './display-model';
 import { cloneImageRoi } from './roi';
+import { cloneEnvironmentSphereMaterial } from './environment-sphere-material';
 import { ViewerSessionState } from './types';
 
 export function buildSessionDisplayName(filename: string, existingFilenames: string[]): string {
@@ -58,6 +59,9 @@ export function cloneViewerSessionState(state: ViewerSessionState): ViewerSessio
     displayGamma: state.displayGamma,
     channelThumbnailDisplayGamma: state.channelThumbnailDisplayGamma,
     viewerMode: state.viewerMode,
+    panoramaDisplayMode: state.panoramaDisplayMode,
+    panoramaLightingMethod: state.panoramaLightingMethod,
+    environmentSphereMaterial: cloneEnvironmentSphereMaterial(state.environmentSphereMaterial),
     visualizationMode: state.visualizationMode,
     activeColormapId: state.activeColormapId,
     colormapExposureEv: state.colormapExposureEv,

@@ -3,11 +3,14 @@ import {
   createAdaptiveDepthPointBudgetResolver,
   type DepthPointBudgetResolver
 } from '../../depth-point-budget';
+import { SPHERICAL_HARMONICS_COEFFICIENT_COUNT } from '../../panorama-lighting';
 import { REQUIRED_TEXTURE_UNITS } from './constants';
 import { createColormapTexture } from './colormap-texture';
 import { createDepthProgram } from './depth-program';
+import { createEnvironmentImportanceTexture } from './environment-importance-texture';
 import { createImageProgram } from './image-program';
 import { createPanoramaProgram } from './panorama-program';
+import { createPathTracingPresentProgram } from './path-tracing-present-program';
 import { configureDepthProgramSamplers, configureProgramSamplers } from './program-utils';
 import { createZeroTexture } from './texture-store';
 import type { GlImageRendererState, LayerSourceTextures } from './types';
@@ -35,6 +38,7 @@ export function createGlImageRendererState(
 
   const imageProgram = createImageProgram(gl);
   const panoramaProgram = createPanoramaProgram(gl);
+  const pathTracingPresentProgram = createPathTracingPresentProgram(gl);
   const depthProgram = createDepthProgram(gl);
 
   gl.bindVertexArray(vao);
@@ -42,6 +46,7 @@ export function createGlImageRendererState(
 
   const zeroTexture = createZeroTexture(gl, smoothFloatMinification);
   const colormapTexture = createColormapTexture(gl);
+  const environmentImportanceTexture = createEnvironmentImportanceTexture(gl);
 
   configureProgramSamplers(gl, imageProgram.program);
   configureProgramSamplers(gl, panoramaProgram.program);
@@ -56,6 +61,18 @@ export function createGlImageRendererState(
     colormapTexture,
     imageProgram,
     panoramaProgram,
+    pathTracingPresentProgram,
+    pathTracingFloatAccumulationSupported: gl.getExtension('EXT_color_buffer_float') !== null,
+    pathTracingSurfaces: new Map(),
+    activeSourceRevisionKey: '',
+    environmentImportanceTexture,
+    environmentImportanceTextureSize: { width: 1, height: 1 },
+    environmentImportanceGridSize: { width: 1, height: 1 },
+    environmentImportanceEntryCount: 0,
+    environmentImportanceProjection: 0,
+    environmentShIrradiance: new Float32Array(
+      SPHERICAL_HARMONICS_COEFFICIENT_COUNT * 3
+    ),
     depthProgram,
     layerTexturesBySession: new Map<string, Map<number, LayerSourceTextures>>(),
     exportSourceSurface: null,

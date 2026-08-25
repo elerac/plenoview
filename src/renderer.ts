@@ -16,6 +16,17 @@ import type { ChannelRecognitionNameRules } from './channel-recognition-name-rul
 import type { DecodedLayer, ViewerRenderState, ViewerState, ViewportInfo } from './types';
 import type { ViewerPaneRenderInfo } from './viewer-pane-layout';
 import type { ReadExportPixelsArgs } from './rendering/gl-image-renderer';
+import {
+  computeEnvironmentMapImportanceSampling,
+  computeEnvironmentMapIrradiance,
+  resolvePanoramaDisplayMode,
+  type EnvironmentImportanceSamplingTable
+} from './panorama-lighting';
+
+interface CachedEnvironmentLighting {
+  irradiance: Float32Array;
+  importanceSampling: EnvironmentImportanceSamplingTable;
+}
 
 export class WebGlExrRenderer implements Disposable {
   private readonly imageRenderer: GlImageRenderer;
@@ -24,6 +35,7 @@ export class WebGlExrRenderer implements Disposable {
   private readonly rulerOverlayRenderer: RulerOverlayRenderer;
   private rulersVisible = false;
   private panes: ViewerPaneRenderInfo[] = [];
+  private readonly environmentLightingCache = new Map<string, CachedEnvironmentLighting>();
   private disposed = false;
 
   constructor(
@@ -106,7 +118,7 @@ export class WebGlExrRenderer implements Disposable {
     visualizationMode: ViewerState['visualizationMode'],
     maskInvalidStokesVectors: ViewerState['maskInvalidStokesVectors'] | undefined,
     spectralRgbGroupingEnabled: ViewerState['spectralRgbGroupingEnabled'] | undefined,
-    _textureRevisionKey: string,
+    textureRevisionKey: string,
     binding: DisplaySourceBinding,
     channelRecognitionNameRules?: ViewerState['channelRecognitionNameRules']
   ): void {
@@ -114,7 +126,39 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
-    this.imageRenderer.setDisplaySelectionBindings(sessionId, layerIndex, width, height, binding);
+    this.imageRenderer.setDisplaySelectionBindings(
+      sessionId,
+      layerIndex,
+      width,
+      height,
+      binding,
+      textureRevisionKey
+    );
+    const environmentCacheKey = buildEnvironmentLightingCacheKey(
+      sessionId,
+      layerIndex,
+      textureRevisionKey
+    );
+    let environmentLighting = this.environmentLightingCache.get(environmentCacheKey);
+    if (!environmentLighting) {
+      const environmentSource = {
+        layer,
+        sourceWidth: width,
+        sourceHeight: height,
+        selection,
+        visualizationMode,
+        maskInvalidStokesVectors,
+        spectralRgbGroupingEnabled,
+        channelRecognitionNameRules
+      };
+      environmentLighting = {
+        irradiance: computeEnvironmentMapIrradiance(environmentSource),
+        importanceSampling: computeEnvironmentMapImportanceSampling(environmentSource)
+      };
+      this.environmentLightingCache.set(environmentCacheKey, environmentLighting);
+    }
+    this.imageRenderer.setEnvironmentShIrradiance(environmentLighting.irradiance);
+    this.imageRenderer.setEnvironmentImportanceSampling(environmentLighting.importanceSampling);
     const displaySize = resolveDisplayImageSize(width, height, selection);
     this.overlayRenderer.setDisplaySelectionContext(width, height, layer, selection, visualizationMode, {
       maskInvalidStokesVectors,
@@ -187,6 +231,7 @@ export class WebGlExrRenderer implements Disposable {
     }
 
     this.imageRenderer.discardSessionTextures(sessionId);
+    discardEnvironmentLightingCacheEntries(this.environmentLightingCache, `${sessionId}:`);
   }
 
   discardLayerSourceTextures(sessionId: string, layerIndex: number): void {
@@ -195,6 +240,10 @@ export class WebGlExrRenderer implements Disposable {
     }
 
     this.imageRenderer.discardLayerSourceTextures(sessionId, layerIndex);
+    discardEnvironmentLightingCacheEntries(
+      this.environmentLightingCache,
+      `${sessionId}:${layerIndex}:`
+    );
   }
 
   discardChannelMaterializedBuffer(sessionId: string, layerIndex: number, channelName: string): void {
@@ -235,6 +284,14 @@ export class WebGlExrRenderer implements Disposable {
     this.rulerOverlayRenderer.clearOverlay();
   }
 
+  beginProgressiveImageRender(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.imageRenderer.clearFramebuffer();
+  }
+
   render(state: ViewerRenderState): void {
     if (this.disposed) {
       return;
@@ -246,20 +303,20 @@ export class WebGlExrRenderer implements Disposable {
     this.renderRulerOverlay(state);
   }
 
-  renderImage(state: ViewerState): void {
+  renderImage(state: ViewerState): boolean {
     if (this.disposed) {
-      return;
+      return false;
     }
 
-    this.imageRenderer.render(state);
+    return this.imageRenderer.render(state);
   }
 
-  renderImagePane(pane: ViewerPaneRenderInfo, state: ViewerState): void {
+  renderImagePane(pane: ViewerPaneRenderInfo, state: ViewerState): boolean {
     if (this.disposed) {
-      return;
+      return false;
     }
 
-    this.imageRenderer.renderPane(state, pane);
+    return this.imageRenderer.renderPane(state, pane);
   }
 
   renderValueOverlay(state: ViewerState): void {
@@ -267,6 +324,10 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
+    if (isEnvironmentLightingMode(state)) {
+      this.overlayRenderer.clearValues();
+      return;
+    }
     this.overlayRenderer.renderValues(state);
   }
 
@@ -275,7 +336,9 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
-    this.overlayRenderer.renderPaneValues(state, pane);
+    if (!isEnvironmentLightingMode(state)) {
+      this.overlayRenderer.renderPaneValues(state, pane);
+    }
   }
 
   renderProbeOverlay(state: ViewerState): void {
@@ -283,6 +346,10 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
+    if (isEnvironmentLightingMode(state)) {
+      this.probeOverlayRenderer.clearOverlay();
+      return;
+    }
     this.probeOverlayRenderer.render(state);
   }
 
@@ -291,7 +358,9 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
-    this.probeOverlayRenderer.renderPane(state, pane);
+    if (!isEnvironmentLightingMode(state)) {
+      this.probeOverlayRenderer.renderPane(state, pane);
+    }
   }
 
   setRulersVisible(visible: boolean): void {
@@ -307,7 +376,7 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
-    this.rulerOverlayRenderer.render(state, this.rulersVisible);
+    this.rulerOverlayRenderer.render(state, this.rulersVisible && !isEnvironmentLightingMode(state));
   }
 
   renderRulerOverlayPane(pane: ViewerPaneRenderInfo, state: ViewerState): void {
@@ -315,7 +384,11 @@ export class WebGlExrRenderer implements Disposable {
       return;
     }
 
-    this.rulerOverlayRenderer.renderPane(state, this.rulersVisible, pane);
+    this.rulerOverlayRenderer.renderPane(
+      state,
+      this.rulersVisible && !isEnvironmentLightingMode(state),
+      pane
+    );
   }
 
   readExportPixels(args: ReadExportPixelsArgs): ExportImagePixels {
@@ -332,11 +405,36 @@ export class WebGlExrRenderer implements Disposable {
     }
 
     this.disposed = true;
+    this.environmentLightingCache.clear();
     this.rulerOverlayRenderer.dispose();
     this.probeOverlayRenderer.dispose();
     this.overlayRenderer.dispose();
     this.imageRenderer.dispose();
   }
+}
+
+function buildEnvironmentLightingCacheKey(
+  sessionId: string,
+  layerIndex: number,
+  textureRevisionKey: string
+): string {
+  return `${sessionId}:${layerIndex}:${textureRevisionKey}`;
+}
+
+function discardEnvironmentLightingCacheEntries(
+  cache: Map<string, CachedEnvironmentLighting>,
+  prefix: string
+): void {
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) {
+      cache.delete(key);
+    }
+  }
+}
+
+function isEnvironmentLightingMode(state: ViewerState): boolean {
+  return state.viewerMode === 'panorama' &&
+    resolvePanoramaDisplayMode(state.panoramaDisplayMode) === 'environmentLighting';
 }
 
 function clonePaneRenderInfo(pane: ViewerPaneRenderInfo): ViewerPaneRenderInfo {

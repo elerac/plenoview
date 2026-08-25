@@ -37,3 +37,4 @@ uv.lock
 *.exr
 !public/cbox_rgb.exr
 !public/middlebury_chess1_rgb_p.exr
+public/BH3D_datasets/
