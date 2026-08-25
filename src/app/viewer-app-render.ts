@@ -1005,6 +1005,8 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
     (previous.panoramaDisplayMode ?? 'image') === (next.panoramaDisplayMode ?? 'image') &&
     (previous.panoramaLightingMethod ?? 'sphericalHarmonics') ===
       (next.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    (previous.environmentLightingInteractive === true) ===
+      (next.environmentLightingInteractive === true) &&
     sameEnvironmentSphereMaterial(
       previous.environmentSphereMaterial,
       next.environmentSphereMaterial
@@ -1114,6 +1116,8 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
     (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
       (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    (a.environmentLightingInteractive === true) ===
+      (b.environmentLightingInteractive === true) &&
     sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.visualizationMode === b.visualizationMode &&
     a.activeColormapId === b.activeColormapId &&

@@ -1,4 +1,8 @@
 import type { Disposable } from './lifecycle';
+import {
+  resolvePanoramaDisplayMode,
+  resolvePanoramaLightingMethod
+} from './panorama-lighting';
 import type { ViewerInteractionState, ViewerSessionState, ViewerViewState } from './types';
 import {
   createInteractionState,
@@ -20,6 +24,8 @@ export interface ViewerInteractionCoordinatorDependencies {
   onInteractionChange: (state: ViewerInteractionState, previous: ViewerInteractionState) => void;
   scheduleFrame?: (callback: FrameRequestCallback) => number;
   cancelFrame?: (id: number) => void;
+  scheduleDelay?: (callback: () => void, delayMs: number) => number;
+  cancelDelay?: (id: number) => void;
 }
 
 export interface SessionInteractionSyncResult {
@@ -28,11 +34,14 @@ export interface SessionInteractionSyncResult {
   changed: boolean;
 }
 
+export const ENVIRONMENT_LIGHTING_INTERACTION_SETTLE_MS = 120;
+
 export class ViewerInteractionCoordinator implements Disposable {
   private state: ViewerInteractionState;
   private publishedState: ViewerInteractionState;
   private pendingPreviousState: ViewerInteractionState | null = null;
   private frameId: number | null = null;
+  private environmentLightingSettleId: number | null = null;
   private disposed = false;
 
   private readonly getSessionState: ViewerInteractionCoordinatorDependencies['getSessionState'];
@@ -40,6 +49,8 @@ export class ViewerInteractionCoordinator implements Disposable {
   private readonly onInteractionChange: ViewerInteractionCoordinatorDependencies['onInteractionChange'];
   private readonly scheduleFrame: NonNullable<ViewerInteractionCoordinatorDependencies['scheduleFrame']>;
   private readonly cancelFrame: NonNullable<ViewerInteractionCoordinatorDependencies['cancelFrame']>;
+  private readonly scheduleDelay: NonNullable<ViewerInteractionCoordinatorDependencies['scheduleDelay']>;
+  private readonly cancelDelay: NonNullable<ViewerInteractionCoordinatorDependencies['cancelDelay']>;
 
   constructor(dependencies: ViewerInteractionCoordinatorDependencies) {
     const initialState = createInteractionState(dependencies.initialSessionState);
@@ -50,6 +61,8 @@ export class ViewerInteractionCoordinator implements Disposable {
     this.onInteractionChange = dependencies.onInteractionChange;
     this.scheduleFrame = dependencies.scheduleFrame ?? window.requestAnimationFrame.bind(window);
     this.cancelFrame = dependencies.cancelFrame ?? window.cancelAnimationFrame.bind(window);
+    this.scheduleDelay = dependencies.scheduleDelay ?? window.setTimeout.bind(window);
+    this.cancelDelay = dependencies.cancelDelay ?? window.clearTimeout.bind(window);
   }
 
   getState(): ViewerInteractionState {
@@ -71,10 +84,19 @@ export class ViewerInteractionCoordinator implements Disposable {
       return;
     }
 
+    const environmentLightingInteractive = shouldUseInteractiveEnvironmentLighting(
+      sessionState,
+      this.state.view,
+      nextView
+    );
     this.state = {
       ...this.state,
-      view: nextView
+      view: nextView,
+      ...(environmentLightingInteractive ? { environmentLightingInteractive: true } : {})
     };
+    if (environmentLightingInteractive) {
+      this.scheduleEnvironmentLightingSettle();
+    }
     this.scheduleFlush();
   }
 
@@ -127,6 +149,7 @@ export class ViewerInteractionCoordinator implements Disposable {
     };
 
     this.cancelScheduledFlush();
+    this.cancelEnvironmentLightingSettle();
     this.pendingPreviousState = null;
     this.state = next;
     this.publishedState = next;
@@ -145,6 +168,7 @@ export class ViewerInteractionCoordinator implements Disposable {
 
     this.disposed = true;
     this.cancelScheduledFlush();
+    this.cancelEnvironmentLightingSettle();
     this.pendingPreviousState = null;
   }
 
@@ -189,6 +213,29 @@ export class ViewerInteractionCoordinator implements Disposable {
     this.cancelFrame(this.frameId);
     this.frameId = null;
   }
+
+  private scheduleEnvironmentLightingSettle(): void {
+    this.cancelEnvironmentLightingSettle();
+    this.environmentLightingSettleId = this.scheduleDelay(() => {
+      this.environmentLightingSettleId = null;
+      if (this.disposed || this.state.environmentLightingInteractive !== true) {
+        return;
+      }
+
+      const { environmentLightingInteractive: _interactive, ...settledState } = this.state;
+      this.state = settledState;
+      this.scheduleFlush();
+    }, ENVIRONMENT_LIGHTING_INTERACTION_SETTLE_MS);
+  }
+
+  private cancelEnvironmentLightingSettle(): void {
+    if (this.environmentLightingSettleId === null) {
+      return;
+    }
+
+    this.cancelDelay(this.environmentLightingSettleId);
+    this.environmentLightingSettleId = null;
+  }
 }
 
 function sameInteractionState(a: ViewerInteractionState, b: ViewerInteractionState): boolean {
@@ -196,6 +243,26 @@ function sameInteractionState(a: ViewerInteractionState, b: ViewerInteractionSta
     sameViewState(a.view, b.view) &&
     samePixel(a.hoveredPixel, b.hoveredPixel) &&
     sameRoi(a.draftRoi, b.draftRoi) &&
-    sameRoiInteractionState(a.roiInteraction, b.roiInteraction)
+    sameRoiInteractionState(a.roiInteraction, b.roiInteraction) &&
+    (a.environmentLightingInteractive === true) ===
+      (b.environmentLightingInteractive === true)
   );
+}
+
+function shouldUseInteractiveEnvironmentLighting(
+  sessionState: ViewerSessionState,
+  previousView: ViewerViewState,
+  nextView: ViewerViewState
+): boolean {
+  if (
+    sessionState.viewerMode !== 'panorama' ||
+    resolvePanoramaDisplayMode(sessionState.panoramaDisplayMode) !== 'environmentLighting' ||
+    resolvePanoramaLightingMethod(sessionState.panoramaLightingMethod) !== 'sphericalHarmonics'
+  ) {
+    return false;
+  }
+
+  return previousView.panoramaYawDeg !== nextView.panoramaYawDeg ||
+    previousView.panoramaPitchDeg !== nextView.panoramaPitchDeg ||
+    previousView.panoramaHfovDeg !== nextView.panoramaHfovDeg;
 }

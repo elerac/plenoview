@@ -10,6 +10,7 @@ uniform vec2 uOutputPixelScale;
 uniform vec2 uScreenOrigin;
 uniform vec2 uImageSize;
 uniform bool uSourceTextureMipmapsAvailable;
+uniform bool uEnvironmentLightingInteractive;
 uniform float uExposure;
 uniform float uDisplayGamma;
 uniform bool uUseColormap;
@@ -82,6 +83,8 @@ const int MICROFACET_DISTRIBUTION_BECKMANN = 0;
 const int MICROFACET_DISTRIBUTION_GGX = 1;
 const int ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT = 256;
 const int ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT = 128;
+const int ROUGH_PLASTIC_INTERACTIVE_DIFFUSE_SAMPLE_COUNT = 64;
+const int ROUGH_PLASTIC_INTERACTIVE_SPECULAR_SAMPLE_COUNT = 64;
 const float ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP = 4.0;
 const int STOKES_DEGREE_MODULATION_MODE_VALUE = 0;
 const int STOKES_DEGREE_MODULATION_MODE_SATURATION = 1;
@@ -1418,13 +1421,22 @@ vec3 evaluateEnvironmentRoughPlastic(
   float maximumEnvironmentLod = max(log2(max(uImageSize.x, uImageSize.y)), 0.0);
   vec3 wo = normalize(viewDirection);
   float normalDotView = max(dot(normal, wo), 1.0e-5);
+  int specularSampleCount = uEnvironmentLightingInteractive
+    ? ROUGH_PLASTIC_INTERACTIVE_SPECULAR_SAMPLE_COUNT
+    : ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT;
+  int diffuseSampleCount = uEnvironmentLightingInteractive
+    ? ROUGH_PLASTIC_INTERACTIVE_DIFFUSE_SAMPLE_COUNT
+    : ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT;
 
   vec3 specular = vec3(0.0);
   float roughReflectance = 0.0;
   for (int sampleIndex = 0; sampleIndex < ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT; sampleIndex += 1) {
+    if (sampleIndex >= specularSampleCount) {
+      break;
+    }
     vec2 sampleValue = roughPlasticSample2D(
       sampleIndex,
-      ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT,
+      specularSampleCount,
       0.0
     );
     vec3 localMicrofacetNormal = sampleRoughPlasticMicrofacetNormal(sampleValue, alpha);
@@ -1469,24 +1481,27 @@ vec3 evaluateEnvironmentRoughPlastic(
     float environmentLod = resolveEnvironmentSampleLod(
       wi,
       directionPdf,
-      float(ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT),
+      float(specularSampleCount),
       maximumEnvironmentLod
     );
     specular += sampleEnvironmentRadiance(wi, environmentLod) * sampleWeight;
     roughReflectance += sampleWeight;
   }
-  specular /= float(ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT);
+  specular /= float(specularSampleCount);
   roughReflectance = clamp(
-    roughReflectance / float(ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT),
+    roughReflectance / float(specularSampleCount),
     0.0,
     1.0
   );
 
   vec3 transmittedIrradiance = vec3(0.0);
   for (int sampleIndex = 0; sampleIndex < ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT; sampleIndex += 1) {
+    if (sampleIndex >= diffuseSampleCount) {
+      break;
+    }
     vec2 sampleValue = roughPlasticSample2D(
       sampleIndex,
-      ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT,
+      diffuseSampleCount,
       0.3819660112501051
     );
     vec3 wi = roughPlasticLocalToWorld(
@@ -1500,13 +1515,13 @@ vec3 evaluateEnvironmentRoughPlastic(
     float environmentLod = resolveEnvironmentSampleLod(
       wi,
       normalDotLight / PI,
-      float(ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT),
+      float(diffuseSampleCount),
       maximumEnvironmentLod
     );
     transmittedIrradiance += sampleEnvironmentRadiance(wi, environmentLod) *
       externalTransmittance;
   }
-  transmittedIrradiance /= float(ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT);
+  transmittedIrradiance /= float(diffuseSampleCount);
 
   vec3 diffuseReflectance = clamp(materialDiffuseReflectance, vec3(0.0), vec3(1.0));
   float internalReflectance = approximateInternalDiffuseReflectance(eta);

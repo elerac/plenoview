@@ -197,6 +197,7 @@ export interface ViewerInteractionState {
   hoveredPixel: ImagePixel | null;
   draftRoi: ImageRoi | null;
   roiInteraction: ViewerRoiInteractionState;
+  environmentLightingInteractive?: boolean;
 }
 
 export interface ViewerRenderState extends ViewerSessionState {
@@ -207,6 +208,7 @@ export interface ViewerRenderState extends ViewerSessionState {
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
   invalidValueWarningEnabled?: boolean;
   invalidValueWarningPhase?: number;
+  environmentLightingInteractive?: boolean;
   hoveredPixel: ImagePixel | null;
   draftRoi: ImageRoi | null;
   roiInteraction: ViewerRoiInteractionState;

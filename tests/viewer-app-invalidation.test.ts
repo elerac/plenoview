@@ -168,6 +168,38 @@ describe('viewer app lanes', () => {
     )).toBe(true);
   });
 
+  it('rerenders SH environment lighting when interaction quality settles', () => {
+    const initialState = createActiveState();
+    const settledState: ViewerAppState = {
+      ...initialState,
+      sessionState: {
+        ...initialState.sessionState,
+        viewerMode: 'panorama',
+        panoramaDisplayMode: 'environmentLighting',
+        panoramaLightingMethod: 'sphericalHarmonics'
+      }
+    };
+    const interactiveState: ViewerAppState = {
+      ...settledState,
+      interactionState: {
+        ...settledState.interactionState,
+        environmentLightingInteractive: true
+      }
+    };
+
+    const interactiveFlags = createRenderFlags(settledState, interactiveState);
+    const settledFlags = createRenderFlags(interactiveState, settledState);
+
+    expect(hasRenderFlag(
+      interactiveFlags,
+      ViewerRenderInvalidationFlags.RenderImage
+    )).toBe(true);
+    expect(hasRenderFlag(
+      settledFlags,
+      ViewerRenderInvalidationFlags.RenderImage
+    )).toBe(true);
+  });
+
   it('rerenders the environment sphere material without preparing image resources', () => {
     const initialState = createActiveState();
     const state: ViewerAppState = {

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ViewerInteractionCoordinator } from '../src/interaction-coordinator';
+import {
+  ENVIRONMENT_LIGHTING_INTERACTION_SETTLE_MS,
+  ViewerInteractionCoordinator
+} from '../src/interaction-coordinator';
 import { createEmptyRoiInteractionState, createInteractionState } from '../src/view-state';
 import { createInitialState } from '../src/viewer-store';
 import type { ViewerSessionState, ViewerViewState } from '../src/types';
@@ -17,6 +20,7 @@ function createHarness(initialSessionState: Partial<ViewerSessionState> = {}) {
     ...initialSessionState
   };
   let frameCallback: FrameRequestCallback | null = null;
+  let delayCallback: (() => void) | null = null;
   const onInteractionChange = vi.fn();
   const commitViewState = vi.fn((view) => {
     sessionState = {
@@ -26,6 +30,9 @@ function createHarness(initialSessionState: Partial<ViewerSessionState> = {}) {
   });
   const cancelFrame = vi.fn(() => {
     frameCallback = null;
+  });
+  const cancelDelay = vi.fn(() => {
+    delayCallback = null;
   });
 
   const coordinator = new ViewerInteractionCoordinator({
@@ -37,7 +44,13 @@ function createHarness(initialSessionState: Partial<ViewerSessionState> = {}) {
       frameCallback = callback;
       return 1;
     },
-    cancelFrame
+    cancelFrame,
+    scheduleDelay: (callback, delayMs) => {
+      expect(delayMs).toBe(ENVIRONMENT_LIGHTING_INTERACTION_SETTLE_MS);
+      delayCallback = callback;
+      return 2;
+    },
+    cancelDelay
   });
 
   return {
@@ -45,6 +58,7 @@ function createHarness(initialSessionState: Partial<ViewerSessionState> = {}) {
     onInteractionChange,
     commitViewState,
     cancelFrame,
+    cancelDelay,
     getSessionState: () => sessionState,
     setSessionState: (next: typeof sessionState) => {
       sessionState = next;
@@ -54,7 +68,13 @@ function createHarness(initialSessionState: Partial<ViewerSessionState> = {}) {
       frameCallback = null;
       callback?.(0);
     },
-    hasScheduledFrame: () => frameCallback !== null
+    settleEnvironmentLighting: () => {
+      const callback = delayCallback;
+      delayCallback = null;
+      callback?.();
+    },
+    hasScheduledFrame: () => frameCallback !== null,
+    hasScheduledEnvironmentLightingSettle: () => delayCallback !== null
   };
 }
 
@@ -128,6 +148,50 @@ describe('interaction coordinator', () => {
     expect(harness.hasScheduledFrame()).toBe(false);
     expect(harness.onInteractionChange).not.toHaveBeenCalled();
     expect(harness.commitViewState).not.toHaveBeenCalled();
+  });
+
+  it('uses interactive SH lighting while panorama view updates are active and settles at full quality', () => {
+    const harness = createHarness({
+      viewerMode: 'panorama',
+      panoramaDisplayMode: 'environmentLighting',
+      panoramaLightingMethod: 'sphericalHarmonics'
+    });
+
+    harness.coordinator.enqueueViewPatch({ panoramaYawDeg: 12 });
+
+    expect(harness.hasScheduledEnvironmentLightingSettle()).toBe(true);
+    harness.flush();
+    expect(harness.onInteractionChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        environmentLightingInteractive: true,
+        view: expect.objectContaining({ panoramaYawDeg: 12 })
+      }),
+      expect.anything()
+    );
+
+    harness.settleEnvironmentLighting();
+    expect(harness.hasScheduledFrame()).toBe(true);
+    harness.flush();
+
+    const settledState = harness.onInteractionChange.mock.calls.at(-1)?.[0];
+    expect(settledState.environmentLightingInteractive).toBeUndefined();
+    expect(settledState.view.panoramaYawDeg).toBe(12);
+    expect(harness.commitViewState).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps path-traced panorama view updates out of the SH interaction quality path', () => {
+    const harness = createHarness({
+      viewerMode: 'panorama',
+      panoramaDisplayMode: 'environmentLighting',
+      panoramaLightingMethod: 'pathTracing'
+    });
+
+    harness.coordinator.enqueueViewPatch({ panoramaYawDeg: 12 });
+    harness.flush();
+
+    expect(harness.hasScheduledEnvironmentLightingSettle()).toBe(false);
+    const publishedState = harness.onInteractionChange.mock.calls.at(-1)?.[0];
+    expect(publishedState.environmentLightingInteractive).toBeUndefined();
   });
 
   it('rehydrates from session state and clears transient hover on session switches', () => {

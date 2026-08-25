@@ -68,6 +68,9 @@ export function mergeRenderState(
   return {
     ...sessionState,
     ...pickViewState(interactionState.view, sessionState.depthChannel),
+    ...(interactionState.environmentLightingInteractive === true
+      ? { environmentLightingInteractive: true }
+      : {}),
     viewerBackground: options.viewerBackground ?? DEFAULT_VIEWER_BACKGROUND_ID,
     maskInvalidStokesVectors: options.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
     spectralRgbGroupingEnabled: options.spectralRgbGroupingEnabled ?? DEFAULT_SPECTRAL_RGB_GROUPING_ENABLED,

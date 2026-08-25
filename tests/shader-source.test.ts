@@ -189,6 +189,13 @@ describe('shader source regressions', () => {
     expect(source).toContain('float resolveEnvironmentSampleLod(');
     expect(source).toContain('const int ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT = 256;');
     expect(source).toContain('const int ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT = 128;');
+    expect(source).toContain('uniform bool uEnvironmentLightingInteractive;');
+    expect(source).toContain('const int ROUGH_PLASTIC_INTERACTIVE_DIFFUSE_SAMPLE_COUNT = 64;');
+    expect(source).toContain('const int ROUGH_PLASTIC_INTERACTIVE_SPECULAR_SAMPLE_COUNT = 64;');
+    expect(source).toContain('if (sampleIndex >= specularSampleCount)');
+    expect(source).toContain('if (sampleIndex >= diffuseSampleCount)');
+    expect(source).toContain('specular /= float(specularSampleCount);');
+    expect(source).toContain('transmittedIrradiance /= float(diffuseSampleCount);');
     expect(source).toContain('ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP /');
     expect(source).toContain('vec3 sampleRoughPlasticMicrofacetNormal(vec2 sampleValue, float alpha)');
     expect(source).toContain(

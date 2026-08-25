@@ -206,7 +206,10 @@ export function cloneInteractionState(
     view,
     hoveredPixel: state.hoveredPixel ? { ...state.hoveredPixel } : null,
     draftRoi: cloneImageRoi(state.draftRoi),
-    roiInteraction: { ...(state.roiInteraction ?? createEmptyRoiInteractionState()) }
+    roiInteraction: { ...(state.roiInteraction ?? createEmptyRoiInteractionState()) },
+    ...(state.environmentLightingInteractive === true
+      ? { environmentLightingInteractive: true }
+      : {})
   };
 }
 
@@ -218,6 +221,8 @@ export function sameInteractionState(
     sameViewCommit(a.view, b.view) &&
     samePixel(a.hoveredPixel, b.hoveredPixel) &&
     sameImageRoi(a.draftRoi, b.draftRoi) &&
+    (a.environmentLightingInteractive === true) ===
+      (b.environmentLightingInteractive === true) &&
     sameRoiInteractionState(
       a.roiInteraction ?? createEmptyRoiInteractionState(),
       b.roiInteraction ?? createEmptyRoiInteractionState()

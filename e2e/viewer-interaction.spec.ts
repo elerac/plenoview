@@ -270,6 +270,27 @@ test('switches the panorama viewer between image, SH, and path-traced lighting',
     return window.__openExrViewerE2E?.snapshot().panoramaDisplayMode;
   })).toBe('environmentLighting');
 
+  const viewer = page.locator('#viewer-container');
+  const viewerBox = await viewer.boundingBox();
+  if (!viewerBox) {
+    throw new Error('Viewer container is not visible.');
+  }
+  const centerX = viewerBox.x + viewerBox.width * 0.5;
+  const centerY = viewerBox.y + viewerBox.height * 0.5;
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX + 24, centerY + 12);
+  await page.evaluate(async () => {
+    await window.__openExrViewerE2E?.waitForFrames(1);
+  });
+  expect(await page.evaluate(() => (
+    window.__openExrViewerE2E?.snapshot().environmentLightingInteractive
+  ))).toBe(true);
+  await page.mouse.up();
+  await expect.poll(async () => page.evaluate(() => (
+    window.__openExrViewerE2E?.snapshot().environmentLightingInteractive
+  )), { timeout: 30_000 }).toBe(false);
+
   await viewMenuButton.click();
   await panoramaViewerMenuItem.click();
   await environmentPathTracingMenuItem.click();

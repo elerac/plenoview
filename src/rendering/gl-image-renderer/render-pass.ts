@@ -323,6 +323,10 @@ function setPanoramaUniforms(
     program.uniforms.sourceTextureMipmapsAvailable,
     state.smoothFloatMinification ? 1 : 0
   );
+  gl.uniform1i(
+    program.uniforms.environmentLightingInteractive,
+    viewerState.environmentLightingInteractive === true ? 1 : 0
+  );
   gl.uniform1f(program.uniforms.panoramaYawDeg, viewerState.panoramaYawDeg);
   gl.uniform1f(
     program.uniforms.panoramaPitchDeg,

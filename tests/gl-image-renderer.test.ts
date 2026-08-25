@@ -1235,6 +1235,7 @@ describe('gl image renderer', () => {
       panoramaYawDeg: 17,
       panoramaPitchDeg: 90,
       panoramaHfovDeg: 90,
+      environmentLightingInteractive: true,
       environmentSphereMaterial: {
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
         alpha: 0.25,
@@ -1283,6 +1284,7 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uPanoramaHfovDeg')).toBe(90);
     expect(lastUniform1iValue(gl, 'uPanoramaDisplayMode')).toBe(1);
     expect(lastUniform1iValue(gl, 'uSourceTextureMipmapsAvailable')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentLightingInteractive')).toBe(1);
     expect(lastUniform3fvValue(gl, 'uEnvironmentShIrradiance[0]')).toEqual(
       environmentShIrradiance
     );

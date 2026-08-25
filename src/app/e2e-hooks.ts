@@ -18,6 +18,7 @@ interface E2EStateSnapshot {
   viewerMode: ViewerAppState['sessionState']['viewerMode'];
   panoramaDisplayMode: NonNullable<ViewerAppState['sessionState']['panoramaDisplayMode']>;
   panoramaLightingMethod: NonNullable<ViewerAppState['sessionState']['panoramaLightingMethod']>;
+  environmentLightingInteractive: boolean;
   panoramaYawDeg: number;
   depthYawDeg: number;
   depthPitchDeg: number;
@@ -185,6 +186,8 @@ function createSnapshot(state: ViewerAppState, appReady: boolean): E2EStateSnaps
     viewerMode: state.sessionState.viewerMode,
     panoramaDisplayMode: state.sessionState.panoramaDisplayMode ?? 'image',
     panoramaLightingMethod: state.sessionState.panoramaLightingMethod ?? 'sphericalHarmonics',
+    environmentLightingInteractive:
+      state.interactionState.environmentLightingInteractive === true,
     panoramaYawDeg: state.interactionState.view.panoramaYawDeg,
     depthYawDeg: state.interactionState.view.depthYawDeg,
     depthPitchDeg: state.interactionState.view.depthPitchDeg

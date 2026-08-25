@@ -18,6 +18,11 @@ export function createPanoramaProgram(gl: WebGL2RenderingContext): ProgramBundle
         program,
         'uSourceTextureMipmapsAvailable'
       ),
+      environmentLightingInteractive: getRequiredUniformLocation(
+        gl,
+        program,
+        'uEnvironmentLightingInteractive'
+      ),
       panoramaYawDeg: getRequiredUniformLocation(gl, program, 'uPanoramaYawDeg'),
       panoramaPitchDeg: getRequiredUniformLocation(gl, program, 'uPanoramaPitchDeg'),
       panoramaHfovDeg: getRequiredUniformLocation(gl, program, 'uPanoramaHfovDeg'),
