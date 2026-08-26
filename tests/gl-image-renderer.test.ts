@@ -1011,9 +1011,9 @@ describe('gl image renderer', () => {
     renderer.render(changedMaterialState);
     expect(readRootPathTracingSampleCount(renderer)).toBe(1);
 
-    setRootPathTracingSampleCount(renderer, 1023);
+    setRootPathTracingSampleCount(renderer, 4095);
     expect(renderer.render(changedMaterialState)).toBe(false);
-    expect(readRootPathTracingSampleCount(renderer)).toBe(1024);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(4096);
 
     renderer.setPanes([{
       path: [1],

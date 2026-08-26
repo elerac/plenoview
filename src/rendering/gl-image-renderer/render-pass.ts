@@ -57,7 +57,7 @@ const BACKGROUND_MODE_NONE = 0;
 const BACKGROUND_MODE_CHECKER = 1;
 const BACKGROUND_MODE_SOLID = 2;
 const PATH_TRACING_PASS_DIRECT = 2;
-export const MAX_PATH_TRACING_SAMPLE_COUNT = 1024;
+export const MAX_PATH_TRACING_SAMPLE_COUNT = 4096;
 
 interface PanoramaRenderTarget {
   accumulationKey: string;
