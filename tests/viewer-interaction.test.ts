@@ -8,7 +8,12 @@ import { createChannelRgbSelection, createViewerState } from './helpers/state-fi
 import type { ImagePixel, ViewerState, ViewportInfo } from '../src/types';
 import type { ViewerPaneRenderInfo } from '../src/viewer-pane-layout';
 
+const activeInteractions: ViewerInteraction[] = [];
+
 afterEach(() => {
+  for (const interaction of activeInteractions.splice(0)) {
+    interaction.destroy();
+  }
   vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
@@ -34,6 +39,89 @@ describe('viewer interaction roi gestures', () => {
 
     expect(harness.onToggleLockPixel).toHaveBeenCalledWith({ ix: 5, iy: 5 });
     expect(harness.onDraftRoi).not.toHaveBeenCalled();
+    expect(harness.onCommitRoi).not.toHaveBeenCalled();
+  });
+
+  it('cancels a stale mouse drag when the pointer returns with its button released', () => {
+    const harness = createHarness();
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 50,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 60,
+      clientY: 50
+    });
+    expect(harness.onViewChange).toHaveBeenCalled();
+
+    harness.onViewChange.mockClear();
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 0,
+      clientX: 80,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 0,
+      clientX: 90,
+      clientY: 50
+    });
+
+    expect(harness.onViewChange).not.toHaveBeenCalled();
+    expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 50,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointerup', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 0,
+      clientX: 50,
+      clientY: 50
+    });
+
+    expect(harness.onToggleLockPixel).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels an unfinished ROI drag when the app window loses focus', () => {
+    const harness = createHarness();
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientX: 50,
+      clientY: 50,
+      shiftKey: true
+    });
+    expect(harness.onDraftRoi).toHaveBeenLastCalledWith({ x0: 5, y0: 5, x1: 5, y1: 5 });
+
+    window.dispatchEvent(new Event('blur'));
+
+    expect(harness.onDraftRoi).toHaveBeenLastCalledWith(null);
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 0,
+      clientX: 80,
+      clientY: 70,
+      shiftKey: true
+    });
     expect(harness.onCommitRoi).not.toHaveBeenCalled();
   });
 
@@ -1073,6 +1161,46 @@ describe('viewer interaction depth probe', () => {
     expect(harness.onToggleLockPixel).not.toHaveBeenCalled();
   });
 
+  it('cancels stale middle-button camera panning when the pointer returns released', () => {
+    const harness = createHarness({
+      viewerMode: '3d',
+      depthYawDeg: 0,
+      depthPitchDeg: 0,
+      depthTargetX: 0,
+      depthTargetY: 0,
+      depthTargetZ: 0
+    });
+
+    dispatchPointer(harness.element, 'pointerdown', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 1,
+      buttons: 4,
+      clientX: 50,
+      clientY: 50
+    });
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 1,
+      buttons: 4,
+      clientX: 60,
+      clientY: 45
+    });
+    expect(harness.onViewChange).toHaveBeenCalled();
+
+    harness.onViewChange.mockClear();
+    dispatchPointer(harness.element, 'pointermove', {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 0,
+      clientX: 80,
+      clientY: 30
+    });
+
+    expect(harness.onViewChange).not.toHaveBeenCalled();
+  });
+
   it('pans the 3D target with Ctrl-left and Meta-left drags', () => {
     for (const modifier of ['ctrlKey', 'metaKey'] as const) {
       const harness = createHarness({
@@ -1875,6 +2003,7 @@ function createHarness(
     },
     cancelFrame
   });
+  activeInteractions.push(interaction);
 
   return {
     interaction,

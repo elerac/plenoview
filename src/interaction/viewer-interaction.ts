@@ -110,6 +110,7 @@ export class ViewerInteraction {
   private dragging = false;
   private movedDuringDrag = false;
   private dragPointerId: number | null = null;
+  private dragButtonMask = 0;
   private dragMode: DragMode = null;
   private previousPointer: PointerPosition | null = null;
   private lastPointerInElement: PointerPosition | null = null;
@@ -185,8 +186,10 @@ export class ViewerInteraction {
     this.element.addEventListener('pointermove', this.onPointerMove);
     this.element.addEventListener('pointerup', this.onPointerUp);
     this.element.addEventListener('pointercancel', this.onPointerCancel);
+    this.element.addEventListener('lostpointercapture', this.onLostPointerCapture);
     this.element.addEventListener('pointerleave', this.onPointerLeave);
     this.element.addEventListener('contextmenu', this.onContextMenu);
+    window.addEventListener('blur', this.onWindowBlur);
     document.addEventListener('visibilitychange', this.onDocumentVisibilityChange);
   }
 
@@ -196,9 +199,12 @@ export class ViewerInteraction {
     this.element.removeEventListener('pointermove', this.onPointerMove);
     this.element.removeEventListener('pointerup', this.onPointerUp);
     this.element.removeEventListener('pointercancel', this.onPointerCancel);
+    this.element.removeEventListener('lostpointercapture', this.onLostPointerCapture);
     this.element.removeEventListener('pointerleave', this.onPointerLeave);
     this.element.removeEventListener('contextmenu', this.onContextMenu);
+    window.removeEventListener('blur', this.onWindowBlur);
     document.removeEventListener('visibilitychange', this.onDocumentVisibilityChange);
+    this.cancelActivePointerInteractions();
     this.imageKeyboardPan.destroy();
     this.panoramaKeyboardOrbit.destroy();
     this.panoramaAutoRotate.destroy();
@@ -518,7 +524,7 @@ export class ViewerInteraction {
       if (hit.regionId) {
         this.callbacks.onScreenshotSelectionActiveRegionChange?.(hit.regionId);
       }
-      this.startDrag(event.pointerId);
+      this.startDrag(event.pointerId, event.button);
       this.dragMode = 'screenshot';
       this.movedDuringDrag = false;
       this.previousPointer = point;
@@ -565,7 +571,7 @@ export class ViewerInteraction {
       const handle = state.roi ? resolveRoiAdjustmentHandle(point, state.roi, state, viewport) : null;
       this.setRoiInteractionState(createRoiInteractionState({ hoverHandle: handle }));
       if (handle) {
-        this.startDrag(event.pointerId);
+        this.startDrag(event.pointerId, event.button);
         this.dragMode = 'roi-adjust';
         this.movedDuringDrag = false;
         this.roiAdjustmentDrag = createRoiAdjustmentDrag(handle, point, state.roi!);
@@ -588,7 +594,7 @@ export class ViewerInteraction {
         return;
       }
 
-      this.startDrag(event.pointerId);
+      this.startDrag(event.pointerId, event.button);
       this.dragMode = 'roi';
       this.movedDuringDrag = false;
       this.roiAnchorPixel = anchorPixel;
@@ -599,7 +605,7 @@ export class ViewerInteraction {
       return;
     }
 
-    this.startDrag(event.pointerId);
+    this.startDrag(event.pointerId, event.button);
     this.dragMode = depthPanDrag ? 'depth-pan' : 'pan';
     this.movedDuringDrag = false;
     this.previousPointer = point;
@@ -623,6 +629,19 @@ export class ViewerInteraction {
 
     if (this.dragging && this.dragPointerId !== null && event.pointerId !== this.dragPointerId) {
       return;
+    }
+
+    if (
+      this.dragging &&
+      this.dragPointerId === event.pointerId &&
+      (event.pointerType === 'mouse' || event.pointerType === 'pen') &&
+      this.dragButtonMask !== 0 &&
+      (event.buttons & this.dragButtonMask) === 0
+    ) {
+      // Native windows and embedded webviews can stop receiving pointer events
+      // while the cursor is outside the app. Reconcile the drag state from the
+      // button bitfield when the pointer returns without its initiating button.
+      this.cancelDrag(event.pointerId);
     }
 
     const screenshotSelection = this.getScreenshotSelection();
@@ -888,6 +907,20 @@ export class ViewerInteraction {
     }
   };
 
+  private readonly onLostPointerCapture = (event: PointerEvent): void => {
+    const wasGesturePointer = this.touchGesture?.pointerIds.includes(event.pointerId) ?? false;
+    if (wasGesturePointer) {
+      this.cancelTouchGesture();
+    }
+    if (event.pointerType === 'touch') {
+      this.forgetTouchPointer(event.pointerId);
+    }
+
+    if (this.dragging && this.dragPointerId === event.pointerId) {
+      this.cancelDrag(event.pointerId, { releasePointerCapture: false });
+    }
+  };
+
   private readonly onPointerLeave = (): void => {
     this.lastPointerInElement = null;
     this.emitHoverPixel(null);
@@ -910,20 +943,19 @@ export class ViewerInteraction {
     event.preventDefault();
   };
 
-  private startDrag(pointerId: number): void {
+  private startDrag(pointerId: number, button: number): void {
     this.dragging = true;
     this.dragPointerId = pointerId;
+    this.dragButtonMask = pointerButtonToButtonsMask(button);
   }
 
   private clearDrag(pointerId: number | null, options: { releasePointerCapture?: boolean } = {}): void {
     const wasDragging = this.dragging;
     const wasScreenshotResize = this.dragMode === 'screenshot' && this.screenshotDrag?.handle !== 'move';
     const wasScreenshotDrag = this.dragMode === 'screenshot';
-    if (options.releasePointerCapture !== false && pointerId !== null) {
-      this.releasePointerCapture(pointerId);
-    }
     this.dragging = false;
     this.dragPointerId = null;
+    this.dragButtonMask = 0;
     this.dragMode = null;
     this.movedDuringDrag = false;
     this.previousPointer = null;
@@ -932,6 +964,9 @@ export class ViewerInteraction {
     this.roiAnchorPixel = null;
     this.roiAdjustmentDrag = null;
     this.screenshotDrag = null;
+    if (options.releasePointerCapture !== false && pointerId !== null) {
+      this.releasePointerCapture(pointerId);
+    }
     if (wasScreenshotDrag) {
       this.callbacks.onScreenshotSelectionSquareSnapChange?.(false);
       this.callbacks.onScreenshotSelectionSnapGuideChange?.(createEmptySnapGuide());
@@ -958,6 +993,34 @@ export class ViewerInteraction {
 
   private cancelDragForTouchGesture(): void {
     this.cancelDrag(this.dragPointerId, { releasePointerCapture: false });
+  }
+
+  private cancelTouchGesture(): void {
+    if (!this.touchGesture) {
+      return;
+    }
+
+    this.touchGesture = null;
+    this.pendingDepthDragProbeState = null;
+    this.movedDuringDrag = false;
+    this.panoramaAutoRotate.setUserInteracting(false);
+    this.threeDAutoOrbit.setUserInteracting(false);
+  }
+
+  private cancelActivePointerInteractions(): void {
+    const capturedPointerIds = new Set(this.touchPointers.keys());
+    if (this.dragPointerId !== null) {
+      capturedPointerIds.add(this.dragPointerId);
+    }
+
+    if (this.dragging) {
+      this.cancelDrag(this.dragPointerId, { releasePointerCapture: false });
+    }
+    this.cancelTouchGesture();
+    this.touchPointers.clear();
+    for (const pointerId of capturedPointerIds) {
+      this.releasePointerCapture(pointerId);
+    }
   }
 
   private capturePointer(pointerId: number): void {
@@ -1293,8 +1356,15 @@ export class ViewerInteraction {
   }
 
   private readonly onDocumentVisibilityChange = (): void => {
+    if (document.visibilityState !== 'visible') {
+      this.cancelActivePointerInteractions();
+    }
     this.panoramaAutoRotate.sync();
     this.threeDAutoOrbit.sync();
+  };
+
+  private readonly onWindowBlur = (): void => {
+    this.cancelActivePointerInteractions();
   };
 }
 
@@ -1620,6 +1690,19 @@ function sameViewerKeyboardZoomInput(
 
 function isScreenshotSelectionDragButton(event: PointerEvent): boolean {
   return event.button === 0 || (event.button === 2 && event.ctrlKey);
+}
+
+function pointerButtonToButtonsMask(button: number): number {
+  if (button === 1) {
+    return 4;
+  }
+  if (button === 2) {
+    return 2;
+  }
+  if (button >= 0 && button <= 4) {
+    return 1 << button;
+  }
+  return 0;
 }
 
 function isThreeDPanDragStart(event: PointerEvent, state: ViewerState): boolean {
