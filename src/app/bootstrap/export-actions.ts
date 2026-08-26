@@ -37,6 +37,7 @@ import type { DisplayController } from '../../controllers/display-controller';
 import type {
   ExportColormapPreviewRequest,
   ExportColormapRequest,
+  CopyImageScale,
   ExportImageBatchPreviewRequest,
   ExportImageBatchRequest,
   ExportImagePreviewRequest,
@@ -75,6 +76,7 @@ interface ColormapExportResolverOptions {
 interface ImageExportResolverOptions {
   signal?: AbortSignal;
   previewMaxLongestEdge?: number;
+  outputScale?: number;
 }
 
 interface ColormapExportResolverDependencies {
@@ -323,11 +325,14 @@ export function createImageExportPixelsResolver({
       activeSession.decoded.height,
       renderState.displaySelection
     );
-    const requestedWidth = screenshotRegion?.outputWidth ?? displaySize.width;
-    const requestedHeight = screenshotRegion?.outputHeight ?? displaySize.height;
+    const scaledImageSize = !screenshotRegion && options.outputScale !== undefined && options.outputScale !== 1
+      ? resolveScaledImageExportSize(displaySize.width, displaySize.height, options.outputScale)
+      : null;
+    const requestedWidth = screenshotRegion?.outputWidth ?? scaledImageSize?.width ?? displaySize.width;
+    const requestedHeight = screenshotRegion?.outputHeight ?? scaledImageSize?.height ?? displaySize.height;
     const outputSize = options.previewMaxLongestEdge
       ? resolveBoundedImageExportSize(requestedWidth, requestedHeight, options.previewMaxLongestEdge)
-      : screenshotRegion
+      : screenshotRegion || scaledImageSize
         ? { width: requestedWidth, height: requestedHeight }
         : null;
 
@@ -432,7 +437,7 @@ export async function handleCopyImageToClipboard({
   resolveImageExportPixels,
   exportSink = BROWSER_EXPORT_SINK,
   isDisposed
-}: CopyImageToClipboardActionDependencies): Promise<void> {
+}: CopyImageToClipboardActionDependencies, scale: CopyImageScale = 1): Promise<void> {
   if (isDisposed()) {
     throw createAbortError('Viewer application has been disposed.');
   }
@@ -444,7 +449,10 @@ export async function handleCopyImageToClipboard({
     const stateSnapshot = core.getState();
     const sourceSession = selectActiveSession(stateSnapshot);
     pngBlob = (async () => {
-      const pixels = await resolveImageExportPixels({ mode: 'image' });
+      const pixels = await resolveImageExportPixels(
+        { mode: 'image' },
+        scale === 1 ? undefined : { outputScale: scale }
+      );
       if (sourceSession) {
         assertActiveSessionCurrent(core.getState(), sourceSession);
       }
@@ -1529,4 +1537,19 @@ export function resolveBoundedImageExportSize(
   maxLongestEdge: number
 ): { width: number; height: number } {
   return resolveBoundedColormapExportSize(width, height, maxLongestEdge);
+}
+
+function resolveScaledImageExportSize(
+  width: number,
+  height: number,
+  scale: number
+): { width: number; height: number } {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    throw new Error('Copy image scale must be positive.');
+  }
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  };
 }

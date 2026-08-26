@@ -55,6 +55,7 @@ import {
 } from '../export/screenshot-region';
 import type { ImageStatsReadoutModel, SpectralPlotReadoutModel, ViewerStateReadoutModel } from '../app/viewer-app-types';
 import type {
+  CopyImageScale,
   DisplaySelection,
   DisplayLuminanceRange,
   ExrMetadataEntry,
@@ -277,7 +278,7 @@ export interface UiCallbacks {
   onOpenFileClick: () => void;
   onOpenFolderClick: () => void;
   onExportImage: (request: ExportImageRequest, onProgress?: (update: ExportProgressUpdate) => void) => Promise<ExportSaveResult>;
-  onCopyImageToClipboard: () => Promise<void>;
+  onCopyImageToClipboard: (scale: CopyImageScale) => Promise<void>;
   onExportScreenshotRegions: (
     request: ExportScreenshotRegionsRequest,
     onProgress?: (update: ExportProgressUpdate) => void
@@ -2896,9 +2897,7 @@ export class ViewerUi implements Disposable {
     this.disposables.addEventListener(document, 'keydown', this.onViewerContextMenuKeyDown);
 
     this.disposables.addEventListener(this.elements.viewerContainer, 'contextmenu', this.onViewerContextMenu);
-    this.disposables.addEventListener(this.elements.viewerContextCopyImageButton, 'click', () => {
-      this.copyImageToClipboardFromContextMenu();
-    });
+    this.disposables.addEventListener(this.elements.viewerContextMenu, 'click', this.onViewerContextCopyImageClick);
 
     this.disposables.addEventListener(this.elements.openFileButton, 'click', () => {
       this.topMenuController.closeAll();
@@ -3297,6 +3296,23 @@ export class ViewerUi implements Disposable {
     this.closeViewerContextMenu();
   };
 
+  private readonly onViewerContextCopyImageClick = (event: MouseEvent): void => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const button = target.closest<HTMLButtonElement>('[data-copy-image-scale]');
+    if (!button || !this.elements.viewerContextMenu.contains(button)) {
+      return;
+    }
+
+    const scale = parseCopyImageScale(button.dataset.copyImageScale);
+    if (scale !== null) {
+      this.copyImageToClipboardFromContextMenu(scale);
+    }
+  };
+
   private canOpenViewerContextMenu(): boolean {
     return (
       !this.disposed &&
@@ -3314,7 +3330,9 @@ export class ViewerUi implements Disposable {
 
     const viewerRect = readElementClientRect(this.elements.viewerContainer);
     const menu = this.elements.viewerContextMenu;
+    this.updateViewerContextCopyImageLabels();
     menu.classList.remove('hidden');
+    this.alignViewerContextCopyImageSizes();
 
     const menuRect = menu.getBoundingClientRect();
     const menuWidth = menuRect.width || menu.offsetWidth;
@@ -3325,6 +3343,44 @@ export class ViewerUi implements Disposable {
     this.elements.viewerContextCopyImageButton.focus();
   }
 
+  private updateViewerContextCopyImageLabels(): void {
+    const imageSize = this.callbacks.getScreenshotSelectionContext().imageSize;
+    const buttons = this.elements.viewerContextMenu.querySelectorAll<HTMLButtonElement>('[data-copy-image-scale]');
+    for (const button of buttons) {
+      const scale = parseCopyImageScale(button.dataset.copyImageScale);
+      if (scale !== null) {
+        const label = formatCopyImageMenuLabel(scale, imageSize);
+        const action = document.createElement('span');
+        action.className = 'viewer-context-copy-image-action';
+        action.textContent = label.action;
+        button.classList.add('viewer-context-copy-image-item');
+        if (label.size) {
+          const size = document.createElement('span');
+          size.className = 'viewer-context-copy-image-size';
+          size.textContent = label.size;
+          button.replaceChildren(action, size);
+          button.setAttribute('aria-label', `${label.action} ${label.size}`);
+        } else {
+          button.replaceChildren(action);
+          button.setAttribute('aria-label', label.action);
+        }
+      }
+    }
+  }
+
+  private alignViewerContextCopyImageSizes(): void {
+    const menu = this.elements.viewerContextMenu;
+    menu.style.removeProperty('--viewer-context-copy-image-action-width');
+    const actionElements = menu.querySelectorAll<HTMLElement>('.viewer-context-copy-image-action');
+    let maxWidth = 0;
+    for (const action of actionElements) {
+      maxWidth = Math.max(maxWidth, action.getBoundingClientRect().width || action.offsetWidth);
+    }
+    if (maxWidth > 0) {
+      menu.style.setProperty('--viewer-context-copy-image-action-width', `${Math.ceil(maxWidth)}px`);
+    }
+  }
+
   private closeViewerContextMenu(): void {
     this.elements.viewerContextMenu.classList.add('hidden');
   }
@@ -3333,14 +3389,14 @@ export class ViewerUi implements Disposable {
     return !this.elements.viewerContextMenu.classList.contains('hidden');
   }
 
-  private copyImageToClipboardFromContextMenu(): void {
+  private copyImageToClipboardFromContextMenu(scale: CopyImageScale = 1): void {
     if (this.elements.viewerContextCopyImageButton.disabled) {
       return;
     }
 
     this.closeViewerContextMenu();
     this.clearViewerKeyboardNavigationInput();
-    void this.callbacks.onCopyImageToClipboard().catch(() => {});
+    void this.callbacks.onCopyImageToClipboard(scale).catch(() => {});
   }
 
   private readonly onScreenshotSelectionKeyboardGuard = (event: KeyboardEvent): void => {
@@ -3862,6 +3918,43 @@ function createFallbackViewerPaneRenderInfo(viewport: ViewportInfo): ViewerPaneR
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function parseCopyImageScale(value: string | undefined): CopyImageScale | null {
+  switch (value) {
+    case '0.25':
+      return 0.25;
+    case '0.5':
+      return 0.5;
+    case '1':
+      return 1;
+    case '2':
+      return 2;
+    case '4':
+      return 4;
+    default:
+      return null;
+  }
+}
+
+function formatCopyImageMenuLabel(
+  scale: CopyImageScale,
+  imageSize: ViewportInfo | null
+): { action: string; size: string | null } {
+  const action = `Copy Image ×${scale}`;
+  if (
+    !imageSize ||
+    !Number.isFinite(imageSize.width) ||
+    !Number.isFinite(imageSize.height) ||
+    imageSize.width <= 0 ||
+    imageSize.height <= 0
+  ) {
+    return { action, size: null };
+  }
+
+  const width = Math.max(1, Math.round(imageSize.width * scale));
+  const height = Math.max(1, Math.round(imageSize.height * scale));
+  return { action, size: `(${width} × ${height})` };
 }
 
 function findColormapOptionIdByLabel(

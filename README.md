@@ -13,7 +13,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 - `File > Export Screenshot...` exports an image-viewer or panorama-viewer screenshot region to PNG; multiple screenshot regions export as a ZIP, with optional reproduction JSON.
 - `File > Export Batch...` exports selected file/channel combinations as a ZIP of PNG images.
 - `File > Export Colormap...` exports any registered colormap as a standalone PNG gradient with configurable colormap, size, orientation, and filename.
-- Right-click `Copy Image` copies the current display image to the clipboard.
+- Right-click `Copy Image` copies the current display image to the clipboard at 1×, 4×, 2×, 0.5×, or 0.25× scale; the menu labels every scale explicitly and aligns the resulting pixel dimensions for easy comparison.
 - `View > Image viewer` / `Panorama viewer` / `3D viewer` switches between the existing 2D image view, panorama tools for equirectangular and horizontal-cross cubemap environment maps, and a point-cloud view for RGB plus depth or position data. The `Panorama viewer` submenu offers the source `Panorama image`, `Environment lighting (SH)`, and `Environment lighting (path tracing)`.
 - `View > Rulers` toggles pixel rulers in `Image viewer`.
 - `Window` controls include normal/full-screen preview plus single-pane, vertical split, and horizontal split viewer layouts.
@@ -290,7 +290,7 @@ Controller methods:
 - `File > Export Screenshot...`: select and export screenshot regions from Image or Panorama viewer; multiple regions export as a ZIP.
 - `File > Export Batch...`: export selected file/channel combinations as a ZIP of PNG images; the batch dialog has its own `Split RGB` option.
 - `File > Export Colormap...`: export a registered colormap to a PNG gradient with selectable colormap, `width`, `height`, `orientation`, and filename.
-- Right-click viewer menu > `Copy Image`: copy the current display image to the clipboard.
+- Right-click viewer menu > `Copy Image`: copy the current display image at 1×, 4×, 2×, 0.5×, or 0.25× scale. Enlarged copies use nearest-neighbor sampling; reduced copies use the viewer's smooth minification sampling.
 - Settings dialog > `Display Cache Budget`: use `Automatic` or choose a fixed retained display residency budget from `64`, `128`, `256`, `512`, or `1024` MB. The memory breakdown also shows decoded pixels, GPU textures, CPU materialized buffers, analysis cache, and total tracked memory. The value persists in `localStorage`.
 - Settings dialog: configure theme, spectrum lattice motion, spectral grouping default, Stokes defaults/visibility, invalid Stokes masking, auto exposure percentile, and image load workers.
 - `View > Image viewer` / `Panorama viewer > Panorama image`: switch between planar image viewing and spherical panorama viewing.

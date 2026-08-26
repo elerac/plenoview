@@ -4765,7 +4765,61 @@ describe('view menu', () => {
     await flushMicrotasks();
 
     expect(onCopyImageToClipboard).toHaveBeenCalledTimes(1);
+    expect(onCopyImageToClipboard).toHaveBeenCalledWith(1);
     expect(contextMenu.classList.contains('hidden')).toBe(true);
+  });
+
+  it('offers scaled copy-image actions in the viewer context menu', async () => {
+    installUiFixture();
+
+    const onCopyImageToClipboard = vi.fn(async () => undefined);
+    const ui = new ViewerUi(createUiCallbacks({ onCopyImageToClipboard }));
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+
+    const viewerContainer = document.getElementById('viewer-container') as HTMLElement;
+    const contextMenu = document.getElementById('viewer-context-menu') as HTMLDivElement;
+    const buttons = Array.from(
+      contextMenu.querySelectorAll<HTMLButtonElement>('[data-copy-image-scale]')
+    );
+
+    viewerContainer.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 50,
+      clientY: 60
+    }));
+
+    expect(buttons.map((button) => ({
+      action: button.querySelector('.viewer-context-copy-image-action')?.textContent,
+      size: button.querySelector('.viewer-context-copy-image-size')?.textContent
+    }))).toEqual([
+      { action: 'Copy Image ×1', size: '(200 × 100)' },
+      { action: 'Copy Image ×4', size: '(800 × 400)' },
+      { action: 'Copy Image ×2', size: '(400 × 200)' },
+      { action: 'Copy Image ×0.5', size: '(100 × 50)' },
+      { action: 'Copy Image ×0.25', size: '(50 × 25)' }
+    ]);
+    expect(buttons.map((button) => button.classList.contains('viewer-context-copy-image-item')))
+      .toEqual([true, true, true, true, true]);
+
+    for (const button of buttons) {
+      viewerContainer.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 50,
+        clientY: 60
+      }));
+      button.click();
+    }
+    await flushMicrotasks();
+
+    expect(onCopyImageToClipboard.mock.calls).toEqual([
+      [1],
+      [4],
+      [2],
+      [0.5],
+      [0.25]
+    ]);
   });
 
   it('leaves the browser context menu alone when no image is active', () => {

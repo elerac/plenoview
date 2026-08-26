@@ -1813,7 +1813,7 @@ describe('bootstrap app lifecycle', () => {
     app.dispose();
   });
 
-  it('copies the current image render to the clipboard at source resolution', async () => {
+  it('copies the current image render to the clipboard at source, reduced, and enlarged resolutions', async () => {
     class ResizeObserverMock {
       constructor(callback: ResizeObserverCallback) {
         mocks.setResizeObserverCallback(callback);
@@ -1877,7 +1877,7 @@ describe('bootstrap app lifecycle', () => {
     const { bootstrapApp } = await import('../src/app/bootstrap');
     const app = await bootstrapApp();
     const callbacks = mocks.getUiCallbacks() as {
-      onCopyImageToClipboard: () => Promise<void>;
+      onCopyImageToClipboard: (scale?: 0.25 | 0.5 | 1 | 2 | 4) => Promise<void>;
     };
 
     await expect(callbacks.onCopyImageToClipboard()).resolves.toBeUndefined();
@@ -1901,6 +1901,41 @@ describe('bootstrap app lifecycle', () => {
     expect(exportRequest).not.toHaveProperty('outputHeight');
     expect(mocks.createPngBlobFromPixels).toHaveBeenCalledWith(pixels);
     expect(clipboardWrite).toHaveBeenCalledTimes(1);
+
+    const reducedPixels = {
+      width: 512,
+      height: 256,
+      data: new Uint8ClampedArray(512 * 256 * 4)
+    };
+    mocks.rendererReadExportPixels.mockReturnValue(reducedPixels);
+
+    await expect(callbacks.onCopyImageToClipboard(0.5)).resolves.toBeUndefined();
+
+    expect(mocks.rendererReadExportPixels).toHaveBeenLastCalledWith(expect.objectContaining({
+      sourceWidth: 1024,
+      sourceHeight: 512,
+      outputWidth: 512,
+      outputHeight: 256
+    }));
+    expect(mocks.createPngBlobFromPixels).toHaveBeenLastCalledWith(reducedPixels);
+
+    const enlargedPixels = {
+      width: 2048,
+      height: 1024,
+      data: new Uint8ClampedArray(2048 * 1024 * 4)
+    };
+    mocks.rendererReadExportPixels.mockReturnValue(enlargedPixels);
+
+    await expect(callbacks.onCopyImageToClipboard(2)).resolves.toBeUndefined();
+
+    expect(mocks.rendererReadExportPixels).toHaveBeenLastCalledWith(expect.objectContaining({
+      sourceWidth: 1024,
+      sourceHeight: 512,
+      outputWidth: 2048,
+      outputHeight: 1024
+    }));
+    expect(mocks.createPngBlobFromPixels).toHaveBeenLastCalledWith(enlargedPixels);
+    expect(clipboardWrite).toHaveBeenCalledTimes(3);
 
     app.dispose();
   });

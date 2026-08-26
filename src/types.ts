@@ -294,6 +294,7 @@ export interface ViewportRect {
 export type ExportImageFormat = 'png';
 export type ExportColormapFormat = 'png';
 export type ExportColormapOrientation = 'horizontal' | 'vertical';
+export type CopyImageScale = 0.25 | 0.5 | 1 | 2 | 4;
 export type PngCompressionLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 export const DEFAULT_PNG_COMPRESSION_LEVEL: PngCompressionLevel = 9;
 

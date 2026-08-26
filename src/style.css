@@ -808,6 +808,17 @@ output {
   min-width: 8.5rem;
 }
 
+.viewer-context-copy-image-item {
+  display: grid;
+  grid-template-columns: var(--viewer-context-copy-image-action-width, max-content) max-content;
+  align-items: center;
+  column-gap: 0.45rem;
+}
+
+.viewer-context-copy-image-action {
+  justify-self: start;
+}
+
 .app-menu-setting-group {
   display: grid;
   gap: 6px;

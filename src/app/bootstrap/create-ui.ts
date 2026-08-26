@@ -63,7 +63,7 @@ interface CreateViewerUiDependencies {
   ) => Promise<{ width: number; height: number; data: Uint8ClampedArray }>;
   resolveImageExportPixels: (
     request?: ExportImagePreviewRequest | ExportImageRequest,
-    options?: { signal?: AbortSignal; previewMaxLongestEdge?: number }
+    options?: { signal?: AbortSignal; previewMaxLongestEdge?: number; outputScale?: number }
   ) => Promise<ExportImagePixels>;
   onImageLoadWorkersChange: (workerCount: number) => void;
   isDisposed: () => boolean;
@@ -129,13 +129,13 @@ export function createViewerUi({
         isDisposed
       }, onProgress);
     },
-    onCopyImageToClipboard: async () => {
+    onCopyImageToClipboard: async (scale) => {
       await handleCopyImageToClipboard({
         core,
         resolveImageExportPixels,
         exportSink: host,
         isDisposed
-      });
+      }, scale);
     },
     onExportScreenshotRegions: async (
       request: ExportScreenshotRegionsRequest,
