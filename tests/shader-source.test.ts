@@ -166,6 +166,7 @@ describe('shader source regressions', () => {
     expect(source).toContain('const vec3 ENVIRONMENT_SPHERE_CENTER = vec3(0.0, 0.0, 3.5);');
     expect(source).toContain('const vec3 ENVIRONMENT_FLOOR_CENTER = vec3(0.0, 1.0, 3.5);');
     expect(source).toContain('const float ENVIRONMENT_FLOOR_RADIUS = 2.75;');
+    expect(source).toContain('const float ENVIRONMENT_FLOOR_ALPHA = 0.7;');
     expect(source).toContain('const float ENVIRONMENT_CAMERA_ORBIT_RADIUS = 3.5;');
     expect(source).toContain('const float MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG = -15.0;');
     expect(source).toContain('vec3 originToCenter = rayOrigin - center;');
@@ -213,7 +214,7 @@ describe('shader source regressions', () => {
     expect(source).not.toContain('0.6180339887498949');
     expect(source).not.toContain('abs(normal.z) < 0.999');
     expect(source).toContain('textureLod(uSourceTextures[0], uv, lod)');
-    expect(source).toContain('surfaceType == ENVIRONMENT_SURFACE_SPHERE');
+    expect(source).toContain('materialAlpha = ENVIRONMENT_FLOOR_ALPHA;');
     expect(source).toContain(
       'ENVIRONMENT_COMPARISON_SPHERE_DIFFUSE_REFLECTANCE[sphereIndex]'
     );
@@ -223,9 +224,12 @@ describe('shader source regressions', () => {
     expect(source).toContain('sphereAlpha = uEnvironmentSphereAlpha;');
     expect(source).toContain('sceneMaterialAlpha');
     expect(source).not.toContain('lightingNormal');
-    expect(source).toContain(
-      'sceneAlbedo * evaluateEnvironmentIrradiance(sceneNormal) * (sceneVisibility / PI)'
-    );
+    expect(source).toContain('vec3 linear = evaluateEnvironmentRoughPlastic(');
+    expect(source).toContain('surfaceType == ENVIRONMENT_SURFACE_FLOOR');
+    expect(source).toContain('evaluateEnvironmentIrradiance(normal) *');
+    expect(source).toContain('(exteriorDiffuseTransmittance / PI);');
+    expect(source).toContain(') * sceneVisibility;');
+    expect(source).not.toContain('samplePathTracingLambertDirection');
     expect(source).toContain('albedo = mix(vec3(0.34), vec3(0.43), checker);');
     expect(source).not.toContain('radialFade');
   });

@@ -140,6 +140,7 @@ const float ENVIRONMENT_COMPARISON_SPHERE_ALPHA[6] = float[6](
 );
 const vec3 ENVIRONMENT_FLOOR_CENTER = vec3(0.0, 1.0, 3.5);
 const float ENVIRONMENT_FLOOR_RADIUS = 2.75;
+const float ENVIRONMENT_FLOOR_ALPHA = 0.7;
 const float ENVIRONMENT_CAMERA_ORBIT_RADIUS = 3.5;
 const float MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG = -15.0;
 const float PATH_TRACING_RAY_EPSILON = 1.0e-3;
@@ -949,7 +950,7 @@ bool resolveEnvironmentScene(
       );
       visibility = min(visibility, comparisonVisibility);
     }
-    materialAlpha = 1.0;
+    materialAlpha = ENVIRONMENT_FLOOR_ALPHA;
     surfaceType = ENVIRONMENT_SURFACE_FLOOR;
     return true;
   }
@@ -1405,7 +1406,8 @@ vec3 evaluateEnvironmentRoughPlastic(
   vec3 normal,
   vec3 viewDirection,
   vec3 materialDiffuseReflectance,
-  float materialAlpha
+  float materialAlpha,
+  bool useSphericalHarmonicsDiffuse
 ) {
   vec3 cameraForward;
   vec3 cameraRight;
@@ -1494,34 +1496,42 @@ vec3 evaluateEnvironmentRoughPlastic(
     1.0
   );
 
-  vec3 transmittedIrradiance = vec3(0.0);
-  for (int sampleIndex = 0; sampleIndex < ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT; sampleIndex += 1) {
-    if (sampleIndex >= diffuseSampleCount) {
-      break;
+  vec3 transmittedIrradiance;
+  if (useSphericalHarmonicsDiffuse) {
+    float exteriorDiffuseTransmittance = 1.0 -
+      approximateInternalDiffuseReflectance(1.0 / eta);
+    transmittedIrradiance = evaluateEnvironmentIrradiance(normal) *
+      (exteriorDiffuseTransmittance / PI);
+  } else {
+    transmittedIrradiance = vec3(0.0);
+    for (int sampleIndex = 0; sampleIndex < ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT; sampleIndex += 1) {
+      if (sampleIndex >= diffuseSampleCount) {
+        break;
+      }
+      vec2 sampleValue = roughPlasticSample2D(
+        sampleIndex,
+        diffuseSampleCount,
+        0.3819660112501051
+      );
+      vec3 wi = roughPlasticLocalToWorld(
+        sampleCosineHemisphere(sampleValue),
+        normal,
+        tangent,
+        bitangent
+      );
+      float normalDotLight = max(dot(normal, wi), 1.0e-6);
+      float externalTransmittance = 1.0 - evaluateDielectricFresnel(normalDotLight, eta);
+      float environmentLod = resolveEnvironmentSampleLod(
+        wi,
+        normalDotLight / PI,
+        float(diffuseSampleCount),
+        maximumEnvironmentLod
+      );
+      transmittedIrradiance += sampleEnvironmentRadiance(wi, environmentLod) *
+        externalTransmittance;
     }
-    vec2 sampleValue = roughPlasticSample2D(
-      sampleIndex,
-      diffuseSampleCount,
-      0.3819660112501051
-    );
-    vec3 wi = roughPlasticLocalToWorld(
-      sampleCosineHemisphere(sampleValue),
-      normal,
-      tangent,
-      bitangent
-    );
-    float normalDotLight = max(dot(normal, wi), 1.0e-6);
-    float externalTransmittance = 1.0 - evaluateDielectricFresnel(normalDotLight, eta);
-    float environmentLod = resolveEnvironmentSampleLod(
-      wi,
-      normalDotLight / PI,
-      float(diffuseSampleCount),
-      maximumEnvironmentLod
-    );
-    transmittedIrradiance += sampleEnvironmentRadiance(wi, environmentLod) *
-      externalTransmittance;
+    transmittedIrradiance /= float(diffuseSampleCount);
   }
-  transmittedIrradiance /= float(diffuseSampleCount);
 
   vec3 diffuseReflectance = clamp(materialDiffuseReflectance, vec3(0.0), vec3(1.0));
   float internalReflectance = approximateInternalDiffuseReflectance(eta);
@@ -1946,27 +1956,7 @@ bool samplePathTracingRoughPlastic(
   return !hasInvalidValue(pathWeight);
 }
 
-vec3 samplePathTracingLambertDirection(
-  vec3 normal,
-  inout uint randomState
-) {
-  vec3 cameraForward;
-  vec3 cameraRight;
-  vec3 cameraDown;
-  resolveEnvironmentOrbitBasis(cameraForward, cameraRight, cameraDown);
-  vec3 tangent;
-  vec3 bitangent;
-  buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);
-  return roughPlasticLocalToWorld(
-    sampleCosineHemisphere(nextPathTracingRandom2(randomState)),
-    normal,
-    tangent,
-    bitangent
-  );
-}
-
 vec3 evaluatePathTracingSurfaceBsdf(
-  int surfaceType,
   vec3 normal,
   vec3 viewDirection,
   vec3 lightDirection,
@@ -1979,29 +1969,24 @@ vec3 evaluatePathTracingSurfaceBsdf(
     samplingPdf = 0.0;
     return vec3(0.0);
   }
-  if (surfaceType == ENVIRONMENT_SURFACE_SPHERE) {
-    float alpha = clamp(materialAlpha, 1.0e-3, 1.0);
-    float eta = max(uEnvironmentSphereIntIor, 1.0e-3) /
-      max(uEnvironmentSphereExtIor, 1.0e-3);
-    samplingPdf = evaluatePathTracingRoughPlasticPdf(
-      normal,
-      viewDirection,
-      lightDirection,
-      eta,
-      alpha
-    );
-    return evaluatePathTracingRoughPlasticBsdf(
-      normal,
-      viewDirection,
-      lightDirection,
-      eta,
-      alpha,
-      albedo
-    );
-  }
-
-  samplingPdf = normalDotLight / PI;
-  return max(albedo, vec3(0.0)) / PI;
+  float alpha = clamp(materialAlpha, 1.0e-3, 1.0);
+  float eta = max(uEnvironmentSphereIntIor, 1.0e-3) /
+    max(uEnvironmentSphereExtIor, 1.0e-3);
+  samplingPdf = evaluatePathTracingRoughPlasticPdf(
+    normal,
+    viewDirection,
+    lightDirection,
+    eta,
+    alpha
+  );
+  return evaluatePathTracingRoughPlasticBsdf(
+    normal,
+    viewDirection,
+    lightDirection,
+    eta,
+    alpha,
+    albedo
+  );
 }
 
 bool isEnvironmentDirectionVisible(
@@ -2028,7 +2013,6 @@ bool isEnvironmentDirectionVisible(
 }
 
 vec3 samplePathTracingDirectEnvironment(
-  int surfaceType,
   vec3 position,
   vec3 normal,
   vec3 viewDirection,
@@ -2051,7 +2035,6 @@ vec3 samplePathTracingDirectEnvironment(
 
   float bsdfPdf;
   vec3 bsdf = evaluatePathTracingSurfaceBsdf(
-    surfaceType,
     normal,
     viewDirection,
     lightDirection,
@@ -2086,7 +2069,7 @@ vec3 traceEnvironmentPath(
     vec3 albedo;
     float ignoredVisibility;
     float materialAlpha;
-    int surfaceType;
+    int ignoredSurfaceType;
     if (!resolveEnvironmentScene(
       rayOrigin,
       rayDirection,
@@ -2095,7 +2078,7 @@ vec3 traceEnvironmentPath(
       albedo,
       ignoredVisibility,
       materialAlpha,
-      surfaceType
+      ignoredSurfaceType
     )) {
       float misWeight = hasPreviousBsdfSample
         ? pathTracingPowerHeuristic(
@@ -2111,7 +2094,6 @@ vec3 traceEnvironmentPath(
     }
 
     radiance += throughput * samplePathTracingDirectEnvironment(
-      surfaceType,
       position,
       normal,
       -rayDirection,
@@ -2123,23 +2105,17 @@ vec3 traceEnvironmentPath(
     vec3 nextDirection;
     vec3 bounceWeight;
     float nextBsdfPdf;
-    if (surfaceType == ENVIRONMENT_SURFACE_SPHERE) {
-      if (!samplePathTracingRoughPlastic(
-        normal,
-        -rayDirection,
-        albedo,
-        materialAlpha,
-        randomState,
-        nextDirection,
-        bounceWeight,
-        nextBsdfPdf
-      )) {
-        break;
-      }
-    } else {
-      nextDirection = samplePathTracingLambertDirection(normal, randomState);
-      bounceWeight = max(albedo, vec3(0.0));
-      nextBsdfPdf = max(dot(normal, nextDirection), 0.0) / PI;
+    if (!samplePathTracingRoughPlastic(
+      normal,
+      -rayDirection,
+      albedo,
+      materialAlpha,
+      randomState,
+      nextDirection,
+      bounceWeight,
+      nextBsdfPdf
+    )) {
+      break;
     }
 
     throughput *= bounceWeight;
@@ -2259,14 +2235,13 @@ void main() {
       sceneMaterialAlpha,
       surfaceType
     )) {
-      vec3 linear = surfaceType == ENVIRONMENT_SURFACE_SPHERE
-        ? evaluateEnvironmentRoughPlastic(
-            sceneNormal,
-            rayOrigin - scenePosition,
-            sceneAlbedo,
-            sceneMaterialAlpha
-          )
-        : sceneAlbedo * evaluateEnvironmentIrradiance(sceneNormal) * (sceneVisibility / PI);
+      vec3 linear = evaluateEnvironmentRoughPlastic(
+        sceneNormal,
+        rayOrigin - scenePosition,
+        sceneAlbedo,
+        sceneMaterialAlpha,
+        surfaceType == ENVIRONMENT_SURFACE_FLOOR
+      ) * sceneVisibility;
       linear *= exp2(uExposure);
       vec3 color = sanitizeDisplayColor(linearToDisplayGamma(linear));
       outColor = encodeOutputColor(screen, color, 1.0);
