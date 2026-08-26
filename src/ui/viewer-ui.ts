@@ -88,7 +88,6 @@ import type {
   VisualizationMode
 } from '../types';
 import type { ProbeColorPreview } from '../probe';
-import type { EnvironmentSphereMaterialPatch } from '../environment-sphere-material';
 import { ProbeReadoutController, type ProbeCoordinateImageSize } from './probe-readout';
 import { setRoiReadout } from './roi-readout';
 import { SpectralPlotPanel } from './spectral-plot-panel';
@@ -335,7 +334,6 @@ export interface UiCallbacks {
   onDepthSettingsChange?: (
     patch: Partial<Pick<ViewerSessionState, 'depthChannel' | 'depthFocalLengthPx' | 'depthPointSizePx'>>
   ) => void;
-  onEnvironmentSphereMaterialChange?: (patch: EnvironmentSphereMaterialPatch) => void;
   onAutoFitImageOnSelectChange: (enabled: boolean) => void;
   onAutoFitImage: () => void;
   onAutoExposureChange: (enabled: boolean) => void;
@@ -742,9 +740,6 @@ export class ViewerUi implements Disposable {
       },
       onDepthSettingsChange: (patch) => {
         this.callbacks.onDepthSettingsChange?.(patch);
-      },
-      onEnvironmentSphereMaterialChange: (patch) => {
-        this.callbacks.onEnvironmentSphereMaterialChange?.(patch);
       }
     });
     this.dragDropController = new DragDropController(this.elements, {

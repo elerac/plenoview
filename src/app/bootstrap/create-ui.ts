@@ -266,12 +266,6 @@ export function createViewerUi({
         patch
       });
     },
-    onEnvironmentSphereMaterialChange: (patch) => {
-      core.dispatch({
-        type: 'environmentSphereMaterialEdited',
-        patch
-      });
-    },
     onAutoFitImageOnSelectChange: (enabled) => {
       core.dispatch({ type: 'autoFitImageOnSelectSet', enabled });
     },

@@ -1700,15 +1700,14 @@ describe('viewer state inspector', () => {
     ]);
   });
 
-  it('shows and commits sphere material controls only for environment lighting', () => {
+  it('does not expose environment sphere material controls', () => {
     installUiFixture();
 
-    const onEnvironmentSphereMaterialChange = vi.fn();
-    const ui = new ViewerUi(createUiCallbacks({ onEnvironmentSphereMaterialChange }));
-    const readout = {
+    const ui = new ViewerUi(createUiCallbacks());
+    ui.setViewerStateReadout({
       hasActiveImage: true,
       viewerMode: 'panorama' as const,
-      panoramaDisplayMode: 'image' as const,
+      panoramaDisplayMode: 'environmentLighting' as const,
       environmentSphereMaterial: {
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
         alpha: 0.15,
@@ -1725,57 +1724,10 @@ describe('viewer state inspector', () => {
         panoramaPitchDeg: 5,
         panoramaHfovDeg: 80
       }
-    };
-
-    ui.setViewerStateReadout(readout);
-    const materialFields = document.getElementById('viewer-state-environment-material-fields') as HTMLDivElement;
-    const diffuseR = document.getElementById('viewer-state-environment-diffuse-r-input') as HTMLInputElement;
-    const diffuseG = document.getElementById('viewer-state-environment-diffuse-g-input') as HTMLInputElement;
-    const alpha = document.getElementById('viewer-state-environment-alpha-input') as HTMLInputElement;
-    const intIor = document.getElementById('viewer-state-environment-int-ior-input') as HTMLInputElement;
-    const distribution = document.getElementById('viewer-state-environment-distribution-select') as HTMLSelectElement;
-    const nonlinear = document.getElementById('viewer-state-environment-nonlinear-checkbox') as HTMLInputElement;
-
-    expect(materialFields.classList.contains('hidden')).toBe(true);
-    expect(diffuseR.disabled).toBe(true);
-
-    ui.setViewerStateReadout({
-      ...readout,
-      panoramaDisplayMode: 'environmentLighting'
     });
 
-    expect(materialFields.classList.contains('hidden')).toBe(false);
-    expect(diffuseR.disabled).toBe(false);
-    expect(diffuseR.value).toBe('0.2');
-    expect(diffuseG.value).toBe('0.3');
-    expect(alpha.value).toBe('0.15');
-    expect(intIor.value).toBe('1.6');
-    expect(distribution.value).toBe('beckmann');
-    expect(nonlinear.checked).toBe(false);
-
-    diffuseR.value = '-1';
-    diffuseR.dispatchEvent(new Event('blur'));
-    alpha.value = '0';
-    alpha.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    intIor.value = '1.7';
-    intIor.dispatchEvent(new Event('blur'));
-    distribution.value = 'ggx';
-    distribution.dispatchEvent(new Event('change'));
-    nonlinear.checked = true;
-    nonlinear.dispatchEvent(new Event('change'));
-
-    expect(onEnvironmentSphereMaterialChange.mock.calls).toEqual([
-      [{ diffuseReflectance: { r: 0 } }],
-      [{ alpha: 0.001 }],
-      [{ intIor: 1.7 }],
-      [{ distribution: 'ggx' }],
-      [{ nonlinear: true }]
-    ]);
-
-    diffuseG.value = '';
-    diffuseG.dispatchEvent(new Event('blur'));
-    expect(diffuseG.getAttribute('aria-invalid')).toBe('true');
-    expect(onEnvironmentSphereMaterialChange).toHaveBeenCalledTimes(5);
+    expect(document.querySelector('[aria-label="Environment sphere material"]')).toBeNull();
+    expect(document.querySelector('[id^="viewer-state-environment-"]')).toBeNull();
   });
 
   it('renders auto depth focal as a full numeric value without committing manual state on unchanged blur', () => {

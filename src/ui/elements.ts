@@ -232,7 +232,6 @@ export interface Elements {
   viewerStateEmptyState: HTMLElement;
   viewerStateImageFields: HTMLDivElement;
   viewerStatePanoramaFields: HTMLDivElement;
-  viewerStateEnvironmentMaterialFields: HTMLDivElement;
   viewerStateDepthFields: HTMLDivElement;
   viewerStateZoomInput: HTMLInputElement;
   viewerStatePanXInput: HTMLInputElement;
@@ -240,14 +239,6 @@ export interface Elements {
   viewerStateYawInput: HTMLInputElement;
   viewerStatePitchInput: HTMLInputElement;
   viewerStateHfovInput: HTMLInputElement;
-  viewerStateEnvironmentDiffuseRInput: HTMLInputElement;
-  viewerStateEnvironmentDiffuseGInput: HTMLInputElement;
-  viewerStateEnvironmentDiffuseBInput: HTMLInputElement;
-  viewerStateEnvironmentAlphaInput: HTMLInputElement;
-  viewerStateEnvironmentIntIorInput: HTMLInputElement;
-  viewerStateEnvironmentExtIorInput: HTMLInputElement;
-  viewerStateEnvironmentDistributionSelect: HTMLSelectElement;
-  viewerStateEnvironmentNonlinearCheckbox: HTMLInputElement;
   viewerStateDepthChannelSelect: HTMLSelectElement;
   viewerStateDepthFocalLabel: HTMLLabelElement;
   viewerStateDepthFocalInput: HTMLInputElement;
@@ -535,7 +526,6 @@ export type ViewerStatePanelElements = Pick<
   | 'viewerStateEmptyState'
   | 'viewerStateImageFields'
   | 'viewerStatePanoramaFields'
-  | 'viewerStateEnvironmentMaterialFields'
   | 'viewerStateDepthFields'
   | 'viewerStateZoomInput'
   | 'viewerStatePanXInput'
@@ -543,14 +533,6 @@ export type ViewerStatePanelElements = Pick<
   | 'viewerStateYawInput'
   | 'viewerStatePitchInput'
   | 'viewerStateHfovInput'
-  | 'viewerStateEnvironmentDiffuseRInput'
-  | 'viewerStateEnvironmentDiffuseGInput'
-  | 'viewerStateEnvironmentDiffuseBInput'
-  | 'viewerStateEnvironmentAlphaInput'
-  | 'viewerStateEnvironmentIntIorInput'
-  | 'viewerStateEnvironmentExtIorInput'
-  | 'viewerStateEnvironmentDistributionSelect'
-  | 'viewerStateEnvironmentNonlinearCheckbox'
   | 'viewerStateDepthChannelSelect'
   | 'viewerStateDepthFocalLabel'
   | 'viewerStateDepthFocalInput'
@@ -837,7 +819,6 @@ export function resolveElements(): Elements {
     viewerStateEmptyState: requireElement('viewer-state-empty-state', HTMLElement),
     viewerStateImageFields: requireElement('viewer-state-image-fields', HTMLDivElement),
     viewerStatePanoramaFields: requireElement('viewer-state-panorama-fields', HTMLDivElement),
-    viewerStateEnvironmentMaterialFields: requireElement('viewer-state-environment-material-fields', HTMLDivElement),
     viewerStateDepthFields: requireElement('viewer-state-depth-fields', HTMLDivElement),
     viewerStateZoomInput: requireElement('viewer-state-zoom-input', HTMLInputElement),
     viewerStatePanXInput: requireElement('viewer-state-pan-x-input', HTMLInputElement),
@@ -845,14 +826,6 @@ export function resolveElements(): Elements {
     viewerStateYawInput: requireElement('viewer-state-yaw-input', HTMLInputElement),
     viewerStatePitchInput: requireElement('viewer-state-pitch-input', HTMLInputElement),
     viewerStateHfovInput: requireElement('viewer-state-hfov-input', HTMLInputElement),
-    viewerStateEnvironmentDiffuseRInput: requireElement('viewer-state-environment-diffuse-r-input', HTMLInputElement),
-    viewerStateEnvironmentDiffuseGInput: requireElement('viewer-state-environment-diffuse-g-input', HTMLInputElement),
-    viewerStateEnvironmentDiffuseBInput: requireElement('viewer-state-environment-diffuse-b-input', HTMLInputElement),
-    viewerStateEnvironmentAlphaInput: requireElement('viewer-state-environment-alpha-input', HTMLInputElement),
-    viewerStateEnvironmentIntIorInput: requireElement('viewer-state-environment-int-ior-input', HTMLInputElement),
-    viewerStateEnvironmentExtIorInput: requireElement('viewer-state-environment-ext-ior-input', HTMLInputElement),
-    viewerStateEnvironmentDistributionSelect: requireElement('viewer-state-environment-distribution-select', HTMLSelectElement),
-    viewerStateEnvironmentNonlinearCheckbox: requireElement('viewer-state-environment-nonlinear-checkbox', HTMLInputElement),
     viewerStateDepthChannelSelect: requireElement('viewer-state-depth-channel-select', HTMLSelectElement),
     viewerStateDepthFocalLabel: requireElement('viewer-state-depth-focal-label', HTMLLabelElement),
     viewerStateDepthFocalInput: requireElement('viewer-state-depth-focal-input', HTMLInputElement),
