@@ -46,7 +46,7 @@ import {
   type ScreenshotSelectionSnapGuide
 } from '../interaction/screenshot-selection';
 import { resolveElements, type Elements } from './elements';
-import { setImageStats } from './image-stats-panel';
+import { hasInvalidImageValues, setImageStats } from './image-stats-panel';
 import { setMetadata } from './metadata-panel';
 import { type LayerOptionItem, type OpenedImageOptionItem } from './image-browser-types';
 import { LayoutSplitController } from './layout-split-controller';
@@ -1910,6 +1910,10 @@ export class ViewerUi implements Disposable {
       return;
     }
 
+    this.elements.appInvalidValueWarningButton.classList.toggle(
+      'has-invalid-values',
+      readout.hasActiveImage && !readout.isLoading && hasInvalidImageValues(readout.stats)
+    );
     setImageStats(this.elements, readout);
   }
 

@@ -2127,6 +2127,42 @@ describe('viewer state inspector', () => {
 });
 
 describe('image stats inspector', () => {
+  it('highlights the invalid value warning icon when the image contains an invalid value', () => {
+    installUiFixture();
+
+    const ui = new ViewerUi(createUiCallbacks());
+    const button = document.getElementById('app-invalid-value-warning-button') as HTMLButtonElement;
+
+    expect(button.classList.contains('has-invalid-values')).toBe(false);
+
+    ui.setImageStats({
+      hasActiveImage: true,
+      isLoading: false,
+      stats: {
+        width: 2,
+        height: 1,
+        pixelCount: 2,
+        channels: [createStatsChannel('R', 0.5, 0.5, 0.5, 1, 0, 0, 1)]
+      }
+    });
+
+    expect(button.classList.contains('has-invalid-values')).toBe(true);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+
+    ui.setImageStats({
+      hasActiveImage: true,
+      isLoading: false,
+      stats: {
+        width: 1,
+        height: 1,
+        pixelCount: 1,
+        channels: [createStatsChannel('R', 0.5, 0.5, 0.5, 1)]
+      }
+    });
+
+    expect(button.classList.contains('has-invalid-values')).toBe(false);
+  });
+
   it('places Image Stats after View and renders the compact stats table without Metadata in the inspector', () => {
     installUiFixture();
 

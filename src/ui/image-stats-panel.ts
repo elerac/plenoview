@@ -3,6 +3,14 @@ import type { ImageStatsReadoutModel } from '../app/viewer-app-types';
 import type { ImageStats, StatsChannelSummary } from '../types';
 import type { ImageStatsPanelElements } from './elements';
 
+export function hasInvalidImageValues(stats: ImageStats | null): boolean {
+  return stats?.channels.some((channel) =>
+    channel.nanPixelCount > 0 ||
+    channel.negativeInfinityPixelCount > 0 ||
+    channel.positiveInfinityPixelCount > 0
+  ) ?? false;
+}
+
 export function setImageStats(
   elements: ImageStatsPanelElements,
   readout: ImageStatsReadoutModel
