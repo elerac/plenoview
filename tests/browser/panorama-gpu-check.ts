@@ -1,6 +1,7 @@
 import { EnvironmentRadianceCache } from '../../src/rendering/gl-image-renderer/environment-radiance-cache';
 import { ENVIRONMENT_RADIANCE_TEXTURE_UNIT, PanoramaPrograms } from '../../src/rendering/gl-image-renderer/panorama-program';
 import type { PanoramaUniforms, ProgramBundle } from '../../src/rendering/gl-image-renderer/types';
+import { MITSUBA_SILVER_ETA, MITSUBA_SILVER_K } from '../../src/silver-ior';
 
 const output = document.querySelector<HTMLPreElement>('#results')!;
 const canvas = document.querySelector<HTMLCanvasElement>('#gpu')!;
@@ -207,8 +208,7 @@ async function run(): Promise<void> {
     checkPixels(read(shaded.texture), Array.from({ length: 4 }, () => [1, 0.5, 6.75, 1]).flat(),
       'SH lighting samples the baked HDR texture with the expected diffuse response');
 
-    // At near-normal incidence, low-roughness silver in a constant environment
-    // returns radiance * 0.96 in both renderers, with no plastic diffuse term.
+    // Path tracing uses measured Ag Fresnel; the SH preview retains its 0.96 fit.
     // One bounce also checks that the terminal reflection can reach the sky.
     for (const kind of ['sphericalHarmonics', 'pathTracing'] as const) {
       const silver = await prepare(kind);
@@ -222,6 +222,8 @@ async function run(): Promise<void> {
       gl.uniform1f(uniforms.panoramaHfovDeg, 1);
       gl.uniform1f(uniforms.displayGamma, 1);
       gl.uniform1i(uniforms.environmentSphereSmoothSilver, 1);
+      gl.uniform3f(uniforms.conductorEta, ...MITSUBA_SILVER_ETA);
+      gl.uniform3f(uniforms.conductorK, ...MITSUBA_SILVER_K);
       gl.uniform3f(uniforms.environmentSphereDiffuseReflectance, 0, 0, 0);
       gl.uniform1f(uniforms.environmentSphereAlpha, 0.02);
       gl.uniform1i(uniforms.sourceTextureMipmapsAvailable, constantEnvironment.mipmapsAvailable ? 1 : 0);
@@ -232,7 +234,11 @@ async function run(): Promise<void> {
           gl.bindTexture(gl.TEXTURE_2D, constantEnvironment.texture);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
         });
-        checkPixels(read(reflection.texture), Array.from({ length: 4 }, () => [3.84, 0.96, 8.64, 1]).flat(),
+        const reflected = [4, 1, 9].map((value, channel) => {
+          const eta = MITSUBA_SILVER_ETA[channel], k = MITSUBA_SILVER_K[channel];
+          return value * (kind === 'pathTracing' ? ((eta - 1) ** 2 + k * k) / ((eta + 1) ** 2 + k * k) : 0.96);
+        });
+        checkPixels(read(reflection.texture), Array.from({ length: 4 }, () => [...reflected, 1]).flat(),
           `${kind} polished silver reflects HDR radiance without diffuse loss or MIS dimming (${bounces} bounce limit)`);
       }
     }

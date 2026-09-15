@@ -9,10 +9,11 @@ export function getOrCreatePathTracingSurface(
   key: string,
   width: number,
   height: number,
-  signature: string
+  signature: string,
+  polarized = false
 ): PathTracingAccumulationSurface {
   const existing = state.pathTracingSurfaces.get(key);
-  if (existing && existing.width === width && existing.height === height) {
+  if (existing && existing.width === width && existing.height === height && existing.polarized === polarized) {
     if (existing.signature !== signature) {
       resetPathTracingSurface(state.gl, existing, signature);
     }
@@ -22,7 +23,7 @@ export function getOrCreatePathTracingSurface(
   if (existing) {
     deletePathTracingSurface(state.gl, existing);
   }
-  const created = createPathTracingSurface(state.gl, width, height, signature);
+  const created = createPathTracingSurface(state.gl, width, height, signature, polarized);
   state.pathTracingSurfaces.set(key, created);
   return created;
 }
@@ -32,6 +33,13 @@ export function clearPathTracingSurfaces(state: GlImageRendererState): void {
     deletePathTracingSurface(state.gl, surface);
   }
   state.pathTracingSurfaces.clear();
+}
+
+export function deletePathTracingSurfaceByKey(state: GlImageRendererState, key: string): void {
+  const surface = state.pathTracingSurfaces.get(key);
+  if (!surface) return;
+  deletePathTracingSurface(state.gl, surface);
+  state.pathTracingSurfaces.delete(key);
 }
 
 export function prunePathTracingSurfaces(
@@ -50,49 +58,55 @@ function createPathTracingSurface(
   gl: WebGL2RenderingContext,
   width: number,
   height: number,
-  signature: string
+  signature: string,
+  polarized: boolean
 ): PathTracingAccumulationSurface {
   const textures: WebGLTexture[] = [];
   const framebuffers: WebGLFramebuffer[] = [];
+  const stokesTextures: WebGLTexture[][] = [[], []];
   gl.activeTexture(gl.TEXTURE0 + PATH_TRACING_ACCUMULATION_TEXTURE_UNIT);
 
   try {
     for (let index = 0; index < 2; index += 1) {
-      const texture = gl.createTexture();
-      if (!texture) {
-        throw new Error('Failed to create path-tracing accumulation texture.');
-      }
-      textures.push(texture);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA32F,
-        width,
-        height,
-        0,
-        gl.RGBA,
-        gl.FLOAT,
-        null
-      );
-
       const framebuffer = gl.createFramebuffer();
-      if (!framebuffer) {
-        throw new Error('Failed to create path-tracing accumulation framebuffer.');
-      }
+      if (!framebuffer) throw new Error('Failed to create path-tracing accumulation framebuffer.');
       framebuffers.push(framebuffer);
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-      gl.framebufferTexture2D(
-        gl.FRAMEBUFFER,
-        gl.COLOR_ATTACHMENT0,
-        gl.TEXTURE_2D,
-        texture,
-        0
-      );
+      const attachments: number[] = [];
+      for (let component = 0; component < (polarized ? 4 : 1); component += 1) {
+        const texture = gl.createTexture();
+        if (!texture) {
+          throw new Error('Failed to create path-tracing accumulation texture.');
+        }
+        textures.push(texture);
+        stokesTextures[index].push(texture);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA32F,
+          width,
+          height,
+          0,
+          gl.RGBA,
+          gl.FLOAT,
+          null
+        );
+
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          gl.COLOR_ATTACHMENT0 + component,
+          gl.TEXTURE_2D,
+          texture,
+          0
+        );
+        attachments.push(gl.COLOR_ATTACHMENT0 + component);
+      }
+      if (polarized) gl.drawBuffers(attachments);
       if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
         throw new Error('Path-tracing floating-point framebuffer is incomplete.');
       }
@@ -109,7 +123,9 @@ function createPathTracingSurface(
 
   const surface: PathTracingAccumulationSurface = {
     framebuffers: [framebuffers[0], framebuffers[1]],
-    textures: [textures[0], textures[1]],
+    textures: [stokesTextures[0][0], stokesTextures[1][0]],
+    stokesTextures: [stokesTextures[0], stokesTextures[1]],
+    polarized,
     width,
     height,
     readIndex: 0,
@@ -151,7 +167,7 @@ function deletePathTracingSurface(
   for (const framebuffer of surface.framebuffers) {
     gl.deleteFramebuffer(framebuffer);
   }
-  for (const texture of surface.textures) {
-    gl.deleteTexture(texture);
+  for (const textures of surface.stokesTextures) {
+    for (const texture of textures) gl.deleteTexture(texture);
   }
 }

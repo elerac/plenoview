@@ -92,7 +92,10 @@ describe('embed params', () => {
       }
     };
 
-    expect(decodeEmbedViewerState(encodeEmbedViewerState(state))).toMatchObject(state);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState(state))).toMatchObject({
+      ...state,
+      environmentSphereMaterial: { ...state.environmentSphereMaterial, distribution: 'beckmann' }
+    });
     expect(decodeEmbedViewerState(encodeEmbedViewerState({
       environmentSphereMaterial: {
         ...state.environmentSphereMaterial,

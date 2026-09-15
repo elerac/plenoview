@@ -12,6 +12,7 @@ import { buildSelectedDisplayTexture } from '../src/display/materialize-cpu';
 import { CONSTRAINED_DEPTH_POINTS, type DepthPointBudgetResolver } from '../src/depth-point-budget';
 import { clampPanoramaProjectionPitch } from '../src/interaction/panorama-geometry';
 import { GlImageRenderer } from '../src/rendering/gl-image-renderer';
+import type { GlImageRendererState } from '../src/rendering/gl-image-renderer/types';
 import type { ViewerState } from '../src/types';
 import { createEmptyRoiInteractionState } from '../src/view-state';
 import { createInitialState } from '../src/viewer-store';
@@ -1175,6 +1176,140 @@ describe('gl image renderer', () => {
     expect(readRootPathTracingSampleCount(renderer)).toBeUndefined();
   });
 
+  it('retains all RGB Stokes accumulation across display selections and resets on material edits', () => {
+    const { renderer, gl, layer, state } = createPolarizedHarness();
+    expect(renderer.render(state)).toBe(true);
+    const renderState = getRendererState(renderer);
+    const surface = renderState.pathTracingSurfaces.get('root')!;
+    expect(surface.polarized).toBe(true);
+    expect(surface.stokesTextures.map(textures => textures.length)).toEqual([4, 4]);
+    expect(new Set(surface.stokesTextures.flat()).size).toBe(8);
+    expect(gl.drawBuffers).toHaveBeenCalledTimes(2);
+    expect(gl.drawBuffers).toHaveBeenCalledWith([0, 1, 2, 3].map(index => gl.COLOR_ATTACHMENT0 + index));
+    expect(lastUniform1iValue(gl, 'uEnvironmentPolarized')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentImportanceProjection')).toBe(2);
+    const source = renderState.activePolarizedEnvironment!;
+    const environment = renderState.environmentRadianceCache.getOrCreatePolarized(source.sourceKey, source);
+
+    const select = (selection: ViewerState['displaySelection'], colormap = false) => {
+      const binding = buildDisplaySourceBinding(layer, selection, colormap ? 'colormap' : 'rgb');
+      renderer.ensureLayerChannelsResident('penvmap', 0, 2, 3, layer, getDisplaySourceBindingChannelNames(binding));
+      renderer.setDisplaySelectionBindings('penvmap', 0, 2, 3, binding, 'display-selection-changed');
+      return { ...state, displaySelection: selection, visualizationMode: colormap ? 'colormap' as const : 'rgb' as const };
+    };
+    renderer.render(select(createStokesSelection('dolp', 'stokesRgb')));
+    expect(surface.sampleCount).toBe(2);
+    renderer.render(select(createStokesSelection('aolp', 'stokesRgb'), true));
+    expect(surface.sampleCount).toBe(3);
+    const circularState = select(createChannelRgbSelection('S3.R', 'S3.G', 'S3.B'));
+    renderer.render(circularState);
+    expect(lastUniform1iValue(gl, 'uPathTracingOutputComponent')).toBe(3);
+    expect(surface.sampleCount).toBe(4);
+    renderer.render({ ...circularState, maskInvalidStokesVectors: true, exposureEv: 3, displayGamma: 1.6 });
+    expect(surface.sampleCount).toBe(5);
+    expect(renderState.pathTracingSurfaces.get('root')).toBe(surface);
+    expect(renderState.environmentRadianceCache.getOrCreatePolarized(source.sourceKey, source)).toBe(environment);
+    expect(gl.drawBuffers).toHaveBeenCalledTimes(2);
+
+    renderer.render({
+      ...circularState,
+      environmentSphereMaterial: { ...state.environmentSphereMaterial, type: 'roughSilver', alpha: 0.3, distribution: 'ggx' }
+    });
+    expect(surface.sampleCount).toBe(1);
+    expect(renderState.pathTracingSurfaces.get('root')).toBe(surface);
+    expect(lastUniform1iValue(gl, 'uEnvironmentSphereRoughSilver')).toBe(1);
+    renderer.render({
+      ...circularState,
+      environmentSphereMaterial: { ...state.environmentSphereMaterial, type: 'pplastic', alpha: 0.12 }
+    });
+    expect(surface.sampleCount).toBe(1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentSpherePolarizedPlastic')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentSphereRoughSilver')).toBe(0);
+    const ownedTextures = [...surface.stokesTextures.flat(), ...environment.textures, environment.importanceTexture];
+    renderer.dispose();
+    for (const texture of ownedTextures) expect(gl.deleteTexture).toHaveBeenCalledWith(texture);
+  });
+
+  it('restores raw RGB source units after polarized rendering when switching to image, panorama, depth, or export', () => {
+    const { renderer, gl, state } = createPolarizedHarness();
+    const expected = getRendererState(renderer).activeSourceTextures.slice(0, 3);
+    const expectRawBindings = () => {
+      for (let index = 0; index < 3; index += 1) {
+        gl.activeTexture(gl.TEXTURE0 + index);
+        expect(gl.getParameter(gl.TEXTURE_BINDING_2D)).toBe(expected[index]);
+      }
+    };
+    renderer.render(state);
+    gl.activeTexture(gl.TEXTURE0 + 1);
+    expect(gl.getParameter(gl.TEXTURE_BINDING_2D)).not.toBe(expected[1]);
+    renderer.render({ ...state, viewerMode: 'image' });
+    expectRawBindings();
+    renderer.render(state);
+    renderer.render({ ...state, panoramaDisplayMode: 'image' });
+    expectRawBindings();
+    renderer.render(state);
+    renderer.render({ ...state, viewerMode: '3d', depthChannel: 'Z' });
+    expect(gl.drawArrays).toHaveBeenLastCalledWith(gl.POINTS, 0, 6);
+    expectRawBindings();
+    renderer.render(state);
+    const liveSampleCount = readRootPathTracingSampleCount(renderer);
+    renderer.readExportPixels({ state, sourceWidth: 2, sourceHeight: 3, outputWidth: 2, outputHeight: 3 });
+    expectRawBindings();
+    expect(readRootPathTracingSampleCount(renderer)).toBe(liveSampleCount);
+    renderer.dispose();
+  });
+
+  it('exports a polarized viewport without replacing or advancing its progressive surfaces', () => {
+    const { renderer, gl, state, layer } = createPolarizedHarness();
+    renderer.render(state);
+    renderer.render(state);
+    const surface = getRendererState(renderer).pathTracingSurfaces.get('root')!;
+    const previousReadIndex = surface.readIndex;
+    const selection = createStokesSelection('aolp', 'stokesRgb');
+    const binding = buildDisplaySourceBinding(layer, selection, 'colormap');
+    renderer.ensureLayerChannelsResident('penvmap', 0, 2, 3, layer, getDisplaySourceBindingChannelNames(binding));
+    renderer.setDisplaySelectionBindings('penvmap', 0, 2, 3, binding);
+    const drawsBefore = vi.mocked(gl.drawArrays).mock.calls.length;
+    renderer.readExportPixels({
+      state: { ...state, displaySelection: selection, visualizationMode: 'colormap' },
+      sourceWidth: 2, sourceHeight: 3, outputWidth: 20, outputHeight: 15,
+      screenshot: { coordinateSpace: 'viewport', rect: { x: 10, y: 10, width: 20, height: 15 }, sourceViewport: { width: 100, height: 80 } }
+    });
+    expect(lastUniform1iValue(gl, 'uEnvironmentPolarized')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uPathTracingPass')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uPathTracingSampleIndex')).toBe(63);
+    expect(lastUniform1fValue(gl, 'uPathTracingBlendWeight')).toBe(1 / 64);
+    expect(lastUniform1iValue(gl, 'uStokesParameter')).toBe(0);
+    expect(lastUniform2fValue(gl, 'uScreenOrigin')).toEqual([10, 10]);
+    expect(vi.mocked(gl.drawArrays).mock.calls.length - drawsBefore).toBe(128);
+    expect(gl.drawBuffers).toHaveBeenCalledTimes(4);
+    expect(getRendererState(renderer).pathTracingSurfaces.get('root')).toBe(surface);
+    expect(getRendererState(renderer).pathTracingSurfaces.has('__export')).toBe(false);
+    expect(surface.sampleCount).toBe(2);
+    expect(surface.readIndex).toBe(previousReadIndex);
+    expect(renderer.render(state)).toBe(true);
+    expect(surface.sampleCount).toBe(3);
+    renderer.dispose();
+  });
+
+  it('preserves live accumulation when an export accumulation framebuffer cannot be allocated', () => {
+    const { renderer, gl, state } = createPolarizedHarness();
+    renderer.render(state);
+    const surface = getRendererState(renderer).pathTracingSurfaces.get('root')!;
+    vi.mocked(gl.checkFramebufferStatus).mockReturnValueOnce(gl.FRAMEBUFFER_COMPLETE).mockReturnValueOnce(0);
+    expect(() => renderer.readExportPixels({
+      state, sourceWidth: 2, sourceHeight: 3, outputWidth: 20, outputHeight: 15,
+      screenshot: { coordinateSpace: 'viewport', rect: { x: 10, y: 10, width: 20, height: 15 }, sourceViewport: { width: 100, height: 80 } }
+    })).toThrow('framebuffer is incomplete');
+    expect(getRendererState(renderer).pathTracingSurfaces.get('root')).toBe(surface);
+    expect(surface.sampleCount).toBe(1);
+    expect(getRendererState(renderer).pathTracingFloatAccumulationSupported).toBe(true);
+    expect(getRendererState(renderer).pathTracingSurfaces.has('__export')).toBe(false);
+    renderer.render(state);
+    expect(surface.sampleCount).toBe(2);
+    renderer.dispose();
+  });
+
   it('keeps the renderer-owned invalid value warning phase across ordinary redraws', () => {
     const { renderer, gl } = createHarness();
     const layer = createInterleavedLayerFromChannels({
@@ -1449,7 +1584,7 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uEnvironmentSphereAlpha')).toBe(0.25);
     expect(lastUniform1fValue(gl, 'uEnvironmentSphereIntIor')).toBe(1.6);
     expect(lastUniform1fValue(gl, 'uEnvironmentSphereExtIor')).toBe(1.1);
-    expect(lastUniform1iValue(gl, 'uEnvironmentSphereDistribution')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uEnvironmentSphereDistribution')).toBe(0);
     expect(lastUniform1iValue(gl, 'uEnvironmentSphereNonlinear')).toBe(1);
   });
 
@@ -1718,6 +1853,28 @@ function createHarness(options: {
   };
 }
 
+function createPolarizedHarness() {
+  const { renderer, gl } = createHarness({ floatAccumulationSupported: true });
+  const layer = createLayerFromChannels({
+    R: [1, 1, 1, 1, 1, 1], G: [2, 2, 2, 2, 2, 2], B: [3, 3, 3, 3, 3, 3], Z: [1, 1, 1, 1, 1, 1],
+    ...Object.fromEntries(['S0', 'S1', 'S2', 'S3'].flatMap((component, index) =>
+      ['R', 'G', 'B'].map(color => [`${component}.${color}`, Array(6).fill(index === 0 ? 1 : -0.1)])))
+  });
+  const state = createPanoramaState({
+    panoramaDisplayMode: 'environmentLighting', panoramaLightingMethod: 'pathTracing',
+    displaySelection: createChannelRgbSelection('R', 'G', 'B')
+  });
+  renderer.resize(100, 80, 0, 0, 1);
+  renderer.ensureLayerChannelsResident('penvmap', 0, 2, 3, layer, ['R', 'G', 'B', 'Z']);
+  renderer.setDisplaySelectionBindings('penvmap', 0, 2, 3, buildDisplaySourceBinding(layer, state.displaySelection), 'initial');
+  renderer.setDepthSourceBinding('penvmap', 0, 2, 3, { kind: 'scalarDepth', channelName: 'Z' }, { kind: 'scalarDepth', range: { min: 1, max: 1 } });
+  return { renderer, gl, layer, state };
+}
+
+function getRendererState(renderer: GlImageRenderer): GlImageRendererState {
+  return (renderer as unknown as { state: GlImageRendererState }).state;
+}
+
 function getLayerTexturesBySession(renderer: GlImageRenderer): Map<string, Map<number, unknown>> {
   return (renderer as unknown as { layerTexturesBySession: Map<string, Map<number, unknown>> }).layerTexturesBySession;
 }
@@ -1893,6 +2050,8 @@ function createWebGlContextMock(options: {
   const framebuffers = [{ id: 'framebuffer-1' }, { id: 'framebuffer-2' }];
   const renderbuffers = [{ id: 'renderbuffer-1' }, { id: 'renderbuffer-2' }];
   const vaos = [{ id: 'vao-1' }];
+  let activeTextureUnit = 0x84c0;
+  const boundTextures = new Map<number, WebGLTexture | null>();
 
   return {
     VERTEX_SHADER: 0x8b31,
@@ -1962,8 +2121,8 @@ function createWebGlContextMock(options: {
     getProgramInfoLog: vi.fn(() => ''),
     deleteProgram: vi.fn(),
     bindVertexArray: vi.fn(),
-    activeTexture: vi.fn(),
-    bindTexture: vi.fn(),
+    activeTexture: vi.fn((unit: number) => { activeTextureUnit = unit; }),
+    bindTexture: vi.fn((_target: number, texture: WebGLTexture | null) => { boundTextures.set(activeTextureUnit, texture); }),
     bindFramebuffer: vi.fn(),
     bindRenderbuffer: vi.fn(),
     framebufferTexture2D: vi.fn(),
@@ -1990,6 +2149,7 @@ function createWebGlContextMock(options: {
     isEnabled: vi.fn(() => false),
     scissor: vi.fn(),
     drawArrays: vi.fn(),
+    drawBuffers: vi.fn(),
     readPixels: vi.fn(),
     viewport: vi.fn(),
     getUniformLocation: vi.fn((_program, name: string) => ({ name })),
@@ -2007,13 +2167,14 @@ function createWebGlContextMock(options: {
       return null;
     }),
     getParameter: vi.fn((parameter) => {
-      if (parameter === 0x8ca6 || parameter === 0x8caa || parameter === 0x8069) {
+      if (parameter === 0x8ca6 || parameter === 0x8caa) {
         return null;
       }
       if (parameter === 0x0ba2 || parameter === 0x0c10) {
         return new Int32Array([0, 0, 100, 80]);
       }
-      if (parameter === 0x84e0) return 0x84c0;
+      if (parameter === 0x84e0) return activeTextureUnit;
+      if (parameter === 0x8069) return boundTextures.get(activeTextureUnit) ?? null;
       if (parameter === 16) {
         return 16;
       }

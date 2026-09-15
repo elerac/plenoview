@@ -1,7 +1,12 @@
 import type { ViewerState } from '../../types';
+import { usesPathTracingEnvironmentLighting } from '../../panorama-lighting';
 import { COLORMAP_TEXTURE_UNIT } from './constants';
 import { renderDepthPass, renderImagePass, renderPanoramaPass } from './render-pass';
+import { deletePathTracingSurfaceByKey } from './path-tracing-surface';
 import type { ExportImagePixels, ExportSurface, GlImageRendererState, ReadExportPixelsArgs } from './types';
+
+export const POLARIZED_SCREENSHOT_SAMPLE_COUNT = 64;
+const EXPORT_ACCUMULATION_KEY = '__export';
 
 export function readExportPixels(
   state: GlImageRendererState,
@@ -59,7 +64,23 @@ export function readExportPixels(
       viewportTop: 0
     } as const;
     if (exportRender.state.viewerMode === 'panorama') {
-      if (renderPanoramaPass(state, exportRender.state, options)) {
+      if (screenshot && usesPathTracingEnvironmentLighting(exportRender.state) &&
+        state.activePolarizedEnvironment && state.pathTracingFloatAccumulationSupported) {
+        // Average signed Stokes samples before deriving AoLP/DoLP, just like
+        // the live viewer. A private surface preserves the viewport's samples.
+        for (let sample = 0; sample < POLARIZED_SCREENSHOT_SAMPLE_COUNT; sample += 1) {
+          const pending = renderPanoramaPass(state, exportRender.state, options, {
+            accumulationKey: EXPORT_ACCUMULATION_KEY,
+            outputRect: { x: 0, y: 0, width: outputWidth, height: outputHeight },
+            sampleLimit: POLARIZED_SCREENSHOT_SAMPLE_COUNT,
+            preserveScreenOrigin: true
+          });
+          if (!pending) break;
+          if (!state.pathTracingSurfaces.get(EXPORT_ACCUMULATION_KEY)?.sampleCount) {
+            throw new Error('Panorama is still preparing. Wait for its programs before exporting.');
+          }
+        }
+      } else if (renderPanoramaPass(state, exportRender.state, options)) {
         throw new Error('Panorama is still preparing. Wait for its programs before exporting.');
       }
     } else if (exportRender.state.viewerMode === '3d') {
@@ -80,6 +101,7 @@ export function readExportPixels(
       data
     };
   } finally {
+    deletePathTracingSurfaceByKey(state, EXPORT_ACCUMULATION_KEY);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);

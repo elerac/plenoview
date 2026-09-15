@@ -99,6 +99,7 @@ export interface ViewerRuntimeUi extends Disposable {
   setViewerMode(mode: ViewerMode): void;
   setPanoramaDisplayMode(mode: PanoramaDisplayMode): void;
   setPanoramaLightingMethod?(method: PanoramaLightingMethod): void;
+  setEnvironmentSphereMaterial?(material: EnvironmentSphereMaterial): void;
   setThreeDModeAvailable(available: boolean): void;
   setVisualizationMode(mode: VisualizationMode): void;
   setStokesDegreeModulationControl(
@@ -151,3 +152,4 @@ export interface ViewerRuntimeUi extends Disposable {
   setViewerStateReadout(readout: ViewerStateReadoutModel): void;
   setImageStats(readout: ImageStatsReadoutModel): void;
 }
+import type { EnvironmentSphereMaterial } from '../environment-sphere-material';

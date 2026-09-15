@@ -99,9 +99,9 @@ describe('viewer app core', () => {
     core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
 
     expect(core.getState().sessionState.environmentSphereMaterial).toMatchObject({
-      type: 'smoothSilver',
+      type: 'roughSilver',
       diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
-      alpha: 0.02,
+      alpha: 0.01,
       intIor: 1.49,
       extIor: 1.000277,
       distribution: 'beckmann',
@@ -121,12 +121,12 @@ describe('viewer app core', () => {
     });
 
     expect(core.getState().sessionState.environmentSphereMaterial).toEqual({
-      type: 'smoothSilver',
+      type: 'roughSilver',
       diffuseReflectance: { r: 0, g: 0.3, b: 1 },
       alpha: 0.001,
       intIor: 4,
       extIor: 1.2,
-      distribution: 'ggx',
+      distribution: 'beckmann',
       nonlinear: true
     });
   });

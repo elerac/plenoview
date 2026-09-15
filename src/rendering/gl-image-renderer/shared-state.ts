@@ -11,6 +11,7 @@ import { createEnvironmentImportanceTexture } from './environment-importance-tex
 import { createImageProgram } from './image-program';
 import { PanoramaPrograms } from './panorama-program';
 import { EnvironmentRadianceCache } from './environment-radiance-cache';
+import { RoughPlasticTransmittanceCache } from './roughplastic-transmittance-texture';
 import { createPathTracingPresentProgram } from './path-tracing-present-program';
 import { configureDepthProgramSamplers, configureProgramSamplers } from './program-utils';
 import { createZeroTexture } from './texture-store';
@@ -61,10 +62,13 @@ export function createGlImageRendererState(
     imageProgram,
     panoramaPrograms: new PanoramaPrograms(gl),
     environmentRadianceCache: new EnvironmentRadianceCache(gl, smoothFloatMinification),
+    roughPlasticTransmittanceCache: new RoughPlasticTransmittanceCache(gl),
     pathTracingPresentProgram,
     pathTracingFloatAccumulationSupported: gl.getExtension('EXT_color_buffer_float') !== null,
     pathTracingSurfaces: new Map(),
     activeSourceRevisionKey: '',
+    activePolarizedEnvironment: null,
+    activeSourceTextures: [],
     environmentImportanceTexture,
     environmentImportanceTextureSize: { width: 1, height: 1 },
     environmentImportanceGridSize: { width: 1, height: 1 },

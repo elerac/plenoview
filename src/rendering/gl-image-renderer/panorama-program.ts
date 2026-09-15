@@ -2,7 +2,7 @@ import vertexSource from '../shaders/fullscreen-triangle.vert.glsl?raw';
 import { resolvePanoramaDisplayMode, resolvePanoramaLightingMethod } from '../../panorama-lighting';
 import type { ViewerRenderState } from '../../types';
 import { DISPLAY_SOURCE_SLOT_COUNT } from '../../display/bindings';
-import { COLORMAP_TEXTURE_UNIT, PATH_TRACING_ACCUMULATION_TEXTURE_UNIT, PATH_TRACING_ENVIRONMENT_TABLE_TEXTURE_UNIT } from './constants';
+import { COLORMAP_TEXTURE_UNIT, PATH_TRACING_ACCUMULATION_TEXTURE_UNIT, PATH_TRACING_ENVIRONMENT_TABLE_TEXTURE_UNIT, ENVIRONMENT_STOKES_TEXTURE_UNITS, PATH_TRACING_STOKES_TEXTURE_UNITS } from './constants';
 import { createPendingProgram, type PendingProgram } from './pending-program';
 import { createPanoramaFragmentSource, environmentRadianceFragmentSource, type PanoramaProgramKind } from './panorama-shader-source';
 import { getCommonUniforms, getRequiredUniformLocation } from './program-utils';
@@ -65,6 +65,13 @@ export class PanoramaPrograms {
     const optional = (name: string) => gl.getUniformLocation(program, name);
     const uniforms: PanoramaUniforms = {
       ...getCommonUniforms(gl, program, true),
+      environmentPolarized: optional('uEnvironmentPolarized'),
+      conductorEta: optional('uConductorEta'),
+      conductorK: optional('uConductorK'),
+      environmentSphereRoughSilver: optional('uEnvironmentSphereRoughSilver'),
+      environmentSpherePolarizedPlastic: optional('uEnvironmentSpherePolarizedPlastic'),
+      pathTracingOutputComponent: optional('uPathTracingOutputComponent'),
+      pathTracingOutputColorChannel: optional('uPathTracingOutputColorChannel'),
       environmentRadianceTexture: optional('uEnvironmentRadianceTexture'),
       sourceTextureMipmapsAvailable: optional('uSourceTextureMipmapsAvailable'),
       environmentSampleCounts: optional('uEnvironmentSampleCounts'),
@@ -101,6 +108,11 @@ export class PanoramaPrograms {
     gl.uniform1i(uniforms.environmentRadianceTexture, ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
     gl.uniform1i(uniforms.pathTracingPreviousTexture, PATH_TRACING_ACCUMULATION_TEXTURE_UNIT);
     gl.uniform1i(uniforms.environmentImportanceTexture, PATH_TRACING_ENVIRONMENT_TABLE_TEXTURE_UNIT);
+    for (let component = 1; component < 4; component += 1) {
+      gl.uniform1i(optional(`uEnvironmentStokesS${component}Texture`), ENVIRONMENT_STOKES_TEXTURE_UNITS[component]);
+      gl.uniform1i(optional(`uPathTracingPreviousS${component}Texture`), PATH_TRACING_STOKES_TEXTURE_UNITS[component]);
+    }
+    gl.uniform1i(optional('uRoughPlasticTransmittanceTexture'), 7);
     return { program, uniforms };
   }
 }

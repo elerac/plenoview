@@ -15,6 +15,7 @@ export interface Elements {
   bottomPanel: HTMLElement;
   bottomPanelContent: HTMLElement;
   channelThumbnailStrip: HTMLElement;
+  channelThumbnailSourceHint: HTMLElement;
   imagePanel: HTMLElement;
   imagePanelContent: HTMLElement;
   imagePanelCollapseButton: HTMLButtonElement;
@@ -202,6 +203,7 @@ export interface Elements {
   imageStatsEmptyState: HTMLElement;
   imageStatsLoadingState: HTMLElement;
   imageStatsTable: HTMLElement;
+  probePanel: HTMLElement;
   probeMode: HTMLElement;
   probeCoords: HTMLElement;
   probeColorPreview: HTMLDivElement;
@@ -232,6 +234,9 @@ export interface Elements {
   viewerStateEmptyState: HTMLElement;
   viewerStateImageFields: HTMLDivElement;
   viewerStatePanoramaFields: HTMLDivElement;
+  environmentMaterialFields: HTMLDivElement;
+  environmentMaterialSelect: HTMLSelectElement;
+  environmentRoughnessInput: HTMLInputElement;
   viewerStateDepthFields: HTMLDivElement;
   viewerStateZoomInput: HTMLInputElement;
   viewerStatePanXInput: HTMLInputElement;
@@ -593,6 +598,7 @@ export function resolveElements(): Elements {
     bottomPanel: requireElement('bottom-panel', HTMLElement),
     bottomPanelContent: requireElement('bottom-panel-content', HTMLElement),
     channelThumbnailStrip: requireElement('channel-thumbnail-strip', HTMLElement),
+    channelThumbnailSourceHint: requireElement('channel-thumbnail-source-hint', HTMLElement),
     imagePanel: requireElement('image-panel', HTMLElement),
     imagePanelContent: requireElement('image-panel-content', HTMLElement),
     imagePanelCollapseButton: requireElement('image-panel-collapse-button', HTMLButtonElement),
@@ -789,6 +795,7 @@ export function resolveElements(): Elements {
     imageStatsEmptyState: requireElement('image-stats-empty-state', HTMLElement),
     imageStatsLoadingState: requireElement('image-stats-loading-state', HTMLElement),
     imageStatsTable: requireElement('image-stats-table', HTMLElement),
+    probePanel: requireElement('probe-panel', HTMLElement),
     probeMode: requireElement('probe-mode', HTMLElement),
     probeCoords: requireElement('probe-coords', HTMLElement),
     probeColorPreview: requireElement('probe-color-preview', HTMLDivElement),
@@ -819,6 +826,9 @@ export function resolveElements(): Elements {
     viewerStateEmptyState: requireElement('viewer-state-empty-state', HTMLElement),
     viewerStateImageFields: requireElement('viewer-state-image-fields', HTMLDivElement),
     viewerStatePanoramaFields: requireElement('viewer-state-panorama-fields', HTMLDivElement),
+    environmentMaterialFields: requireElement('environment-material-fields', HTMLDivElement),
+    environmentMaterialSelect: requireElement('environment-material-select', HTMLSelectElement),
+    environmentRoughnessInput: requireElement('environment-roughness-input', HTMLInputElement),
     viewerStateDepthFields: requireElement('viewer-state-depth-fields', HTMLDivElement),
     viewerStateZoomInput: requireElement('viewer-state-zoom-input', HTMLInputElement),
     viewerStatePanXInput: requireElement('viewer-state-pan-x-input', HTMLInputElement),

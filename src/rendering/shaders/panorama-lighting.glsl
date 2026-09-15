@@ -1,5 +1,7 @@
 uniform bool uSourceTextureMipmapsAvailable;
 uniform bool uEnvironmentSphereSmoothSilver;
+uniform bool uEnvironmentSphereRoughSilver;
+uniform bool uEnvironmentSpherePolarizedPlastic;
 uniform vec3 uEnvironmentSphereDiffuseReflectance;
 uniform float uEnvironmentSphereAlpha;
 uniform float uEnvironmentSphereIntIor;
@@ -12,6 +14,7 @@ uniform sampler2D uEnvironmentRadianceTexture;
 const int ENVIRONMENT_SURFACE_FLOOR = 0;
 const int ENVIRONMENT_SURFACE_SPHERE = 1;
 const int ENVIRONMENT_SURFACE_SMOOTH_SILVER = 2;
+const int ENVIRONMENT_SURFACE_COMPARISON_SPHERE = 3;
 const float ENVIRONMENT_RAY_EPSILON = 1.0e-3;
 // Neutral, high reflectance gives polished silver a mirror-like appearance.
 const vec3 ENVIRONMENT_SILVER_REFLECTANCE = vec3(0.96);
@@ -105,7 +108,7 @@ bool resolveEnvironmentScene(
   vec3 sphereCenter = ENVIRONMENT_SPHERE_CENTER;
   vec3 sphereDiffuseReflectance = uEnvironmentSphereDiffuseReflectance;
   float sphereAlpha = uEnvironmentSphereAlpha;
-  int sphereSurfaceType = uEnvironmentSphereSmoothSilver
+  int sphereSurfaceType = (uEnvironmentSphereSmoothSilver || uEnvironmentSphereRoughSilver)
     ? ENVIRONMENT_SURFACE_SMOOTH_SILVER
     : ENVIRONMENT_SURFACE_SPHERE;
   for (
@@ -128,7 +131,7 @@ bool resolveEnvironmentScene(
       sphereDiffuseReflectance =
         ENVIRONMENT_COMPARISON_SPHERE_DIFFUSE_REFLECTANCE[sphereIndex];
       sphereAlpha = ENVIRONMENT_COMPARISON_SPHERE_ALPHA[sphereIndex];
-      sphereSurfaceType = ENVIRONMENT_SURFACE_SPHERE;
+      sphereSurfaceType = ENVIRONMENT_SURFACE_COMPARISON_SPHERE;
     }
   }
   float floorDistance = intersectEnvironmentFloor(

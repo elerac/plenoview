@@ -386,6 +386,9 @@ export function createViewerUi({
     onPanoramaLightingMethodChange: (method) => {
       getDisplayController().setPanoramaLightingMethod(method);
     },
+    onEnvironmentSphereMaterialChange: (patch) => {
+      core.dispatch({ type: 'environmentSphereMaterialEdited', patch });
+    },
     onLayerChange: (layerIndex) => {
       getDisplayController().setActiveLayer(layerIndex);
     },

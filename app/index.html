@@ -1330,6 +1330,16 @@
                     <label for="viewer-state-hfov-input">HFOV</label>
                     <input id="viewer-state-hfov-input" class="viewer-state-input" type="number" step="any" value="100" />
                   </div>
+                  <div id="environment-material-fields" class="viewer-state-fields hidden" aria-label="Path tracing material">
+                    <label for="environment-material-select">Material</label>
+                    <select id="environment-material-select" class="viewer-state-input">
+                      <option value="roughConductor">Rough Conductor</option>
+                      <option value="roughPlasticWhite">Rough Plastic (White)</option>
+                      <option value="roughPlasticBlack">Rough Plastic (Black)</option>
+                    </select>
+                    <label for="environment-roughness-input">Roughness</label>
+                    <input id="environment-roughness-input" class="viewer-state-input" type="number" min="0.001" max="1" step="0.001" value="0.01" title="Microfacet roughness alpha" />
+                  </div>
                   <div id="viewer-state-depth-fields" class="viewer-state-fields hidden" aria-label="3D viewer state">
                     <label for="viewer-state-depth-channel-select">Source</label>
                     <select id="viewer-state-depth-channel-select" class="viewer-state-input"></select>
@@ -1510,6 +1520,9 @@
 
         <div id="bottom-panel" class="bottom-panel-shell panel-shell panel-shell--bottom">
           <aside id="bottom-panel-content" class="bottom-panel" aria-label="Bottom panel">
+            <p id="channel-thumbnail-source-hint" class="channel-thumbnail-source-hint hidden">
+              Source EXR previews. Select a channel to show its rendered result in the main viewport.
+            </p>
             <section class="bottom-panel-section" aria-label="Channel thumbnails">
               <div
                 id="channel-thumbnail-strip"

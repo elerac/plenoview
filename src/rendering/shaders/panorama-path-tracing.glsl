@@ -12,7 +12,7 @@ uniform int uEnvironmentImportanceProjection;
 
 const int PATH_TRACING_PASS_ACCUMULATE = 1;
 const int ENVIRONMENT_IMPORTANCE_PROJECTION_CUBEMAP = 1;
-const int PATH_TRACING_RUSSIAN_ROULETTE_START_BOUNCE = 2;
+const int ENVIRONMENT_IMPORTANCE_PROJECTION_PENVMAP = 2;
 
 uint pathTracingHash(uint value) {
   uint state = value * 747796405u + 2891336453u;
@@ -43,11 +43,30 @@ vec2 nextPathTracingRandom2(inout uint state) {
 vec4 readEnvironmentImportanceEntry(int index) {
   int width = max(uEnvironmentImportanceTextureSize.x, 1);
   int safeIndex = clamp(index, 0, max(uEnvironmentImportanceEntryCount - 1, 0));
+  if (uEnvironmentImportanceProjection == ENVIRONMENT_IMPORTANCE_PROJECTION_PENVMAP) safeIndex *= 2;
   return texelFetch(
     uEnvironmentImportanceTexture,
     ivec2(safeIndex - (safeIndex / width) * width, safeIndex / width),
     0
   );
+}
+
+vec4 readPenvmapImportanceCorners(int index) {
+  int width = max(uEnvironmentImportanceTextureSize.x, 1);
+  int offset = 2 * index + 1;
+  return texelFetch(uEnvironmentImportanceTexture, ivec2(offset % width, offset / width), 0);
+}
+
+float bilinearImportanceDensity(vec4 corners, vec2 p) {
+  return mix(mix(corners.x, corners.y, p.x), mix(corners.z, corners.w, p.x), p.y);
+}
+
+float sampleLinearDensity(float sampleValue, float start, float end) {
+  // Invert the integral with a cancellation-free quadratic root.
+  if (abs(end - start) < 1.0e-6 * max(start + end, 1.0e-20)) return sampleValue;
+  float integral = sampleValue * (start + end);
+  return clamp(integral / max(start + sqrt(max(0.0,
+    start * start + (end - start) * integral)), 1.0e-30), 0.0, 1.0);
 }
 
 vec3 cubemapImportanceDirection(int faceIndex, vec2 local) {
@@ -112,6 +131,15 @@ float environmentImportancePdf(vec3 direction) {
 
   int gridWidth = max(uEnvironmentImportanceGridSize.x, 1);
   int gridHeight = max(uEnvironmentImportanceGridSize.y, 1);
+  if (uEnvironmentImportanceProjection == ENVIRONMENT_IMPORTANCE_PROJECTION_PENVMAP) {
+    vec3 localDirection = viewerToPenvmap(normalize(direction));
+    vec2 uv = penvmapDirectionToUv(localDirection);
+    vec2 grid = vec2(fract(uv.x - 0.5 / float(gridWidth)), uv.y) * vec2(gridWidth, gridHeight);
+    ivec2 cell = min(ivec2(grid), ivec2(gridWidth - 1, gridHeight - 1));
+    float density = bilinearImportanceDensity(readPenvmapImportanceCorners(cell.y * gridWidth + cell.x), grid - vec2(cell));
+    float sine = length(localDirection.xz);
+    return density / (2.0 * PI * PI * max(sine, 1.0e-7));
+  }
   if (uEnvironmentImportanceProjection == ENVIRONMENT_IMPORTANCE_PROJECTION_CUBEMAP) {
     int faceIndex;
     vec2 local;
@@ -177,7 +205,19 @@ bool sampleEnvironmentImportance(
   int gridWidth = max(uEnvironmentImportanceGridSize.x, 1);
   int gridHeight = max(uEnvironmentImportanceGridSize.y, 1);
 
-  if (uEnvironmentImportanceProjection == ENVIRONMENT_IMPORTANCE_PROJECTION_CUBEMAP) {
+  if (uEnvironmentImportanceProjection == ENVIRONMENT_IMPORTANCE_PROJECTION_PENVMAP) {
+    int row = selectedIndex / gridWidth;
+    int column = selectedIndex - row * gridWidth;
+    vec4 corners = readPenvmapImportanceCorners(selectedIndex);
+    float y = sampleLinearDensity(sampleValue.y, corners.x + corners.y, corners.z + corners.w);
+    float x = sampleLinearDensity(sampleValue.x, mix(corners.x, corners.z, y), mix(corners.y, corners.w, y));
+    vec2 uv = vec2((float(column) + x + 0.5) / float(gridWidth),
+                   (float(row) + y) / float(gridHeight));
+    vec3 localDirection = penvmapUvToDirection(uv);
+    direction = penvmapToViewer(localDirection);
+    pdf = bilinearImportanceDensity(corners, vec2(x, y)) /
+      (2.0 * PI * PI * max(length(localDirection.xz), 1.0e-7));
+  } else if (uEnvironmentImportanceProjection == ENVIRONMENT_IMPORTANCE_PROJECTION_CUBEMAP) {
     int entriesPerFace = gridWidth * gridHeight;
     int faceIndex = selectedIndex / entriesPerFace;
     int faceCell = selectedIndex - faceIndex * entriesPerFace;
@@ -251,16 +291,17 @@ vec3 evaluatePathTracingRoughPlasticBsdf(
   }
 
   float fresnel = evaluateDielectricFresnel(viewDotMicrofacet, eta);
-  float distribution = evaluateRoughPlasticMicrofacetDistribution(
-    normalDotMicrofacet,
+  float distribution = mitsubaMicrofacetDistribution(
+    normal,
+    microfacetNormal,
     alpha
   );
-  float geometry = evaluateRoughPlasticSmithG1(
+  float geometry = mitsubaSmithG1(
     viewDirection,
     microfacetNormal,
     normal,
     alpha
-  ) * evaluateRoughPlasticSmithG1(
+  ) * mitsubaSmithG1(
     lightDirection,
     microfacetNormal,
     normal,
@@ -268,7 +309,7 @@ vec3 evaluatePathTracingRoughPlasticBsdf(
   );
   vec3 specular = vec3(
     fresnel * distribution * geometry /
-    max(4.0 * normalDotView * normalDotLight, 1.0e-8)
+    (4.0 * normalDotView * normalDotLight)
   );
 
   vec3 diffuseReflectance = clamp(
@@ -276,17 +317,18 @@ vec3 evaluatePathTracingRoughPlasticBsdf(
     vec3(0.0),
     vec3(1.0)
   );
-  float internalReflectance = approximateInternalDiffuseReflectance(eta);
+  vec2 viewLookup = roughPlasticLookup(normalDotView, alpha);
+  float internalReflectance = viewLookup.y;
   vec3 internalDenominator = uEnvironmentSphereNonlinear
     ? vec3(1.0) - diffuseReflectance * internalReflectance
     : vec3(1.0 - internalReflectance);
   vec3 correctedDiffuseReflectance = diffuseReflectance /
-    max(internalDenominator, vec3(1.0e-4));
-  float viewTransmittance = 1.0 - evaluateDielectricFresnel(normalDotView, eta);
-  float lightTransmittance = 1.0 - evaluateDielectricFresnel(normalDotLight, eta);
+    internalDenominator;
+  float viewTransmittance = viewLookup.x;
+  float lightTransmittance = roughPlasticLookup(normalDotLight, alpha).x;
   vec3 diffuse = correctedDiffuseReflectance *
     (viewTransmittance * lightTransmittance /
-      max(PI * eta * eta, 1.0e-6));
+      (PI * eta * eta));
 
   return max(specular + diffuse, vec3(0.0));
 }
@@ -294,14 +336,16 @@ vec3 evaluatePathTracingRoughPlasticBsdf(
 float resolvePathTracingRoughPlasticSpecularProbability(
   vec3 normal,
   vec3 viewDirection,
-  float eta
+  float alpha,
+  vec3 diffuseReflectance
 ) {
   float normalDotView = max(dot(normal, viewDirection), 0.0);
-  return clamp(
-    0.25 + 0.5 * evaluateDielectricFresnel(normalDotView, eta),
-    0.25,
-    0.75
-  );
+  float transmittance = roughPlasticLookup(normalDotView, alpha).x;
+  float diffuseMean = dot(diffuseReflectance, vec3(1.0 / 3.0));
+  float specularWeight = 1.0 / max(1.0 + diffuseMean, 1.0e-8);
+  float specular = (1.0 - transmittance) * specularWeight;
+  float diffuse = transmittance * (1.0 - specularWeight);
+  return specular / max(specular + diffuse, 1.0e-20);
 }
 
 float evaluatePathTracingRoughPlasticPdf(
@@ -309,7 +353,8 @@ float evaluatePathTracingRoughPlasticPdf(
   vec3 viewDirection,
   vec3 lightDirection,
   float eta,
-  float alpha
+  float alpha,
+  vec3 diffuseReflectance
 ) {
   float normalDotLight = dot(normal, lightDirection);
   if (dot(normal, viewDirection) <= 0.0 || normalDotLight <= 0.0) {
@@ -324,17 +369,20 @@ float evaluatePathTracingRoughPlasticPdf(
     float normalDotMicrofacet = max(dot(normal, microfacetNormal), 0.0);
     float viewDotMicrofacet = max(dot(viewDirection, microfacetNormal), 0.0);
     if (normalDotMicrofacet > 0.0 && viewDotMicrofacet > 0.0) {
-      specularPdf = evaluateRoughPlasticMicrofacetDistribution(
-        normalDotMicrofacet,
+      specularPdf = mitsubaMicrofacetDistribution(
+        normal,
+        microfacetNormal,
         alpha
-      ) * normalDotMicrofacet / max(4.0 * viewDotMicrofacet, 1.0e-8);
+      ) * mitsubaSmithG1(viewDirection, microfacetNormal, normal, alpha) /
+        max(4.0 * dot(normal, viewDirection), 1.0e-20);
     }
   }
   float diffusePdf = normalDotLight / PI;
   float specularProbability = resolvePathTracingRoughPlasticSpecularProbability(
     normal,
     viewDirection,
-    eta
+    alpha,
+    diffuseReflectance
   );
   return specularProbability * specularPdf +
     (1.0 - specularProbability) * diffusePdf;
@@ -358,7 +406,7 @@ bool samplePathTracingRoughPlastic(
   vec3 bitangent;
   buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);
 
-  float alpha = clamp(materialAlpha, 1.0e-3, 1.0);
+  float alpha = max(materialAlpha, 1.0e-4);
   float eta = max(uEnvironmentSphereIntIor, 1.0e-3) /
     max(uEnvironmentSphereExtIor, 1.0e-3);
   float normalDotView = max(dot(normal, viewDirection), 0.0);
@@ -369,19 +417,12 @@ bool samplePathTracingRoughPlastic(
   float specularProbability = resolvePathTracingRoughPlasticSpecularProbability(
     normal,
     viewDirection,
-    eta
+    alpha,
+    diffuseReflectance
   );
   if (nextPathTracingRandom(randomState) < specularProbability) {
-    vec3 localMicrofacetNormal = sampleRoughPlasticMicrofacetNormal(
-      nextPathTracingRandom2(randomState),
-      alpha
-    );
-    vec3 microfacetNormal = roughPlasticLocalToWorld(
-      localMicrofacetNormal,
-      normal,
-      tangent,
-      bitangent
-    );
+    vec3 microfacetNormal = sampleMitsubaVisibleMicrofacet(
+      normal, viewDirection, alpha, nextPathTracingRandom2(randomState));
     if (dot(viewDirection, microfacetNormal) <= 0.0) {
       return false;
     }
@@ -405,7 +446,8 @@ bool samplePathTracingRoughPlastic(
     viewDirection,
     lightDirection,
     eta,
-    alpha
+    alpha,
+    diffuseReflectance
   );
   if (!(sampledPdf > 0.0) || !isFiniteValue(sampledPdf)) {
     return false;
@@ -436,7 +478,7 @@ vec3 evaluatePathTracingSurfaceBsdf(
     samplingPdf = 0.0;
     return vec3(0.0);
   }
-  float alpha = clamp(materialAlpha, 1.0e-3, 1.0);
+  float alpha = max(materialAlpha, 1.0e-4);
   float eta = max(uEnvironmentSphereIntIor, 1.0e-3) /
     max(uEnvironmentSphereExtIor, 1.0e-3);
   samplingPdf = evaluatePathTracingRoughPlasticPdf(
@@ -444,7 +486,8 @@ vec3 evaluatePathTracingSurfaceBsdf(
     viewDirection,
     lightDirection,
     eta,
-    alpha
+    alpha,
+    albedo
   );
   return evaluatePathTracingRoughPlasticBsdf(
     normal,
@@ -454,6 +497,83 @@ vec3 evaluatePathTracingSurfaceBsdf(
     alpha,
     albedo
   );
+}
+
+// pplastic.cpp uses a reflectance-only mixture, independent of incident angle.
+float polarizedPlasticSpecularProbability(vec3 albedo) {
+  return 1.0 / max(1.0 + dot(albedo, vec3(1.0 / 3.0)), 1.0e-8);
+}
+
+RgbMueller evaluatePathTracingPolarizedPlasticBsdf(
+  vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 albedo,
+  float materialAlpha, out float samplingPdf
+) {
+  samplingPdf = 0.0;
+  float normalDotView = dot(normal, viewDirection);
+  float normalDotLight = dot(normal, lightDirection);
+  if (normalDotView <= 0.0 || normalDotLight <= 0.0) return depolarizingMueller(vec3(0.0));
+  vec3 halfway = viewDirection + lightDirection;
+  if (dot(halfway, halfway) <= 1.0e-20) return depolarizingMueller(vec3(0.0));
+  vec3 microfacet = normalize(halfway);
+  float alpha = max(materialAlpha, 1.0e-4);
+  float eta = uEnvironmentSphereIntIor / uEnvironmentSphereExtIor;
+  float distribution = mitsubaMicrofacetDistribution(normal, microfacet, alpha);
+  float gView = mitsubaSmithG1(viewDirection, microfacet, normal, alpha);
+  float gLight = mitsubaSmithG1(lightDirection, microfacet, normal, alpha);
+  float specularPdf = distribution * gView / (4.0 * normalDotView);
+  if (dot(viewDirection, microfacet) <= 0.0 || dot(lightDirection, microfacet) <= 0.0) specularPdf = 0.0;
+  float specularProbability = polarizedPlasticSpecularProbability(albedo);
+  samplingPdf = specularProbability * specularPdf + (1.0 - specularProbability) * normalDotLight / PI;
+  // Our integrator applies cos(theta_o) separately; upstream eval includes it.
+  float specularScale = distribution * gView * gLight / (4.0 * normalDotView * normalDotLight);
+  if (!uEnvironmentPolarized) {
+    float ignoredCosThetaT;
+    float reflection = mitsubaDielectricFresnel(dot(viewDirection, microfacet), eta, ignoredCosThetaT);
+    float reflectView = mitsubaDielectricFresnel(normalDotView, eta, ignoredCosThetaT);
+    float reflectLight = mitsubaDielectricFresnel(normalDotLight, eta, ignoredCosThetaT);
+    return depolarizingMueller(vec3(reflection * specularScale) +
+      albedo * ((1.0 - reflectLight) * (1.0 - reflectView) / PI));
+  }
+  mat4 specular = dielectricReflectionMueller(microfacet, viewDirection, lightDirection, eta) * specularScale;
+  mat4 diffuse = pplasticDiffuseMueller(normal, viewDirection, lightDirection, eta) / PI;
+  // No roughplastic lookup, internal-scattering correction, or eta^-2 term:
+  // pplastic defines this direct sum of two differently polarized components.
+  return RgbMueller(specular + diffuse * albedo.r,
+                     specular + diffuse * albedo.g,
+                     specular + diffuse * albedo.b);
+}
+
+bool samplePathTracingPolarizedPlastic(
+  vec3 normal, vec3 viewDirection, vec3 albedo, float materialAlpha,
+  inout uint randomState, out vec3 lightDirection, out RgbMueller weight,
+  out float samplingPdf
+) {
+  weight = depolarizingMueller(vec3(0.0));
+  samplingPdf = 0.0;
+  if (dot(normal, viewDirection) <= 0.0) return false;
+  float sampleLobe = nextPathTracingRandom(randomState);
+  vec2 sampleDirection = nextPathTracingRandom2(randomState);
+  if (sampleLobe < polarizedPlasticSpecularProbability(albedo)) {
+    vec3 microfacet = sampleMitsubaVisibleMicrofacet(normal, viewDirection,
+      max(materialAlpha, 1.0e-4), sampleDirection);
+    lightDirection = reflect(-viewDirection, microfacet);
+  } else {
+    vec2 disk = mitsubaConcentricDisk(sampleDirection);
+    vec3 tangent = mitsubaStokesBasis(normal), bitangent = cross(normal, tangent);
+    lightDirection = tangent * disk.x + bitangent * disk.y +
+      normal * sqrt(max(0.0, 1.0 - dot(disk, disk)));
+  }
+  RgbMueller value = evaluatePathTracingPolarizedPlasticBsdf(normal, viewDirection,
+    lightDirection, albedo, materialAlpha, samplingPdf);
+  if (!(samplingPdf > 0.0) || !isFiniteValue(samplingPdf)) return false;
+  weight = scaleMueller(value, dot(normal, lightDirection) / samplingPdf);
+  return true;
+}
+
+bool usesPolarizedPlasticSurface(int surfaceType) {
+  if (surfaceType == ENVIRONMENT_SURFACE_SPHERE) return uEnvironmentSpherePolarizedPlastic;
+  return uEnvironmentPolarized && (surfaceType == ENVIRONMENT_SURFACE_FLOOR ||
+    surfaceType == ENVIRONMENT_SURFACE_COMPARISON_SPHERE);
 }
 
 bool isEnvironmentDirectionVisible(
@@ -479,153 +599,159 @@ bool isEnvironmentDirectionVisible(
   );
 }
 
-vec3 samplePathTracingDirectEnvironment(
-  vec3 position,
-  vec3 normal,
-  vec3 viewDirection,
-  vec3 albedo,
-  float materialAlpha,
-  inout uint randomState
+// Each returned BSDF maps the incoming WORLD Stokes frame (-lightDirection)
+// to the outgoing WORLD frame (+viewDirection), as si.to_world_mueller does.
+RgbMueller evaluatePolarizedSurfaceBsdf(
+  vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 albedo,
+  float materialAlpha, int surfaceType, out float samplingPdf
 ) {
-  vec3 lightDirection;
-  float environmentPdf;
-  if (!sampleEnvironmentImportance(randomState, lightDirection, environmentPdf)) {
-    return vec3(0.0);
+  samplingPdf = 0.0;
+  if (surfaceType != ENVIRONMENT_SURFACE_SMOOTH_SILVER) {
+    if (usesPolarizedPlasticSurface(surfaceType)) {
+      return evaluatePathTracingPolarizedPlasticBsdf(normal, viewDirection,
+        lightDirection, albedo, materialAlpha, samplingPdf);
+    }
+    // Upstream roughplastic intentionally depolarizes BOTH lobes.
+    return depolarizingMueller(evaluatePathTracingSurfaceBsdf(
+      normal, viewDirection, lightDirection, albedo, materialAlpha, samplingPdf));
   }
+  if (!uEnvironmentSphereRoughSilver) return depolarizingMueller(vec3(0.0));
+  float normalDotView = dot(normal, viewDirection);
   float normalDotLight = dot(normal, lightDirection);
-  if (
-    normalDotLight <= 0.0 ||
-    !isEnvironmentDirectionVisible(position, normal, lightDirection)
-  ) {
-    return vec3(0.0);
-  }
-
-  float bsdfPdf;
-  vec3 bsdf = evaluatePathTracingSurfaceBsdf(
-    normal,
-    viewDirection,
-    lightDirection,
-    albedo,
-    materialAlpha,
-    bsdfPdf
-  );
-  float misWeight = pathTracingPowerHeuristic(environmentPdf, bsdfPdf);
-  vec3 environmentRadiance = max(
-    sampleEnvironmentRadiance(lightDirection, 0.0),
-    vec3(0.0)
-  );
-  return bsdf * environmentRadiance *
-    (normalDotLight * misWeight / max(environmentPdf, 1.0e-10));
+  if (normalDotView <= 0.0 || normalDotLight <= 0.0) return depolarizingMueller(vec3(0.0));
+  vec3 halfway = viewDirection + lightDirection;
+  if (dot(halfway, halfway) <= 1.0e-20) return depolarizingMueller(vec3(0.0));
+  vec3 microfacet = normalize(halfway);
+  float alpha = max(materialAlpha, 1.0e-4);
+  float distribution = mitsubaMicrofacetDistribution(normal, microfacet, alpha);
+  float gView = mitsubaSmithG1(viewDirection, microfacet, normal, alpha);
+  float gLight = mitsubaSmithG1(lightDirection, microfacet, normal, alpha);
+  samplingPdf = distribution * gView / (4.0 * normalDotView);
+  RgbMueller reflection = silverReflectionMueller(microfacet, viewDirection, lightDirection);
+  if (!uEnvironmentPolarized) reflection = depolarizingMueller(unpolarizedMueller(reflection));
+  return scaleMueller(reflection, distribution * gView * gLight /
+    (4.0 * normalDotView * normalDotLight));
 }
 
-vec3 traceEnvironmentPath(
-  vec3 initialRayOrigin,
-  vec3 initialRayDirection,
-  inout uint randomState
+bool samplePolarizedSurfaceBsdf(
+  vec3 normal, vec3 viewDirection, vec3 albedo, float materialAlpha, int surfaceType,
+  inout uint randomState, out vec3 lightDirection, out RgbMueller weight,
+  out float samplingPdf, out bool delta
 ) {
-  vec3 radiance = vec3(0.0);
-  vec3 throughput = vec3(1.0);
-  vec3 rayOrigin = initialRayOrigin;
-  vec3 rayDirection = initialRayDirection;
-  float previousBsdfPdf = 0.0;
-  bool hasPreviousBsdfSample = false;
+  samplingPdf = 0.0;
+  delta = false;
+  weight = depolarizingMueller(vec3(0.0));
+  if (dot(normal, viewDirection) <= 0.0) return false;
+  if (surfaceType != ENVIRONMENT_SURFACE_SMOOTH_SILVER) {
+    if (usesPolarizedPlasticSurface(surfaceType)) {
+      return samplePathTracingPolarizedPlastic(normal, viewDirection, albedo,
+        materialAlpha, randomState, lightDirection, weight, samplingPdf);
+    }
+    vec3 scalarWeight = vec3(0.0);
+    bool valid = samplePathTracingRoughPlastic(normal, viewDirection, albedo,
+      materialAlpha, randomState, lightDirection, scalarWeight, samplingPdf);
+    weight = depolarizingMueller(scalarWeight);
+    return valid;
+  }
+  delta = !uEnvironmentSphereRoughSilver;
+  float alpha = max(materialAlpha, 1.0e-4);
+  vec3 microfacet = delta ? normal : sampleMitsubaVisibleMicrofacet(
+    normal, viewDirection, alpha, nextPathTracingRandom2(randomState));
+  lightDirection = reflect(-viewDirection, microfacet);
+  if (dot(normal, lightDirection) <= 0.0 || dot(viewDirection, microfacet) <= 0.0) return false;
+  weight = silverReflectionMueller(microfacet, viewDirection, lightDirection);
+  if (!uEnvironmentPolarized) weight = depolarizingMueller(unpolarizedMueller(weight));
+  if (delta) {
+    samplingPdf = 1.0;
+  } else {
+    samplingPdf = mitsubaMicrofacetDistribution(normal, microfacet, alpha) *
+      mitsubaSmithG1(viewDirection, microfacet, normal, alpha) / (4.0 * dot(normal, viewDirection));
+    // Visible-normal sampling cancels D, G1(wi) and the reflection Jacobian.
+    weight = scaleMueller(weight, mitsubaSmithG1(lightDirection, microfacet, normal, alpha));
+  }
+  return samplingPdf > 0.0 && isFiniteValue(samplingPdf);
+}
 
-  for (int bounce = 0; bounce < uPathTracingMaxBounces; bounce += 1) {
-    vec3 position;
-    vec3 normal;
-    vec3 albedo;
-    float ignoredVisibility;
-    float materialAlpha;
+bool finiteMueller(RgbMueller matrix) {
+  for (int column = 0; column < 4; ++column) {
+    if (any(isnan(matrix.r[column])) || any(isinf(matrix.r[column])) ||
+        any(isnan(matrix.g[column])) || any(isinf(matrix.g[column])) ||
+        any(isnan(matrix.b[column])) || any(isinf(matrix.b[column]))) return false;
+  }
+  return true;
+}
+
+PolarizedStokes tracePolarizedEnvironmentPath(
+  vec3 initialRayOrigin, vec3 initialRayDirection, inout uint randomState
+) {
+  PolarizedStokes radiance = zeroStokes();
+  RgbMueller throughput = identityMueller();
+  vec3 rayOrigin = initialRayOrigin, rayDirection = initialRayDirection;
+  float previousBsdfPdf = 0.0;
+  bool previousDelta = true;
+
+  // uPathTracingMaxBounces counts surface scattering events. Evaluate an
+  // escaping emitter ray after the final event too, to pair both MIS proposals.
+  for (int bounce = 0; bounce <= uPathTracingMaxBounces; ++bounce) {
+    vec3 position, normal, albedo;
+    float visibility, materialAlpha;
     int surfaceType;
-    if (!resolveEnvironmentScene(
-      rayOrigin,
-      rayDirection,
-      position,
-      normal,
-      albedo,
-      ignoredVisibility,
-      materialAlpha,
-      surfaceType
-    )) {
-      float misWeight = hasPreviousBsdfSample
-        ? pathTracingPowerHeuristic(
-            previousBsdfPdf,
-            environmentImportancePdf(rayDirection)
-          )
-        : 1.0;
-      radiance += throughput * max(
-        sampleEnvironmentRadiance(rayDirection, 0.0),
-        vec3(0.0)
-      ) * misWeight;
+    if (!resolveEnvironmentScene(rayOrigin, rayDirection, position, normal,
+                                  albedo, visibility, materialAlpha, surfaceType)) {
+      float misWeight = previousDelta ? 1.0 : pathTracingPowerHeuristic(
+        previousBsdfPdf, environmentImportancePdf(rayDirection));
+      radiance = addStokes(radiance, scaleStokes(
+        applyMueller(throughput, samplePolarizedEnvironment(rayDirection)), misWeight));
       break;
     }
+    if (bounce == uPathTracingMaxBounces) break;
+    vec3 viewDirection = -rayDirection;
+    if (dot(normal, viewDirection) <= 0.0) break;
+    bool delta = surfaceType == ENVIRONMENT_SURFACE_SMOOTH_SILVER && !uEnvironmentSphereRoughSilver;
 
-    if (surfaceType == ENVIRONMENT_SURFACE_SMOOTH_SILVER) {
-      vec3 reflectedDirection;
-      vec3 reflectionWeight;
-      float ignoredReflectionPdf;
-      if (!sampleSmoothSilverReflection(
-        normal, -rayDirection, materialAlpha, nextPathTracingRandom2(randomState),
-        reflectedDirection, reflectionWeight, ignoredReflectionPdf
-      )) {
-        break;
+    // path.cpp: throughput * (world BSDF * world emitter Stokes), in this order.
+    if (!delta) {
+      vec3 lightDirection;
+      float environmentPdf;
+      if (sampleEnvironmentImportance(randomState, lightDirection, environmentPdf) &&
+          dot(normal, lightDirection) > 0.0 &&
+          isEnvironmentDirectionVisible(position, normal, lightDirection)) {
+        float bsdfPdf;
+        RgbMueller bsdf = evaluatePolarizedSurfaceBsdf(normal, viewDirection,
+          lightDirection, albedo, materialAlpha, surfaceType, bsdfPdf);
+        float scale = dot(normal, lightDirection) *
+          pathTracingPowerHeuristic(environmentPdf, bsdfPdf) / environmentPdf;
+        PolarizedStokes contribution = applyMueller(throughput,
+          applyMueller(bsdf, samplePolarizedEnvironment(lightDirection)));
+        radiance = addStokes(radiance, scaleStokes(contribution, scale));
       }
-      throughput *= reflectionWeight;
-      rayDirection = reflectedDirection;
-      rayOrigin = position + normal * ENVIRONMENT_RAY_EPSILON;
-      // Sample the narrow silver lobe with the BSDF alone. With no environment
-      // NEE at this vertex, an escaping reflection must receive full weight.
-      hasPreviousBsdfSample = false;
-      if (bounce + 1 == uPathTracingMaxBounces &&
-          isEnvironmentDirectionVisible(position, normal, rayDirection)) {
-        radiance += throughput * max(sampleEnvironmentRadiance(rayDirection, 0.0), vec3(0.0));
-      }
-      continue;
     }
-
-    radiance += throughput * samplePathTracingDirectEnvironment(
-      position,
-      normal,
-      -rayDirection,
-      albedo,
-      materialAlpha,
-      randomState
-    );
 
     vec3 nextDirection;
-    vec3 bounceWeight;
-    float nextBsdfPdf;
-    if (!samplePathTracingRoughPlastic(
-      normal,
-      -rayDirection,
-      albedo,
-      materialAlpha,
-      randomState,
-      nextDirection,
-      bounceWeight,
-      nextBsdfPdf
-    )) {
-      break;
-    }
+    RgbMueller bounceWeight;
+    float nextPdf;
+    bool nextDelta;
+    if (!samplePolarizedSurfaceBsdf(normal, viewDirection, albedo, materialAlpha,
+        surfaceType, randomState, nextDirection, bounceWeight, nextPdf, nextDelta)) break;
+    throughput = multiplyMueller(throughput, bounceWeight);
+    float throughputMaximum = maxColorComponent(unpolarizedMueller(throughput));
+    if (!finiteMueller(throughput) || !(throughputMaximum > 0.0)) break;
 
-    throughput *= bounceWeight;
-    if (hasInvalidValue(throughput) || maxColorComponent(throughput) <= 0.0) {
-      break;
+    // Mitsuba's default rr_depth=5, using max(M00), never signed S1-S3.
+    if (bounce + 1 >= 5) {
+      float survival = min(throughputMaximum, 0.95);
+      if (nextPathTracingRandom(randomState) >= survival) break;
+      throughput = scaleMueller(throughput, 1.0 / survival);
     }
-
-    if (bounce >= PATH_TRACING_RUSSIAN_ROULETTE_START_BOUNCE) {
-      float survivalProbability = clamp(maxColorComponent(throughput), 0.05, 0.95);
-      if (nextPathTracingRandom(randomState) >= survivalProbability) {
-        break;
-      }
-      throughput /= survivalProbability;
-    }
-
     rayOrigin = position + normal * ENVIRONMENT_RAY_EPSILON;
     rayDirection = nextDirection;
-    previousBsdfPdf = nextBsdfPdf;
-    hasPreviousBsdfSample = true;
+    previousBsdfPdf = nextPdf;
+    previousDelta = nextDelta;
   }
+  // No clamping or tone mapping of signed Stokes components during transport.
+  return stokesToSensor(radiance, initialRayDirection);
+}
 
-  return sanitizeDisplayColor(max(radiance, vec3(0.0)));
+vec3 traceEnvironmentPath(vec3 rayOrigin, vec3 rayDirection, inout uint randomState) {
+  return tracePolarizedEnvironmentPath(rayOrigin, rayDirection, randomState).s0;
 }

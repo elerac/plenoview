@@ -12,7 +12,7 @@ uniform int uBackgroundMode;
 uniform vec3 uBackgroundColor;
 uniform int uAlphaOutputMode;
 
-out vec4 outColor;
+layout(location = 0) out vec4 outColor;
 
 const int ALPHA_OUTPUT_OPAQUE = 0;
 const int ALPHA_OUTPUT_STRAIGHT = 1;

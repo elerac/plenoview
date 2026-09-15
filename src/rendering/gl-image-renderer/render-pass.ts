@@ -17,6 +17,9 @@ import {
 import { clampPanoramaProjectionPitch } from '../../interaction/panorama-geometry';
 import { usesPathTracingEnvironmentLighting } from '../../panorama-lighting';
 import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
+import { MITSUBA_SILVER_ETA, MITSUBA_SILVER_K } from '../../silver-ior';
+import { restoreDisplaySelectionTextures } from './texture-store';
+import { ROUGH_PLASTIC_TRANSMITTANCE_TEXTURE_UNIT } from './roughplastic-transmittance-texture';
 import {
   clampDepthZoom,
   normalizeDepthTarget,
@@ -35,7 +38,8 @@ import {
   DEPTH_POSITION_Z_TEXTURE_UNIT,
   DEPTH_TEXTURE_UNIT,
   DEFAULT_RENDER_PASS_OPTIONS,
-  PATH_TRACING_ACCUMULATION_TEXTURE_UNIT,
+  PATH_TRACING_STOKES_TEXTURE_UNITS,
+  ENVIRONMENT_STOKES_TEXTURE_UNITS,
   PATH_TRACING_ENVIRONMENT_TABLE_TEXTURE_UNIT
 } from './constants';
 import {
@@ -61,6 +65,8 @@ export const MAX_PATH_TRACING_SAMPLE_COUNT = 4096;
 interface PanoramaRenderTarget {
   accumulationKey: string;
   outputRect: { x: number; y: number; width: number; height: number };
+  sampleLimit?: number;
+  preserveScreenOrigin?: boolean;
 }
 
 export function render(
@@ -146,6 +152,7 @@ export function renderImagePass(
 ): void {
   const gl = state.gl;
   const program = state.imageProgram;
+  restoreDisplaySelectionTextures(state);
   gl.useProgram(program.program);
   gl.bindVertexArray(state.vao);
   gl.activeTexture(gl.TEXTURE0 + COLORMAP_TEXTURE_UNIT);
@@ -164,18 +171,21 @@ export function renderPanoramaPass(
   target?: PanoramaRenderTarget
 ): boolean {
   const kind = resolvePanoramaProgramKind(viewerState);
+  const polarizedSource = kind === 'pathTracing' ? state.activePolarizedEnvironment : null;
   const program = state.panoramaPrograms.get(kind);
-  const radianceProgram = kind === 'image' ? null : state.panoramaPrograms.get('radiance');
+  const radianceProgram = kind === 'image' || polarizedSource ? null : state.panoramaPrograms.get('radiance');
   // Request both programs before polling again, so their compilation can overlap.
-  if (!program || (kind !== 'image' && !radianceProgram)) {
+  if (!program || (kind !== 'image' && !polarizedSource && !radianceProgram)) {
     state.preparingPanorama = true;
     return true;
   }
+  if (kind === 'image') restoreDisplaySelectionTextures(state);
   if (radianceProgram && state.imageSize) {
     const { width, height } = state.imageSize;
     const key = `${state.activeSourceRevisionKey}:${state.activeBinding.stokesParameter}:${viewerState.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS}`;
     const radiance = state.environmentRadianceCache.getOrCreate(key, width, height, () => {
       const gl = state.gl;
+      restoreDisplaySelectionTextures(state);
       gl.useProgram(radianceProgram.program);
       gl.bindVertexArray(state.vao);
       setCommonUniforms(state, radianceProgram.uniforms, viewerState, options);
@@ -191,7 +201,10 @@ export function renderPanoramaPass(
   ) {
     try {
       return renderProgressivePathTracingPass(state, program, viewerState, options, target);
-    } catch {
+    } catch (error) {
+      // A large screenshot can exceed GPU memory while the live viewport is
+      // healthy. Its caller owns temporary-surface cleanup and reports failure.
+      if (target.preserveScreenOrigin) throw error;
       clearPathTracingSurfaces(state);
       state.pathTracingFloatAccumulationSupported = false;
       state.gl.bindFramebuffer(state.gl.FRAMEBUFFER, null);
@@ -217,6 +230,7 @@ export function renderPanoramaPass(
   gl.activeTexture(gl.TEXTURE0 + COLORMAP_TEXTURE_UNIT);
   gl.bindTexture(gl.TEXTURE_2D, state.colormapTexture);
 
+  if (usesPathTracingEnvironmentLighting(viewerState)) bindPathTracingAccumulation(state, []);
   setPanoramaUniforms(
     state,
     program,
@@ -240,38 +254,42 @@ function renderProgressivePathTracingPass(
   const gl = state.gl;
   const destinationFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
   const material = normalizeEnvironmentSphereMaterial(viewerState.environmentSphereMaterial);
-  const signature = buildPathTracingSignature(
+  let signature = buildPathTracingSignature(
     state,
     viewerState,
     material,
     options,
     target.outputRect
   );
+  if (target.preserveScreenOrigin) {
+    signature += `|${options.screenOriginX ?? 0}|${options.screenOriginY ?? 0}`;
+  }
+  const sampleLimit = Math.max(1, Math.min(MAX_PATH_TRACING_SAMPLE_COUNT, target.sampleLimit ?? MAX_PATH_TRACING_SAMPLE_COUNT));
   const surface = getOrCreatePathTracingSurface(
     state,
     target.accumulationKey,
     target.outputRect.width,
     target.outputRect.height,
-    signature
+    signature,
+    Boolean(state.activePolarizedEnvironment)
   );
 
-  if (surface.sampleCount < MAX_PATH_TRACING_SAMPLE_COUNT) {
+  if (surface.sampleCount < sampleLimit) {
     const writeIndex: 0 | 1 = surface.readIndex === 0 ? 1 : 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, surface.framebuffers[writeIndex]);
     gl.disable(gl.SCISSOR_TEST);
     gl.viewport(0, 0, surface.width, surface.height);
     gl.useProgram(program.program);
     gl.bindVertexArray(state.vao);
-    gl.activeTexture(gl.TEXTURE0 + PATH_TRACING_ACCUMULATION_TEXTURE_UNIT);
-    gl.bindTexture(gl.TEXTURE_2D, surface.textures[surface.readIndex]);
+    bindPathTracingAccumulation(state, surface.stokesTextures[surface.readIndex]);
     setPanoramaUniforms(
       state,
       program,
       viewerState,
       {
         ...options,
-        screenOriginX: 0,
-        screenOriginY: 0
+        screenOriginX: target.preserveScreenOrigin ? options.screenOriginX : 0,
+        screenOriginY: target.preserveScreenOrigin ? options.screenOriginY : 0
       },
       1,
       surface.sampleCount,
@@ -298,9 +316,13 @@ function renderProgressivePathTracingPass(
   );
   gl.useProgram(state.pathTracingPresentProgram.program);
   gl.bindVertexArray(state.vao);
-  gl.activeTexture(gl.TEXTURE0 + PATH_TRACING_ACCUMULATION_TEXTURE_UNIT);
-  gl.bindTexture(gl.TEXTURE_2D, surface.textures[surface.readIndex]);
+  bindPathTracingAccumulation(state, surface.stokesTextures[surface.readIndex]);
+  gl.activeTexture(gl.TEXTURE0 + COLORMAP_TEXTURE_UNIT);
+  gl.bindTexture(gl.TEXTURE_2D, state.colormapTexture);
   const uniforms = state.pathTracingPresentProgram.uniforms;
+  setCommonUniforms(state, uniforms, viewerState, options);
+  setPolarizationOutputUniforms(state, uniforms);
+  gl.uniform1i(uniforms.environmentPolarized, surface.polarized ? 1 : 0);
   gl.uniform2i(uniforms.outputOriginPx, target.outputRect.x, target.outputRect.y);
   gl.uniform2f(
     uniforms.outputSize,
@@ -329,7 +351,7 @@ function renderProgressivePathTracingPass(
   gl.uniform1i(uniforms.alphaOutputMode, resolveAlphaOutputModeUniformValue(options.alphaOutputMode));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  return surface.sampleCount < MAX_PATH_TRACING_SAMPLE_COUNT;
+  return surface.sampleCount < sampleLimit;
 }
 
 function setPanoramaUniforms(
@@ -343,9 +365,25 @@ function setPanoramaUniforms(
 ): void {
   const gl = state.gl;
   setCommonUniforms(state, program.uniforms, viewerState, options);
+  setPolarizationOutputUniforms(state, program.uniforms);
+  const polarizedSource = usesPathTracingEnvironmentLighting(viewerState) ? state.activePolarizedEnvironment : null;
+  const polarized = polarizedSource
+    ? state.environmentRadianceCache.getOrCreatePolarized(polarizedSource.sourceKey, polarizedSource)
+    : null;
+  gl.uniform1i(program.uniforms.environmentPolarized, polarized ? 1 : 0);
+  if (usesPathTracingEnvironmentLighting(viewerState)) {
+    for (let component = 1; component < 4; component += 1) {
+      gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_STOKES_TEXTURE_UNITS[component]);
+      gl.bindTexture(gl.TEXTURE_2D, polarized?.textures[component] ?? state.zeroTexture);
+    }
+  }
+  if (polarized) {
+    gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
+    gl.bindTexture(gl.TEXTURE_2D, polarized.texture);
+  }
   gl.uniform1i(
     program.uniforms.sourceTextureMipmapsAvailable,
-    state.smoothFloatMinification ? 1 : 0
+    state.smoothFloatMinification && !polarized ? 1 : 0
   );
   const interactive = viewerState.environmentLightingInteractive === true;
   gl.uniform2i(
@@ -364,28 +402,39 @@ function setPanoramaUniforms(
   gl.uniform1i(program.uniforms.pathTracingSampleIndex, pathTracingSampleIndex);
   gl.uniform1f(program.uniforms.pathTracingBlendWeight, pathTracingBlendWeight);
   gl.activeTexture(gl.TEXTURE0 + PATH_TRACING_ENVIRONMENT_TABLE_TEXTURE_UNIT);
-  gl.bindTexture(gl.TEXTURE_2D, state.environmentImportanceTexture);
+  gl.bindTexture(gl.TEXTURE_2D, polarized?.importanceTexture ?? state.environmentImportanceTexture);
   gl.uniform2i(
     program.uniforms.environmentImportanceTextureSize,
-    state.environmentImportanceTextureSize.width,
-    state.environmentImportanceTextureSize.height
+    (polarized?.importanceTextureSize ?? state.environmentImportanceTextureSize).width,
+    (polarized?.importanceTextureSize ?? state.environmentImportanceTextureSize).height
   );
   gl.uniform2i(
     program.uniforms.environmentImportanceGridSize,
-    state.environmentImportanceGridSize.width,
-    state.environmentImportanceGridSize.height
+    (polarized?.importanceGridSize ?? state.environmentImportanceGridSize).width,
+    (polarized?.importanceGridSize ?? state.environmentImportanceGridSize).height
   );
   gl.uniform1i(
     program.uniforms.environmentImportanceEntryCount,
-    state.environmentImportanceEntryCount
+    polarized?.importanceEntryCount ?? state.environmentImportanceEntryCount
   );
   gl.uniform1i(
     program.uniforms.environmentImportanceProjection,
-    state.environmentImportanceProjection
+    polarized ? 2 : state.environmentImportanceProjection
   );
   gl.uniform3fv(program.uniforms.environmentShIrradiance, state.environmentShIrradiance);
   const material = normalizeEnvironmentSphereMaterial(viewerState.environmentSphereMaterial);
+  if (usesPathTracingEnvironmentLighting(viewerState)) {
+    gl.activeTexture(gl.TEXTURE0 + ROUGH_PLASTIC_TRANSMITTANCE_TEXTURE_UNIT);
+    const usesRoughPlastic = !polarized || material.type === 'roughplastic';
+    gl.bindTexture(gl.TEXTURE_2D, usesRoughPlastic
+      ? state.roughPlasticTransmittanceCache.getOrCreate(material)
+      : state.zeroTexture);
+    gl.uniform3f(program.uniforms.conductorEta, ...MITSUBA_SILVER_ETA);
+    gl.uniform3f(program.uniforms.conductorK, ...MITSUBA_SILVER_K);
+  }
   gl.uniform1i(program.uniforms.environmentSphereSmoothSilver, material.type === 'smoothSilver' ? 1 : 0);
+  gl.uniform1i(program.uniforms.environmentSphereRoughSilver, material.type === 'roughSilver' ? 1 : 0);
+  gl.uniform1i(program.uniforms.environmentSpherePolarizedPlastic, material.type === 'pplastic' ? 1 : 0);
   gl.uniform3f(
     program.uniforms.environmentSphereDiffuseReflectance,
     material.diffuseReflectance.r,
@@ -402,6 +451,38 @@ function setPanoramaUniforms(
   gl.uniform1i(program.uniforms.environmentSphereNonlinear, material.nonlinear ? 1 : 0);
 }
 
+function bindPathTracingAccumulation(state: GlImageRendererState, textures: readonly WebGLTexture[]): void {
+  for (let component = 0; component < 4; component += 1) {
+    state.gl.activeTexture(state.gl.TEXTURE0 + PATH_TRACING_STOKES_TEXTURE_UNITS[component]);
+    state.gl.bindTexture(state.gl.TEXTURE_2D, textures[component] ?? state.zeroTexture);
+  }
+}
+
+function setPolarizationOutputUniforms(
+  state: GlImageRendererState,
+  uniforms: {
+    pathTracingOutputComponent: WebGLUniformLocation | null;
+    pathTracingOutputColorChannel: WebGLUniformLocation | null;
+  }
+): void {
+  const source = state.activePolarizedEnvironment;
+  let component = 0;
+  let colorChannel = -1;
+  if (source) {
+    const colors = [source.channels.r, source.channels.g, source.channels.b];
+    const components = ['s0', 's1', 's2', 's3'] as const;
+    const first = state.activeBinding.slots[0];
+    if (state.activeBinding.stokesParameter === null) {
+      component = Math.max(0, components.findIndex(name => colors.some(color => color[name] === first)));
+    }
+    if (state.activeBinding.mode === 'channelMono' || state.activeBinding.mode === 'stokesDirect') {
+      colorChannel = colors.findIndex(color => components.some(name => color[name] === first));
+    }
+  }
+  state.gl.uniform1i(uniforms.pathTracingOutputComponent, component);
+  state.gl.uniform1i(uniforms.pathTracingOutputColorChannel, colorChannel);
+}
+
 function buildPathTracingSignature(
   state: GlImageRendererState,
   viewerState: ViewerState,
@@ -410,8 +491,8 @@ function buildPathTracingSignature(
   outputRect: PanoramaRenderTarget['outputRect']
 ): string {
   return [
-    state.activeSourceRevisionKey,
-    viewerState.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
+    state.activePolarizedEnvironment?.sourceKey ?? state.activeSourceRevisionKey,
+    state.activePolarizedEnvironment ? false : viewerState.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
     state.imageSize?.width ?? 0,
     state.imageSize?.height ?? 0,
     outputRect.width,
@@ -441,6 +522,7 @@ export function renderDepthPass(
   options: RenderPassOptions
 ): void {
   const gl = state.gl;
+  restoreDisplaySelectionTextures(state);
   const sourceSize = state.depthSourceSize ?? state.imageSize;
   const depthSource = state.activeDepthSource;
   const depthGeometry = state.activeDepthGeometry;

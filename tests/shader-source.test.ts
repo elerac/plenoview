@@ -160,7 +160,7 @@ describe('shader source regressions', () => {
 
     expect(source).toContain('vec2 pixelSample = vec2(0.5);');
     expect(createPanoramaFragmentSource('pathTracing')).toContain(
-      'vec2 pixelSample = nextPathTracingRandom2(randomState);'
+      'vec2 samplePosition = screen + nextPathTracingRandom2(randomState) / pixelScale;'
     );
     expect(source).toContain('vec2 samplePosition = screen + pixelSample / pixelScale;');
   });
@@ -307,14 +307,16 @@ describe('shader source regressions', () => {
     expect(source).toContain('uniform sampler2D uEnvironmentImportanceTexture;');
     expect(source).toContain('uniform int uPathTracingMaxBounces;');
     expect(source).toContain(
-      'for (int bounce = 0; bounce < uPathTracingMaxBounces; bounce += 1)'
+      'for (int bounce = 0; bounce <= uPathTracingMaxBounces; ++bounce)'
     );
-    expect(source).toContain('vec3 samplePathTracingDirectEnvironment(');
+    expect(source).toContain('PolarizedStokes tracePolarizedEnvironmentPath(');
     expect(source).toContain('bool sampleEnvironmentImportance(');
     expect(source).toContain('float pathTracingPowerHeuristic(');
-    expect(source).toContain('float survivalProbability = clamp(');
-    expect(source).toContain('outColor = mix(previous, pathSample,');
-    expect(presentSource).toContain('vec3 linear = alpha > 1.0e-6');
-    expect(presentSource).toContain('accumulated.rgb / alpha');
+    expect(source).toContain('float survival = min(throughputMaximum, 0.95);');
+    expect(source).toContain('outColor = mix(texelFetch(uPathTracingPreviousTexture, pixel, 0), s0, weight);');
+    expect(source).toContain('throughput = multiplyMueller(throughput, bounceWeight);');
+    expect(source).toContain('layout(location = 3) out vec4 outStokesS3;');
+    expect(presentSource).toContain('float inverseAlpha = alpha > 1.0e-6');
+    expect(presentSource).toContain('accumulated.rgb * inverseAlpha');
   });
 });

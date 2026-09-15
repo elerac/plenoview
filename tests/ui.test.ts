@@ -53,6 +53,11 @@ import {
   IMAGE_LOAD_WORKERS_STORAGE_KEY
 } from '../src/image-load-workers';
 import { SPECTRAL_RGB_GROUPING_STORAGE_KEY } from '../src/spectral-default-settings';
+import {
+  createDefaultEnvironmentSphereMaterial,
+  normalizeEnvironmentSphereMaterial,
+  type EnvironmentSphereMaterialPatch
+} from '../src/environment-sphere-material';
 
 const AUTO_EXPOSURE_PERCENTILE_STORAGE_KEY = 'plenoview:auto-exposure-percentile:v1';
 const SPECTRUM_LATTICE_MOTION_STORAGE_KEY = 'plenoview:spectrum-lattice-motion:v1';
@@ -3825,6 +3830,122 @@ describe('view menu', () => {
     panoramaImageItem.click();
     expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('image');
     expect(onViewerModeChange).toHaveBeenCalledTimes(3);
+  });
+
+  it('identifies source thumbnails and hides locked source probes while showing path-traced results', () => {
+    installUiFixture();
+    const onRgbGroupChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onRgbGroupChange }));
+    const hint = document.getElementById('channel-thumbnail-source-hint')!;
+    const strip = document.getElementById('channel-thumbnail-strip')!;
+    const probe = document.getElementById('probe-panel')!;
+    const channels = ['S0.R', 'S0.G', 'S0.B', 'S1.R', 'S1.G', 'S1.B', 'S2.R', 'S2.G', 'S2.B'];
+    const items = buildChannelViewItems(channels).map(item => ({
+      ...item,
+      thumbnailDataUrl: 'data:image/png;base64,AAAA'
+    }));
+    ui.setOpenedImageOptions([{ id: 'penvmap', label: 'penvmap.exr' }], 'penvmap');
+    ui.setRgbGroupOptions(channels, items[0]!.selection, items);
+    ui.setProbeReadout('Locked', { x: 0, y: 0, values: { 'S0.R': 7 } }, {
+      cssColor: 'rgb(255, 0, 0)',
+      displayValues: [{ label: 'R', value: '7' }]
+    });
+    const sourcePreview = strip.querySelector('img')!;
+    expect(hint.classList.contains('hidden')).toBe(true);
+    expect(probe.classList.contains('hidden')).toBe(false);
+
+    ui.setViewerMode('panorama');
+    ui.setPanoramaDisplayMode('environmentLighting');
+    expect(hint.classList.contains('hidden')).toBe(true);
+    ui.setPanoramaLightingMethod('pathTracing');
+    expect(hint.classList.contains('hidden')).toBe(false);
+    expect(hint.textContent).toContain('Source EXR previews');
+    expect(hint.textContent).toContain('rendered result in the main viewport');
+    expect(strip.getAttribute('aria-describedby')).toBe(hint.id);
+    expect(probe.classList.contains('hidden')).toBe(true);
+    expect(strip.querySelector('img')).toBe(sourcePreview);
+    (strip.querySelector('.channel-thumbnail-tile[aria-selected="false"]') as HTMLButtonElement).click();
+    expect(onRgbGroupChange).toHaveBeenCalled();
+
+    ui.setPanoramaDisplayMode('image');
+    expect(hint.classList.contains('hidden')).toBe(true);
+    expect(probe.classList.contains('hidden')).toBe(false);
+    expect(strip.hasAttribute('aria-describedby')).toBe(false);
+    ui.setPanoramaDisplayMode('environmentLighting');
+    expect(probe.classList.contains('hidden')).toBe(true);
+    ui.setViewerMode('image');
+    expect(hint.classList.contains('hidden')).toBe(true);
+    expect(probe.classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('probe-color-values')!.textContent).toContain('7');
+    ui.dispose();
+  });
+
+  it('offers three rough material presets with editable preset alpha defaults and fixed Beckmann distribution', () => {
+    installUiFixture();
+    let currentMaterial = createDefaultEnvironmentSphereMaterial();
+    const onEnvironmentSphereMaterialChange = vi.fn((patch: EnvironmentSphereMaterialPatch) => {
+      currentMaterial = normalizeEnvironmentSphereMaterial(patch, currentMaterial);
+      ui.setEnvironmentSphereMaterial(currentMaterial);
+    });
+    const ui = new ViewerUi(createUiCallbacks({ onEnvironmentSphereMaterialChange }));
+    const fields = document.getElementById('environment-material-fields') as HTMLDivElement;
+    const material = document.getElementById('environment-material-select') as HTMLSelectElement;
+    const roughness = document.getElementById('environment-roughness-input') as HTMLInputElement;
+    expect(Array.from(material.options, option => [option.value, option.textContent])).toEqual([
+      ['roughConductor', 'Rough Conductor'],
+      ['roughPlasticWhite', 'Rough Plastic (White)'],
+      ['roughPlasticBlack', 'Rough Plastic (Black)']
+    ]);
+    expect(document.getElementById('environment-distribution-select')).toBeNull();
+    expect(document.querySelectorAll('#environment-roughness-input')).toHaveLength(1);
+    expect(fields.classList.contains('hidden')).toBe(true);
+    ui.setOpenedImageOptions([{ id: 'penvmap', label: 'penvmap.exr' }], 'penvmap');
+    ui.setViewerMode('panorama');
+    ui.setPanoramaDisplayMode('environmentLighting');
+    ui.setPanoramaLightingMethod('pathTracing');
+    expect(fields.classList.contains('hidden')).toBe(false);
+    expect(material.disabled).toBe(false);
+    expect(material.value).toBe('roughConductor');
+    expect(roughness.disabled).toBe(false);
+    expect(roughness.value).toBe('0.01');
+    expect(roughness.step).toBe('0.001');
+    roughness.value = '0.035';
+    roughness.dispatchEvent(new Event('change'));
+    expect(onEnvironmentSphereMaterialChange).toHaveBeenLastCalledWith({ alpha: 0.035 });
+    expect(roughness.value).toBe('0.035');
+
+    material.value = 'roughPlasticWhite';
+    material.dispatchEvent(new Event('change'));
+    expect(onEnvironmentSphereMaterialChange).toHaveBeenLastCalledWith({
+      type: 'pplastic', diffuseReflectance: { r: 1, g: 1, b: 1 }, distribution: 'beckmann', alpha: 0.1
+    });
+    expect(material.value).toBe('roughPlasticWhite');
+    expect(roughness.value).toBe('0.1');
+    expect(roughness.disabled).toBe(false);
+
+    material.value = 'roughPlasticBlack';
+    material.dispatchEvent(new Event('change'));
+    expect(onEnvironmentSphereMaterialChange).toHaveBeenLastCalledWith({
+      type: 'pplastic', diffuseReflectance: { r: 0, g: 0, b: 0 }, distribution: 'beckmann', alpha: 0.1
+    });
+    expect(material.value).toBe('roughPlasticBlack');
+    expect(roughness.value).toBe('0.1');
+    expect(roughness.disabled).toBe(false);
+    roughness.value = '0.07';
+    roughness.dispatchEvent(new Event('change'));
+    expect(onEnvironmentSphereMaterialChange).toHaveBeenLastCalledWith({ alpha: 0.07 });
+    expect(roughness.value).toBe('0.07');
+
+    material.value = 'roughConductor';
+    material.dispatchEvent(new Event('change'));
+    expect(onEnvironmentSphereMaterialChange).toHaveBeenLastCalledWith({ type: 'roughSilver', distribution: 'beckmann', alpha: 0.01 });
+    expect(material.value).toBe('roughConductor');
+    expect(roughness.value).toBe('0.01');
+    expect(roughness.disabled).toBe(false);
+    ui.setPanoramaLightingMethod('sphericalHarmonics');
+    expect(fields.classList.contains('hidden')).toBe(true);
+    expect(roughness.disabled).toBe(true);
+    ui.dispose();
   });
 
   it('requests browser fullscreen and updates checked state when full screen preview is selected', async () => {

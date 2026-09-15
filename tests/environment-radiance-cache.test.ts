@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EnvironmentRadianceCache } from '../src/rendering/gl-image-renderer/environment-radiance-cache';
+import { createPlanarChannelStorage } from '../src/channel-storage';
+import type { PolarizedEnvironmentSource } from '../src/rendering/gl-image-renderer/environment-polarization';
+import type { DecodedLayer } from '../src/types';
 
 describe('environment radiance cache', () => {
   it('bakes each source revision once and rebakes changed dimensions', () => {
@@ -182,6 +185,58 @@ describe('environment radiance cache', () => {
     expect(() => cache.getOrCreate('source', width, height, vi.fn())).toThrow('dimensions');
     expect(gl.createTexture).not.toHaveBeenCalled();
   });
+
+  it('caches all four signed components with their own sampling table and restores source bindings', () => {
+    const { cache, gl, state } = createHarness();
+    const source = makePolarizedSource();
+    const before = snapshot(state);
+    const entry = cache.getOrCreatePolarized('session:0:penvmap', source);
+    expect(entry.texture).toBe(entry.textures[0]);
+    expect(entry.textures).toHaveLength(4);
+    expect(entry.mipmapsAvailable).toBe(false);
+    expect(entry.importanceGridSize).toEqual({ width: 2, height: 2 });
+    expect(entry.importanceEntryCount).toBe(4);
+    expect(entry.importanceTextureSize).toEqual({ width: 8, height: 1 });
+    expect(gl.texImage2D).toHaveBeenCalledTimes(5);
+    expect(gl.generateMipmap).not.toHaveBeenCalled();
+    expect(gl.createFramebuffer).not.toHaveBeenCalled();
+    expect(snapshot(state)).toEqual(before);
+    const s1Upload = gl.texImage2D.mock.calls[1][8] as Float32Array;
+    expect(Array.from(s1Upload.subarray(0, 4))).toEqual([-2, -2, -2, 1]);
+    expect(cache.getOrCreatePolarized('session:0:penvmap', source)).toBe(entry);
+    expect(gl.texImage2D).toHaveBeenCalledTimes(5);
+    cache.deleteByPrefix('session:0:');
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(5);
+    for (const texture of [...entry.textures, entry.importanceTexture]) {
+      expect(gl.deleteTexture).toHaveBeenCalledWith(texture);
+    }
+  });
+
+  it('invalidates polarized resources when decoded layer identity changes', () => {
+    const { cache, gl } = createHarness();
+    const first = cache.getOrCreatePolarized('same', makePolarizedSource());
+    const second = cache.getOrCreatePolarized('same', makePolarizedSource());
+    expect(second).not.toBe(first);
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(5);
+  });
+
+  it('cleans up a failed signed texture upload before retrying', () => {
+    const { cache, gl, state } = createHarness();
+    const before = snapshot(state);
+    const source = makePolarizedSource();
+    gl.getError.mockReturnValueOnce(gl.NO_ERROR).mockReturnValueOnce(1285);
+    expect(() => cache.getOrCreatePolarized('failed', source)).toThrow('0x505');
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(2);
+    expect(snapshot(state)).toEqual(before);
+    expect(cache.getOrCreatePolarized('failed', source).textures).toHaveLength(4);
+  });
+
+  it('does not require framebuffer float support to upload polarized inputs', () => {
+    const { cache } = createHarness({ floatColorBuffer: false });
+    expect(cache.getOrCreatePolarized('source', makePolarizedSource()).textures).toHaveLength(4);
+    cache.dispose();
+    expect(() => cache.getOrCreatePolarized('source', makePolarizedSource())).toThrow('disposed');
+  });
 });
 
 function createHarness({ smooth = true, floatColorBuffer = true } = {}) {
@@ -227,6 +282,7 @@ function createHarness({ smooth = true, floatColorBuffer = true } = {}) {
     READ_FRAMEBUFFER: 24,
     COLOR_ATTACHMENT0: 25,
     FRAMEBUFFER_COMPLETE: 26,
+    NO_ERROR: 0,
     getExtension: vi.fn(() => floatColorBuffer ? {} : null),
     getParameter: vi.fn((parameter: number): unknown => {
       switch (parameter) {
@@ -266,7 +322,9 @@ function createHarness({ smooth = true, floatColorBuffer = true } = {}) {
     deleteTexture: vi.fn(),
     deleteFramebuffer: vi.fn(),
     texParameteri: vi.fn(),
-    texImage2D: vi.fn(),
+    texImage2D: vi.fn<(target: number, level: number, internalFormat: number, width: number, height: number,
+      border: number, format: number, type: number, pixels: Float32Array | null) => void>(),
+    getError: vi.fn(() => 0),
     framebufferTexture2D: vi.fn(),
     checkFramebufferStatus: vi.fn(() => 26),
     generateMipmap: vi.fn()
@@ -280,4 +338,22 @@ function createHarness({ smooth = true, floatColorBuffer = true } = {}) {
 
 function snapshot(state: ReturnType<typeof createHarness>['state']) {
   return { ...state, textures: new Map(state.textures) };
+}
+
+function makePolarizedSource(): PolarizedEnvironmentSource {
+  const channelNames = ['S0', 'S1', 'S2', 'S3'].flatMap(component => ['R', 'G', 'B'].map(rgb => `${component}.${rgb}`));
+  const layer = {
+    name: null, channelNames,
+    channelStorage: createPlanarChannelStorage(Object.fromEntries(channelNames.map(name =>
+      [name, new Float32Array(6).fill(name.startsWith('S1') ? -2 : 1)])), channelNames),
+    analysis: {}
+  } as DecodedLayer;
+  return {
+    sourceKey: 'session:0:penvmap', layer, width: 2, height: 3,
+    channels: {
+      r: { s0: 'S0.R', s1: 'S1.R', s2: 'S2.R', s3: 'S3.R' },
+      g: { s0: 'S0.G', s1: 'S1.G', s2: 'S2.G', s3: 'S3.G' },
+      b: { s0: 'S0.B', s1: 'S1.B', s2: 'S2.B', s3: 'S3.B' }
+    }
+  };
 }

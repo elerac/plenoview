@@ -43,6 +43,9 @@ import {
   DEPTH_TEXTURE_UNIT
 } from './constants';
 import type { GlImageRendererState, LayerSourceTextures } from './types';
+import { polarizedEnvironmentSourceKey, resolvePolarizedEnvironmentChannels } from './environment-polarization';
+
+const recognitionRulesByLayer = new WeakMap<DecodedLayer, ChannelRecognitionNameRules | undefined>();
 
 export function createZeroTexture(
   gl: WebGL2RenderingContext,
@@ -79,6 +82,7 @@ export function ensureLayerChannelsResident(
   channelNames: string[],
   channelRecognitionNameRules?: ChannelRecognitionNameRules
 ): ResidentChannelUpload[] {
+  recognitionRulesByLayer.set(layer, channelRecognitionNameRules);
   const layerTextures = getOrCreateLayerSourceTextures(state, sessionId, layerIndex, width, height, layer);
   const uploads: ResidentChannelUpload[] = [];
 
@@ -436,13 +440,33 @@ export function setDisplaySelectionBindings(
   state.activeBinding = binding;
 
   const layerTextures = state.layerTexturesBySession.get(sessionId)?.get(layerIndex) ?? null;
+  const polarizedChannels = layerTextures
+    ? resolvePolarizedEnvironmentChannels(layerTextures.layer, binding, recognitionRulesByLayer.get(layerTextures.layer))
+    : null;
+  state.activePolarizedEnvironment = layerTextures && polarizedChannels ? {
+    sourceKey: polarizedEnvironmentSourceKey(sessionId, layerIndex, polarizedChannels),
+    layer: layerTextures.layer,
+    channels: polarizedChannels,
+    width,
+    height
+  } : null;
+  state.activeSourceTextures = [];
   for (let slotIndex = 0; slotIndex < DISPLAY_SOURCE_SLOT_COUNT; slotIndex += 1) {
     const channelName = binding.slots[slotIndex];
     const texture = channelName
       ? layerTextures?.textureByChannel.get(channelName) ?? state.zeroTexture
       : state.zeroTexture;
+    state.activeSourceTextures.push(texture);
     state.gl.activeTexture(state.gl.TEXTURE0 + slotIndex);
     state.gl.bindTexture(state.gl.TEXTURE_2D, texture);
+  }
+}
+
+/** Restore source units reused by polarized path tracing before image draws. */
+export function restoreDisplaySelectionTextures(state: GlImageRendererState): void {
+  for (let slotIndex = 0; slotIndex < state.activeSourceTextures.length; slotIndex += 1) {
+    state.gl.activeTexture(state.gl.TEXTURE0 + slotIndex);
+    state.gl.bindTexture(state.gl.TEXTURE_2D, state.activeSourceTextures[slotIndex]);
   }
 }
 

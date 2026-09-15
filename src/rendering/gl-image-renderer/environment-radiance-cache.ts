@@ -1,3 +1,10 @@
+import {
+  buildPolarizedEnvironmentImportanceSampling,
+  buildPolarizedEnvironmentPixels,
+  polarizedEnvironmentSize,
+  type PolarizedEnvironmentSource
+} from './environment-polarization';
+
 const ENVIRONMENT_RADIANCE_TEXTURE_UNIT = 15;
 const CACHE_BUDGET_BYTES = 128 * 1024 * 1024;
 
@@ -6,10 +13,22 @@ export interface EnvironmentRadianceTexture {
   mipmapsAvailable: boolean;
 }
 
+export interface PolarizedEnvironmentRadianceTexture extends EnvironmentRadianceTexture {
+  textures: [WebGLTexture, WebGLTexture, WebGLTexture, WebGLTexture];
+  width: number;
+  height: number;
+  importanceTexture: WebGLTexture;
+  importanceTextureSize: { width: number; height: number };
+  importanceGridSize: { width: number; height: number };
+  importanceEntryCount: number;
+}
+
 interface CacheEntry extends EnvironmentRadianceTexture {
   width: number;
   height: number;
   bytes: number;
+  polarized?: PolarizedEnvironmentRadianceTexture;
+  sourceLayer?: PolarizedEnvironmentSource['layer'];
 }
 
 /** Linear HDR display selections, shared by the lighting programs. */
@@ -71,6 +90,97 @@ export class EnvironmentRadianceCache {
     return entry;
   }
 
+  /** Signed RGB Stokes inputs and the matching S0-only continuous PDF. */
+  getOrCreatePolarized(key: string, source: PolarizedEnvironmentSource): PolarizedEnvironmentRadianceTexture {
+    if (this.disposed) {
+      throw new Error('The environment radiance cache has been disposed.');
+    }
+    const { width, height } = polarizedEnvironmentSize(source);
+    const maxSize = this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE) as number;
+    if (width > maxSize || height > maxSize) {
+      throw new RangeError('Polarized environment dimensions exceed the supported texture size.');
+    }
+    const existing = this.entries.get(key);
+    if (existing?.polarized && existing.width === width && existing.height === height && existing.sourceLayer === source.layer) {
+      this.entries.delete(key);
+      this.entries.set(key, existing);
+      return existing.polarized;
+    }
+    if (existing) {
+      this.deleteEntry(key, existing);
+    }
+    const texelCount = width * (height - 1) * 2;
+    // Even width keeps each two-texel alias/corner pair on the same row.
+    const importanceWidth = Math.min(texelCount, maxSize - maxSize % 2);
+    const importanceHeight = Math.ceil(texelCount / importanceWidth);
+    if (importanceHeight > maxSize) {
+      throw new RangeError('Polarized environment sampling table exceeds the supported texture size.');
+    }
+    const bytes = width * height * 64 + importanceWidth * importanceHeight * 16;
+    for (const [oldKey, entry] of this.entries) {
+      if (this.bytes + bytes <= CACHE_BUDGET_BYTES) {
+        break;
+      }
+      this.deleteEntry(oldKey, entry);
+    }
+
+    const gl = this.gl;
+    const previousActiveTexture = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
+    gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
+    const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+    const allocated: WebGLTexture[] = [];
+    try {
+      const upload = (textureWidth: number, textureHeight: number, pixels: Float32Array): WebGLTexture => {
+        const texture = gl.createTexture();
+        if (!texture) {
+          throw new Error('Failed to create a polarized environment texture.');
+        }
+        allocated.push(texture);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        // penvmap's latitude grid includes the poles; hardware filtering would
+        // use a different grid. Its exact bilinear interpolation is in GLSL.
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, textureWidth, textureHeight, 0, gl.RGBA, gl.FLOAT, pixels);
+        const uploadError = gl.getError();
+        if (uploadError !== gl.NO_ERROR) {
+          throw new Error(`Failed to upload a polarized environment texture (WebGL error 0x${uploadError.toString(16)}).`);
+        }
+        return texture;
+      };
+      const textures = [0, 1, 2, 3].map(component => upload(
+        width, height, buildPolarizedEnvironmentPixels(source, component as 0 | 1 | 2 | 3)
+      )) as PolarizedEnvironmentRadianceTexture['textures'];
+      const table = buildPolarizedEnvironmentImportanceSampling(source);
+      const importancePixels = importanceWidth * importanceHeight * 4 === table.rgba32f.length
+        ? table.rgba32f
+        : new Float32Array(importanceWidth * importanceHeight * 4);
+      if (importancePixels !== table.rgba32f) {
+        importancePixels.set(table.rgba32f);
+      }
+      const polarized: PolarizedEnvironmentRadianceTexture = {
+        texture: textures[0], textures, width, height, mipmapsAvailable: false,
+        importanceTexture: upload(importanceWidth, importanceHeight, importancePixels),
+        importanceTextureSize: { width: importanceWidth, height: importanceHeight },
+        importanceGridSize: { width: table.gridWidth, height: table.gridHeight },
+        importanceEntryCount: table.entryCount
+      };
+      this.entries.set(key, { ...polarized, bytes, polarized, sourceLayer: source.layer });
+      this.bytes += bytes;
+      return polarized;
+    } catch (error) {
+      for (const texture of allocated) {
+        gl.deleteTexture(texture);
+      }
+      throw error;
+    } finally {
+      gl.bindTexture(gl.TEXTURE_2D, previousTexture);
+      gl.activeTexture(previousActiveTexture);
+    }
+  }
+
   deleteByPrefix(prefix: string): void {
     for (const [key, entry] of this.entries) {
       if (key.startsWith(prefix)) {
@@ -93,7 +203,11 @@ export class EnvironmentRadianceCache {
   private deleteEntry(key: string, entry: CacheEntry): void {
     this.entries.delete(key);
     this.bytes -= entry.bytes;
-    this.gl.deleteTexture(entry.texture);
+    for (const texture of entry.polarized
+      ? [...entry.polarized.textures, entry.polarized.importanceTexture]
+      : [entry.texture]) {
+      this.gl.deleteTexture(texture);
+    }
   }
 
   private createEntry(width: number, height: number, bytes: number, bake: () => void): CacheEntry {

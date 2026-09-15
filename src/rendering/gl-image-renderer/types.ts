@@ -1,5 +1,7 @@
 import type { PanoramaPrograms } from './panorama-program';
 import type { EnvironmentRadianceCache } from './environment-radiance-cache';
+import type { PolarizedEnvironmentSource } from './environment-polarization';
+import type { RoughPlasticTransmittanceCache } from './roughplastic-transmittance-texture';
 import type { DisplaySourceBinding } from '../../display/bindings';
 import type { DepthPointBudgetResolver } from '../../depth-point-budget';
 import type { DepthSource, DepthSourceGeometry } from '../../depth';
@@ -43,6 +45,13 @@ export interface ImageUniforms extends CommonUniforms {
 }
 
 export interface PanoramaUniforms extends CommonUniforms {
+  environmentPolarized: WebGLUniformLocation | null;
+  conductorEta: WebGLUniformLocation | null;
+  conductorK: WebGLUniformLocation | null;
+  environmentSphereRoughSilver: WebGLUniformLocation | null;
+  environmentSpherePolarizedPlastic: WebGLUniformLocation | null;
+  pathTracingOutputComponent: WebGLUniformLocation | null;
+  pathTracingOutputColorChannel: WebGLUniformLocation | null;
   environmentRadianceTexture: WebGLUniformLocation | null;
   sourceTextureMipmapsAvailable: WebGLUniformLocation | null;
   environmentSampleCounts: WebGLUniformLocation | null;
@@ -69,7 +78,10 @@ export interface PanoramaUniforms extends CommonUniforms {
   environmentSphereNonlinear: WebGLUniformLocation | null;
 }
 
-export interface PathTracingPresentUniforms {
+export interface PathTracingPresentUniforms extends CommonUniforms {
+  environmentPolarized: WebGLUniformLocation | null;
+  pathTracingOutputComponent: WebGLUniformLocation | null;
+  pathTracingOutputColorChannel: WebGLUniformLocation | null;
   outputOriginPx: WebGLUniformLocation;
   outputSize: WebGLUniformLocation;
   outputPixelScale: WebGLUniformLocation;
@@ -84,6 +96,8 @@ export interface PathTracingPresentUniforms {
 export interface PathTracingAccumulationSurface {
   framebuffers: readonly [WebGLFramebuffer, WebGLFramebuffer];
   textures: readonly [WebGLTexture, WebGLTexture];
+  stokesTextures: readonly [readonly WebGLTexture[], readonly WebGLTexture[]];
+  polarized: boolean;
   width: number;
   height: number;
   readIndex: 0 | 1;
@@ -181,10 +195,13 @@ export interface GlImageRendererState {
   imageProgram: ProgramBundle<ImageUniforms>;
   panoramaPrograms: PanoramaPrograms;
   environmentRadianceCache: EnvironmentRadianceCache;
+  roughPlasticTransmittanceCache: RoughPlasticTransmittanceCache;
   pathTracingPresentProgram: ProgramBundle<PathTracingPresentUniforms>;
   pathTracingFloatAccumulationSupported: boolean;
   pathTracingSurfaces: Map<string, PathTracingAccumulationSurface>;
   activeSourceRevisionKey: string;
+  activePolarizedEnvironment: PolarizedEnvironmentSource | null;
+  activeSourceTextures: WebGLTexture[];
   environmentImportanceTexture: WebGLTexture;
   environmentImportanceTextureSize: { width: number; height: number };
   environmentImportanceGridSize: { width: number; height: number };

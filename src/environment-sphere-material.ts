@@ -1,5 +1,10 @@
 export type EnvironmentMicrofacetDistribution = 'beckmann' | 'ggx';
 
+export type EnvironmentSphereMaterialPreset =
+  | 'roughConductor'
+  | 'roughPlasticWhite'
+  | 'roughPlasticBlack';
+
 export interface EnvironmentSphereDiffuseReflectance {
   r: number;
   g: number;
@@ -7,7 +12,7 @@ export interface EnvironmentSphereDiffuseReflectance {
 }
 
 export interface EnvironmentSphereMaterial {
-  type: 'roughplastic' | 'smoothSilver';
+  type: 'pplastic' | 'roughplastic' | 'smoothSilver' | 'roughSilver';
   diffuseReflectance: EnvironmentSphereDiffuseReflectance;
   alpha: number;
   intIor: number;
@@ -33,9 +38,9 @@ const DEFAULT_DIFFUSE_REFLECTANCE: EnvironmentSphereDiffuseReflectance = {
 };
 
 export const DEFAULT_ENVIRONMENT_SPHERE_MATERIAL: Readonly<EnvironmentSphereMaterial> = Object.freeze({
-  type: 'smoothSilver',
+  type: 'roughSilver',
   diffuseReflectance: Object.freeze({ ...DEFAULT_DIFFUSE_REFLECTANCE }),
-  alpha: 0.02,
+  alpha: 0.01,
   intIor: 1.49,
   extIor: 1.000277,
   distribution: 'beckmann',
@@ -44,6 +49,31 @@ export const DEFAULT_ENVIRONMENT_SPHERE_MATERIAL: Readonly<EnvironmentSphereMate
 
 export function createDefaultEnvironmentSphereMaterial(): EnvironmentSphereMaterial {
   return cloneEnvironmentSphereMaterial(DEFAULT_ENVIRONMENT_SPHERE_MATERIAL);
+}
+
+export function resolveEnvironmentSphereMaterialPreset(
+  material: Readonly<EnvironmentSphereMaterial>
+): EnvironmentSphereMaterialPreset {
+  if (material.type === 'smoothSilver' || material.type === 'roughSilver') {
+    return 'roughConductor';
+  }
+  const { r, g, b } = material.diffuseReflectance;
+  return (r + g + b) / 3 >= 0.5 ? 'roughPlasticWhite' : 'roughPlasticBlack';
+}
+
+export function createEnvironmentSphereMaterialPresetPatch(
+  preset: EnvironmentSphereMaterialPreset
+): EnvironmentSphereMaterialPatch {
+  if (preset === 'roughConductor') {
+    return { type: 'roughSilver', alpha: 0.01, distribution: 'beckmann' };
+  }
+  const reflectance = preset === 'roughPlasticWhite' ? 1 : 0;
+  return {
+    type: 'pplastic',
+    diffuseReflectance: { r: reflectance, g: reflectance, b: reflectance },
+    alpha: 0.1,
+    distribution: 'beckmann'
+  };
 }
 
 export function cloneEnvironmentSphereMaterial(
@@ -67,7 +97,7 @@ export function normalizeEnvironmentSphereMaterial(
 ): EnvironmentSphereMaterial {
   const diffusePatch = patch?.diffuseReflectance;
   return {
-    type: patch?.type === 'roughplastic' || patch?.type === 'smoothSilver'
+    type: patch?.type === 'pplastic' || patch?.type === 'roughplastic' || patch?.type === 'smoothSilver' || patch?.type === 'roughSilver'
       ? patch.type
       : base.type,
     diffuseReflectance: {
@@ -93,9 +123,8 @@ export function normalizeEnvironmentSphereMaterial(
       ENVIRONMENT_SPHERE_IOR_MAX,
       base.extIor
     ),
-    distribution: patch?.distribution === 'beckmann' || patch?.distribution === 'ggx'
-      ? patch.distribution
-      : base.distribution,
+    // The viewer uses Beckmann for every center-sphere preset, including restored sessions.
+    distribution: 'beckmann',
     nonlinear: typeof patch?.nonlinear === 'boolean' ? patch.nonlinear : base.nonlinear
   };
 }
@@ -112,7 +141,7 @@ export function normalizeEnvironmentSphereMaterialValue(value: unknown): Environ
     : {};
   return normalizeEnvironmentSphereMaterial({
     // Snapshots created before material types were introduced used roughplastic.
-    type: record.type === 'smoothSilver' ? 'smoothSilver' : 'roughplastic',
+    type: record.type === 'pplastic' || record.type === 'smoothSilver' || record.type === 'roughSilver' ? record.type : 'roughplastic',
     diffuseReflectance: {
       r: finiteNumberOrUndefined(diffuseRecord.r),
       g: finiteNumberOrUndefined(diffuseRecord.g),

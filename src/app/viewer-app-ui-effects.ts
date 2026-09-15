@@ -1,4 +1,5 @@
 import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
+import { DEFAULT_ENVIRONMENT_SPHERE_MATERIAL } from '../environment-sphere-material';
 import { ViewerUiInvalidationFlags } from './viewer-app-ui';
 import type { ViewerUiTransition } from './viewer-app-types';
 
@@ -56,6 +57,7 @@ export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransiti
     ui.setViewerMode(snapshot.viewerMode);
     ui.setPanoramaDisplayMode(snapshot.panoramaDisplayMode);
     ui.setPanoramaLightingMethod?.(snapshot.panoramaLightingMethod);
+    ui.setEnvironmentSphereMaterial?.(snapshot.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL);
     ui.setThreeDModeAvailable(Boolean(snapshot.threeDModeAvailable));
   }
 

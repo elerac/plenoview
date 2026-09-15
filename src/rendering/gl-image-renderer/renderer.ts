@@ -264,6 +264,8 @@ export class GlImageRenderer implements Disposable {
     this.state.activeDepthGeometry = null;
     this.state.activeBinding = createEmptyDisplaySourceBinding();
     this.state.activeSourceRevisionKey = '';
+    this.state.activePolarizedEnvironment = null;
+    this.state.activeSourceTextures = [];
     this.state.environmentShIrradiance.fill(0);
     clearEnvironmentImportanceTextureState(this.state);
     clearPathTracingSurfaces(this.state);
@@ -329,6 +331,8 @@ export class GlImageRenderer implements Disposable {
     this.state.colormapEntryCount = 0;
     this.state.activeBinding = createEmptyDisplaySourceBinding();
     this.state.activeSourceRevisionKey = '';
+    this.state.activePolarizedEnvironment = null;
+    this.state.activeSourceTextures = [];
     this.state.environmentShIrradiance.fill(0);
     clearEnvironmentImportanceTextureState(this.state);
     clearPathTracingSurfaces(this.state);
@@ -347,6 +351,7 @@ export class GlImageRenderer implements Disposable {
     this.state.gl.deleteProgram(this.state.imageProgram.program);
     this.state.panoramaPrograms.dispose();
     this.state.environmentRadianceCache.dispose();
+    this.state.roughPlasticTransmittanceCache.dispose();
     this.state.gl.deleteProgram(this.state.pathTracingPresentProgram.program);
     this.state.gl.deleteProgram(this.state.depthProgram.program);
   }

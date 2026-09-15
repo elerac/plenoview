@@ -3,17 +3,19 @@ import {
   DEFAULT_ENVIRONMENT_SPHERE_MATERIAL,
   cloneEnvironmentSphereMaterial,
   createDefaultEnvironmentSphereMaterial,
+  createEnvironmentSphereMaterialPresetPatch,
   normalizeEnvironmentSphereMaterial,
   normalizeEnvironmentSphereMaterialValue,
+  resolveEnvironmentSphereMaterialPreset,
   sameEnvironmentSphereMaterial
 } from '../src/environment-sphere-material';
 
 describe('environment sphere material', () => {
-  it('defaults to polished silver while retaining roughplastic parameters', () => {
+  it('defaults to Rough Conductor with Beckmann roughness 0.01', () => {
     expect(createDefaultEnvironmentSphereMaterial()).toEqual({
-      type: 'smoothSilver',
+      type: 'roughSilver',
       diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
-      alpha: 0.02,
+      alpha: 0.01,
       intIor: 1.49,
       extIor: 1.000277,
       distribution: 'beckmann',
@@ -32,12 +34,12 @@ describe('environment sphere material', () => {
     });
 
     expect(normalized).toEqual({
-      type: 'smoothSilver',
+      type: 'roughSilver',
       diffuseReflectance: { r: 0, g: 0.25, b: 1 },
       alpha: 0.001,
       intIor: 4,
       extIor: DEFAULT_ENVIRONMENT_SPHERE_MATERIAL.extIor,
-      distribution: 'ggx',
+      distribution: 'beckmann',
       nonlinear: true
     });
   });
@@ -69,11 +71,28 @@ describe('environment sphere material', () => {
       alpha: 0.35,
       intIor: 1.6,
       extIor: 1,
-      distribution: 'ggx',
+      distribution: 'beckmann',
       nonlinear: true
     });
     expect(normalizeEnvironmentSphereMaterialValue('invalid')).toBeNull();
     expect(normalizeEnvironmentSphereMaterialValue({ type: 'smoothSilver' })?.type).toBe('smoothSilver');
     expect(normalizeEnvironmentSphereMaterial({ type: 'roughplastic' }).type).toBe('roughplastic');
+    expect(normalizeEnvironmentSphereMaterial({ type: 'pplastic' }).type).toBe('pplastic');
+    expect(normalizeEnvironmentSphereMaterialValue({ type: 'pplastic', alpha: 0.12 })?.type).toBe('pplastic');
+  });
+
+  it('selects polarized white and black plastic at 0.1 and conductor at 0.01', () => {
+    const edited = normalizeEnvironmentSphereMaterial({ alpha: 0.15 });
+    for (const [preset, reflectance] of [['roughPlasticWhite', 1], ['roughPlasticBlack', 0]] as const) {
+      const material = normalizeEnvironmentSphereMaterial(createEnvironmentSphereMaterialPresetPatch(preset), edited);
+      expect(material).toMatchObject({
+        type: 'pplastic', alpha: 0.1, distribution: 'beckmann',
+        diffuseReflectance: { r: reflectance, g: reflectance, b: reflectance }
+      });
+      expect(resolveEnvironmentSphereMaterialPreset(material)).toBe(preset);
+      const conductor = normalizeEnvironmentSphereMaterial(createEnvironmentSphereMaterialPresetPatch('roughConductor'), material);
+      expect(conductor).toMatchObject({ type: 'roughSilver', alpha: 0.01, distribution: 'beckmann' });
+      expect(resolveEnvironmentSphereMaterialPreset(conductor)).toBe('roughConductor');
+    }
   });
 });

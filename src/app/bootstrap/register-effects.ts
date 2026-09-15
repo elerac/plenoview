@@ -24,6 +24,7 @@ export function registerBootstrapEffects({
   isDisposed
 }: RegisterBootstrapEffectsArgs): Array<() => void> {
   const unsubscribers: Array<() => void> = [];
+  let renderEffectRevision = 0;
 
   unsubscribers.push(core.subscribeState((transition) => {
     if (isDisposed()) {
@@ -47,7 +48,11 @@ export function registerBootstrapEffects({
       return;
     }
 
+    const revision = ++renderEffectRevision;
     applyRenderEffects(core, ui, services.renderer, services.renderCache, transition);
+    // Cached/preview exposure can synchronously dispatch a newer render here.
+    // Its loop sources must survive when this older callback resumes.
+    if (revision !== renderEffectRevision) return;
     services.invalidValueWarningRenderLoop.sync(transition.snapshot.paneRenderSources);
     services.pathTracingRenderLoop.sync(transition.snapshot.paneRenderSources);
   }));

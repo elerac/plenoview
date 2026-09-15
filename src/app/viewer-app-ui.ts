@@ -2,6 +2,7 @@ import { sameDisplayLuminanceRange } from '../colormap-range';
 import { buildChannelViewItems, type ChannelViewItem } from '../channel-view-items';
 import { hasDepthChannelCandidate } from '../depth';
 import { sameDisplaySelection } from '../display-model';
+import { sameEnvironmentSphereMaterial } from '../environment-sphere-material';
 import type { OpenedImageSession } from '../types';
 import type { ViewerAppState, ViewerUiSnapshot } from './viewer-app-types';
 import {
@@ -119,6 +120,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       viewerMode: state.sessionState.viewerMode,
       panoramaDisplayMode: resolvePanoramaDisplayMode(state.sessionState.panoramaDisplayMode),
       panoramaLightingMethod: resolvePanoramaLightingMethod(state.sessionState.panoramaLightingMethod),
+      environmentSphereMaterial: state.sessionState.environmentSphereMaterial,
       threeDModeAvailable: Boolean(
         activeSession &&
         hasDepthChannelCandidate(
@@ -239,6 +241,7 @@ export function computeViewerUiInvalidation(
     previous.viewerMode !== next.viewerMode ||
     previous.panoramaDisplayMode !== next.panoramaDisplayMode ||
     previous.panoramaLightingMethod !== next.panoramaLightingMethod ||
+    !sameEnvironmentSphereMaterial(previous.environmentSphereMaterial, next.environmentSphereMaterial) ||
     previous.shouldClearImageBrowserPanels !== next.shouldClearImageBrowserPanels
   ) {
     flags |= ViewerUiInvalidationFlags.ViewerMode;
@@ -583,6 +586,7 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     a.viewerMode === b.viewerMode &&
     a.panoramaDisplayMode === b.panoramaDisplayMode &&
     a.panoramaLightingMethod === b.panoramaLightingMethod &&
+    sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.threeDModeAvailable === b.threeDModeAvailable &&
     a.visualizationMode === b.visualizationMode &&
     sameStokesControl(a.stokesDegreeModulationControl, b.stokesDegreeModulationControl) &&

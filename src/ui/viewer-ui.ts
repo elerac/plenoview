@@ -8,6 +8,14 @@ import {
   type ChannelViewThumbnailItem
 } from '../channel-view-items';
 import { cloneDisplaySelection, sameDisplaySelection } from '../display-model';
+import {
+  createDefaultEnvironmentSphereMaterial,
+  createEnvironmentSphereMaterialPresetPatch,
+  normalizeEnvironmentSphereMaterial,
+  resolveEnvironmentSphereMaterialPreset,
+  type EnvironmentSphereMaterial,
+  type EnvironmentSphereMaterialPatch
+} from '../environment-sphere-material';
 import { AppFullscreenController } from './app-fullscreen-controller';
 import { ChannelThumbnailStrip } from './channel-thumbnail-strip';
 import { CollapsibleSectionsController } from './collapsible-sections';
@@ -349,6 +357,7 @@ export interface UiCallbacks {
   onViewerModeChange: (mode: ViewerMode) => void;
   onPanoramaDisplayModeChange?: (mode: PanoramaDisplayMode) => void;
   onPanoramaLightingMethodChange?: (method: PanoramaLightingMethod) => void;
+  onEnvironmentSphereMaterialChange?: (patch: EnvironmentSphereMaterialPatch) => void;
   onLayerChange: (layerIndex: number) => void;
   onRgbGroupChange: (mapping: DisplaySelection) => void;
   onColormapChange: (colormapId: string | null) => void;
@@ -452,6 +461,7 @@ export class ViewerUi implements Disposable {
   private viewerMode: ViewerMode = 'image';
   private panoramaDisplayMode: PanoramaDisplayMode = 'image';
   private panoramaLightingMethod: PanoramaLightingMethod = 'sphericalHarmonics';
+  private environmentSphereMaterial = createDefaultEnvironmentSphereMaterial();
   private threeDModeAvailable = false;
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
@@ -1202,6 +1212,14 @@ export class ViewerUi implements Disposable {
 
     this.threeDModeAvailable = available;
     this.updateViewerModeMenuItemsDisabled();
+  }
+
+  setEnvironmentSphereMaterial(material: EnvironmentSphereMaterial): void {
+    if (this.disposed) {
+      return;
+    }
+    this.environmentSphereMaterial = normalizeEnvironmentSphereMaterial(material);
+    this.updateEnvironmentMaterialControls();
   }
 
   setVisualizationMode(mode: VisualizationMode): void {
@@ -2799,10 +2817,13 @@ export class ViewerUi implements Disposable {
     this.elements.environmentLightingMenuItem.disabled = disabled;
     this.elements.environmentPathTracingMenuItem.disabled = disabled;
     this.elements.threeDViewerMenuItem.disabled = disabled || !this.threeDModeAvailable;
+    this.updateEnvironmentMaterialControls();
     this.notifyDesktopCommandStateChanged();
   }
 
   private updatePanoramaDisplayModeMenuItems(): void {
+    this.updateEnvironmentMaterialControls();
+    this.updateRenderedSourceContext();
     const panoramaActive = this.viewerMode === 'panorama';
     this.elements.panoramaImageMenuItem.setAttribute(
       'aria-checked',
@@ -2820,6 +2841,30 @@ export class ViewerUi implements Disposable {
         this.panoramaDisplayMode === 'environmentLighting' &&
         this.panoramaLightingMethod === 'pathTracing' ? 'true' : 'false'
     );
+  }
+
+  private updateEnvironmentMaterialControls(): void {
+    const active = this.viewerMode === 'panorama' && this.panoramaDisplayMode === 'environmentLighting' &&
+      this.panoramaLightingMethod === 'pathTracing';
+    const disabled = !active || this.isViewerLoadBlocked || this.openedImageCount === 0;
+    const material = this.environmentSphereMaterial;
+    this.elements.environmentMaterialFields.classList.toggle('hidden', !active);
+    this.elements.environmentMaterialSelect.disabled = disabled;
+    this.elements.environmentMaterialSelect.value = resolveEnvironmentSphereMaterialPreset(material);
+    this.elements.environmentRoughnessInput.disabled = disabled;
+    this.elements.environmentRoughnessInput.value = String(material.alpha);
+  }
+
+  private updateRenderedSourceContext(): void {
+    const pathTracing = this.viewerMode === 'panorama' && this.panoramaDisplayMode === 'environmentLighting' &&
+      this.panoramaLightingMethod === 'pathTracing';
+    this.elements.channelThumbnailSourceHint.classList.toggle('hidden', !pathTracing);
+    this.elements.probePanel.classList.toggle('hidden', pathTracing);
+    if (pathTracing) {
+      this.elements.channelThumbnailStrip.setAttribute('aria-describedby', this.elements.channelThumbnailSourceHint.id);
+    } else {
+      this.elements.channelThumbnailStrip.removeAttribute('aria-describedby');
+    }
   }
 
   private updateWindowPaneMenuItemsDisabled(): void {
@@ -3082,6 +3127,24 @@ export class ViewerUi implements Disposable {
       this.callbacks.onPanoramaLightingMethodChange?.('pathTracing');
       this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
       this.callbacks.onViewerModeChange('panorama');
+    });
+
+    this.disposables.addEventListener(this.elements.environmentMaterialSelect, 'change', () => {
+      const preset = this.elements.environmentMaterialSelect.value;
+      if (!this.elements.environmentMaterialSelect.disabled &&
+        (preset === 'roughConductor' || preset === 'roughPlasticWhite' || preset === 'roughPlasticBlack')) {
+        this.callbacks.onEnvironmentSphereMaterialChange?.(createEnvironmentSphereMaterialPresetPatch(preset));
+      }
+    });
+    this.disposables.addEventListener(this.elements.environmentRoughnessInput, 'change', () => {
+      const alpha = this.elements.environmentRoughnessInput.valueAsNumber;
+      if (!this.elements.environmentRoughnessInput.disabled && Number.isFinite(alpha)) {
+        this.callbacks.onEnvironmentSphereMaterialChange?.({
+          alpha: normalizeEnvironmentSphereMaterial({ alpha }, this.environmentSphereMaterial).alpha
+        });
+      } else {
+        this.updateEnvironmentMaterialControls();
+      }
     });
 
     this.disposables.addEventListener(this.elements.threeDViewerMenuItem, 'click', () => {

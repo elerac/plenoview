@@ -403,6 +403,7 @@ export interface ViewerUiSnapshot {
   viewerMode: ViewerSessionState['viewerMode'];
   panoramaDisplayMode: NonNullable<ViewerSessionState['panoramaDisplayMode']>;
   panoramaLightingMethod: NonNullable<ViewerSessionState['panoramaLightingMethod']>;
+  environmentSphereMaterial?: EnvironmentSphereMaterial;
   threeDModeAvailable?: boolean;
   visualizationMode: ViewerSessionState['visualizationMode'];
   stokesDegreeModulationControl: StokesDegreeModulationControlModel | null;
