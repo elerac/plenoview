@@ -1,6 +1,48 @@
 import { expect, test } from './helpers/test';
 import { gotoViewerApp, openGalleryCbox } from './helpers/app';
 
+test('explains shader preparation until ready and clears the message on mode exit', async ({ page }, testInfo) => {
+  // Keep completion pending even when the browser's shader cache is warm.
+  await page.addInitScript(() => {
+    const getProgramParameter = WebGL2RenderingContext.prototype.getProgramParameter;
+    WebGL2RenderingContext.prototype.getProgramParameter = function (program, parameter) {
+      if (parameter === 0x91b1 && document.documentElement.hasAttribute('data-test-hold-shaders')) {
+        return false;
+      }
+      return getProgramParameter.call(this, program, parameter);
+    };
+  });
+  await gotoViewerApp(page);
+  await openGalleryCbox(page);
+  await page.evaluate(() => document.documentElement.setAttribute('data-test-hold-shaders', ''));
+  await page.locator('#view-menu-button').click();
+  await page.locator('#panorama-viewer-menu-item').click();
+  await page.locator('#panorama-image-menu-item').click();
+
+  const message = page.locator('.panorama-preparing');
+  await expect(message).toBeVisible();
+  await expect(message).toContainText('Compiling graphics shaders. This may take a few seconds.');
+  await page.locator('#exposure-slider').press('ArrowRight');
+  await expect(page.locator('#exposure-value')).toHaveValue('0.1');
+  await expect(message).toBeVisible();
+  await testInfo.attach('compilation-message', {
+    body: await page.screenshot(), contentType: 'image/png'
+  });
+
+  // The user can leave a preparing view without waiting for its program.
+  await page.locator('#view-menu-button').click();
+  await page.locator('#image-viewer-menu-item').click();
+  await expect(message).toBeHidden();
+  await page.locator('#view-menu-button').click();
+  await page.locator('#panorama-viewer-menu-item').click();
+  await page.locator('#panorama-image-menu-item').click();
+  await expect(message).toBeVisible();
+  await page.evaluate(() => document.documentElement.removeAttribute('data-test-hold-shaders'));
+  await expect(message).toBeHidden({ timeout: 30_000 });
+  await expect(page.locator('#gl-canvas')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('#error-banner')).toBeHidden();
+});
+
 test('renders each panorama program and keeps exposure controls usable @smoke', async ({ page }, testInfo) => {
   test.slow();
   await gotoViewerApp(page);

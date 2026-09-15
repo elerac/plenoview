@@ -1390,7 +1390,13 @@
 
         <section id="viewer-container" class="viewer-container">
           <canvas id="gl-canvas"></canvas>
-          <div class="panorama-preparing" role="status" aria-live="polite">Preparing panorama…</div>
+          <div class="panorama-preparing" role="status" aria-live="polite" aria-atomic="true">
+            <span class="panorama-preparing-spinner" aria-hidden="true"></span>
+            <div>
+              <strong>Preparing panorama…</strong>
+              <span class="panorama-preparing-detail">Compiling graphics shaders. This may take a few seconds.</span>
+            </div>
+          </div>
           <canvas id="overlay-canvas"></canvas>
           <canvas id="probe-overlay-canvas"></canvas>
           <svg id="ruler-overlay-svg" aria-hidden="true"></svg>
