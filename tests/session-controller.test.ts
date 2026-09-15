@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionController } from '../src/controllers/session-controller';
 import { LoadQueueService } from '../src/services/load-queue';
 import { ViewerAppCore } from '../src/app/viewer-app-core';
@@ -164,6 +164,68 @@ async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
 }
+
+describe('URL download progress', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('publishes gallery progress to the UI and clears it before decoding and on reload', async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const response = () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { stream = controller; }
+    }), { headers: { 'Content-Length': '4' } });
+    vi.stubGlobal('fetch', vi.fn(async () => response()));
+    const decode = createDeferred<DecodedExrImage>();
+    const decodeBytes = vi.fn(async () => decode.promise);
+    const { controller, core } = createController({ decodeBytes });
+    const ui = vi.fn();
+    core.subscribeUi(ui);
+    const pending = controller.enqueueGalleryImage('polanalyser-spoons');
+    await vi.waitFor(() => expect(core.getState().downloadProgress?.totalBytes).toBe(4));
+    stream.enqueue(new Uint8Array([1, 2]));
+    await vi.waitFor(() => expect(core.getState().downloadProgress?.downloadedBytes).toBe(2));
+    expect(ui.mock.lastCall?.[0].snapshot.downloadProgress).toEqual({
+      filename: 'spoons.exr', activeDownloads: 1, downloadedBytes: 2, totalBytes: 4
+    });
+    stream.enqueue(new Uint8Array([3, 4]));
+    stream.close();
+    await vi.waitFor(() => expect(decodeBytes).toHaveBeenCalledTimes(1));
+    expect(core.getState().downloadProgress).toBeNull();
+    expect(core.getState().isLoading).toBe(true);
+    decode.resolve(createDecodedImage());
+    await pending;
+    const reload = controller.reloadSession(controller.getActiveSession()!.id);
+    await vi.waitFor(() => expect(core.getState().downloadProgress?.totalBytes).toBe(4));
+    stream.enqueue(new Uint8Array([1, 2, 3, 4]));
+    stream.close();
+    await reload;
+    expect(core.getState().downloadProgress).toBeNull();
+    expect(core.getState().isLoading).toBe(false);
+    controller.dispose();
+  });
+
+  it('keeps simultaneous downloads independent when one fails, then clears progress on disposal', async () => {
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { streams.push(controller); }
+    }))));
+    const decodeBytes = vi.fn(async () => createDecodedImage());
+    const { controller, core } = createController({ decodeBytes, maxWorkers: 2 });
+    const first = controller.enqueueUrl('/first.exr');
+    const firstRejection = expect(first).rejects.toThrow('Disconnected');
+    const second = controller.enqueueUrl('/second.exr');
+    await vi.waitFor(() => expect(streams).toHaveLength(2));
+    expect(core.getState().downloadProgress?.activeDownloads).toBe(2);
+    streams[0]!.error(new Error('Disconnected'));
+    await firstRejection;
+    expect(core.getState().downloadProgress).toMatchObject({ filename: 'second.exr', activeDownloads: 1 });
+    expect(core.getState().isLoading).toBe(true);
+    controller.dispose();
+    expect(core.getState().downloadProgress).toBeNull();
+    await second;
+    expect(core.getState().isLoading).toBe(false);
+    expect(decodeBytes).not.toHaveBeenCalled();
+  });
+});
 
 describe('session controller shim', () => {
   it('applies decoded images as new active sessions', async () => {

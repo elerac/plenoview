@@ -25,6 +25,11 @@ export function resourceReducer(
         ...state,
         isLoading: intent.loading
       };
+    case 'downloadProgressSet':
+      return state.downloadProgress === intent.progress ? state : {
+        ...state,
+        downloadProgress: intent.progress
+      };
     case 'colormapRegistryResolved': {
       return {
         ...state,

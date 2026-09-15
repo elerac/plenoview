@@ -12,7 +12,7 @@ export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransiti
   }
 
   if (invalidation & ViewerUiInvalidationFlags.Loading) {
-    ui.setLoading(snapshot.isLoading, snapshot.isViewerLoadBlocked);
+    ui.setLoading(snapshot.isLoading, snapshot.isViewerLoadBlocked, snapshot.downloadProgress);
     ui.setRgbViewLoading(snapshot.isDisplayBusy, snapshot.isDisplayOverlayLoading);
   }
 

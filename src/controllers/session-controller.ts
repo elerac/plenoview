@@ -1,4 +1,5 @@
 import { createAbortError, isAbortError, throwIfAborted, type Disposable } from '../lifecycle';
+import { downloadImageBytes, type DownloadByteProgress } from '../download-image';
 import {
   errorResource,
   isPendingMatch,
@@ -260,6 +261,7 @@ export class SessionController implements Disposable {
 
   private readonly abortController = new AbortController();
   private readonly loadResourcesByKey = new Map<string, AsyncResource<void>>();
+  private readonly downloads = new Map<symbol, DownloadByteProgress & { filename: string }>();
   private readonly pendingOpenedImageReservationGroups = new Map<string, PendingOpenedImageReservationGroup>();
   private nextLoadRequestId = 1;
   private nextLoadGroupId = 1;
@@ -713,6 +715,8 @@ export class SessionController implements Disposable {
     this.disposed = true;
     this.abortController.abort(createAbortError('Session controller has been disposed.'));
     this.loadQueue.cancelAll('Session controller has been disposed.');
+    this.downloads.clear();
+    this.core.dispatch({ type: 'downloadProgressSet', progress: null });
     this.clearAllPendingOpenedImageReservations();
   }
 
@@ -1316,12 +1320,7 @@ export class SessionController implements Disposable {
   ): Promise<void> {
     this.throwIfStopped(options.signal);
 
-    const response = await fetch(url, { signal: options.signal });
-    if (!response.ok) {
-      throw new Error(`Failed to load ${url} (${response.status})`);
-    }
-
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    const bytes = await this.downloadUrlBytes(url, options.filename, options.signal);
     this.throwIfStopped(options.signal);
     const decoded = await this.decodeBytes(bytes, {
       signal: options.signal,
@@ -1334,6 +1333,38 @@ export class SessionController implements Disposable {
       url
     }, {
       displayName: options.displayName
+    });
+  }
+
+  private async downloadUrlBytes(url: string, filename: string, signal: AbortSignal): Promise<Uint8Array> {
+    this.throwIfStopped(signal);
+    const id = Symbol();
+    try {
+      return await downloadImageBytes(url, signal, (progress) => {
+        this.throwIfStopped(signal);
+        this.downloads.set(id, { filename, ...progress });
+        this.publishDownloadProgress();
+      });
+    } finally {
+      this.downloads.delete(id);
+      if (!this.disposed) {
+        this.publishDownloadProgress();
+      }
+    }
+  }
+
+  private publishDownloadProgress(): void {
+    const downloads = [...this.downloads.values()];
+    this.core.dispatch({
+      type: 'downloadProgressSet',
+      progress: downloads.length === 0 ? null : {
+        filename: downloads[0]!.filename,
+        activeDownloads: downloads.length,
+        downloadedBytes: downloads.reduce((sum, download) => sum + download.downloadedBytes, 0),
+        totalBytes: downloads.every((download) => download.totalBytes !== null)
+          ? downloads.reduce((sum, download) => sum + download.totalBytes!, 0)
+          : null
+      }
     });
   }
 
@@ -1438,7 +1469,8 @@ export class SessionController implements Disposable {
         this.decodeBytes,
         this.pathFileProvider,
         signal,
-        reservationReason
+        reservationReason,
+        (url) => this.downloadUrlBytes(url, session.filename, signal)
       );
       this.throwIfStopped(signal);
       const baseState = this.getActiveSessionId() === sessionId
@@ -1507,15 +1539,11 @@ async function decodeExrFromSessionSource(
   decodeBytes: (bytes: Uint8Array, options?: DecodeBytesOptions) => Promise<DecodedExrImage>,
   pathFileProvider: PathFileProvider | null,
   signal: AbortSignal | undefined,
-  reservationReason: DecodeMemoryReservationReason
+  reservationReason: DecodeMemoryReservationReason,
+  downloadUrlBytes: (url: string) => Promise<Uint8Array>
 ): Promise<DecodedExrImage> {
   if (source.kind === 'url') {
-    const response = await fetch(source.url, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to load ${source.url} (${response.status})`);
-    }
-
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    const bytes = await downloadUrlBytes(source.url);
     if (signal) {
       throwIfAborted(signal, 'Session reload was aborted.');
     }

@@ -1,4 +1,5 @@
 import type { ChannelThumbnailOptionItem } from './viewer-ui';
+import type { ImageDownloadProgress } from '../download-image';
 import type { ColormapLut } from '../colormaps';
 import type {
   DisplayLuminanceRange,
@@ -62,7 +63,7 @@ export interface ViewerRuntimeUi extends Disposable {
   readonly rulerLabelOverlay: HTMLElement;
 
   setError(message: string | null): void;
-  setLoading(loading: boolean, viewerBlocked?: boolean): void;
+  setLoading(loading: boolean, viewerBlocked?: boolean, downloadProgress?: ImageDownloadProgress | null): void;
   setRgbViewLoading(displayBusy: boolean, overlayLoading?: boolean): void;
   setDeferredLoad?(handler: (() => void | Promise<void>) | null): void;
   setDisplayCacheBudget(preference: DisplayCacheBudgetPreference, resolvedBudgetMb: number): void;

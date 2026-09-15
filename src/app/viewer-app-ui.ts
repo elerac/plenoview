@@ -96,6 +96,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
     const nextSnapshot: ViewerUiSnapshot = {
       errorMessage: state.errorMessage,
       isLoading: state.isLoading,
+      downloadProgress: state.downloadProgress,
       isViewerLoadBlocked: state.isLoading && !activeSession,
       isDisplayBusy: Boolean(
         state.pendingSelectionTransitionRequestId ||
@@ -187,6 +188,7 @@ export function computeViewerUiInvalidation(
 
   if (
     previous.isLoading !== next.isLoading ||
+    previous.downloadProgress !== next.downloadProgress ||
     previous.isViewerLoadBlocked !== next.isViewerLoadBlocked ||
     previous.isDisplayBusy !== next.isDisplayBusy ||
     previous.isDisplayOverlayLoading !== next.isDisplayOverlayLoading
@@ -572,6 +574,7 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
   return (
     a.errorMessage === b.errorMessage &&
     a.isLoading === b.isLoading &&
+    a.downloadProgress === b.downloadProgress &&
     a.isViewerLoadBlocked === b.isViewerLoadBlocked &&
     a.isDisplayBusy === b.isDisplayBusy &&
     a.isDisplayOverlayLoading === b.isDisplayOverlayLoading &&

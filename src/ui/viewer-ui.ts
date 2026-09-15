@@ -8,6 +8,8 @@ import {
   type ChannelViewThumbnailItem
 } from '../channel-view-items';
 import { cloneDisplaySelection, sameDisplaySelection } from '../display-model';
+import { DownloadProgressView } from './download-progress';
+import type { ImageDownloadProgress } from '../download-image';
 import {
   createDefaultEnvironmentSphereMaterial,
   createEnvironmentSphereMaterialPresetPatch,
@@ -411,6 +413,8 @@ export class ViewerUi implements Disposable {
   private readonly disposables = new DisposableBag();
   private readonly elements: Elements;
   private readonly loadingOverlayDisclosure: ProgressiveLoadingOverlayDisclosure;
+  private readonly downloadProgressView: DownloadProgressView;
+  private downloadProgress: ImageDownloadProgress | null = null;
   private readonly openedImagesPanel: OpenedImagesPanel;
   private readonly channelThumbnailStrip: ChannelThumbnailStrip;
   private readonly colormapPanel: ColormapPanel;
@@ -493,6 +497,8 @@ export class ViewerUi implements Disposable {
     this.loadingOverlayDisclosure = new ProgressiveLoadingOverlayDisclosure((phase) => {
       this.renderLoadingOverlayPhase(phase);
     });
+    this.downloadProgressView = new DownloadProgressView(this.elements.viewerContainer);
+    this.disposables.addDisposable(this.downloadProgressView);
     this.openedImagesPanel = new OpenedImagesPanel(this.elements, {
       onOpenedImageSelected: (sessionId) => {
         this.callbacks.onOpenedImageSelected(sessionId);
@@ -896,9 +902,14 @@ export class ViewerUi implements Disposable {
     return Array.from(this.elements.galleryMenu.querySelectorAll<HTMLButtonElement>('button[data-gallery-id]'));
   }
 
-  setLoading(loading: boolean, viewerBlocked = loading): void {
+  setLoading(loading: boolean, viewerBlocked = loading, downloadProgress: ImageDownloadProgress | null = null): void {
     if (this.disposed) {
       return;
+    }
+    if (this.downloadProgress !== downloadProgress) {
+      this.downloadProgress = downloadProgress;
+      this.downloadProgressView.setProgress(downloadProgress);
+      this.updateLoadingOverlayVisibility();
     }
     if (this.isLoading === loading && this.isViewerLoadBlocked === viewerBlocked) {
       return;
@@ -2056,7 +2067,9 @@ export class ViewerUi implements Disposable {
       return;
     }
 
-    this.loadingOverlayDisclosure.setLoading(this.isViewerLoadBlocked || this.isDisplayOverlayLoading);
+    this.loadingOverlayDisclosure.setLoading(
+      (this.isViewerLoadBlocked && !this.downloadProgress) || this.isDisplayOverlayLoading
+    );
   }
 
   private renderLoadingOverlayPhase(phase: LoadingOverlayPhase): void {

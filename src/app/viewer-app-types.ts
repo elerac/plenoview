@@ -1,4 +1,5 @@
 import type { ChannelViewThumbnailItem } from '../channel-view-items';
+import type { ImageDownloadProgress } from '../download-image';
 import type { AsyncResource, ViewerError } from '../async-resource';
 import type { AutoExposureResult } from '../analysis/auto-exposure';
 import type { ColormapLut, ColormapRegistry } from '../colormaps';
@@ -191,6 +192,7 @@ export interface ViewerAppState {
   activeSessionId: string | null;
   errorMessage: string | null;
   isLoading: boolean;
+  downloadProgress: ImageDownloadProgress | null;
   colormapRegistry: ColormapRegistry | null;
   defaultColormapId: string;
   colormapLutResource: AsyncResource<ColormapLut>;
@@ -222,6 +224,7 @@ export interface ViewerAppState {
 export type ViewerIntent =
   | { type: 'errorSet'; message: string | null }
   | { type: 'loadingSet'; loading: boolean }
+  | { type: 'downloadProgressSet'; progress: ImageDownloadProgress | null }
   | { type: 'autoFitImageOnSelectSet'; enabled: boolean }
   | { type: 'autoExposureSet'; enabled: boolean }
   | { type: 'autoExposurePercentileSet'; percentile: number }
@@ -388,6 +391,7 @@ export interface ViewerStateTransition {
 export interface ViewerUiSnapshot {
   errorMessage: string | null;
   isLoading: boolean;
+  downloadProgress: ImageDownloadProgress | null;
   isViewerLoadBlocked: boolean;
   isDisplayBusy: boolean;
   isDisplayOverlayLoading: boolean;

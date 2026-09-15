@@ -47,6 +47,7 @@ export function createInitialViewerAppState(): ViewerAppState {
     activeSessionId: null,
     errorMessage: null,
     isLoading: false,
+    downloadProgress: null,
     colormapRegistry: null,
     defaultColormapId: DEFAULT_COLORMAP_ID,
     colormapLutResource: idleResource(),

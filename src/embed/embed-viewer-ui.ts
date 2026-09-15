@@ -1,4 +1,6 @@
 import { formatProbeCoordinates } from '../ui/probe-readout';
+import { DownloadProgressView } from '../ui/download-progress';
+import type { ImageDownloadProgress } from '../download-image';
 import type { ViewerRuntimeUi, ScreenshotSelectionInteractionState } from '../ui/viewer-runtime-ui';
 import { ChannelThumbnailStrip } from '../ui/channel-thumbnail-strip';
 import {
@@ -112,6 +114,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
 
   private readonly root: HTMLElement;
   private readonly status: HTMLElement;
+  private readonly downloadProgressView: DownloadProgressView;
   private readonly sourceLabel: HTMLElement;
   private readonly probe: HTMLElement;
   private readonly probeSwatch: HTMLElement;
@@ -240,6 +243,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
       this.channelPanel
     );
     this.root.append(this.viewerContainer);
+    this.downloadProgressView = new DownloadProgressView(this.viewerContainer);
     document.body.append(this.root);
   }
 
@@ -258,6 +262,7 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
       this.channelPanel.removeEventListener(eventName, stopViewerInteractionEvent);
     }
     this.channelThumbnailStrip?.dispose();
+    this.downloadProgressView.dispose();
     document.body.classList.remove('embed-body');
   }
 
@@ -278,19 +283,20 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     this.status.textContent = message;
   }
 
-  setLoading(loading: boolean, viewerBlocked = loading): void {
+  setLoading(loading: boolean, viewerBlocked = loading, downloadProgress: ImageDownloadProgress | null = null): void {
     if (this.disposed) {
       return;
     }
 
     this.channelThumbnailStrip?.setLoading(viewerBlocked);
+    this.downloadProgressView.setProgress(downloadProgress);
 
     if (loading) {
       this.deferredLoadButton.classList.add('hidden');
       this.deferredLoadButton.disabled = true;
     }
 
-    if (!loading) {
+    if (!loading || downloadProgress) {
       if (!this.status.classList.contains('is-error')) {
         this.status.classList.add('hidden');
         this.status.textContent = '';
