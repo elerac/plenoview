@@ -294,7 +294,9 @@ export class GlImageRenderer implements Disposable {
   }
 
   preparePanoramaPrograms(state: ViewerState, signal?: AbortSignal): Promise<void> {
-    return this.state.panoramaPrograms.prepare(state, signal);
+    // Capture the prepared export source before another pane can change it
+    // while the shader compilation promise is pending.
+    return this.state.panoramaPrograms.prepare(state, signal, Boolean(this.state.activePolarizedEnvironment));
   }
 
   render(state: ViewerState): boolean {

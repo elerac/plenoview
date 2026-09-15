@@ -1,7 +1,8 @@
 # Panorama GPU checks
 
 The renderer compiles separate ordinary-panorama, spherical-harmonics (SH), and
-path-tracing programs on first use. `KHR_parallel_shader_compile` keeps the
+path-tracing programs on first use, with separate cached path-tracing variants
+for polarized and ordinary RGB environments. `KHR_parallel_shader_compile` keeps the
 render loop polling without synchronously querying link status. A small status
 message stays visible while a requested program is preparing. Screenshot exports
 await readiness and then restore their source and palette before readback.
@@ -24,6 +25,8 @@ masking, mip averages, cache reuse/eviction, the SH diffuse response, and polish
 silver reflection in SH and path tracing (including a one-bounce limit).
 All checks should pass. The GPU backend and compilation times are printed.
 Reload timings may be much faster because the browser/driver caches programs.
+For controlled cold comparisons and first-draw timing, see
+[shader compilation measurements](../../docs/shader-compilation-performance.md).
 
 ## Browser regression tests on Windows
 

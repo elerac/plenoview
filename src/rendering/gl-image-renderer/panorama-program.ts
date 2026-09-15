@@ -10,6 +10,7 @@ import type { PanoramaUniforms, ProgramBundle } from './types';
 
 export const ENVIRONMENT_RADIANCE_TEXTURE_UNIT = 15;
 type ProgramKind = PanoramaProgramKind | 'radiance';
+type ProgramKey = ProgramKind | 'pathTracingPolarized';
 interface ProgramEntry {
   pending: PendingProgram;
   bundle: ProgramBundle<PanoramaUniforms> | null;
@@ -17,22 +18,23 @@ interface ProgramEntry {
 
 /** Only requested modes compile. Polling never asks the driver to wait for a link. */
 export class PanoramaPrograms {
-  private readonly entries = new Map<ProgramKind, ProgramEntry>();
+  private readonly entries = new Map<ProgramKey, ProgramEntry>();
   private disposed = false;
 
   constructor(private readonly gl: WebGL2RenderingContext) {}
 
-  get(kind: ProgramKind): ProgramBundle<PanoramaUniforms> | null {
+  get(kind: ProgramKind, polarized = false): ProgramBundle<PanoramaUniforms> | null {
     if (this.disposed) throw new Error('Renderer has been disposed.');
-    let entry = this.entries.get(kind);
+    const key = kind === 'pathTracing' && polarized ? 'pathTracingPolarized' : kind;
+    let entry = this.entries.get(key);
     if (!entry) {
       entry = {
         pending: createPendingProgram(this.gl, vertexSource, kind === 'radiance'
           ? environmentRadianceFragmentSource
-          : createPanoramaFragmentSource(kind)),
+          : createPanoramaFragmentSource(kind, polarized)),
         bundle: null
       };
-      this.entries.set(kind, entry);
+      this.entries.set(key, entry);
     }
     if (entry.bundle) return entry.bundle;
     const program = entry.pending.poll();
@@ -41,13 +43,13 @@ export class PanoramaPrograms {
     return entry.bundle;
   }
 
-  async prepare(state: ViewerRenderState, signal?: AbortSignal): Promise<void> {
+  async prepare(state: ViewerRenderState, signal?: AbortSignal, polarized = false): Promise<void> {
     if (state.viewerMode !== 'panorama') return;
     const kind = resolvePanoramaProgramKind(state);
     for (;;) {
       signal?.throwIfAborted();
-      const program = this.get(kind);
-      const radiance = kind === 'image' || this.get('radiance');
+      const program = this.get(kind, polarized);
+      const radiance = kind === 'image' || (kind === 'pathTracing' && polarized) || this.get('radiance');
       if (program && radiance) return;
       await new Promise<void>((resolve) => setTimeout(resolve, 16));
     }

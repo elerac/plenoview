@@ -44,9 +44,9 @@ for (const realFile of [false, true]) {
           if (window.__polarizedExposureHistory!.length > 10) window.__polarizedExposureHistory!.shift();
         }
         if (!this.getParameter(this.FRAMEBUFFER_BINDING)) return;
-        const polarized = this.getUniformLocation(program, 'uEnvironmentPolarized');
+        const polarized = this.getUniformLocation(program, 'uEnvironmentStokesS1Texture');
         const pass = this.getUniformLocation(program, 'uPathTracingPass');
-        if (!polarized || !pass || !this.getUniform(program, polarized) || this.getUniform(program, pass) !== 1) return;
+        if (!polarized || !pass || this.getUniform(program, pass) !== 1) return;
         const sample = this.getUniformLocation(program, 'uPathTracingSampleIndex');
         const index = Number(this.getUniform(program, sample!));
         if (index > 10 && index % 32 !== 0 && index !== 63) return;

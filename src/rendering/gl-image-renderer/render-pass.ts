@@ -172,7 +172,7 @@ export function renderPanoramaPass(
 ): boolean {
   const kind = resolvePanoramaProgramKind(viewerState);
   const polarizedSource = kind === 'pathTracing' ? state.activePolarizedEnvironment : null;
-  const program = state.panoramaPrograms.get(kind);
+  const program = state.panoramaPrograms.get(kind, Boolean(polarizedSource));
   const radianceProgram = kind === 'image' || polarizedSource ? null : state.panoramaPrograms.get('radiance');
   // Request both programs before polling again, so their compilation can overlap.
   if (!program || (kind !== 'image' && !polarizedSource && !radianceProgram)) {

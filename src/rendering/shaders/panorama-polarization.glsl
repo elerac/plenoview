@@ -4,7 +4,11 @@
 // Verified revision: f2f30d101bbd5ee07b6e54643c7fef6949924b8f.
 // Stokes vectors follow the physical propagation direction, opposite to the
 // traced camera ray. Matrices below use GLSL's COLUMN-major constructors.
+#ifdef PATH_TRACING_POLARIZED_ENVIRONMENT
+const bool uEnvironmentPolarized = PATH_TRACING_POLARIZED_ENVIRONMENT;
+#else
 uniform bool uEnvironmentPolarized;
+#endif
 uniform sampler2D uEnvironmentStokesS1Texture;
 uniform sampler2D uEnvironmentStokesS2Texture;
 uniform sampler2D uEnvironmentStokesS3Texture;

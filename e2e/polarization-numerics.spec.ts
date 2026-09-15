@@ -184,11 +184,14 @@ function numericalCases(): NumericalCase[] {
   return cases;
 }
 
-test('production polarized GLSL matches independent Mitsuba numerical references @smoke', async ({ page }, testInfo) => {
+for (const specialized of [false, true]) {
+test(`production ${specialized ? 'specialized' : 'dynamic'} polarized GLSL matches independent Mitsuba numerical references @smoke`, async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const cases = numericalCases();
   const components = ['panorama-common.glsl', 'panorama-projection.glsl', 'panorama-lighting.glsl', 'panorama-polarization.glsl', 'panorama-path-tracing.glsl'];
-  const prefix = '#version 300 es\n' + components.map(file => readFileSync(new URL(`../src/rendering/shaders/${file}`, import.meta.url), 'utf8')).join('\n') + `
+  const prefix = '#version 300 es\n' +
+    (specialized ? '#define PATH_TRACING_POLARIZED_ENVIRONMENT true\n' : '') +
+    components.map(file => readFileSync(new URL(`../src/rendering/shaders/${file}`, import.meta.url), 'utf8')).join('\n') + `
 uniform sampler2D uTestTexture;
 vec4 packStokes(PolarizedStokes value) { return vec4(value.s0.r,value.s1.r,value.s2.r,value.s3.r); }
 `;
@@ -326,6 +329,8 @@ void main() {
     }
   }
 });
+
+}
 
 test('all Stokes presentation mappings read averaged rendered buffers @smoke', async ({ page }, testInfo) => {
   const parameterNames = ['aolp', 'dolp', 'dop', 'docp', 'cop', 'top', 's1_over_s0', 's2_over_s0', 's3_over_s0'] as const;

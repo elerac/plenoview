@@ -86,6 +86,90 @@ describe('gl image renderer', () => {
     expect(gl.deleteShader).toHaveBeenCalledTimes(4);
   });
 
+  it('compiles scalar and polarized path programs once each and reuses them when sources switch', () => {
+    const { renderer, gl, layer, state } = createPolarizedHarness();
+    const programs = getRendererState(renderer).panoramaPrograms;
+    const polarizedBinding = buildDisplaySourceBinding(layer, state.displaySelection);
+    const scalarLayer = createLayerFromChannels({ R: [1], G: [0.5], B: [0.25] });
+    const scalarBinding = buildDisplaySourceBinding(scalarLayer, state.displaySelection);
+    const compiledVariants = () => vi.mocked(gl.shaderSource).mock.calls
+      .map((call) => call[1])
+      .filter(source => source.includes('#define PATH_TRACING_POLARIZED_ENVIRONMENT '));
+
+    renderer.render(state);
+    const polarizedProgram = programs.get('pathTracing', true)!.program;
+    expect(gl.createProgram).toHaveBeenCalledTimes(4);
+    expect(compiledVariants()).toEqual([expect.stringContaining('#define PATH_TRACING_POLARIZED_ENVIRONMENT true')]);
+
+    renderer.ensureLayerChannelsResident('scalar', 0, 1, 1, scalarLayer, ['R', 'G', 'B']);
+    renderer.setDisplaySelectionBindings('scalar', 0, 1, 1, scalarBinding);
+    renderer.render(state);
+    const scalarProgram = programs.get('pathTracing', false)!.program;
+    expect(scalarProgram).not.toBe(polarizedProgram);
+    // Three shared programs, both path variants, and the scalar radiance bake.
+    expect(gl.createProgram).toHaveBeenCalledTimes(6);
+    expect(compiledVariants()).toEqual([
+      expect.stringContaining('#define PATH_TRACING_POLARIZED_ENVIRONMENT true'),
+      expect.stringContaining('#define PATH_TRACING_POLARIZED_ENVIRONMENT false')
+    ]);
+
+    for (let round = 0; round < 2; round += 1) {
+      renderer.setDisplaySelectionBindings('penvmap', 0, 2, 3, polarizedBinding);
+      vi.mocked(gl.useProgram).mockClear();
+      renderer.render(state);
+      expect(vi.mocked(gl.useProgram).mock.calls.some(([used]) => used === polarizedProgram)).toBe(true);
+      expect(vi.mocked(gl.useProgram).mock.calls.some(([used]) => used === scalarProgram)).toBe(false);
+
+      renderer.setDisplaySelectionBindings('scalar', 0, 1, 1, scalarBinding);
+      vi.mocked(gl.useProgram).mockClear();
+      renderer.render(state);
+      expect(vi.mocked(gl.useProgram).mock.calls.some(([used]) => used === scalarProgram)).toBe(true);
+      expect(vi.mocked(gl.useProgram).mock.calls.some(([used]) => used === polarizedProgram)).toBe(false);
+    }
+    expect(gl.createProgram).toHaveBeenCalledTimes(6);
+    expect(compiledVariants()).toHaveLength(2);
+    renderer.dispose();
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(6);
+  });
+
+  it('prepares only the captured polarized variant when another source becomes active during compilation', async () => {
+    vi.useFakeTimers();
+    const parallelCompilation = { complete: false };
+    const { renderer, gl, layer, state } = createPolarizedHarness({ parallelCompilation });
+    try {
+      let prepared = false;
+      const preparation = renderer.preparePanoramaPrograms(state).then(() => { prepared = true; });
+      expect(gl.createProgram).toHaveBeenCalledTimes(4);
+      expect(gl.drawArrays).not.toHaveBeenCalled();
+
+      // Another pane may rebind the shared renderer while export awaits its shader.
+      const scalarLayer = createLayerFromChannels({ R: [1], G: [0.5], B: [0.25] });
+      renderer.ensureLayerChannelsResident('scalar', 0, 1, 1, scalarLayer, ['R', 'G', 'B']);
+      renderer.setDisplaySelectionBindings('scalar', 0, 1, 1, buildDisplaySourceBinding(scalarLayer, state.displaySelection));
+      expect(getRendererState(renderer).activePolarizedEnvironment).toBeNull();
+      await vi.advanceTimersByTimeAsync(16);
+      expect(prepared).toBe(false);
+      expect(gl.createProgram).toHaveBeenCalledTimes(4);
+
+      parallelCompilation.complete = true;
+      await vi.advanceTimersByTimeAsync(16);
+      await preparation;
+      expect(prepared).toBe(true);
+      // No scalar path or radiance bake was requested by the pending preparation.
+      expect(gl.createProgram).toHaveBeenCalledTimes(4);
+
+      renderer.setDisplaySelectionBindings('penvmap', 0, 2, 3, buildDisplaySourceBinding(layer, state.displaySelection));
+      parallelCompilation.complete = false;
+      renderer.render(state);
+      expect(gl.drawArrays).toHaveBeenCalled();
+      expect(getRendererState(renderer).preparingPanorama).toBe(false);
+      expect(gl.createProgram).toHaveBeenCalledTimes(4);
+    } finally {
+      renderer.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it('rebakes linear radiance for source revisions and Stokes changes, and reuses it for display adjustments', () => {
     const { renderer, gl } = createHarness({ floatAccumulationSupported: true, floatLinearSupported: true });
     const layer = createLayerFromChannels({ S0: [1], S1: [0.5], S2: [0.2], S3: [0] });
@@ -1853,8 +1937,8 @@ function createHarness(options: {
   };
 }
 
-function createPolarizedHarness() {
-  const { renderer, gl } = createHarness({ floatAccumulationSupported: true });
+function createPolarizedHarness(options: { parallelCompilation?: { complete: boolean } } = {}) {
+  const { renderer, gl } = createHarness({ floatAccumulationSupported: true, ...options });
   const layer = createLayerFromChannels({
     R: [1, 1, 1, 1, 1, 1], G: [2, 2, 2, 2, 2, 2], B: [3, 3, 3, 3, 3, 3], Z: [1, 1, 1, 1, 1, 1],
     ...Object.fromEntries(['S0', 'S1', 'S2', 'S3'].flatMap((component, index) =>

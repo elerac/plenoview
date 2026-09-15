@@ -19,7 +19,7 @@ function fragmentSource(...parts: string[]): string {
 }
 
 /** Assemble distinct programs so native compilers only see the selected mode. */
-export function createPanoramaFragmentSource(kind: PanoramaProgramKind): string {
+export function createPanoramaFragmentSource(kind: PanoramaProgramKind, polarized?: boolean): string {
   switch (kind) {
     case 'image':
       return fragmentSource(commonSource, displayColorsSource, displaySource, projectionSource, imageMainSource);
@@ -36,6 +36,7 @@ export function createPanoramaFragmentSource(kind: PanoramaProgramKind): string 
     case 'pathTracing':
       return fragmentSource(
         '#define PATH_TRACED_STOKES',
+        ...(polarized === undefined ? [] : [`#define PATH_TRACING_POLARIZED_ENVIRONMENT ${polarized}`]),
         commonSource,
         displayColorsSource,
         pathTracingDisplaySource,

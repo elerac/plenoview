@@ -21,6 +21,18 @@ const pathTracingPresentShaderPath =
   '../src/rendering/shaders/path-tracing-present.frag.glsl';
 
 describe('shader source regressions', () => {
+  it('specializes path transport to its source while keeping diagnostic shaders dynamic', () => {
+    for (const polarized of [true, false]) {
+      expect(createPanoramaFragmentSource('pathTracing', polarized)).toContain(
+        `#define PATH_TRACING_POLARIZED_ENVIRONMENT ${polarized}`
+      );
+    }
+    expect(createPanoramaFragmentSource('pathTracing')).not.toContain('#define PATH_TRACING_POLARIZED_ENVIRONMENT');
+    for (const kind of ['image', 'sphericalHarmonics'] as const) {
+      expect(createPanoramaFragmentSource(kind, true)).toBe(createPanoramaFragmentSource(kind, false));
+    }
+  });
+
   it('compiles separate panorama modes without unrelated rendering algorithms', () => {
     const imageSource = createPanoramaFragmentSource('image');
     const shSource = createPanoramaFragmentSource('sphericalHarmonics');
