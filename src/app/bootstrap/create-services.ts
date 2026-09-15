@@ -153,7 +153,11 @@ export function createBootstrapServices({
   const pathTracingRenderLoop = new PathTracingRenderLoop({
     renderer,
     renderCache,
-    getPanes: () => ui.getViewerPaneRenderInfos()
+    getPanes: () => ui.getViewerPaneRenderInfos(),
+    onError: (error) => core.dispatch({
+      type: 'errorSet',
+      message: error instanceof Error ? error.message : String(error)
+    })
   });
   const sessionController = new SessionController({
     core,

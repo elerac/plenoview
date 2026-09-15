@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = Boolean(process.env.CI);
+const useHardwareGpu = process.env.PLAYWRIGHT_GPU === 'hardware';
 const previewCommand = 'npm run preview -- --host 127.0.0.1 --port 4173';
 const webServerCommand = process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ??
   (process.env.PLAYWRIGHT_PREBUILT === 'true'
@@ -33,7 +34,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173',
     launchOptions: {
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+      args: useHardwareGpu ? [] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
     },
     screenshot: 'only-on-failure',
     trace: isCI ? 'retain-on-failure' : 'on-first-retry'
@@ -41,7 +42,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
+      use: { ...devices['Desktop Chrome'], ...(useHardwareGpu ? { channel: 'chrome' } : {}) }
     }
   ],
   webServer: {

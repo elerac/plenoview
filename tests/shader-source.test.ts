@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+  createPanoramaFragmentSource,
+  environmentRadianceFragmentSource
+} from '../src/rendering/gl-image-renderer/panorama-shader-source';
 
 const shaderFiles = [
   '../src/rendering/shaders/exr-image.frag.glsl',
@@ -7,12 +11,75 @@ const shaderFiles = [
 ] as const;
 const flatImageShaderPath = '../src/rendering/shaders/exr-image.frag.glsl';
 const panoramaImageShaderPath = '../src/rendering/shaders/panorama-image.frag.glsl';
+
+function readShaderSource(path: string): string {
+  return path === panoramaImageShaderPath
+    ? createPanoramaFragmentSource('image')
+    : readFileSync(new URL(path, import.meta.url), 'utf8');
+}
 const pathTracingPresentShaderPath =
   '../src/rendering/shaders/path-tracing-present.frag.glsl';
 
 describe('shader source regressions', () => {
+  it('compiles separate panorama modes without unrelated rendering algorithms', () => {
+    const imageSource = createPanoramaFragmentSource('image');
+    const shSource = createPanoramaFragmentSource('sphericalHarmonics');
+    const pathSource = createPanoramaFragmentSource('pathTracing');
+
+    expect(imageSource).toContain('DisplaySample readDisplaySample(');
+    expect(imageSource).not.toContain('resolveEnvironmentScene(');
+    expect(imageSource).not.toContain('sampleEnvironmentRadiance(');
+    expect(imageSource).not.toContain('traceEnvironmentPath(');
+    expect(shSource).toContain('evaluateEnvironmentRoughPlastic(');
+    expect(shSource).not.toContain('traceEnvironmentPath(');
+    expect(shSource).not.toContain('sampleEnvironmentImportance(');
+    expect(pathSource).toContain('traceEnvironmentPath(');
+    expect(pathSource).not.toContain('evaluateEnvironmentRoughPlastic(');
+    expect(pathSource).not.toContain('evaluateEnvironmentIrradiance(');
+    expect(pathSource).not.toContain('readDisplaySample(');
+    expect(pathSource).not.toContain('uSourceTextures');
+
+    for (const source of [imageSource, shSource, pathSource]) {
+      expect(source.startsWith('#version 300 es\n')).toBe(true);
+      expect(source.match(/void main\(/g)).toHaveLength(1);
+      expect(source).not.toContain('uPanoramaDisplayMode');
+      expect(source).not.toContain('uPanoramaLightingMethod');
+    }
+  });
+
+  it('samples the cached HDR texture in lighting loops without evaluating display channels', () => {
+    for (const kind of ['sphericalHarmonics', 'pathTracing'] as const) {
+      const source = createPanoramaFragmentSource(kind);
+      const start = source.indexOf('vec3 sampleEnvironmentRadiance(');
+      const end = source.indexOf('\n}\n', start) + 3;
+      const samplingFunction = source.slice(start, end);
+
+      expect(samplingFunction).toContain('texelFetch(uEnvironmentRadianceTexture, pixel, 0)');
+      expect(samplingFunction).toContain('textureLod(uEnvironmentRadianceTexture, uv, sampleLod)');
+      expect(samplingFunction).not.toContain('readDisplaySample');
+      expect(samplingFunction).not.toContain('uSourceTextures');
+      expect(samplingFunction).not.toContain('uDisplayMode');
+    }
+  });
+
+  it('bakes sanitized linear HDR values and alpha before display transforms', () => {
+    const main = environmentRadianceFragmentSource.slice(
+      environmentRadianceFragmentSource.indexOf('void main()')
+    );
+
+    expect(main).toContain('readDisplaySample(ivec2(gl_FragCoord.xy))');
+    expect(main).toContain('vec4(sanitizeDisplayColor(displaySample.linear), displaySample.alpha)');
+    expect(main).not.toContain('uExposure');
+    expect(main).not.toContain('linearToDisplayGamma');
+    expect(main).not.toContain('sampleColormap');
+    expect(main).not.toContain('applyInvalidValueWarning');
+    expect(environmentRadianceFragmentSource).toContain('floatBitsToUint(value)');
+    expect(environmentRadianceFragmentSource).toContain('(bits & 0x7f800000u) == 0x7f800000u ? 0u : bits');
+    expect(environmentRadianceFragmentSource).toContain('return uintBitsToFloat(finiteBits);');
+  });
+
   it.each(shaderFiles)('%s avoids dynamic sampler indexing and reserved sample identifiers', (path) => {
-    const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+    const source = readShaderSource(path);
 
     expect(source).not.toMatch(/uSourceTextures\[(?!\d+\])/);
     expect(source).not.toMatch(/\bDisplaySample\s+sample\b/);
@@ -59,7 +126,7 @@ describe('shader source regressions', () => {
   });
 
   it.each(shaderFiles)('%s converts physical fragment coordinates to logical screen coordinates', (path) => {
-    const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+    const source = readShaderSource(path);
 
     expect(source).toContain('uniform vec2 uOutputPixelScale;');
     expect(source).toContain('vec2 pixelScale = max(uOutputPixelScale, vec2(1.0e-6));');
@@ -89,15 +156,17 @@ describe('shader source regressions', () => {
   });
 
   it('centers panorama samples in logical pixels under high-density output scaling', () => {
-    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const source = createPanoramaFragmentSource('image');
 
-    expect(source).toContain('vec2 pixelSample = pathTracing');
-    expect(source).toContain(': vec2(0.5);');
+    expect(source).toContain('vec2 pixelSample = vec2(0.5);');
+    expect(createPanoramaFragmentSource('pathTracing')).toContain(
+      'vec2 pixelSample = nextPathTracingRandom2(randomState);'
+    );
     expect(source).toContain('vec2 samplePosition = screen + pixelSample / pixelScale;');
   });
 
   it('selects horizontal-cross cubemap sampling from the source aspect ratio', () => {
-    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const source = createPanoramaFragmentSource('image');
 
     expect(source).toContain('abs(uImageSize.x * 3.0 - uImageSize.y * 4.0) < 0.5');
     expect(source).toContain('ivec2 cubemapDirectionToPixel(vec3 ray)');
@@ -105,24 +174,24 @@ describe('shader source regressions', () => {
   });
 
   it('filters power-of-two cubemap-cross lighting without sampling across face boundaries', () => {
-    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const source = createPanoramaFragmentSource('sphericalHarmonics');
 
     expect(source).toContain('bool usesMipmappedCubemapCrossProjection()');
     expect(source).toContain('uniform bool uSourceTextureMipmapsAvailable;');
-    expect(source).toContain('return uSourceTextureMipmapsAvailable && (');
     expect(source).toContain('(faceSize & (faceSize - 1)) == 0');
     expect(source).toContain('vec2 cubemapFaceSafeUvAtMip(');
     expect(source).toContain('vec2(mipFaceSize - 0.5)');
     expect(source).toContain('float uvClampMip = ceil(clampedLod);');
     expect(source).toContain(
-      'cubemapFaceSafeUvAtMip(face, local, uvClampMip),'
+      'uv = cubemapFaceSafeUvAtMip(face, local, uvClampMip);'
     );
-    expect(source).toContain('clampedLod\n    );');
+    expect(source).toContain('sampleLod = clampedLod;');
+    expect(source).toContain('return textureLod(uEnvironmentRadianceTexture, uv, sampleLod).rgb;');
     expect(source).toContain('lod <= 0.0 ||');
   });
 
   it('derives cubemap environment LOD from per-face texel solid angle', () => {
-    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const source = createPanoramaFragmentSource('sphericalHarmonics');
 
     expect(source).toContain(
       'float majorAxis = max(abs(ray.x), max(abs(ray.y), abs(ray.z)));'
@@ -139,9 +208,8 @@ describe('shader source regressions', () => {
   });
 
   it('provides the spherical-harmonics sphere and floor environment-lighting scene', () => {
-    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const source = createPanoramaFragmentSource('sphericalHarmonics');
 
-    expect(source).toContain('uniform int uPanoramaDisplayMode;');
     expect(source).toContain('uniform vec3 uEnvironmentShIrradiance[36];');
     expect(source).toContain('uniform vec3 uEnvironmentSphereDiffuseReflectance;');
     expect(source).toContain('uniform float uEnvironmentSphereAlpha;');
@@ -149,7 +217,6 @@ describe('shader source regressions', () => {
     expect(source).toContain('uniform float uEnvironmentSphereExtIor;');
     expect(source).toContain('uniform int uEnvironmentSphereDistribution;');
     expect(source).toContain('uniform bool uEnvironmentSphereNonlinear;');
-    expect(source).toContain('const int PANORAMA_DISPLAY_MODE_ENVIRONMENT_LIGHTING = 1;');
     expect(source).toContain('vec3 evaluateEnvironmentIrradiance(vec3 normal)');
     expect(source).toContain('basis[0] = 0.28209479177387814;');
     expect(source).toContain('basis[8] = 0.5462742152960396 * (x2 - y2);');
@@ -180,21 +247,16 @@ describe('shader source regressions', () => {
     expect(source).toContain('resolveEnvironmentOrbitCamera(cameraRay, rayOrigin, ray);');
     expect(source).toContain('uPanoramaPitchDeg,');
     expect(source).toContain('MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG');
-    expect(source).toContain(
-      'if (uPanoramaDisplayMode == PANORAMA_DISPLAY_MODE_ENVIRONMENT_LIGHTING)'
-    );
     expect(source).toContain('vec3 evaluateEnvironmentRoughPlastic(');
     expect(source).toContain('float evaluateDielectricFresnel(float cosThetaI, float eta)');
     expect(source).toContain('float evaluateRoughPlasticSmithG1(');
     expect(source).toContain('float evaluateRoughPlasticMicrofacetDistribution(');
     expect(source).toContain('float resolveEnvironmentSampleLod(');
-    expect(source).toContain('const int ROUGH_PLASTIC_DIFFUSE_SAMPLE_COUNT = 256;');
-    expect(source).toContain('const int ROUGH_PLASTIC_SPECULAR_SAMPLE_COUNT = 128;');
-    expect(source).toContain('uniform bool uEnvironmentLightingInteractive;');
-    expect(source).toContain('const int ROUGH_PLASTIC_INTERACTIVE_DIFFUSE_SAMPLE_COUNT = 64;');
-    expect(source).toContain('const int ROUGH_PLASTIC_INTERACTIVE_SPECULAR_SAMPLE_COUNT = 64;');
-    expect(source).toContain('if (sampleIndex >= specularSampleCount)');
-    expect(source).toContain('if (sampleIndex >= diffuseSampleCount)');
+    expect(source).toContain('uniform ivec2 uEnvironmentSampleCounts;');
+    expect(source).toContain('int specularSampleCount = uEnvironmentSampleCounts.x;');
+    expect(source).toContain('int diffuseSampleCount = uEnvironmentSampleCounts.y;');
+    expect(source).toContain('sampleIndex < specularSampleCount');
+    expect(source).toContain('sampleIndex < diffuseSampleCount');
     expect(source).toContain('specular /= float(specularSampleCount);');
     expect(source).toContain('transmittedIrradiance /= float(diffuseSampleCount);');
     expect(source).toContain('ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP /');
@@ -206,14 +268,14 @@ describe('shader source regressions', () => {
       'transmittedIrradiance += sampleEnvironmentRadiance(wi, environmentLod)'
     );
     expect(source).toContain('vec2 equirectangularDirectionToUv(vec3 direction)');
-    expect(source).toContain('return readDisplaySample(pixel).linear;');
+    expect(source).toContain('return texelFetch(uEnvironmentRadianceTexture, pixel, 0).rgb;');
     expect(source).toContain('roughPlasticRadicalInverse(sampleIndex) + offset');
     expect(source).toContain(
       'buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);'
     );
     expect(source).not.toContain('0.6180339887498949');
     expect(source).not.toContain('abs(normal.z) < 0.999');
-    expect(source).toContain('textureLod(uSourceTextures[0], uv, lod)');
+    expect(source).toContain('textureLod(uEnvironmentRadianceTexture, uv, sampleLod)');
     expect(source).toContain('materialAlpha = ENVIRONMENT_FLOOR_ALPHA;');
     expect(source).toContain(
       'ENVIRONMENT_COMPARISON_SPHERE_DIFFUSE_REFLECTANCE[sphereIndex]'
@@ -235,7 +297,7 @@ describe('shader source regressions', () => {
   });
 
   it('provides progressive multi-bounce path tracing with environment NEE and MIS', () => {
-    const source = readFileSync(new URL(panoramaImageShaderPath, import.meta.url), 'utf8');
+    const source = createPanoramaFragmentSource('pathTracing');
     const presentSource = readFileSync(
       new URL(pathTracingPresentShaderPath, import.meta.url),
       'utf8'
@@ -243,9 +305,9 @@ describe('shader source regressions', () => {
 
     expect(source).toContain('uniform sampler2D uPathTracingPreviousTexture;');
     expect(source).toContain('uniform sampler2D uEnvironmentImportanceTexture;');
-    expect(source).toContain('const int PATH_TRACING_MAX_BOUNCES = 6;');
+    expect(source).toContain('uniform int uPathTracingMaxBounces;');
     expect(source).toContain(
-      'for (int bounce = 0; bounce < PATH_TRACING_MAX_BOUNCES; bounce += 1)'
+      'for (int bounce = 0; bounce < uPathTracingMaxBounces; bounce += 1)'
     );
     expect(source).toContain('vec3 samplePathTracingDirectEnvironment(');
     expect(source).toContain('bool sampleEnvironmentImportance(');

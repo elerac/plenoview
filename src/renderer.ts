@@ -399,6 +399,10 @@ export class WebGlExrRenderer implements Disposable {
     return this.imageRenderer.readExportPixels(args);
   }
 
+  preparePanoramaPrograms(state: ViewerState, signal?: AbortSignal): Promise<void> {
+    return this.imageRenderer.preparePanoramaPrograms(state, signal);
+  }
+
   dispose(): void {
     if (this.disposed) {
       return;

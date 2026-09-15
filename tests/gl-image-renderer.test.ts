@@ -12,6 +12,7 @@ import { buildSelectedDisplayTexture } from '../src/display/materialize-cpu';
 import { CONSTRAINED_DEPTH_POINTS, type DepthPointBudgetResolver } from '../src/depth-point-budget';
 import { clampPanoramaProjectionPitch } from '../src/interaction/panorama-geometry';
 import { GlImageRenderer } from '../src/rendering/gl-image-renderer';
+import type { ViewerState } from '../src/types';
 import { createEmptyRoiInteractionState } from '../src/view-state';
 import { createInitialState } from '../src/viewer-store';
 import {
@@ -28,6 +29,154 @@ afterEach(() => {
 });
 
 describe('gl image renderer', () => {
+  it('keeps panorama frames pending without waiting for link status or drawing', () => {
+    const parallelCompilation = { complete: false };
+    const { renderer, gl } = createHarness({ parallelCompilation });
+    const state = createPanoramaState();
+    vi.mocked(gl.getProgramParameter).mockClear();
+    vi.mocked(gl.getShaderParameter).mockClear();
+
+    expect(renderer.render(state)).toBe(true);
+    expect(renderer.render(state)).toBe(true);
+    expect(gl.drawArrays).not.toHaveBeenCalled();
+    expect(gl.getShaderParameter).not.toHaveBeenCalled();
+    expect(vi.mocked(gl.getProgramParameter).mock.calls.map((call) => call[1])).toEqual([0x91b1, 0x91b1]);
+
+    parallelCompilation.complete = true;
+    expect(renderer.render(state)).toBe(false);
+    expect(gl.drawArrays).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gl.getProgramParameter).mock.calls.at(-1)?.[1]).toBe(gl.LINK_STATUS);
+    expect(renderer.render(state)).toBe(false);
+    expect(gl.drawArrays).toHaveBeenCalledTimes(2);
+    renderer.dispose();
+  });
+
+  it('compiles panorama modes independently and shares the radiance bake program', () => {
+    const { renderer, gl } = createHarness({ floatAccumulationSupported: true });
+    const state = createPanoramaState();
+    expect(gl.createProgram).toHaveBeenCalledTimes(3);
+
+    renderer.render(state);
+    expect(gl.createProgram).toHaveBeenCalledTimes(4);
+    const lightingState = { ...state, panoramaDisplayMode: 'environmentLighting' as const };
+    renderer.render(lightingState);
+    expect(gl.createProgram).toHaveBeenCalledTimes(6);
+    renderer.render({ ...lightingState, panoramaLightingMethod: 'pathTracing' });
+    expect(gl.createProgram).toHaveBeenCalledTimes(7);
+
+    renderer.render(state);
+    renderer.render(lightingState);
+    renderer.render({ ...lightingState, panoramaLightingMethod: 'pathTracing' });
+    expect(gl.createProgram).toHaveBeenCalledTimes(7);
+    renderer.dispose();
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(7);
+  });
+
+  it('requests lighting and radiance compilation together and disposes pending programs', () => {
+    const { renderer, gl } = createHarness({ parallelCompilation: { complete: false } });
+    vi.mocked(gl.deleteShader).mockClear();
+    const state = createPanoramaState({ panoramaDisplayMode: 'environmentLighting' });
+
+    expect(renderer.render(state)).toBe(true);
+    expect(gl.createProgram).toHaveBeenCalledTimes(5);
+    expect(gl.drawArrays).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(5);
+    expect(gl.deleteShader).toHaveBeenCalledTimes(4);
+  });
+
+  it('rebakes linear radiance for source revisions and Stokes changes, and reuses it for display adjustments', () => {
+    const { renderer, gl } = createHarness({ floatAccumulationSupported: true, floatLinearSupported: true });
+    const layer = createLayerFromChannels({ S0: [1], S1: [0.5], S2: [0.2], S3: [0] });
+    const selection = createStokesSelection('dolp');
+    const binding = buildDisplaySourceBinding(layer, selection);
+    const state = createPanoramaState({
+      panoramaDisplayMode: 'environmentLighting',
+      displaySelection: selection,
+      maskInvalidStokesVectors: true
+    });
+    renderer.ensureLayerChannelsResident('session-1', 0, 1, 1, layer, getDisplaySourceBindingChannelNames(binding));
+    renderer.setDisplaySelectionBindings('session-1', 0, 1, 1, binding, 'revision-1');
+    const mipmaps = vi.mocked(gl.generateMipmap);
+
+    renderer.render(state);
+    expect(mipmaps).toHaveBeenCalledTimes(1);
+    renderer.render({ ...state, exposureEv: 2, displayGamma: 1.8, panoramaYawDeg: 15 });
+    expect(mipmaps).toHaveBeenCalledTimes(1);
+    renderer.setDisplaySelectionBindings('session-1', 0, 1, 1, binding, 'revision-2');
+    renderer.render(state);
+    expect(mipmaps).toHaveBeenCalledTimes(2);
+    renderer.render({ ...state, maskInvalidStokesVectors: false });
+    expect(mipmaps).toHaveBeenCalledTimes(3);
+
+    const otherSelection = createStokesSelection('aolp');
+    const otherBinding = buildDisplaySourceBinding(layer, otherSelection);
+    renderer.setDisplaySelectionBindings('session-1', 0, 1, 1, otherBinding, 'revision-2');
+    renderer.render({ ...state, displaySelection: otherSelection });
+    expect(mipmaps).toHaveBeenCalledTimes(4);
+
+    gl.deleteTexture.mockClear();
+    renderer.discardLayerSourceTextures('session-1', 0);
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(getDisplaySourceBindingChannelNames(binding).length + 4);
+    renderer.ensureLayerChannelsResident('session-1', 0, 1, 1, layer, getDisplaySourceBindingChannelNames(binding));
+    renderer.setDisplaySelectionBindings('session-1', 0, 1, 1, binding, 'revision-1');
+    renderer.render(state);
+    expect(mipmaps).toHaveBeenCalledTimes(5);
+    gl.deleteTexture.mockClear();
+    renderer.dispose();
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(getDisplaySourceBindingChannelNames(binding).length + 4);
+  });
+
+  it('refuses screenshot readback until the requested panorama program is ready', async () => {
+    const parallelCompilation = { complete: false };
+    const { renderer, gl } = createHarness({ parallelCompilation });
+    const layer = createLayerFromChannels({ R: [1], G: [0.5], B: [0.2] });
+    const state = createPanoramaState({ displaySelection: createChannelRgbSelection() });
+    renderer.ensureLayerChannelsResident('session-1', 0, 1, 1, layer, ['R', 'G', 'B']);
+    renderer.setDisplaySelectionBindings('session-1', 0, 1, 1, buildDisplaySourceBinding(layer, state.displaySelection));
+    const args = {
+      state,
+      sourceWidth: 1,
+      sourceHeight: 1,
+      screenshot: {
+        coordinateSpace: 'viewport' as const,
+        rect: { x: 0, y: 0, width: 1, height: 1 },
+        sourceViewport: { width: 1, height: 1 }
+      }
+    };
+
+    expect(() => renderer.readExportPixels(args)).toThrow('still preparing');
+    expect(gl.readPixels).not.toHaveBeenCalled();
+    parallelCompilation.complete = true;
+    await renderer.preparePanoramaPrograms(state);
+    renderer.readExportPixels(args);
+    expect(gl.readPixels).toHaveBeenCalledTimes(1);
+    renderer.dispose();
+  });
+
+  it('defers panorama compilation until it is used, reuses it, and disposes it', () => {
+    const { renderer, gl } = createHarness();
+    const shaderSource = gl.shaderSource as unknown as ReturnType<typeof vi.fn>;
+    const panoramaCompilations = () => shaderSource.mock.calls.filter((call) =>
+      (call[1] as string).includes('uniform float uPanoramaYawDeg;')
+    ).length;
+    const state = {
+      ...createInitialState(),
+      viewerMode: 'panorama' as const,
+      hoveredPixel: null,
+      draftRoi: null,
+      roiInteraction: createEmptyRoiInteractionState()
+    };
+
+    expect(panoramaCompilations()).toBe(0);
+    renderer.render(state);
+    expect(panoramaCompilations()).toBe(1);
+    renderer.render(state);
+    expect(panoramaCompilations()).toBe(1);
+    renderer.dispose();
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(4);
+  });
+
   it('uploads only the channels required by the active selection and only uploads newly required channels later', () => {
     const { renderer, gl } = createHarness();
     const layer = createInterleavedLayerFromChannels({
@@ -425,7 +574,7 @@ describe('gl image renderer', () => {
     renderer.dispose();
 
     expect(gl.deleteTexture).toHaveBeenCalledTimes(3);
-    expect(gl.deleteProgram).toHaveBeenCalledTimes(4);
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(3);
     expect(gl.deleteVertexArray).toHaveBeenCalledTimes(1);
   });
 
@@ -978,6 +1127,8 @@ describe('gl image renderer', () => {
 
     expect(renderer.render(state)).toBe(true);
     expect(readRootPathTracingSampleCount(renderer)).toBe(1);
+    expect(lastUniform2iValue(gl, 'uEnvironmentSampleCounts')).toEqual([128, 256]);
+    expect(lastUniform1iValue(gl, 'uPathTracingMaxBounces')).toBe(6);
     expect(lastUniform2iValue(gl, 'uEnvironmentImportanceGridSize')).toEqual([2, 1]);
     expect(lastUniform1iValue(gl, 'uEnvironmentImportanceEntryCount')).toBe(2);
     expect(renderer.render(state)).toBe(true);
@@ -1222,7 +1373,7 @@ describe('gl image renderer', () => {
   });
 
   it('renders screenshot exports through the panorama pass when panorama mode is active', () => {
-    const { renderer, gl } = createHarness({ floatLinearSupported: true });
+    const { renderer, gl } = createHarness({ floatLinearSupported: true, floatAccumulationSupported: true });
     const layer = createInterleavedLayerFromChannels({
       R: [1, 0, 0, 1],
       G: [0, 1, 0, 1],
@@ -1282,9 +1433,10 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uPanoramaYawDeg')).toBe(17);
     expect(lastUniform1fValue(gl, 'uPanoramaPitchDeg')).toBeCloseTo(clampPanoramaProjectionPitch(90), 7);
     expect(lastUniform1fValue(gl, 'uPanoramaHfovDeg')).toBe(90);
-    expect(lastUniform1iValue(gl, 'uPanoramaDisplayMode')).toBe(1);
+    expect(lastUniform1iValue(gl, 'uPanoramaDisplayMode')).toBeUndefined();
     expect(lastUniform1iValue(gl, 'uSourceTextureMipmapsAvailable')).toBe(1);
-    expect(lastUniform1iValue(gl, 'uEnvironmentLightingInteractive')).toBe(1);
+    expect(lastUniform2iValue(gl, 'uEnvironmentSampleCounts')).toEqual([64, 64]);
+    expect(lastUniform1iValue(gl, 'uPathTracingMaxBounces')).toBe(6);
     expect(lastUniform3fvValue(gl, 'uEnvironmentShIrradiance[0]')).toEqual(
       environmentShIrradiance
     );
@@ -1520,10 +1672,24 @@ describe('gl image renderer', () => {
   });
 });
 
+function createPanoramaState(overrides: Partial<ViewerState> = {}): ViewerState {
+  return {
+    ...createInitialState(),
+    viewerMode: 'panorama',
+    panoramaDisplayMode: 'image',
+    panoramaLightingMethod: 'sphericalHarmonics',
+    hoveredPixel: null,
+    draftRoi: null,
+    roiInteraction: createEmptyRoiInteractionState(),
+    ...overrides
+  };
+}
+
 function createHarness(options: {
   resolveDepthPointBudget?: DepthPointBudgetResolver;
   floatLinearSupported?: boolean;
   floatAccumulationSupported?: boolean;
+  parallelCompilation?: { complete: boolean };
 } = {}): {
   renderer: GlImageRenderer;
   gl: ReturnType<typeof createWebGlContextMock>;
@@ -1531,7 +1697,8 @@ function createHarness(options: {
 } {
   const gl = createWebGlContextMock({
     floatLinearSupported: options.floatLinearSupported ?? false,
-    floatAccumulationSupported: options.floatAccumulationSupported ?? false
+    floatAccumulationSupported: options.floatAccumulationSupported ?? false,
+    parallelCompilation: options.parallelCompilation
   });
   const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((contextId) => {
     if (contextId === 'webgl2') {
@@ -1682,6 +1849,7 @@ function getDepthFragmentShaderSource(gl: ReturnType<typeof createWebGlContextMo
 function createWebGlContextMock(options: {
   floatLinearSupported: boolean;
   floatAccumulationSupported: boolean;
+  parallelCompilation?: { complete: boolean };
 }): WebGL2RenderingContext & {
   texImage2D: ReturnType<typeof vi.fn>;
   texParameteri: ReturnType<typeof vi.fn>;
@@ -1754,6 +1922,8 @@ function createWebGlContextMock(options: {
     POINTS: 0x0000,
     FRAMEBUFFER: 0x8d40,
     FRAMEBUFFER_BINDING: 0x8ca6,
+    DRAW_FRAMEBUFFER_BINDING: 0x8ca6,
+    READ_FRAMEBUFFER_BINDING: 0x8caa,
     READ_FRAMEBUFFER: 0x8ca8,
     DRAW_FRAMEBUFFER: 0x8ca9,
     RENDERBUFFER: 0x8d41,
@@ -1764,6 +1934,10 @@ function createWebGlContextMock(options: {
     COLOR_BUFFER_BIT: 0x00004000,
     DEPTH_BUFFER_BIT: 0x00000100,
     SCISSOR_TEST: 0x0c11,
+    SCISSOR_BOX: 0x0c10,
+    VIEWPORT: 0x0ba2,
+    ACTIVE_TEXTURE: 0x84e0,
+    TEXTURE_BINDING_2D: 0x8069,
     DEPTH_TEST: 0x0b71,
     MAX_TEXTURE_SIZE: 4096,
     MAX_TEXTURE_IMAGE_UNITS: 16,
@@ -1779,8 +1953,11 @@ function createWebGlContextMock(options: {
     getShaderInfoLog: vi.fn(() => ''),
     deleteShader: vi.fn(),
     attachShader: vi.fn(),
+    detachShader: vi.fn(),
     linkProgram: vi.fn(),
-    getProgramParameter: vi.fn(() => true),
+    getProgramParameter: vi.fn((_program, parameter: number) => (
+      parameter === 0x91b1 ? options.parallelCompilation?.complete ?? true : true
+    )),
     getProgramInfoLog: vi.fn(() => ''),
     deleteProgram: vi.fn(),
     bindVertexArray: vi.fn(),
@@ -1796,6 +1973,7 @@ function createWebGlContextMock(options: {
     pixelStorei: vi.fn(),
     texParameteri: vi.fn(),
     texImage2D: vi.fn(),
+    generateMipmap: vi.fn(),
     useProgram: vi.fn(),
     uniform1i: vi.fn(),
     uniform1iv: vi.fn(),
@@ -1808,6 +1986,7 @@ function createWebGlContextMock(options: {
     clear: vi.fn(),
     enable: vi.fn(),
     disable: vi.fn(),
+    isEnabled: vi.fn(() => false),
     scissor: vi.fn(),
     drawArrays: vi.fn(),
     readPixels: vi.fn(),
@@ -1821,12 +2000,19 @@ function createWebGlContextMock(options: {
       if (extensionName === 'EXT_color_buffer_float' && options.floatAccumulationSupported) {
         return {};
       }
+      if (extensionName === 'KHR_parallel_shader_compile' && options.parallelCompilation) {
+        return { COMPLETION_STATUS_KHR: 0x91b1 };
+      }
       return null;
     }),
     getParameter: vi.fn((parameter) => {
-      if (parameter === 0x8ca6) {
+      if (parameter === 0x8ca6 || parameter === 0x8caa || parameter === 0x8069) {
         return null;
       }
+      if (parameter === 0x0ba2 || parameter === 0x0c10) {
+        return new Int32Array([0, 0, 100, 80]);
+      }
+      if (parameter === 0x84e0) return 0x84c0;
       if (parameter === 16) {
         return 16;
       }

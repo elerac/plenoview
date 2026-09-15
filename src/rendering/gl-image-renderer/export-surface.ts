@@ -59,7 +59,9 @@ export function readExportPixels(
       viewportTop: 0
     } as const;
     if (exportRender.state.viewerMode === 'panorama') {
-      renderPanoramaPass(state, exportRender.state, options);
+      if (renderPanoramaPass(state, exportRender.state, options)) {
+        throw new Error('Panorama is still preparing. Wait for its programs before exporting.');
+      }
     } else if (exportRender.state.viewerMode === '3d') {
       renderDepthPass(state, exportRender.state, options);
     } else {

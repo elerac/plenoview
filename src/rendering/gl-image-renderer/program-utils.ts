@@ -19,36 +19,44 @@ export function getRequiredUniformLocation(
   return location;
 }
 
-export function getCommonUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): CommonUniforms {
+export function getCommonUniforms(
+  gl: WebGL2RenderingContext,
+  program: WebGLProgram,
+  specialized = false
+): CommonUniforms {
+  // Specialized programs deliberately omit unused display/output uniforms.
+  const location = specialized
+    ? (_gl: WebGL2RenderingContext, _program: WebGLProgram, name: string) => gl.getUniformLocation(program, name)
+    : getRequiredUniformLocation;
   return {
-    viewport: getRequiredUniformLocation(gl, program, 'uViewport'),
-    viewportOrigin: getRequiredUniformLocation(gl, program, 'uViewportOrigin'),
-    outputSize: getRequiredUniformLocation(gl, program, 'uOutputSize'),
-    outputPixelScale: getRequiredUniformLocation(gl, program, 'uOutputPixelScale'),
-    screenOrigin: getRequiredUniformLocation(gl, program, 'uScreenOrigin'),
-    imageSize: getRequiredUniformLocation(gl, program, 'uImageSize'),
-    exposure: getRequiredUniformLocation(gl, program, 'uExposure'),
-    displayGamma: getRequiredUniformLocation(gl, program, 'uDisplayGamma'),
-    useColormap: getRequiredUniformLocation(gl, program, 'uUseColormap'),
-    colormapExposure: getRequiredUniformLocation(gl, program, 'uColormapExposure'),
-    colormapGamma: getRequiredUniformLocation(gl, program, 'uColormapGamma'),
-    colormapZeroCentered: getRequiredUniformLocation(gl, program, 'uColormapZeroCentered'),
-    colormapReversed: getRequiredUniformLocation(gl, program, 'uColormapReversed'),
-    colormapMin: getRequiredUniformLocation(gl, program, 'uColormapMin'),
-    colormapMax: getRequiredUniformLocation(gl, program, 'uColormapMax'),
-    colormapTextureSize: getRequiredUniformLocation(gl, program, 'uColormapTextureSize'),
-    colormapEntryCount: getRequiredUniformLocation(gl, program, 'uColormapEntryCount'),
-    displayMode: getRequiredUniformLocation(gl, program, 'uDisplayMode'),
-    stokesParameter: getRequiredUniformLocation(gl, program, 'uStokesParameter'),
-    maskInvalidStokesVectors: getRequiredUniformLocation(gl, program, 'uMaskInvalidStokesVectors'),
-    warnInvalidValues: getRequiredUniformLocation(gl, program, 'uWarnInvalidValues'),
-    invalidValueWarningPhase: getRequiredUniformLocation(gl, program, 'uInvalidValueWarningPhase'),
-    useStokesDegreeModulation: getRequiredUniformLocation(gl, program, 'uUseStokesDegreeModulation'),
-    stokesDegreeModulationMode: getRequiredUniformLocation(gl, program, 'uStokesDegreeModulationMode'),
-    useImageAlpha: getRequiredUniformLocation(gl, program, 'uUseImageAlpha'),
-    backgroundMode: getRequiredUniformLocation(gl, program, 'uBackgroundMode'),
-    backgroundColor: getRequiredUniformLocation(gl, program, 'uBackgroundColor'),
-    alphaOutputMode: getRequiredUniformLocation(gl, program, 'uAlphaOutputMode')
+    viewport: location(gl, program, 'uViewport'),
+    viewportOrigin: location(gl, program, 'uViewportOrigin'),
+    outputSize: location(gl, program, 'uOutputSize'),
+    outputPixelScale: location(gl, program, 'uOutputPixelScale'),
+    screenOrigin: location(gl, program, 'uScreenOrigin'),
+    imageSize: location(gl, program, 'uImageSize'),
+    exposure: location(gl, program, 'uExposure'),
+    displayGamma: location(gl, program, 'uDisplayGamma'),
+    useColormap: location(gl, program, 'uUseColormap'),
+    colormapExposure: location(gl, program, 'uColormapExposure'),
+    colormapGamma: location(gl, program, 'uColormapGamma'),
+    colormapZeroCentered: location(gl, program, 'uColormapZeroCentered'),
+    colormapReversed: location(gl, program, 'uColormapReversed'),
+    colormapMin: location(gl, program, 'uColormapMin'),
+    colormapMax: location(gl, program, 'uColormapMax'),
+    colormapTextureSize: location(gl, program, 'uColormapTextureSize'),
+    colormapEntryCount: location(gl, program, 'uColormapEntryCount'),
+    displayMode: location(gl, program, 'uDisplayMode'),
+    stokesParameter: location(gl, program, 'uStokesParameter'),
+    maskInvalidStokesVectors: location(gl, program, 'uMaskInvalidStokesVectors'),
+    warnInvalidValues: location(gl, program, 'uWarnInvalidValues'),
+    invalidValueWarningPhase: location(gl, program, 'uInvalidValueWarningPhase'),
+    useStokesDegreeModulation: location(gl, program, 'uUseStokesDegreeModulation'),
+    stokesDegreeModulationMode: location(gl, program, 'uStokesDegreeModulationMode'),
+    useImageAlpha: location(gl, program, 'uUseImageAlpha'),
+    backgroundMode: location(gl, program, 'uBackgroundMode'),
+    backgroundColor: location(gl, program, 'uBackgroundColor'),
+    alphaOutputMode: location(gl, program, 'uAlphaOutputMode')
   };
 }
 

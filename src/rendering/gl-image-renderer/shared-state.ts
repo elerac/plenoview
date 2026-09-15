@@ -9,7 +9,8 @@ import { createColormapTexture } from './colormap-texture';
 import { createDepthProgram } from './depth-program';
 import { createEnvironmentImportanceTexture } from './environment-importance-texture';
 import { createImageProgram } from './image-program';
-import { createPanoramaProgram } from './panorama-program';
+import { PanoramaPrograms } from './panorama-program';
+import { EnvironmentRadianceCache } from './environment-radiance-cache';
 import { createPathTracingPresentProgram } from './path-tracing-present-program';
 import { configureDepthProgramSamplers, configureProgramSamplers } from './program-utils';
 import { createZeroTexture } from './texture-store';
@@ -37,7 +38,6 @@ export function createGlImageRendererState(
   }
 
   const imageProgram = createImageProgram(gl);
-  const panoramaProgram = createPanoramaProgram(gl);
   const pathTracingPresentProgram = createPathTracingPresentProgram(gl);
   const depthProgram = createDepthProgram(gl);
 
@@ -49,7 +49,6 @@ export function createGlImageRendererState(
   const environmentImportanceTexture = createEnvironmentImportanceTexture(gl);
 
   configureProgramSamplers(gl, imageProgram.program);
-  configureProgramSamplers(gl, panoramaProgram.program);
   configureDepthProgramSamplers(gl, depthProgram.program);
 
   return {
@@ -60,7 +59,8 @@ export function createGlImageRendererState(
     zeroTexture,
     colormapTexture,
     imageProgram,
-    panoramaProgram,
+    panoramaPrograms: new PanoramaPrograms(gl),
+    environmentRadianceCache: new EnvironmentRadianceCache(gl, smoothFloatMinification),
     pathTracingPresentProgram,
     pathTracingFloatAccumulationSupported: gl.getExtension('EXT_color_buffer_float') !== null,
     pathTracingSurfaces: new Map(),
@@ -89,6 +89,7 @@ export function createGlImageRendererState(
     invalidValueWarningPhase: 0,
     activeBinding: createEmptyDisplaySourceBinding(),
     resolveDepthPointBudget,
-    disposed: false
+    disposed: false,
+    preparingPanorama: false
   };
 }

@@ -1,3 +1,5 @@
+import type { PanoramaPrograms } from './panorama-program';
+import type { EnvironmentRadianceCache } from './environment-radiance-cache';
 import type { DisplaySourceBinding } from '../../display/bindings';
 import type { DepthPointBudgetResolver } from '../../depth-point-budget';
 import type { DepthSource, DepthSourceGeometry } from '../../depth';
@@ -5,65 +7,65 @@ import type { ExportImagePixels } from '../../export/export-pixels';
 import type { DecodedLayer, ImageRect, ViewerState, ViewportInfo, ViewportRect } from '../../types';
 
 export interface CommonUniforms {
-  viewport: WebGLUniformLocation;
-  viewportOrigin: WebGLUniformLocation;
-  outputSize: WebGLUniformLocation;
-  outputPixelScale: WebGLUniformLocation;
-  screenOrigin: WebGLUniformLocation;
-  imageSize: WebGLUniformLocation;
-  exposure: WebGLUniformLocation;
-  displayGamma: WebGLUniformLocation;
-  useColormap: WebGLUniformLocation;
-  colormapExposure: WebGLUniformLocation;
-  colormapGamma: WebGLUniformLocation;
-  colormapZeroCentered: WebGLUniformLocation;
-  colormapReversed: WebGLUniformLocation;
-  colormapMin: WebGLUniformLocation;
-  colormapMax: WebGLUniformLocation;
-  colormapTextureSize: WebGLUniformLocation;
-  colormapEntryCount: WebGLUniformLocation;
-  displayMode: WebGLUniformLocation;
-  stokesParameter: WebGLUniformLocation;
-  maskInvalidStokesVectors: WebGLUniformLocation;
-  warnInvalidValues: WebGLUniformLocation;
-  invalidValueWarningPhase: WebGLUniformLocation;
-  useStokesDegreeModulation: WebGLUniformLocation;
-  stokesDegreeModulationMode: WebGLUniformLocation;
-  useImageAlpha: WebGLUniformLocation;
-  backgroundMode: WebGLUniformLocation;
-  backgroundColor: WebGLUniformLocation;
-  alphaOutputMode: WebGLUniformLocation;
+  viewport: WebGLUniformLocation | null;
+  viewportOrigin: WebGLUniformLocation | null;
+  outputSize: WebGLUniformLocation | null;
+  outputPixelScale: WebGLUniformLocation | null;
+  screenOrigin: WebGLUniformLocation | null;
+  imageSize: WebGLUniformLocation | null;
+  exposure: WebGLUniformLocation | null;
+  displayGamma: WebGLUniformLocation | null;
+  useColormap: WebGLUniformLocation | null;
+  colormapExposure: WebGLUniformLocation | null;
+  colormapGamma: WebGLUniformLocation | null;
+  colormapZeroCentered: WebGLUniformLocation | null;
+  colormapReversed: WebGLUniformLocation | null;
+  colormapMin: WebGLUniformLocation | null;
+  colormapMax: WebGLUniformLocation | null;
+  colormapTextureSize: WebGLUniformLocation | null;
+  colormapEntryCount: WebGLUniformLocation | null;
+  displayMode: WebGLUniformLocation | null;
+  stokesParameter: WebGLUniformLocation | null;
+  maskInvalidStokesVectors: WebGLUniformLocation | null;
+  warnInvalidValues: WebGLUniformLocation | null;
+  invalidValueWarningPhase: WebGLUniformLocation | null;
+  useStokesDegreeModulation: WebGLUniformLocation | null;
+  stokesDegreeModulationMode: WebGLUniformLocation | null;
+  useImageAlpha: WebGLUniformLocation | null;
+  backgroundMode: WebGLUniformLocation | null;
+  backgroundColor: WebGLUniformLocation | null;
+  alphaOutputMode: WebGLUniformLocation | null;
 }
 
 export interface ImageUniforms extends CommonUniforms {
-  pan: WebGLUniformLocation;
-  zoom: WebGLUniformLocation;
+  pan: WebGLUniformLocation | null;
+  zoom: WebGLUniformLocation | null;
 }
 
 export interface PanoramaUniforms extends CommonUniforms {
-  sourceTextureMipmapsAvailable: WebGLUniformLocation;
-  environmentLightingInteractive: WebGLUniformLocation;
-  panoramaYawDeg: WebGLUniformLocation;
-  panoramaPitchDeg: WebGLUniformLocation;
-  panoramaHfovDeg: WebGLUniformLocation;
-  panoramaDisplayMode: WebGLUniformLocation;
-  panoramaLightingMethod: WebGLUniformLocation;
-  pathTracingPass: WebGLUniformLocation;
-  pathTracingSampleIndex: WebGLUniformLocation;
-  pathTracingBlendWeight: WebGLUniformLocation;
-  pathTracingPreviousTexture: WebGLUniformLocation;
-  environmentImportanceTexture: WebGLUniformLocation;
-  environmentImportanceTextureSize: WebGLUniformLocation;
-  environmentImportanceGridSize: WebGLUniformLocation;
-  environmentImportanceEntryCount: WebGLUniformLocation;
-  environmentImportanceProjection: WebGLUniformLocation;
-  environmentShIrradiance: WebGLUniformLocation;
-  environmentSphereDiffuseReflectance: WebGLUniformLocation;
-  environmentSphereAlpha: WebGLUniformLocation;
-  environmentSphereIntIor: WebGLUniformLocation;
-  environmentSphereExtIor: WebGLUniformLocation;
-  environmentSphereDistribution: WebGLUniformLocation;
-  environmentSphereNonlinear: WebGLUniformLocation;
+  environmentRadianceTexture: WebGLUniformLocation | null;
+  sourceTextureMipmapsAvailable: WebGLUniformLocation | null;
+  environmentSampleCounts: WebGLUniformLocation | null;
+  pathTracingMaxBounces: WebGLUniformLocation | null;
+  panoramaYawDeg: WebGLUniformLocation | null;
+  panoramaPitchDeg: WebGLUniformLocation | null;
+  panoramaHfovDeg: WebGLUniformLocation | null;
+  pathTracingPass: WebGLUniformLocation | null;
+  pathTracingSampleIndex: WebGLUniformLocation | null;
+  pathTracingBlendWeight: WebGLUniformLocation | null;
+  pathTracingPreviousTexture: WebGLUniformLocation | null;
+  environmentImportanceTexture: WebGLUniformLocation | null;
+  environmentImportanceTextureSize: WebGLUniformLocation | null;
+  environmentImportanceGridSize: WebGLUniformLocation | null;
+  environmentImportanceEntryCount: WebGLUniformLocation | null;
+  environmentImportanceProjection: WebGLUniformLocation | null;
+  environmentShIrradiance: WebGLUniformLocation | null;
+  environmentSphereDiffuseReflectance: WebGLUniformLocation | null;
+  environmentSphereAlpha: WebGLUniformLocation | null;
+  environmentSphereIntIor: WebGLUniformLocation | null;
+  environmentSphereExtIor: WebGLUniformLocation | null;
+  environmentSphereDistribution: WebGLUniformLocation | null;
+  environmentSphereNonlinear: WebGLUniformLocation | null;
 }
 
 export interface PathTracingPresentUniforms {
@@ -176,7 +178,8 @@ export interface GlImageRendererState {
   zeroTexture: WebGLTexture;
   colormapTexture: WebGLTexture;
   imageProgram: ProgramBundle<ImageUniforms>;
-  panoramaProgram: ProgramBundle<PanoramaUniforms>;
+  panoramaPrograms: PanoramaPrograms;
+  environmentRadianceCache: EnvironmentRadianceCache;
   pathTracingPresentProgram: ProgramBundle<PathTracingPresentUniforms>;
   pathTracingFloatAccumulationSupported: boolean;
   pathTracingSurfaces: Map<string, PathTracingAccumulationSurface>;
@@ -208,6 +211,7 @@ export interface GlImageRendererState {
   activeBinding: DisplaySourceBinding;
   resolveDepthPointBudget: DepthPointBudgetResolver;
   disposed: boolean;
+  preparingPanorama: boolean;
 }
 
 export type { ExportImagePixels };

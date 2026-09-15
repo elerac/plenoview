@@ -377,8 +377,10 @@ vi.mock('../src/renderer', () => ({
     readonly getViewport = vi.fn(() => ({ width: 320, height: 180 }));
     readonly clearImage = vi.fn();
     readonly setColormapTexture = vi.fn();
+    readonly clearColormapTexture = vi.fn();
     readonly setInvalidValueWarningPhase = vi.fn();
     readonly readExportPixels = mocks.rendererReadExportPixels;
+    readonly preparePanoramaPrograms = vi.fn(() => Promise.resolve());
   }
 }));
 

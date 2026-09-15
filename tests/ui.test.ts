@@ -12439,7 +12439,7 @@ function readStyleRule(selector: string, occurrence = 0): string {
 }
 
 function readStyleSheet(): string {
-  return readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8');
+  return readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8').replace(/\r\n/g, '\n');
 }
 
 function readIndexMarkup(): string {

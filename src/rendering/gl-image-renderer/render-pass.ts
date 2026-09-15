@@ -15,11 +15,7 @@ import {
   type ViewerBackgroundId
 } from '../../viewer-background-settings';
 import { clampPanoramaProjectionPitch } from '../../interaction/panorama-geometry';
-import {
-  resolvePanoramaDisplayMode,
-  resolvePanoramaLightingMethod,
-  usesPathTracingEnvironmentLighting
-} from '../../panorama-lighting';
+import { usesPathTracingEnvironmentLighting } from '../../panorama-lighting';
 import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
 import {
   clampDepthZoom,
@@ -46,9 +42,12 @@ import {
   clearPathTracingSurfaces,
   getOrCreatePathTracingSurface
 } from './path-tracing-surface';
+import { ENVIRONMENT_RADIANCE_TEXTURE_UNIT, resolvePanoramaProgramKind } from './panorama-program';
 import type {
   CommonUniforms,
   GlImageRendererState,
+  PanoramaUniforms,
+  ProgramBundle,
   RenderBackgroundMode,
   RenderPassOptions
 } from './types';
@@ -76,6 +75,7 @@ export function render(
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   if (options.clear !== false) {
+    state.preparingPanorama = false;
     gl.disable(gl.SCISSOR_TEST);
     gl.viewport(0, 0, state.glCanvas.width, state.glCanvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -132,6 +132,7 @@ export function render(
       }
     }
   } finally {
+    state.glCanvas.setAttribute('aria-busy', String(state.preparingPanorama));
     gl.disable(gl.SCISSOR_TEST);
     gl.viewport(0, 0, state.glCanvas.width, state.glCanvas.height);
   }
@@ -162,13 +163,34 @@ export function renderPanoramaPass(
   options: RenderPassOptions,
   target?: PanoramaRenderTarget
 ): boolean {
+  const kind = resolvePanoramaProgramKind(viewerState);
+  const program = state.panoramaPrograms.get(kind);
+  const radianceProgram = kind === 'image' ? null : state.panoramaPrograms.get('radiance');
+  // Request both programs before polling again, so their compilation can overlap.
+  if (!program || (kind !== 'image' && !radianceProgram)) {
+    state.preparingPanorama = true;
+    return true;
+  }
+  if (radianceProgram && state.imageSize) {
+    const { width, height } = state.imageSize;
+    const key = `${state.activeSourceRevisionKey}:${state.activeBinding.stokesParameter}:${viewerState.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS}`;
+    const radiance = state.environmentRadianceCache.getOrCreate(key, width, height, () => {
+      const gl = state.gl;
+      gl.useProgram(radianceProgram.program);
+      gl.bindVertexArray(state.vao);
+      setCommonUniforms(state, radianceProgram.uniforms, viewerState, options);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    });
+    state.gl.activeTexture(state.gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
+    state.gl.bindTexture(state.gl.TEXTURE_2D, radiance.texture);
+  }
   if (
     usesPathTracingEnvironmentLighting(viewerState) &&
     target &&
     state.pathTracingFloatAccumulationSupported
   ) {
     try {
-      return renderProgressivePathTracingPass(state, viewerState, options, target);
+      return renderProgressivePathTracingPass(state, program, viewerState, options, target);
     } catch {
       clearPathTracingSurfaces(state);
       state.pathTracingFloatAccumulationSupported = false;
@@ -190,7 +212,6 @@ export function renderPanoramaPass(
   }
 
   const gl = state.gl;
-  const program = state.panoramaProgram;
   gl.useProgram(program.program);
   gl.bindVertexArray(state.vao);
   gl.activeTexture(gl.TEXTURE0 + COLORMAP_TEXTURE_UNIT);
@@ -198,6 +219,7 @@ export function renderPanoramaPass(
 
   setPanoramaUniforms(
     state,
+    program,
     viewerState,
     options,
     usesPathTracingEnvironmentLighting(viewerState) ? PATH_TRACING_PASS_DIRECT : 0,
@@ -210,6 +232,7 @@ export function renderPanoramaPass(
 
 function renderProgressivePathTracingPass(
   state: GlImageRendererState,
+  program: ProgramBundle<PanoramaUniforms>,
   viewerState: ViewerState,
   options: RenderPassOptions,
   target: PanoramaRenderTarget
@@ -237,12 +260,13 @@ function renderProgressivePathTracingPass(
     gl.bindFramebuffer(gl.FRAMEBUFFER, surface.framebuffers[writeIndex]);
     gl.disable(gl.SCISSOR_TEST);
     gl.viewport(0, 0, surface.width, surface.height);
-    gl.useProgram(state.panoramaProgram.program);
+    gl.useProgram(program.program);
     gl.bindVertexArray(state.vao);
     gl.activeTexture(gl.TEXTURE0 + PATH_TRACING_ACCUMULATION_TEXTURE_UNIT);
     gl.bindTexture(gl.TEXTURE_2D, surface.textures[surface.readIndex]);
     setPanoramaUniforms(
       state,
+      program,
       viewerState,
       {
         ...options,
@@ -310,6 +334,7 @@ function renderProgressivePathTracingPass(
 
 function setPanoramaUniforms(
   state: GlImageRendererState,
+  program: ProgramBundle<PanoramaUniforms>,
   viewerState: ViewerState,
   options: RenderPassOptions,
   pathTracingPass: number,
@@ -317,30 +342,24 @@ function setPanoramaUniforms(
   pathTracingBlendWeight: number
 ): void {
   const gl = state.gl;
-  const program = state.panoramaProgram;
   setCommonUniforms(state, program.uniforms, viewerState, options);
   gl.uniform1i(
     program.uniforms.sourceTextureMipmapsAvailable,
     state.smoothFloatMinification ? 1 : 0
   );
-  gl.uniform1i(
-    program.uniforms.environmentLightingInteractive,
-    viewerState.environmentLightingInteractive === true ? 1 : 0
+  const interactive = viewerState.environmentLightingInteractive === true;
+  gl.uniform2i(
+    program.uniforms.environmentSampleCounts,
+    interactive ? 64 : 128,
+    interactive ? 64 : 256
   );
+  gl.uniform1i(program.uniforms.pathTracingMaxBounces, 6);
   gl.uniform1f(program.uniforms.panoramaYawDeg, viewerState.panoramaYawDeg);
   gl.uniform1f(
     program.uniforms.panoramaPitchDeg,
     clampPanoramaProjectionPitch(viewerState.panoramaPitchDeg)
   );
   gl.uniform1f(program.uniforms.panoramaHfovDeg, viewerState.panoramaHfovDeg);
-  gl.uniform1i(
-    program.uniforms.panoramaDisplayMode,
-    resolvePanoramaDisplayMode(viewerState.panoramaDisplayMode) === 'environmentLighting' ? 1 : 0
-  );
-  gl.uniform1i(
-    program.uniforms.panoramaLightingMethod,
-    resolvePanoramaLightingMethod(viewerState.panoramaLightingMethod) === 'pathTracing' ? 1 : 0
-  );
   gl.uniform1i(program.uniforms.pathTracingPass, pathTracingPass);
   gl.uniform1i(program.uniforms.pathTracingSampleIndex, pathTracingSampleIndex);
   gl.uniform1f(program.uniforms.pathTracingBlendWeight, pathTracingBlendWeight);
@@ -391,6 +410,7 @@ function buildPathTracingSignature(
 ): string {
   return [
     state.activeSourceRevisionKey,
+    viewerState.maskInvalidStokesVectors ?? DEFAULT_MASK_INVALID_STOKES_VECTORS,
     state.imageSize?.width ?? 0,
     state.imageSize?.height ?? 0,
     outputRect.width,

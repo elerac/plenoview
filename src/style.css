@@ -2265,6 +2265,24 @@ body.is-resizing-panel-rows * {
   z-index: var(--z-viewer-image);
 }
 
+.panorama-preparing {
+  display: none;
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-loading-overlay);
+  padding: 8px 12px;
+  border-radius: var(--control-radius);
+  background: rgba(8, 12, 19, 0.85);
+  color: #e7edf8;
+  pointer-events: none;
+}
+
+#gl-canvas[aria-busy="true"] + .panorama-preparing {
+  display: block;
+}
+
 #overlay-canvas,
 #probe-overlay-canvas,
 #ruler-overlay-svg,

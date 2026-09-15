@@ -147,7 +147,10 @@ export class GlImageRenderer implements Disposable {
     this.state.activeSourceRevisionKey = [
       sessionId,
       layerIndex,
-      sourceRevisionKey ?? binding.mode,
+      sourceRevisionKey ?? '',
+      binding.mode,
+      binding.stokesParameter,
+      binding.usesImageAlpha,
       ...binding.slots
     ].join(':');
   }
@@ -218,6 +221,7 @@ export class GlImageRenderer implements Disposable {
     }
 
     discardSessionTextures(this.state, sessionId);
+    this.state.environmentRadianceCache.deleteByPrefix(`${sessionId}:`);
     clearPathTracingSurfaces(this.state);
   }
 
@@ -227,6 +231,7 @@ export class GlImageRenderer implements Disposable {
     }
 
     discardLayerSourceTextures(this.state, sessionId, layerIndex);
+    this.state.environmentRadianceCache.deleteByPrefix(`${sessionId}:${layerIndex}:`);
     clearPathTracingSurfaces(this.state);
   }
 
@@ -244,6 +249,7 @@ export class GlImageRenderer implements Disposable {
     }
 
     discardChannelSourceTexture(this.state, sessionId, layerIndex, channelName);
+    this.state.environmentRadianceCache.deleteByPrefix(`${sessionId}:${layerIndex}:`);
   }
 
   clearImage(): void {
@@ -269,6 +275,8 @@ export class GlImageRenderer implements Disposable {
       return;
     }
 
+    this.state.preparingPanorama = false;
+    this.state.glCanvas.setAttribute('aria-busy', 'false');
     this.state.gl.bindFramebuffer(this.state.gl.FRAMEBUFFER, null);
     this.state.gl.viewport(0, 0, this.state.glCanvas.width, this.state.glCanvas.height);
     this.state.gl.clearColor(0, 0, 0, 0);
@@ -281,6 +289,10 @@ export class GlImageRenderer implements Disposable {
     }
 
     return readExportPixels(this.state, args);
+  }
+
+  preparePanoramaPrograms(state: ViewerState, signal?: AbortSignal): Promise<void> {
+    return this.state.panoramaPrograms.prepare(state, signal);
   }
 
   render(state: ViewerState): boolean {
@@ -333,7 +345,8 @@ export class GlImageRenderer implements Disposable {
     this.state.gl.deleteTexture(this.state.environmentImportanceTexture);
     this.state.gl.deleteVertexArray(this.state.vao);
     this.state.gl.deleteProgram(this.state.imageProgram.program);
-    this.state.gl.deleteProgram(this.state.panoramaProgram.program);
+    this.state.panoramaPrograms.dispose();
+    this.state.environmentRadianceCache.dispose();
     this.state.gl.deleteProgram(this.state.pathTracingPresentProgram.program);
     this.state.gl.deleteProgram(this.state.depthProgram.program);
   }

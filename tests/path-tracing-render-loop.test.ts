@@ -43,7 +43,7 @@ describe('path tracing render loop', () => {
     loop.dispose();
   });
 
-  it('does not schedule without a path-traced source and cancels on mode exit', () => {
+  it('does not schedule without a panorama source and cancels on mode exit', () => {
     const harness = createHarness();
     const loop = new PathTracingRenderLoop(harness.dependencies);
 
@@ -56,6 +56,64 @@ describe('path tracing render loop', () => {
     loop.sync([createRenderSource({ pathTracing: false })]);
     expect(harness.cancelAnimationFrame).toHaveBeenCalledTimes(1);
     expect(harness.queuedFrameCount()).toBe(0);
+  });
+
+  it('polls ordinary panorama compilation once per frame and stops when ready', () => {
+    const harness = createHarness();
+    const loop = new PathTracingRenderLoop(harness.dependencies);
+    harness.renderer.renderImagePane.mockReturnValueOnce(true).mockReturnValueOnce(true).mockReturnValue(false);
+
+    loop.sync([createRenderSource({ pathTracing: false, panorama: true })]);
+    harness.flushNext();
+    expect(harness.renderer.renderImagePane).toHaveBeenCalledTimes(1);
+    expect(harness.queuedFrameCount()).toBe(1);
+    harness.flushNext();
+    expect(harness.renderer.renderImagePane).toHaveBeenCalledTimes(2);
+    expect(harness.queuedFrameCount()).toBe(1);
+    harness.flushNext();
+    expect(harness.renderer.renderImagePane).toHaveBeenCalledTimes(3);
+    expect(harness.queuedFrameCount()).toBe(0);
+    loop.dispose();
+  });
+
+  it('cancels an ordinary panorama compilation poll when leaving the mode or disposing', () => {
+    const harness = createHarness();
+    const loop = new PathTracingRenderLoop(harness.dependencies);
+    harness.renderer.renderImagePane.mockReturnValue(true);
+
+    loop.sync([createRenderSource({ pathTracing: false, panorama: true })]);
+    harness.flushNext();
+    loop.sync([createRenderSource({ pathTracing: false })]);
+    expect(harness.queuedFrameCount()).toBe(0);
+    expect(harness.cancelAnimationFrame).toHaveBeenCalledTimes(1);
+
+    loop.sync([createRenderSource({ pathTracing: false, panorama: true })]);
+    expect(harness.queuedFrameCount()).toBe(1);
+    loop.dispose();
+    expect(harness.queuedFrameCount()).toBe(0);
+    expect(harness.cancelAnimationFrame).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a shader failure once, stops polling, and can render a later selection', () => {
+    const harness = createHarness();
+    const loop = new PathTracingRenderLoop(harness.dependencies);
+    const failure = new Error('Fragment shader compile failed');
+    harness.renderer.renderImagePane.mockImplementationOnce(() => { throw failure; });
+
+    loop.sync([createRenderSource({ pathTracing: false, panorama: true })]);
+    harness.flushNext();
+    expect(harness.onError).toHaveBeenCalledTimes(1);
+    expect(harness.onError).toHaveBeenCalledWith(failure);
+    loop.wake();
+    expect(harness.queuedFrameCount()).toBe(0);
+    expect(harness.queuedDelayCount()).toBe(0);
+
+    loop.sync([createRenderSource({ pathTracing: true })]);
+    harness.flushNext();
+    expect(harness.renderer.renderImagePane).toHaveBeenCalledTimes(2);
+    expect(harness.onError).toHaveBeenCalledTimes(1);
+    expect(harness.queuedFrameCount()).toBe(0);
+    loop.dispose();
   });
 
   it('restores the source colormap before each progressive pane render', () => {
@@ -107,6 +165,7 @@ function createHarness(options: {
   const nowValues = [...(options.nowValues ?? [])];
   const renderer = createRendererMock();
   const renderCache = { prepareActiveSession: vi.fn() };
+  const onError = vi.fn();
   const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
     const handle = nextFrameHandle;
     nextFrameHandle += 1;
@@ -130,6 +189,7 @@ function createHarness(options: {
     renderCache,
     requestAnimationFrame,
     cancelAnimationFrame,
+    onError,
     dependencies: {
       renderer: renderer as unknown as WebGlExrRenderer,
       renderCache: renderCache as unknown as RenderCacheService,
@@ -138,6 +198,7 @@ function createHarness(options: {
       cancelAnimationFrame,
       setTimeout,
       clearTimeout,
+      onError,
       now: () => nowValues.shift() ?? 0
     },
     flushNext: () => {
@@ -166,6 +227,7 @@ function createRendererMock() {
 
 function createRenderSource(options: {
   pathTracing: boolean;
+  panorama?: boolean;
   path?: number[];
   colormapLut?: ViewerPaneRenderSource['colormapLut'];
 }): ViewerPaneRenderSource {
@@ -173,7 +235,7 @@ function createRenderSource(options: {
   const decoded = { width: 1, height: 1, layers: [layer] };
   const sessionState = {
     ...createInitialState(),
-    viewerMode: options.pathTracing ? 'panorama' : 'image',
+    viewerMode: options.pathTracing || options.panorama ? 'panorama' : 'image',
     panoramaDisplayMode: options.pathTracing ? 'environmentLighting' : 'image',
     panoramaLightingMethod: options.pathTracing ? 'pathTracing' : 'sphericalHarmonics'
   } as const;

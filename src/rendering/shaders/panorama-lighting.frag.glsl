@@ -22,9 +22,38 @@ void main() {
 
   vec2 direction = radius <= 1e-6 ? vec2(0.0) : radial / radius;
   vec3 cameraRay = vec3(direction * sin(theta), cos(theta));
+  vec3 rayOrigin = vec3(0.0);
   vec3 ray = cameraRay;
-  ray = rotatePitch(ray, uPanoramaPitchDeg * DEG_TO_RAD);
-  ray = rotateYaw(ray, uPanoramaYawDeg * DEG_TO_RAD);
+  resolveEnvironmentOrbitCamera(cameraRay, rayOrigin, ray);
+
+  vec3 scenePosition;
+  vec3 sceneNormal;
+  vec3 sceneAlbedo;
+  float sceneVisibility;
+  float sceneMaterialAlpha;
+  int surfaceType;
+  if (resolveEnvironmentScene(
+    rayOrigin,
+    ray,
+    scenePosition,
+    sceneNormal,
+    sceneAlbedo,
+    sceneVisibility,
+    sceneMaterialAlpha,
+    surfaceType
+  )) {
+    vec3 linear = evaluateEnvironmentRoughPlastic(
+      sceneNormal,
+      rayOrigin - scenePosition,
+      sceneAlbedo,
+      sceneMaterialAlpha,
+      surfaceType == ENVIRONMENT_SURFACE_FLOOR
+    ) * sceneVisibility;
+    linear *= exp2(uExposure);
+    vec3 color = sanitizeDisplayColor(linearToDisplayGamma(linear));
+    outColor = encodeOutputColor(screen, color, 1.0);
+    return;
+  }
 
   ivec2 pixel = panoramaDirectionToPixel(ray);
   DisplaySample displaySample = readDisplaySample(pixel);

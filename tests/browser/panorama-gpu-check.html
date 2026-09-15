@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panorama GPU correctness checks</title>
+    <style>
+      body { max-width: 1000px; margin: 32px auto; padding: 0 20px; font: 16px/1.5 system-ui; }
+      pre { padding: 20px; background: #f2f4f7; white-space: pre-wrap; overflow-wrap: anywhere; }
+      canvas { width: 32px; height: 32px; }
+    </style>
+  </head>
+  <body>
+    <h1>Panorama GPU correctness checks</h1>
+    <p>Runs the production shader programs and HDR cache on this browser's WebGL device.</p>
+    <pre id="results" data-status="running">Starting…</pre>
+    <canvas id="gpu" width="2" height="2"></canvas>
+    <script type="module" src="./panorama-gpu-check.ts"></script>
+  </body>
+</html>

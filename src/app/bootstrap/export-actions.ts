@@ -336,7 +336,26 @@ export function createImageExportPixelsResolver({
         ? { width: requestedWidth, height: requestedHeight }
         : null;
 
-    return getRenderer().readExportPixels({
+    const renderer = getRenderer();
+    if (screenshotRegion?.coordinateSpace === 'viewport' && renderState.viewerMode === 'panorama') {
+      await renderer.preparePanoramaPrograms(renderState, options.signal);
+      assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
+      if (isDisposed()) {
+        throw createAbortError('Viewer application has been disposed.');
+      }
+      // Rendering can change the shared GL source and palette while compilation
+      // is pending. Restore the export snapshot immediately before readback.
+      const colormapLut = selectActiveColormapLut(state);
+      if (colormapLut) {
+        renderer.setColormapTexture(colormapLut.entryCount, colormapLut.rgba8);
+      } else {
+        renderer.clearColormapTexture();
+      }
+      getRenderCache().prepareActiveSession(activeSession, renderState);
+      assertActiveSessionCurrent(core.getState(), activeSession, options.signal);
+    }
+
+    return renderer.readExportPixels({
       state: renderState,
       sourceWidth: displaySize.width,
       sourceHeight: displaySize.height,
@@ -693,6 +712,7 @@ export async function handleExportImageBatch(
         renderer,
         lutCache,
         signal: exportSignal,
+        isDisposed,
         abortMessage: 'Batch export cancelled.'
       });
       onProgress?.({
@@ -816,6 +836,7 @@ export async function resolveExportImageBatchPreviewPixels(
       renderer: getRenderer(),
       lutCache,
       signal,
+      isDisposed,
       previewMaxLongestEdge,
       abortMessage: 'Batch export preview cancelled.'
     });
@@ -952,6 +973,7 @@ async function resolveBatchEntryExportResult({
   renderer,
   lutCache,
   signal,
+  isDisposed,
   previewMaxLongestEdge,
   rangeStrategy = 'exact',
   abortMessage
@@ -964,6 +986,7 @@ async function resolveBatchEntryExportResult({
   renderer: WebGlExrRenderer;
   lutCache: Map<string, ColormapLut>;
   signal: AbortSignal;
+  isDisposed: () => boolean;
   previewMaxLongestEdge?: number;
   rangeStrategy?: BatchPreviewRangeStrategy;
   abortMessage: string;
@@ -980,6 +1003,8 @@ async function resolveBatchEntryExportResult({
   assertSessionCurrent(getCurrentState(), session, signal);
   if (exportState.lut) {
     renderer.setColormapTexture(exportState.lut.entryCount, exportState.lut.rgba8);
+  } else {
+    renderer.clearColormapTexture();
   }
 
   assertSessionCurrent(getCurrentState(), session, signal);
@@ -1016,6 +1041,23 @@ async function resolveBatchEntryExportResult({
   throwIfAborted(signal, abortMessage);
   assertSessionCurrent(getCurrentState(), session, signal);
 
+  if (screenshotRegion?.coordinateSpace === 'viewport' && renderState.viewerMode === 'panorama') {
+    await renderer.preparePanoramaPrograms(renderState, signal);
+    throwIfAborted(signal, abortMessage);
+    assertSessionCurrent(getCurrentState(), session, signal);
+    if (isDisposed()) {
+      throw createAbortError('Viewer application has been disposed.');
+    }
+    if (exportState.lut) {
+      renderer.setColormapTexture(exportState.lut.entryCount, exportState.lut.rgba8);
+    } else {
+      renderer.clearColormapTexture();
+    }
+    renderCache.prepareActiveSession(session, renderState);
+    throwIfAborted(signal, abortMessage);
+    assertSessionCurrent(getCurrentState(), session, signal);
+  }
+
   const pixels = renderer.readExportPixels({
     state: renderState,
     sourceWidth: displaySize.width,
@@ -1042,6 +1084,7 @@ async function resolveBatchEntryPreviewPixels({
   renderer,
   lutCache,
   signal,
+  isDisposed,
   previewMaxLongestEdge,
   abortMessage
 }: {
@@ -1053,6 +1096,7 @@ async function resolveBatchEntryPreviewPixels({
   renderer: WebGlExrRenderer;
   lutCache: Map<string, ColormapLut>;
   signal: AbortSignal;
+  isDisposed: () => boolean;
   previewMaxLongestEdge: number;
   abortMessage: string;
 }): Promise<ExportImagePixels> {
@@ -1066,6 +1110,7 @@ async function resolveBatchEntryPreviewPixels({
       renderer,
       lutCache,
       signal,
+      isDisposed,
       previewMaxLongestEdge,
       rangeStrategy: 'sampledPreview',
       abortMessage
@@ -1392,6 +1437,8 @@ function restoreActiveRendererBinding(
   const activeColormapLut = selectActiveColormapLut(state);
   if (activeColormapLut) {
     renderer.setColormapTexture(activeColormapLut.entryCount, activeColormapLut.rgba8);
+  } else {
+    renderer.clearColormapTexture();
   }
   const renderState = mergeRenderState(state.sessionState, state.interactionState, {
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,

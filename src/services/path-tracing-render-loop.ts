@@ -14,6 +14,7 @@ interface PathTracingRenderLoopDependencies {
   setTimeout?: (callback: () => void, delayMs: number) => number;
   clearTimeout?: (handle: number) => void;
   now?: () => number;
+  onError?: (error: unknown) => void;
 }
 
 const MAX_PATH_TRACING_PASSES_PER_FRAME = 4;
@@ -31,6 +32,7 @@ export class PathTracingRenderLoop implements Disposable {
   private readonly scheduleDelay: (callback: () => void, delayMs: number) => number;
   private readonly cancelDelay: (handle: number) => void;
   private readonly now: () => number;
+  private readonly onError: (error: unknown) => void;
   private sources: ViewerPaneRenderSource[] = [];
   private frameHandle: number | null = null;
   private delayHandle: number | null = null;
@@ -46,6 +48,7 @@ export class PathTracingRenderLoop implements Disposable {
     this.scheduleDelay = dependencies.setTimeout ?? window.setTimeout.bind(window);
     this.cancelDelay = dependencies.clearTimeout ?? window.clearTimeout.bind(window);
     this.now = dependencies.now ?? performance.now.bind(performance);
+    this.onError = dependencies.onError ?? ((error) => { throw error; });
   }
 
   sync(sources: readonly ViewerPaneRenderSource[]): void {
@@ -95,13 +98,21 @@ export class PathTracingRenderLoop implements Disposable {
       this.sources
     );
     const startTime = this.now();
-    const needsMoreSamples = renderPathTracingSources(
-      this.renderer,
-      this.renderCache,
-      panes,
-      this.sources,
-      Math.min(this.passesPerFrame, maximumPassesPerFrame)
-    );
+    let needsMoreSamples: boolean;
+    try {
+      needsMoreSamples = renderPathTracingSources(
+        this.renderer,
+        this.renderCache,
+        panes,
+        this.sources,
+        Math.min(this.passesPerFrame, maximumPassesPerFrame)
+      );
+    } catch (error) {
+      this.stop();
+      this.sources = [];
+      this.onError(error);
+      return;
+    }
     const elapsedMs = Math.max(0, this.now() - startTime);
     if (elapsedMs > LONG_PATH_TRACING_FRAME_MS) {
       this.passesPerFrame = Math.max(1, Math.floor(this.passesPerFrame / 2));
@@ -124,7 +135,9 @@ export class PathTracingRenderLoop implements Disposable {
   };
 
   private shouldRun(): boolean {
-    return this.sources.some((source) => usesPathTracingEnvironmentLighting(source.renderState));
+    // Every panorama mode can be waiting for a nonblocking shader link. Its
+    // render returns false once ready unless path tracing needs another sample.
+    return this.sources.some((source) => source.renderState.viewerMode === 'panorama');
   }
 
   private stop(): void {
