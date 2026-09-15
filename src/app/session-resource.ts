@@ -1,4 +1,5 @@
 import { computeFitView } from '../interaction/image-geometry';
+import { DEFAULT_PATH_TRACING_MAX_SAMPLES, normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import { DEFAULT_DISPLAY_GAMMA } from '../color';
 import {
   cloneEnvironmentSphereMaterial,
@@ -161,6 +162,7 @@ export function createClearedViewerState(_defaultColormapId: string): ViewerSess
     viewerMode: 'image',
     panoramaDisplayMode: 'image',
     panoramaLightingMethod: 'sphericalHarmonics',
+    pathTracingMaxSamples: DEFAULT_PATH_TRACING_MAX_SAMPLES,
     environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,
@@ -340,6 +342,7 @@ export function buildSwitchedSessionState(
       viewerMode: currentState.viewerMode,
       panoramaDisplayMode: currentState.panoramaDisplayMode ?? 'image',
       panoramaLightingMethod: currentState.panoramaLightingMethod ?? 'sphericalHarmonics',
+      pathTracingMaxSamples: normalizePathTracingMaxSamples(currentState.pathTracingMaxSamples),
       environmentSphereMaterial: cloneEnvironmentSphereMaterial(currentState.environmentSphereMaterial),
       ...nextImageCamera,
       ...nextPanoramaCamera,
@@ -491,6 +494,7 @@ export function buildResetSessionBaseState(
       viewerMode: currentState.viewerMode,
       panoramaDisplayMode: currentState.panoramaDisplayMode ?? 'image',
       panoramaLightingMethod: currentState.panoramaLightingMethod ?? 'sphericalHarmonics',
+      pathTracingMaxSamples: normalizePathTracingMaxSamples(currentState.pathTracingMaxSamples),
       environmentSphereMaterial: cloneEnvironmentSphereMaterial(currentState.environmentSphereMaterial)
     },
     activeSession.decoded,

@@ -3870,6 +3870,118 @@ describe('view menu', () => {
     ui.dispose();
   });
 
+  it('synchronizes maximum SPP between the View panel, panorama menu dialog, and native command', () => {
+    installUiFixture();
+    const onPathTracingMaxSamplesChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onPathTracingMaxSamplesChange }));
+    const input = document.getElementById('path-tracing-max-samples-input') as HTMLInputElement;
+    const menuItem = document.getElementById('path-tracing-max-samples-menu-item') as HTMLButtonElement;
+    const dialog = document.getElementById('path-tracing-max-samples-dialog') as HTMLDialogElement;
+    const dialogInput = document.getElementById('path-tracing-max-samples-dialog-input') as HTMLInputElement;
+    const form = document.getElementById('path-tracing-max-samples-form') as HTMLFormElement;
+    dialog.showModal = vi.fn(() => { dialog.open = true; });
+    dialog.close = vi.fn(() => { dialog.open = false; });
+    expect(input.value).toBe('65536');
+    expect(input.disabled).toBe(true);
+    expect(menuItem.disabled).toBe(true);
+    ui.setViewerMode('panorama');
+    ui.setPanoramaDisplayMode('environmentLighting');
+    ui.setPanoramaLightingMethod('pathTracing');
+    expect(menuItem.disabled).toBe(true);
+    ui.setOpenedImageOptions([{ id: 'penvmap', label: 'penvmap.exr' }], 'penvmap');
+    expect(input.disabled).toBe(false);
+    expect(menuItem.disabled).toBe(false);
+    expect(ui.getDesktopCommandState().pathTracingMaxSamples).toBe(true);
+    ui.setPathTracingMaxSamples(262144);
+    expect(input.value).toBe('262144');
+    expect(dialogInput.value).toBe('262144');
+    input.value = '8192';
+    input.dispatchEvent(new Event('change'));
+    expect(onPathTracingMaxSamplesChange).toHaveBeenLastCalledWith(8192);
+    expect(dialogInput.value).toBe('8192');
+
+    (document.getElementById('view-menu-button') as HTMLButtonElement).click();
+    (document.getElementById('panorama-viewer-menu-item') as HTMLButtonElement).click();
+    menuItem.click();
+    expect(dialog.showModal).toHaveBeenCalledOnce();
+    expect(dialog.open).toBe(true);
+    expect(document.activeElement).toBe(dialogInput);
+    expect(dialogInput.value).toBe('8192');
+    dialogInput.value = '131072';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    expect(onPathTracingMaxSamplesChange).toHaveBeenLastCalledWith(131072);
+    expect(input.value).toBe('131072');
+    expect(dialog.open).toBe(false);
+    expect(document.activeElement).toBe(document.getElementById('view-menu-button'));
+
+    ui.executeDesktopCommand('pathTracingMaxSamples');
+    expect(dialog.open).toBe(true);
+    expect(dialogInput.value).toBe('131072');
+    dialogInput.value = '1';
+    (document.getElementById('path-tracing-max-samples-cancel-button') as HTMLButtonElement).click();
+    expect(input.value).toBe('131072');
+    expect(dialog.open).toBe(false);
+    ui.executeDesktopCommand('pathTracingMaxSamples');
+    expect(dialogInput.value).toBe('131072');
+    ui.setPanoramaLightingMethod('sphericalHarmonics');
+    expect(dialog.open).toBe(false);
+    expect(input.disabled).toBe(true);
+    expect(menuItem.disabled).toBe(true);
+    expect(ui.getDesktopCommandState().pathTracingMaxSamples).toBe(false);
+    ui.dispose();
+  });
+
+  it('validates maximum SPP edits and contains modal keyboard shortcuts without applying cancelled drafts', () => {
+    installUiFixture();
+    const onPathTracingMaxSamplesChange = vi.fn();
+    const onViewerPaneSplit = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onPathTracingMaxSamplesChange, onViewerPaneSplit }));
+    const input = document.getElementById('path-tracing-max-samples-input') as HTMLInputElement;
+    const dialog = document.getElementById('path-tracing-max-samples-dialog') as HTMLDialogElement;
+    const dialogInput = document.getElementById('path-tracing-max-samples-dialog-input') as HTMLInputElement;
+    const form = document.getElementById('path-tracing-max-samples-form') as HTMLFormElement;
+    dialog.showModal = vi.fn(() => { dialog.open = true; });
+    dialog.close = vi.fn(() => { dialog.open = false; });
+    ui.setOpenedImageOptions([{ id: 'penvmap', label: 'penvmap.exr' }], 'penvmap');
+    ui.setViewerMode('panorama');
+    ui.setPanoramaDisplayMode('environmentLighting');
+    ui.setPanoramaLightingMethod('pathTracing');
+    for (const [value, normalized] of [['10.8', 10], ['0', 1], ['2000000', 1048576]] as const) {
+      input.value = value;
+      input.dispatchEvent(new Event('change'));
+      expect(onPathTracingMaxSamplesChange).toHaveBeenLastCalledWith(normalized);
+      expect(input.value).toBe(String(normalized));
+    }
+    onPathTracingMaxSamplesChange.mockClear();
+    input.value = '';
+    input.dispatchEvent(new Event('change'));
+    expect(input.value).toBe('1048576');
+    expect(onPathTracingMaxSamplesChange).not.toHaveBeenCalled();
+    ui.executeDesktopCommand('pathTracingMaxSamples');
+    for (const invalid of ['', '0', '1.5', '1048577']) {
+      dialogInput.value = invalid;
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+      expect(dialog.open).toBe(true);
+      expect(onPathTracingMaxSamplesChange).not.toHaveBeenCalled();
+    }
+    const key = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
+    dialogInput.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(true);
+    expect(document.getElementById('export-dialog-backdrop')!.classList.contains('hidden')).toBe(true);
+    dialogInput.dispatchEvent(new KeyboardEvent('keydown', { key: '\\', ctrlKey: true, bubbles: true }));
+    expect(onViewerPaneSplit).not.toHaveBeenCalled();
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+    expect(dialog.open).toBe(false);
+    expect(onPathTracingMaxSamplesChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('1048576');
+    ui.setViewerMode('image');
+    input.value = '123';
+    input.dispatchEvent(new Event('change'));
+    expect(input.value).toBe('1048576');
+    expect(onPathTracingMaxSamplesChange).not.toHaveBeenCalled();
+    ui.dispose();
+  });
+
   it('offers three rough material presets with editable preset alpha defaults and fixed Beckmann distribution', () => {
     installUiFixture();
     let currentMaterial = createDefaultEnvironmentSphereMaterial();

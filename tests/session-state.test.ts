@@ -36,11 +36,19 @@ describe('session state', () => {
       { id: 'b', state: { ...baseState, exposureEv: 2 } }
     ];
 
-    persistActiveSessionState(sessions, 'a', { ...baseState, exposureEv: 3, zoom: 5 });
+    persistActiveSessionState(sessions, 'a', { ...baseState, exposureEv: 3, zoom: 5, pathTracingMaxSamples: 262_144 });
 
     expect(sessions[0].state.exposureEv).toBe(3);
     expect(sessions[0].state.zoom).toBe(5);
+    expect(sessions[0].state.pathTracingMaxSamples).toBe(262_144);
     expect(sessions[1].state.exposureEv).toBe(2);
+    expect(sessions[1].state.pathTracingMaxSamples).toBe(65_536);
+  });
+
+  it('normalizes legacy and invalid sample ceilings when cloning sessions', () => {
+    expect(cloneViewerSessionState(createViewerSessionState({ pathTracingMaxSamples: undefined })).pathTracingMaxSamples).toBe(65_536);
+    expect(cloneViewerSessionState(createViewerSessionState({ pathTracingMaxSamples: 99.8 })).pathTracingMaxSamples).toBe(99);
+    expect(cloneViewerSessionState(createViewerSessionState({ pathTracingMaxSamples: 2_000_000 })).pathTracingMaxSamples).toBe(1_048_576);
   });
 
   it('drops transient hover data when cloning session state', () => {

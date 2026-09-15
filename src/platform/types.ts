@@ -115,6 +115,7 @@ export type DesktopCommandId =
   | 'viewerModePanorama'
   | 'viewerModeEnvironmentLighting'
   | 'viewerModeEnvironmentPathTracing'
+  | 'pathTracingMaxSamples'
   | 'viewerMode3d'
   | 'toggleRulers'
   | 'windowPreviewNormal'

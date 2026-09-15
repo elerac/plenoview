@@ -172,6 +172,7 @@ export interface ViewerSessionState extends ViewerViewState {
   viewerMode: ViewerMode;
   panoramaDisplayMode?: PanoramaDisplayMode;
   panoramaLightingMethod?: PanoramaLightingMethod;
+  pathTracingMaxSamples?: number;
   environmentSphereMaterial: EnvironmentSphereMaterial;
   visualizationMode: VisualizationMode;
   activeColormapId: string | null;

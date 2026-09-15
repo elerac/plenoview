@@ -16,6 +16,7 @@ import {
 } from '../../viewer-background-settings';
 import { clampPanoramaProjectionPitch } from '../../interaction/panorama-geometry';
 import { usesPathTracingEnvironmentLighting } from '../../panorama-lighting';
+import { normalizePathTracingMaxSamples } from '../../path-tracing-settings';
 import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
 import { MITSUBA_SILVER_ETA, MITSUBA_SILVER_K } from '../../silver-ior';
 import { restoreDisplaySelectionTextures } from './texture-store';
@@ -60,7 +61,6 @@ const BACKGROUND_MODE_NONE = 0;
 const BACKGROUND_MODE_CHECKER = 1;
 const BACKGROUND_MODE_SOLID = 2;
 const PATH_TRACING_PASS_DIRECT = 2;
-export const MAX_PATH_TRACING_SAMPLE_COUNT = 4096;
 
 interface PanoramaRenderTarget {
   accumulationKey: string;
@@ -264,7 +264,7 @@ function renderProgressivePathTracingPass(
   if (target.preserveScreenOrigin) {
     signature += `|${options.screenOriginX ?? 0}|${options.screenOriginY ?? 0}`;
   }
-  const sampleLimit = Math.max(1, Math.min(MAX_PATH_TRACING_SAMPLE_COUNT, target.sampleLimit ?? MAX_PATH_TRACING_SAMPLE_COUNT));
+  const sampleLimit = normalizePathTracingMaxSamples(target.sampleLimit ?? viewerState.pathTracingMaxSamples);
   const surface = getOrCreatePathTracingSurface(
     state,
     target.accumulationKey,

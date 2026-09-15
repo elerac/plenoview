@@ -1,4 +1,5 @@
 import { AUTO_EXPOSURE_SOURCE } from '../analysis/auto-exposure';
+import { DEFAULT_PATH_TRACING_MAX_SAMPLES, normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import { DEFAULT_DISPLAY_GAMMA } from '../color';
 import {
   buildDisplayAutoExposureRevisionKey,
@@ -849,6 +850,7 @@ function buildViewerStateReadout(
     viewerMode: renderState.viewerMode,
     panoramaDisplayMode: renderState.panoramaDisplayMode ?? 'image',
     panoramaLightingMethod: renderState.panoramaLightingMethod ?? 'sphericalHarmonics',
+    pathTracingMaxSamples: normalizePathTracingMaxSamples(renderState.pathTracingMaxSamples),
     environmentSphereMaterial: renderState.environmentSphereMaterial,
     view: {
       zoom: renderState.zoom,
@@ -1005,6 +1007,7 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
     (previous.panoramaDisplayMode ?? 'image') === (next.panoramaDisplayMode ?? 'image') &&
     (previous.panoramaLightingMethod ?? 'sphericalHarmonics') ===
       (next.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    normalizePathTracingMaxSamples(previous.pathTracingMaxSamples) === normalizePathTracingMaxSamples(next.pathTracingMaxSamples) &&
     (previous.environmentLightingInteractive === true) ===
       (next.environmentLightingInteractive === true) &&
     sameEnvironmentSphereMaterial(
@@ -1116,6 +1119,7 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
     (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
       (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    normalizePathTracingMaxSamples(a.pathTracingMaxSamples) === normalizePathTracingMaxSamples(b.pathTracingMaxSamples) &&
     (a.environmentLightingInteractive === true) ===
       (b.environmentLightingInteractive === true) &&
     sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
@@ -1159,6 +1163,7 @@ function stateLikeSessionState(): ViewerAppState['sessionState'] {
     viewerMode: 'image',
     panoramaDisplayMode: 'image',
     panoramaLightingMethod: 'sphericalHarmonics',
+    pathTracingMaxSamples: DEFAULT_PATH_TRACING_MAX_SAMPLES,
     environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,

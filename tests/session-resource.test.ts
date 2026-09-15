@@ -139,7 +139,7 @@ describe('session resource display names', () => {
 });
 
 describe('session resource auto-fit handling', () => {
-  it('carries environment sphere material across session switches and resets', () => {
+  it('carries environment sphere material and sample ceiling across session switches and resets', () => {
     const decoded = createSizedImage(2, 2);
     const storedState = createInitialState();
     const session: OpenedImageSession = {
@@ -153,6 +153,7 @@ describe('session resource auto-fit handling', () => {
     };
     const currentState = {
       ...createInitialState(),
+      pathTracingMaxSamples: 262_144,
       environmentSphereMaterial: {
         ...createInitialState().environmentSphereMaterial,
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
@@ -165,6 +166,8 @@ describe('session resource auto-fit handling', () => {
     const switched = buildSwitchedSessionState(session, currentState, decoded);
     const reset = buildResetSessionBaseState(session, currentState, '0');
 
+    expect(switched.pathTracingMaxSamples).toBe(262_144);
+    expect(reset.pathTracingMaxSamples).toBe(262_144);
     expect(switched.environmentSphereMaterial).toEqual(currentState.environmentSphereMaterial);
     expect(switched.environmentSphereMaterial).not.toBe(currentState.environmentSphereMaterial);
     expect(reset.environmentSphereMaterial).toEqual(currentState.environmentSphereMaterial);

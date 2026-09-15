@@ -8,6 +8,7 @@ import {
 import { cloneDisplaySelection } from './display-model';
 import { cloneImageRoi } from './roi';
 import { cloneEnvironmentSphereMaterial } from './environment-sphere-material';
+import { normalizePathTracingMaxSamples } from './path-tracing-settings';
 import { ViewerSessionState } from './types';
 
 export function buildSessionDisplayName(filename: string, existingFilenames: string[]): string {
@@ -61,6 +62,7 @@ export function cloneViewerSessionState(state: ViewerSessionState): ViewerSessio
     viewerMode: state.viewerMode,
     panoramaDisplayMode: state.panoramaDisplayMode,
     panoramaLightingMethod: state.panoramaLightingMethod,
+    pathTracingMaxSamples: normalizePathTracingMaxSamples(state.pathTracingMaxSamples),
     environmentSphereMaterial: cloneEnvironmentSphereMaterial(state.environmentSphereMaterial),
     visualizationMode: state.visualizationMode,
     activeColormapId: state.activeColormapId,

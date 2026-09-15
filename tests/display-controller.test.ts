@@ -198,6 +198,14 @@ afterEach(() => {
 });
 
 describe('display controller shim', () => {
+  it('updates the sample ceiling and ignores edits after disposal', () => {
+    const { controller, core } = createController(createSession(createDecodedImage()));
+    controller.setPathTracingMaxSamples(512.75);
+    expect(core.getState().sessionState.pathTracingMaxSamples).toBe(512);
+    controller.dispose();
+    controller.setPathTracingMaxSamples(1024);
+    expect(core.getState().sessionState.pathTracingMaxSamples).toBe(512);
+  });
   it('initializes the default colormap into the app core', async () => {
     const { controller, core } = createController();
 

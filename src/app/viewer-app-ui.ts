@@ -3,6 +3,7 @@ import { buildChannelViewItems, type ChannelViewItem } from '../channel-view-ite
 import { hasDepthChannelCandidate } from '../depth';
 import { sameDisplaySelection } from '../display-model';
 import { sameEnvironmentSphereMaterial } from '../environment-sphere-material';
+import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import type { OpenedImageSession } from '../types';
 import type { ViewerAppState, ViewerUiSnapshot } from './viewer-app-types';
 import {
@@ -121,6 +122,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       panoramaDisplayMode: resolvePanoramaDisplayMode(state.sessionState.panoramaDisplayMode),
       panoramaLightingMethod: resolvePanoramaLightingMethod(state.sessionState.panoramaLightingMethod),
       environmentSphereMaterial: state.sessionState.environmentSphereMaterial,
+      pathTracingMaxSamples: normalizePathTracingMaxSamples(state.sessionState.pathTracingMaxSamples),
       threeDModeAvailable: Boolean(
         activeSession &&
         hasDepthChannelCandidate(
@@ -242,6 +244,7 @@ export function computeViewerUiInvalidation(
     previous.panoramaDisplayMode !== next.panoramaDisplayMode ||
     previous.panoramaLightingMethod !== next.panoramaLightingMethod ||
     !sameEnvironmentSphereMaterial(previous.environmentSphereMaterial, next.environmentSphereMaterial) ||
+    previous.pathTracingMaxSamples !== next.pathTracingMaxSamples ||
     previous.shouldClearImageBrowserPanels !== next.shouldClearImageBrowserPanels
   ) {
     flags |= ViewerUiInvalidationFlags.ViewerMode;
@@ -587,6 +590,7 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     a.panoramaDisplayMode === b.panoramaDisplayMode &&
     a.panoramaLightingMethod === b.panoramaLightingMethod &&
     sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
+    a.pathTracingMaxSamples === b.pathTracingMaxSamples &&
     a.threeDModeAvailable === b.threeDModeAvailable &&
     a.visualizationMode === b.visualizationMode &&
     sameStokesControl(a.stokesDegreeModulationControl, b.stokesDegreeModulationControl) &&

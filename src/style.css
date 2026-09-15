@@ -2265,6 +2265,25 @@ body.is-resizing-panel-rows * {
   z-index: var(--z-viewer-image);
 }
 
+dialog.app-dialog--max-spp {
+  width: min(26rem, calc(100% - 2rem));
+  color: var(--text);
+}
+
+dialog.app-dialog--max-spp:not([open]) {
+  display: none;
+}
+
+.app-dialog--max-spp form {
+  display: grid;
+  gap: 12px;
+}
+
+.app-dialog--max-spp::backdrop {
+  background: rgba(8, 12, 19, 0.68);
+  backdrop-filter: blur(8px);
+}
+
 .panorama-preparing {
   display: none;
   grid-template-columns: 20px minmax(0, 1fr);

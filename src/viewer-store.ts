@@ -1,4 +1,5 @@
 import { DEFAULT_DISPLAY_GAMMA } from './color';
+import { DEFAULT_PATH_TRACING_MAX_SAMPLES, normalizePathTracingMaxSamples } from './path-tracing-settings';
 import {
   createDefaultEnvironmentSphereMaterial,
   sameEnvironmentSphereMaterial
@@ -32,6 +33,7 @@ const SESSION_STATE_KEYS = [
   'viewerMode',
   'panoramaDisplayMode',
   'panoramaLightingMethod',
+  'pathTracingMaxSamples',
   'environmentSphereMaterial',
   'visualizationMode',
   'activeColormapId',
@@ -73,6 +75,7 @@ export function createInitialState(): ViewerSessionState {
     viewerMode: 'image',
     panoramaDisplayMode: 'image',
     panoramaLightingMethod: 'sphericalHarmonics',
+    pathTracingMaxSamples: DEFAULT_PATH_TRACING_MAX_SAMPLES,
     environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',
     activeColormapId: null,
@@ -202,6 +205,9 @@ function pickSessionStatePatch(
   const depthSource = patch.depthChannel !== undefined
     ? patch.depthChannel
     : currentState.depthChannel;
+  if ('pathTracingMaxSamples' in patch) {
+    nextPatch.pathTracingMaxSamples = normalizePathTracingMaxSamples(patch.pathTracingMaxSamples);
+  }
   if (patch.depthYawDeg !== undefined) {
     nextPatch.depthYawDeg = normalizeDepthYawForSource(patch.depthYawDeg, depthSource);
   } else if (patch.depthChannel !== undefined) {

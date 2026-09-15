@@ -168,6 +168,28 @@ describe('viewer app lanes', () => {
     )).toBe(true);
   });
 
+  it('refreshes the sample control and resumes rendering without rebaking resources when its limit changes', () => {
+    const initialState = createActiveState();
+    const state: ViewerAppState = {
+      ...initialState,
+      sessionState: {
+        ...initialState.sessionState,
+        viewerMode: 'panorama',
+        panoramaDisplayMode: 'environmentLighting',
+        panoramaLightingMethod: 'pathTracing',
+        pathTracingMaxSamples: 4
+      }
+    };
+    const nextState: ViewerAppState = {
+      ...state, sessionState: { ...state.sessionState, pathTracingMaxSamples: 8 }
+    };
+    expect(hasUiFlag(createUiFlags(state, nextState), ViewerUiInvalidationFlags.ViewerMode)).toBe(true);
+    const flags = createRenderFlags(state, nextState);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.ViewerStateReadout)).toBe(true);
+    expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.ResourcePrepare)).toBe(false);
+  });
+
   it('rerenders SH environment lighting when interaction quality settles', () => {
     const initialState = createActiveState();
     const settledState: ViewerAppState = {

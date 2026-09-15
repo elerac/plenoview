@@ -16,6 +16,7 @@ import type { GlImageRendererState } from '../src/rendering/gl-image-renderer/ty
 import type { ViewerState } from '../src/types';
 import { createEmptyRoiInteractionState } from '../src/view-state';
 import { createInitialState } from '../src/viewer-store';
+import { DEFAULT_PATH_TRACING_MAX_SAMPLES } from '../src/path-tracing-settings';
 import {
   createChannelMonoSelection,
   createChannelRgbSelection,
@@ -1247,9 +1248,21 @@ describe('gl image renderer', () => {
     renderer.render(changedMaterialState);
     expect(readRootPathTracingSampleCount(renderer)).toBe(1);
 
-    setRootPathTracingSampleCount(renderer, 4095);
+    setRootPathTracingSampleCount(renderer, DEFAULT_PATH_TRACING_MAX_SAMPLES - 1);
     expect(renderer.render(changedMaterialState)).toBe(false);
-    expect(readRootPathTracingSampleCount(renderer)).toBe(4096);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(DEFAULT_PATH_TRACING_MAX_SAMPLES);
+
+    // The limit controls stopping only; changing it must retain the accumulated image.
+    const convergedSurface = getRendererState(renderer).pathTracingSurfaces.get('root');
+    const stoppedState = { ...changedMaterialState, pathTracingMaxSamples: 32 };
+    expect(renderer.render(stoppedState)).toBe(false);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(DEFAULT_PATH_TRACING_MAX_SAMPLES);
+    const resumedState = { ...changedMaterialState, pathTracingMaxSamples: DEFAULT_PATH_TRACING_MAX_SAMPLES + 2 };
+    expect(renderer.render(resumedState)).toBe(true);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(DEFAULT_PATH_TRACING_MAX_SAMPLES + 1);
+    expect(renderer.render(resumedState)).toBe(false);
+    expect(readRootPathTracingSampleCount(renderer)).toBe(DEFAULT_PATH_TRACING_MAX_SAMPLES + 2);
+    expect(getRendererState(renderer).pathTracingSurfaces.get('root')).toBe(convergedSurface);
 
     renderer.setPanes([{
       path: [1],

@@ -389,6 +389,9 @@ export function createViewerUi({
     onEnvironmentSphereMaterialChange: (patch) => {
       core.dispatch({ type: 'environmentSphereMaterialEdited', patch });
     },
+    onPathTracingMaxSamplesChange: (value) => {
+      getDisplayController().setPathTracingMaxSamples(value);
+    },
     onLayerChange: (layerIndex) => {
       getDisplayController().setActiveLayer(layerIndex);
     },

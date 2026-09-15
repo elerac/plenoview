@@ -110,6 +110,15 @@ describe('embed params', () => {
     });
   });
 
+  it('round-trips and normalizes shared sample ceilings without changing older snapshots', () => {
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ pathTracingMaxSamples: 262_144 }))?.pathTracingMaxSamples).toBe(262_144);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ pathTracingMaxSamples: 256.8 }))?.pathTracingMaxSamples).toBe(256);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ pathTracingMaxSamples: -4 }))?.pathTracingMaxSamples).toBe(1);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ pathTracingMaxSamples: 2_000_000 }))?.pathTracingMaxSamples).toBe(1_048_576);
+    expect(decodeEmbedViewerState(encodeURIComponent(JSON.stringify({ pathTracingMaxSamples: 'invalid' })))?.pathTracingMaxSamples).toBe(65_536);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ exposureEv: 1 }))?.pathTracingMaxSamples).toBeUndefined();
+  });
+
   it('builds static-hosting friendly full viewer URLs', () => {
     const url = buildFullViewerUrl({
       baseUrl: '/plenoview/app/',

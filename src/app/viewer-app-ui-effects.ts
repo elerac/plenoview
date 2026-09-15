@@ -1,5 +1,6 @@
 import type { ViewerRuntimeUi } from '../ui/viewer-runtime-ui';
 import { DEFAULT_ENVIRONMENT_SPHERE_MATERIAL } from '../environment-sphere-material';
+import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import { ViewerUiInvalidationFlags } from './viewer-app-ui';
 import type { ViewerUiTransition } from './viewer-app-types';
 
@@ -58,6 +59,7 @@ export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransiti
     ui.setPanoramaDisplayMode(snapshot.panoramaDisplayMode);
     ui.setPanoramaLightingMethod?.(snapshot.panoramaLightingMethod);
     ui.setEnvironmentSphereMaterial?.(snapshot.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL);
+    ui.setPathTracingMaxSamples?.(normalizePathTracingMaxSamples(snapshot.pathTracingMaxSamples));
     ui.setThreeDModeAvailable(Boolean(snapshot.threeDModeAvailable));
   }
 

@@ -1,4 +1,5 @@
 import type { ViewerAppState } from './viewer-app-types';
+import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import type { ViewerAppCore } from './viewer-app-core';
 import type {
   ScreenshotSelectionInteractionState,
@@ -18,6 +19,7 @@ interface E2EStateSnapshot {
   viewerMode: ViewerAppState['sessionState']['viewerMode'];
   panoramaDisplayMode: NonNullable<ViewerAppState['sessionState']['panoramaDisplayMode']>;
   panoramaLightingMethod: NonNullable<ViewerAppState['sessionState']['panoramaLightingMethod']>;
+  pathTracingMaxSamples: number;
   environmentLightingInteractive: boolean;
   panoramaYawDeg: number;
   depthYawDeg: number;
@@ -186,6 +188,7 @@ function createSnapshot(state: ViewerAppState, appReady: boolean): E2EStateSnaps
     viewerMode: state.sessionState.viewerMode,
     panoramaDisplayMode: state.sessionState.panoramaDisplayMode ?? 'image',
     panoramaLightingMethod: state.sessionState.panoramaLightingMethod ?? 'sphericalHarmonics',
+    pathTracingMaxSamples: normalizePathTracingMaxSamples(state.sessionState.pathTracingMaxSamples),
     environmentLightingInteractive:
       state.interactionState.environmentLightingInteractive === true,
     panoramaYawDeg: state.interactionState.view.panoramaYawDeg,

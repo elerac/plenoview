@@ -76,6 +76,7 @@ interface NativeMenuState {
       image: NativeMenuItemState;
       environmentLighting: NativeMenuItemState;
       environmentPathTracing: NativeMenuItemState;
+      maxSamples: NativeMenuItemState;
     };
     threeD: NativeMenuItemState;
     rulers: NativeMenuItemState;
@@ -546,7 +547,9 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks, options: { 
           await checkedCommandItem(
             'viewerModeEnvironmentPathTracing',
             menuState.view.panorama.environmentPathTracing
-          )
+          ),
+          await separator(),
+          commandItem('pathTracingMaxSamples', menuState.view.panorama.maxSamples)
         ]
       }),
       await checkedCommandItem('viewerMode3d', menuState.view.threeD),
@@ -651,6 +654,10 @@ function readNativeMenuState(): NativeMenuState {
         environmentPathTracing: readButtonState(
           'environment-path-tracing-menu-item',
           'Environment lighting (path tracing)'
+        ),
+        maxSamples: readButtonState(
+          'path-tracing-max-samples-menu-item',
+          'Maximum SPP…'
         )
       },
       threeD: readButtonState('three-d-viewer-menu-item', '3D viewer'),

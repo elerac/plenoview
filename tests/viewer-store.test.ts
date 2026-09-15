@@ -28,6 +28,7 @@ describe('viewer store', () => {
     });
     expect(createInitialState().stokesAolpDegreeModulationMode).toBe('value');
     expect(createInitialState().panoramaLightingMethod).toBe('sphericalHarmonics');
+    expect(createInitialState().pathTracingMaxSamples).toBe(65_536);
     expect(createInitialState().environmentSphereMaterial).toEqual({
       type: 'roughSilver',
       diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
@@ -37,6 +38,20 @@ describe('viewer store', () => {
       distribution: 'beckmann',
       nonlinear: false
     });
+  });
+
+  it('stores normalized path-tracing sample ceilings and suppresses equivalent edits', () => {
+    const store = new ViewerStore(createInitialState());
+    const ceilings: number[] = [];
+    store.subscribe(state => ceilings.push(state.pathTracingMaxSamples!));
+
+    store.setState({ pathTracingMaxSamples: 128.9 });
+    store.setState({ pathTracingMaxSamples: 128.1 });
+    store.setState({ pathTracingMaxSamples: -4 });
+    store.setState({ pathTracingMaxSamples: Number.NaN });
+
+    expect(ceilings).toEqual([128, 1, 65_536]);
+    expect(store.getState().pathTracingMaxSamples).toBe(65_536);
   });
 
   it('re-resolves display channels when switching to a layer without the current mapping', () => {

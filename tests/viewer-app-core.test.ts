@@ -5,7 +5,7 @@ import { createDefaultChannelRecognitionNameRules } from '../src/channel-recogni
 import { createDefaultChannelRecognitionSettings } from '../src/channel-recognition-settings';
 import { DEFAULT_DISPLAY_GAMMA } from '../src/color';
 import { DEFAULT_DEPTH_ZOOM } from '../src/depth';
-import { applyEmbedViewerStateSnapshot } from '../src/embed/embed-state';
+import { applyEmbedViewerStateSnapshot, createEmbedViewerStateSnapshot, decodeEmbedViewerState, encodeEmbedViewerState } from '../src/embed/embed-state';
 import { ViewerAppCore } from '../src/app/viewer-app-core';
 import { DEFAULT_PANORAMA_HFOV_DEG } from '../src/interaction/panorama-geometry';
 import { createInteractionState } from '../src/view-state';
@@ -92,6 +92,29 @@ describe('viewer app core', () => {
       panoramaDisplayMode: 'environmentLighting',
       panoramaLightingMethod: 'pathTracing'
     });
+  });
+
+  it('persists normalized sample limits and restores them through shared state', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
+    const original = core.getState();
+
+    core.dispatch({ type: 'pathTracingMaxSamplesSet', pathTracingMaxSamples: 131_072.5 });
+    const edited = core.getState();
+    expect(edited.sessionState.pathTracingMaxSamples).toBe(131_072);
+    expect(edited.sessions[0].state.pathTracingMaxSamples).toBe(131_072);
+    expect(edited.interactionState).toBe(original.interactionState);
+    expect(edited.sessionState.environmentSphereMaterial).toBe(original.sessionState.environmentSphereMaterial);
+    core.dispatch({ type: 'pathTracingMaxSamplesSet', pathTracingMaxSamples: 131_072 });
+    expect(core.getState()).toBe(edited);
+
+    const snapshot = decodeEmbedViewerState(encodeEmbedViewerState(createEmbedViewerStateSnapshot(edited)));
+    core.dispatch({ type: 'pathTracingMaxSamplesSet', pathTracingMaxSamples: 32 });
+    applyEmbedViewerStateSnapshot(core, snapshot);
+    expect(core.getState().sessionState.pathTracingMaxSamples).toBe(131_072);
+
+    core.dispatch({ type: 'pathTracingMaxSamplesSet', pathTracingMaxSamples: Number.NaN });
+    expect(core.getState().sessionState.pathTracingMaxSamples).toBe(65_536);
   });
 
   it('normalizes environment sphere material edits', () => {

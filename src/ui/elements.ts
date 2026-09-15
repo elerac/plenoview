@@ -58,6 +58,12 @@ export interface Elements {
   panoramaImageMenuItem: HTMLButtonElement;
   environmentLightingMenuItem: HTMLButtonElement;
   environmentPathTracingMenuItem: HTMLButtonElement;
+  pathTracingMaxSamplesMenuItem: HTMLButtonElement;
+  pathTracingMaxSamplesDialog: HTMLDialogElement;
+  pathTracingMaxSamplesForm: HTMLFormElement;
+  pathTracingMaxSamplesDialogInput: HTMLInputElement;
+  pathTracingMaxSamplesCancelButton: HTMLButtonElement;
+  pathTracingMaxSamplesApplyButton: HTMLButtonElement;
   threeDViewerMenuItem: HTMLButtonElement;
   rulersMenuItem: HTMLButtonElement;
   windowNormalMenuItem: HTMLButtonElement;
@@ -236,6 +242,7 @@ export interface Elements {
   environmentMaterialFields: HTMLDivElement;
   environmentMaterialSelect: HTMLSelectElement;
   environmentRoughnessInput: HTMLInputElement;
+  pathTracingMaxSamplesInput: HTMLInputElement;
   viewerStateDepthFields: HTMLDivElement;
   viewerStateZoomInput: HTMLInputElement;
   viewerStatePanXInput: HTMLInputElement;
@@ -643,6 +650,12 @@ export function resolveElements(): Elements {
     panoramaImageMenuItem: requireElement('panorama-image-menu-item', HTMLButtonElement),
     environmentLightingMenuItem: requireElement('environment-lighting-menu-item', HTMLButtonElement),
     environmentPathTracingMenuItem: requireElement('environment-path-tracing-menu-item', HTMLButtonElement),
+    pathTracingMaxSamplesMenuItem: requireElement('path-tracing-max-samples-menu-item', HTMLButtonElement),
+    pathTracingMaxSamplesDialog: requireElement('path-tracing-max-samples-dialog', HTMLDialogElement),
+    pathTracingMaxSamplesForm: requireElement('path-tracing-max-samples-form', HTMLFormElement),
+    pathTracingMaxSamplesDialogInput: requireElement('path-tracing-max-samples-dialog-input', HTMLInputElement),
+    pathTracingMaxSamplesCancelButton: requireElement('path-tracing-max-samples-cancel-button', HTMLButtonElement),
+    pathTracingMaxSamplesApplyButton: requireElement('path-tracing-max-samples-apply-button', HTMLButtonElement),
     threeDViewerMenuItem: requireElement('three-d-viewer-menu-item', HTMLButtonElement),
     rulersMenuItem: requireElement('rulers-menu-item', HTMLButtonElement),
     windowNormalMenuItem: requireElement('window-normal-menu-item', HTMLButtonElement),
@@ -827,6 +840,7 @@ export function resolveElements(): Elements {
     environmentMaterialFields: requireElement('environment-material-fields', HTMLDivElement),
     environmentMaterialSelect: requireElement('environment-material-select', HTMLSelectElement),
     environmentRoughnessInput: requireElement('environment-roughness-input', HTMLInputElement),
+    pathTracingMaxSamplesInput: requireElement('path-tracing-max-samples-input', HTMLInputElement),
     viewerStateDepthFields: requireElement('viewer-state-depth-fields', HTMLDivElement),
     viewerStateZoomInput: requireElement('viewer-state-zoom-input', HTMLInputElement),
     viewerStatePanXInput: requireElement('viewer-state-pan-x-input', HTMLInputElement),

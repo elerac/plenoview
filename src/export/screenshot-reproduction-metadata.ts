@@ -1,4 +1,5 @@
 import { cloneDisplayLuminanceRange } from '../colormap-range';
+import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import { cloneDisplaySelection } from '../display-model';
 import {
   cloneScreenshotRegionCrop,
@@ -71,6 +72,7 @@ export interface ScreenshotReproductionMetadataV2 {
     viewerMode: ViewerState['viewerMode'];
     panoramaDisplayMode: NonNullable<ViewerState['panoramaDisplayMode']>;
     panoramaLightingMethod: NonNullable<ViewerState['panoramaLightingMethod']>;
+    pathTracingMaxSamples: number;
     environmentSphereMaterial: EnvironmentSphereMaterial;
     zoom: number;
     panX: number;
@@ -154,6 +156,7 @@ export function buildScreenshotReproductionMetadata({
       viewerMode: renderState.viewerMode,
       panoramaDisplayMode: resolvePanoramaDisplayMode(renderState.panoramaDisplayMode),
       panoramaLightingMethod: resolvePanoramaLightingMethod(renderState.panoramaLightingMethod),
+      pathTracingMaxSamples: normalizePathTracingMaxSamples(renderState.pathTracingMaxSamples),
       environmentSphereMaterial: cloneEnvironmentSphereMaterial(renderState.environmentSphereMaterial),
       zoom: renderState.zoom,
       panX: renderState.panX,

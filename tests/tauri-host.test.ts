@@ -403,6 +403,9 @@ describe('tauri host', () => {
     runMenuAction(openItem);
 
     expect(onCommand).toHaveBeenCalledWith('openFile');
+    const panoramaMenu = findMenuItem(findCreatedSubmenuOptions('View'), 'Panorama viewer');
+    runMenuAction(findMenuItem(panoramaMenu, 'Maximum SPP…'));
+    expect(onCommand).toHaveBeenCalledWith('pathTracingMaxSamples');
     expect(setAsAppMenuMock).toHaveBeenCalledTimes(1);
   });
 
@@ -446,7 +449,8 @@ describe('tauri host', () => {
     expect(readMenuItemLabels(findMenuItem(viewMenuOptions, 'Panorama viewer'))).toEqual([
       'Panorama image',
       'Environment lighting (SH)',
-      'Environment lighting (path tracing)'
+      'Environment lighting (path tracing)',
+      'Maximum SPP…'
     ]);
     expect(nativeWindowMenuItemLabels).toEqual(['Normal', 'Full Screen Preview']);
     expect(nativeWindowMenuItemLabels).not.toEqual(expect.arrayContaining([

@@ -25,6 +25,7 @@ import {
 } from '../../depth';
 import { computeFitView } from '../../interaction/image-geometry';
 import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
+import { normalizePathTracingMaxSamples } from '../../path-tracing-settings';
 import {
   DEFAULT_PANORAMA_HFOV_DEG,
   clampPanoramaPitchForDisplayMode
@@ -172,6 +173,14 @@ export function displayReducer(
         panoramaLightingMethod: intent.panoramaLightingMethod
       }, {
         clearHover: true
+      });
+    }
+    case 'pathTracingMaxSamplesSet': {
+      if (!selectActiveSession(state)) {
+        return state;
+      }
+      return patchSessionState(state, {
+        pathTracingMaxSamples: normalizePathTracingMaxSamples(intent.pathTracingMaxSamples)
       });
     }
     case 'environmentSphereMaterialEdited': {

@@ -1,5 +1,6 @@
 import type { ViewerAppCore } from '../app/viewer-app-core';
 import type { ViewerAppState } from '../app/viewer-app-types';
+import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import {
   cloneEnvironmentSphereMaterial,
   normalizeEnvironmentSphereMaterialValue,
@@ -17,6 +18,7 @@ export interface EmbedViewerStateSnapshot {
   viewerMode?: ViewerSessionState['viewerMode'];
   panoramaDisplayMode?: ViewerSessionState['panoramaDisplayMode'];
   panoramaLightingMethod?: ViewerSessionState['panoramaLightingMethod'];
+  pathTracingMaxSamples?: number;
   environmentSphereMaterial?: EnvironmentSphereMaterial;
   visualizationMode?: ViewerSessionState['visualizationMode'];
   activeLayer?: number;
@@ -43,6 +45,7 @@ export function createEmbedViewerStateSnapshot(state: ViewerAppState): EmbedView
     viewerMode: session.viewerMode,
     panoramaDisplayMode: session.panoramaDisplayMode,
     panoramaLightingMethod: session.panoramaLightingMethod,
+    pathTracingMaxSamples: normalizePathTracingMaxSamples(session.pathTracingMaxSamples),
     environmentSphereMaterial: cloneEnvironmentSphereMaterial(session.environmentSphereMaterial),
     visualizationMode: session.visualizationMode,
     activeLayer: session.activeLayer,
@@ -122,6 +125,12 @@ export function applyEmbedViewerStateSnapshot(
     core.dispatch({
       type: 'panoramaLightingMethodSet',
       panoramaLightingMethod: snapshot.panoramaLightingMethod
+    });
+  }
+  if (snapshot.pathTracingMaxSamples !== undefined) {
+    core.dispatch({
+      type: 'pathTracingMaxSamplesSet',
+      pathTracingMaxSamples: normalizePathTracingMaxSamples(snapshot.pathTracingMaxSamples)
     });
   }
   if (snapshot.environmentSphereMaterial) {
@@ -208,6 +217,9 @@ function normalizeEmbedViewerStateSnapshot(value: unknown): EmbedViewerStateSnap
     panoramaLightingMethod: isPanoramaLightingMethod(record.panoramaLightingMethod)
       ? record.panoramaLightingMethod
       : undefined,
+    pathTracingMaxSamples: record.pathTracingMaxSamples === undefined
+      ? undefined
+      : normalizePathTracingMaxSamples(record.pathTracingMaxSamples),
     environmentSphereMaterial: environmentSphereMaterial ?? undefined,
     visualizationMode: record.visualizationMode === 'rgb' || record.visualizationMode === 'colormap'
       ? record.visualizationMode

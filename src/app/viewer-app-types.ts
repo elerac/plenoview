@@ -97,6 +97,7 @@ export interface ViewerStateReadoutModel {
   viewerMode: ViewerSessionState['viewerMode'];
   panoramaDisplayMode?: NonNullable<ViewerSessionState['panoramaDisplayMode']>;
   panoramaLightingMethod?: NonNullable<ViewerSessionState['panoramaLightingMethod']>;
+  pathTracingMaxSamples?: number;
   environmentSphereMaterial?: EnvironmentSphereMaterial;
   view: Pick<
     ViewerViewState,
@@ -243,6 +244,7 @@ export type ViewerIntent =
   | { type: 'viewerModeSet'; viewerMode: ViewerSessionState['viewerMode'] }
   | { type: 'panoramaDisplayModeSet'; panoramaDisplayMode: NonNullable<ViewerSessionState['panoramaDisplayMode']> }
   | { type: 'panoramaLightingMethodSet'; panoramaLightingMethod: NonNullable<ViewerSessionState['panoramaLightingMethod']> }
+  | { type: 'pathTracingMaxSamplesSet'; pathTracingMaxSamples: number }
   | { type: 'environmentSphereMaterialEdited'; patch: EnvironmentSphereMaterialPatch }
   | { type: 'activeLayerSet'; activeLayer: number }
   | {
@@ -403,6 +405,7 @@ export interface ViewerUiSnapshot {
   viewerMode: ViewerSessionState['viewerMode'];
   panoramaDisplayMode: NonNullable<ViewerSessionState['panoramaDisplayMode']>;
   panoramaLightingMethod: NonNullable<ViewerSessionState['panoramaLightingMethod']>;
+  pathTracingMaxSamples: number;
   environmentSphereMaterial?: EnvironmentSphereMaterial;
   threeDModeAvailable?: boolean;
   visualizationMode: ViewerSessionState['visualizationMode'];

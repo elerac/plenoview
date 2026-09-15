@@ -100,6 +100,7 @@ export interface ViewerRuntimeUi extends Disposable {
   setPanoramaDisplayMode(mode: PanoramaDisplayMode): void;
   setPanoramaLightingMethod?(method: PanoramaLightingMethod): void;
   setEnvironmentSphereMaterial?(material: EnvironmentSphereMaterial): void;
+  setPathTracingMaxSamples?(value: number): void;
   setThreeDModeAvailable(available: boolean): void;
   setVisualizationMode(mode: VisualizationMode): void;
   setStokesDegreeModulationControl(

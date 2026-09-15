@@ -190,6 +190,17 @@
                   >
                     Environment lighting (path tracing)
                   </button>
+                  <button
+                    id="path-tracing-max-samples-menu-item"
+                    class="app-menu-item"
+                    type="button"
+                    role="menuitem"
+                    aria-haspopup="dialog"
+                    aria-controls="path-tracing-max-samples-dialog"
+                    disabled
+                  >
+                    Maximum SPP…
+                  </button>
                 </div>
               </div>
               <button
@@ -551,6 +562,25 @@
         <input id="file-input" type="file" accept=".exr,image/exr" hidden />
         <input id="folder-input" type="file" accept=".exr,image/exr" webkitdirectory multiple hidden />
       </header>
+
+      <dialog id="path-tracing-max-samples-dialog" class="app-dialog app-dialog--max-spp" aria-labelledby="path-tracing-max-samples-title">
+        <form id="path-tracing-max-samples-form" method="dialog">
+          <div class="app-dialog-header">
+            <h2 id="path-tracing-max-samples-title" class="app-dialog-title">Maximum SPP</h2>
+            <p class="app-dialog-subtitle">Stop progressive rendering after this many samples per pixel.</p>
+          </div>
+          <div class="app-dialog-body">
+            <label class="app-dialog-field" for="path-tracing-max-samples-dialog-input">
+              <span class="app-dialog-field-label">Max SPP</span>
+              <input id="path-tracing-max-samples-dialog-input" type="number" min="1" max="1048576" step="1" value="65536" required />
+            </label>
+          </div>
+          <div class="app-dialog-actions">
+            <button id="path-tracing-max-samples-cancel-button" type="button">Cancel</button>
+            <button id="path-tracing-max-samples-apply-button" type="submit">Apply</button>
+          </div>
+        </form>
+      </dialog>
 
       <div id="settings-dialog-backdrop" class="app-dialog-backdrop hidden">
         <section
@@ -1339,6 +1369,8 @@
                     </select>
                     <label for="environment-roughness-input">Roughness</label>
                     <input id="environment-roughness-input" class="viewer-state-input" type="number" min="0.001" max="1" step="0.001" value="0.01" title="Microfacet roughness alpha" />
+                    <label for="path-tracing-max-samples-input">Max SPP</label>
+                    <input id="path-tracing-max-samples-input" class="viewer-state-input" type="number" min="1" max="1048576" step="1" value="65536" title="Maximum samples per pixel" />
                   </div>
                   <div id="viewer-state-depth-fields" class="viewer-state-fields hidden" aria-label="3D viewer state">
                     <label for="viewer-state-depth-channel-select">Source</label>

@@ -16,6 +16,10 @@ import {
   type EnvironmentSphereMaterial,
   type EnvironmentSphereMaterialPatch
 } from '../environment-sphere-material';
+import {
+  DEFAULT_PATH_TRACING_MAX_SAMPLES,
+  normalizePathTracingMaxSamples
+} from '../path-tracing-settings';
 import { AppFullscreenController } from './app-fullscreen-controller';
 import { ChannelThumbnailStrip } from './channel-thumbnail-strip';
 import { CollapsibleSectionsController } from './collapsible-sections';
@@ -358,6 +362,7 @@ export interface UiCallbacks {
   onPanoramaDisplayModeChange?: (mode: PanoramaDisplayMode) => void;
   onPanoramaLightingMethodChange?: (method: PanoramaLightingMethod) => void;
   onEnvironmentSphereMaterialChange?: (patch: EnvironmentSphereMaterialPatch) => void;
+  onPathTracingMaxSamplesChange?: (value: number) => void;
   onLayerChange: (layerIndex: number) => void;
   onRgbGroupChange: (mapping: DisplaySelection) => void;
   onColormapChange: (colormapId: string | null) => void;
@@ -462,6 +467,7 @@ export class ViewerUi implements Disposable {
   private panoramaDisplayMode: PanoramaDisplayMode = 'image';
   private panoramaLightingMethod: PanoramaLightingMethod = 'sphericalHarmonics';
   private environmentSphereMaterial = createDefaultEnvironmentSphereMaterial();
+  private pathTracingMaxSamples = DEFAULT_PATH_TRACING_MAX_SAMPLES;
   private threeDModeAvailable = false;
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
@@ -863,6 +869,7 @@ export class ViewerUi implements Disposable {
     this.folderLoadDialog.close(false, false);
     this.settingsDialog.close(false);
     this.metadataDialog.close(false);
+    this.closePathTracingMaxSamplesDialog(false);
     this.topMenuController.closeAll(false);
     this.dragDropController.showOverlay(false);
     this.elements.appShell.classList.remove('is-window-preview');
@@ -926,6 +933,7 @@ export class ViewerUi implements Disposable {
       this.folderLoadDialog.close(false, false);
       this.settingsDialog.close(false);
       this.metadataDialog.close(false);
+      this.closePathTracingMaxSamplesDialog(false);
     }
   }
 
@@ -1220,6 +1228,13 @@ export class ViewerUi implements Disposable {
     }
     this.environmentSphereMaterial = normalizeEnvironmentSphereMaterial(material);
     this.updateEnvironmentMaterialControls();
+  }
+
+  setPathTracingMaxSamples(value: number): void {
+    if (this.disposed) return;
+    this.pathTracingMaxSamples = normalizePathTracingMaxSamples(value);
+    this.elements.pathTracingMaxSamplesInput.value = String(this.pathTracingMaxSamples);
+    this.elements.pathTracingMaxSamplesDialogInput.value = String(this.pathTracingMaxSamples);
   }
 
   setVisualizationMode(mode: VisualizationMode): void {
@@ -1960,6 +1975,9 @@ export class ViewerUi implements Disposable {
           this.callbacks.onViewerModeChange('3d');
         }
         return;
+      case 'pathTracingMaxSamples':
+        this.openPathTracingMaxSamplesDialog();
+        return;
       case 'toggleRulers': {
         const enabled = !this.rulersVisible;
         this.setRulersVisible(enabled, true);
@@ -2008,6 +2026,7 @@ export class ViewerUi implements Disposable {
       viewerModePanorama: !this.elements.panoramaViewerMenuItem.disabled,
       viewerModeEnvironmentLighting: !this.elements.environmentLightingMenuItem.disabled,
       viewerModeEnvironmentPathTracing: !this.elements.environmentPathTracingMenuItem.disabled,
+      pathTracingMaxSamples: !this.elements.pathTracingMaxSamplesMenuItem.disabled,
       viewerMode3d: !this.elements.threeDViewerMenuItem.disabled,
       toggleRulers: this.openedImageCount > 0 && !this.isViewerLoadBlocked,
       windowPreviewNormal: true,
@@ -2853,6 +2872,33 @@ export class ViewerUi implements Disposable {
     this.elements.environmentMaterialSelect.value = resolveEnvironmentSphereMaterialPreset(material);
     this.elements.environmentRoughnessInput.disabled = disabled;
     this.elements.environmentRoughnessInput.value = String(material.alpha);
+    this.elements.pathTracingMaxSamplesInput.disabled = disabled;
+    this.elements.pathTracingMaxSamplesMenuItem.disabled = disabled;
+    this.elements.pathTracingMaxSamplesDialogInput.disabled = disabled;
+    this.elements.pathTracingMaxSamplesApplyButton.disabled = disabled;
+    if (disabled) this.closePathTracingMaxSamplesDialog(false);
+  }
+
+  private openPathTracingMaxSamplesDialog(): void {
+    if (this.elements.pathTracingMaxSamplesMenuItem.disabled) return;
+    this.topMenuController.closeAll(false);
+    this.clearViewerKeyboardNavigationInput();
+    this.elements.pathTracingMaxSamplesDialogInput.value = String(this.pathTracingMaxSamples);
+    if (!this.elements.pathTracingMaxSamplesDialog.open) this.elements.pathTracingMaxSamplesDialog.showModal();
+    this.elements.pathTracingMaxSamplesDialogInput.focus();
+    this.elements.pathTracingMaxSamplesDialogInput.select();
+  }
+
+  private closePathTracingMaxSamplesDialog(restoreFocus = true): void {
+    if (!this.elements.pathTracingMaxSamplesDialog.open) return;
+    this.elements.pathTracingMaxSamplesDialog.close();
+    if (restoreFocus) this.elements.viewMenuButton.focus();
+  }
+
+  private applyPathTracingMaxSamples(value: number): void {
+    const normalized = normalizePathTracingMaxSamples(value);
+    this.setPathTracingMaxSamples(normalized);
+    this.callbacks.onPathTracingMaxSamplesChange?.(normalized);
   }
 
   private updateProbePanelVisibility(): void {
@@ -3139,6 +3185,40 @@ export class ViewerUi implements Disposable {
       } else {
         this.updateEnvironmentMaterialControls();
       }
+    });
+
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesInput, 'change', () => {
+      const value = this.elements.pathTracingMaxSamplesInput.valueAsNumber;
+      if (!this.elements.pathTracingMaxSamplesInput.disabled && Number.isFinite(value)) {
+        this.applyPathTracingMaxSamples(value);
+      } else {
+        this.setPathTracingMaxSamples(this.pathTracingMaxSamples);
+      }
+    });
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesMenuItem, 'click', () => {
+      this.openPathTracingMaxSamplesDialog();
+    });
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesCancelButton, 'click', () => {
+      this.closePathTracingMaxSamplesDialog();
+    });
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesDialog, 'cancel', (event) => {
+      event.preventDefault();
+      this.closePathTracingMaxSamplesDialog();
+    });
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesDialog, 'keydown', (event) => {
+      // Contain viewer shortcuts while the native modal owns keyboard focus.
+      event.stopPropagation();
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') event.preventDefault();
+    });
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesDialog, 'keyup', (event) => {
+      event.stopPropagation();
+    });
+    this.disposables.addEventListener(this.elements.pathTracingMaxSamplesForm, 'submit', (event) => {
+      event.preventDefault();
+      const input = this.elements.pathTracingMaxSamplesDialogInput;
+      if (input.disabled || !input.reportValidity()) return;
+      this.applyPathTracingMaxSamples(input.valueAsNumber);
+      this.closePathTracingMaxSamplesDialog();
     });
 
     this.disposables.addEventListener(this.elements.threeDViewerMenuItem, 'click', () => {

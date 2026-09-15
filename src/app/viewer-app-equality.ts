@@ -2,6 +2,7 @@ import { sameDisplayLuminanceRange } from '../colormap-range';
 import { sameChannelRecognitionSettings } from '../channel-recognition-settings';
 import { sameChannelRecognitionNameRules } from '../channel-recognition-name-rules';
 import { sameDisplaySelection } from '../display-model';
+import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
 import {
   DEFAULT_ENVIRONMENT_SPHERE_MATERIAL,
   sameEnvironmentSphereMaterial
@@ -34,6 +35,7 @@ export function sameViewerSessionState(a: ViewerSessionState, b: ViewerSessionSt
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
     (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
       (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    normalizePathTracingMaxSamples(a.pathTracingMaxSamples) === normalizePathTracingMaxSamples(b.pathTracingMaxSamples) &&
     sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.visualizationMode === b.visualizationMode &&
     a.activeColormapId === b.activeColormapId &&
@@ -304,6 +306,7 @@ export function sameViewerStateReadout(
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
     (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
       (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    normalizePathTracingMaxSamples(a.pathTracingMaxSamples) === normalizePathTracingMaxSamples(b.pathTracingMaxSamples) &&
     sameEnvironmentSphereMaterial(
       a.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL,
       b.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL

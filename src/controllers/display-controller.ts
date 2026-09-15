@@ -729,6 +729,14 @@ export class DisplayController implements Disposable {
     });
   }
 
+  setPathTracingMaxSamples(pathTracingMaxSamples: number): void {
+    if (this.disposed) {
+      return;
+    }
+
+    this.core.dispatch({ type: 'pathTracingMaxSamplesSet', pathTracingMaxSamples });
+  }
+
   setColormapRange(range: DisplayLuminanceRange): void {
     if (this.disposed) {
       return;

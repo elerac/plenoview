@@ -12,6 +12,7 @@ declare global {
     }[];
     __polarizedPresentation?: { exposure: number; color: number[]; uniforms: Record<string, unknown> };
     __polarizedExposureHistory?: number[];
+    __polarizedSampleIndices?: number[];
   }
 }
 
@@ -25,6 +26,7 @@ for (const realFile of [false, true]) {
     await page.addInitScript(() => {
       window.__polarizedFrames = [];
       window.__polarizedExposureHistory = [];
+      window.__polarizedSampleIndices = [];
       const draw = WebGL2RenderingContext.prototype.drawArrays;
       WebGL2RenderingContext.prototype.drawArrays = function (mode, first, count) {
         draw.call(this, mode, first, count);
@@ -49,6 +51,7 @@ for (const realFile of [false, true]) {
         if (!polarized || !pass || this.getUniform(program, pass) !== 1) return;
         const sample = this.getUniformLocation(program, 'uPathTracingSampleIndex');
         const index = Number(this.getUniform(program, sample!));
+        window.__polarizedSampleIndices!.push(index);
         if (index > 10 && index % 32 !== 0 && index !== 63) return;
         const viewport = this.getParameter(this.VIEWPORT) as Int32Array;
         const stokes: number[][] = [];
@@ -94,6 +97,33 @@ for (const realFile of [false, true]) {
     for (const component of frame.stokes) expect(component[3]).toBeCloseTo(1);
     await testInfo.attach('stokes-float-readback', { body: JSON.stringify(frame), contentType: 'application/json' });
     await testInfo.attach('initial-exposure', { body: await page.locator('#exposure-value').inputValue(), contentType: 'text/plain' });
+
+    // Editing the ceiling stops/resumes the same accumulation, including through View's dialog.
+    const maxSamples = page.locator('#path-tracing-max-samples-input');
+    await expect(maxSamples).toHaveValue('65536');
+    await maxSamples.fill('1');
+    await maxSamples.press('Tab');
+    await expect.poll(() => page.evaluate(() => window.__openExrViewerE2E?.snapshot().pathTracingMaxSamples)).toBe(1);
+    const pausedIndex = await page.evaluate(() => window.__polarizedSampleIndices!.at(-1)!);
+    await page.evaluate(() => { window.__polarizedSampleIndices = []; });
+    await page.locator('#view-menu-button').click();
+    await page.locator('#panorama-viewer-menu-item').click();
+    await page.locator('#path-tracing-max-samples-menu-item').click();
+    const maxSamplesDialog = page.locator('#path-tracing-max-samples-dialog');
+    await expect(maxSamplesDialog).toBeVisible();
+    await testInfo.attach('maximum-spp-dialog', { body: await maxSamplesDialog.screenshot(), contentType: 'image/png' });
+    const resumedLimit = pausedIndex + 5;
+    await page.locator('#path-tracing-max-samples-dialog-input').fill(String(resumedLimit));
+    await page.locator('#path-tracing-max-samples-dialog-input').press('Enter');
+    await expect(maxSamplesDialog).toBeHidden();
+    await expect(maxSamples).toHaveValue(String(resumedLimit));
+    await expect.poll(() => page.evaluate(() => window.__polarizedSampleIndices!.at(-1))).toBe(resumedLimit - 1);
+    expect(await page.evaluate(() => window.__polarizedSampleIndices)).toEqual([
+      pausedIndex + 1, pausedIndex + 2, pausedIndex + 3, pausedIndex + 4
+    ]);
+    await maxSamples.fill('65536');
+    await maxSamples.press('Tab');
+
     if (realFile) {
       // S0 is HDR radiance; use the viewer's normal automatic exposure.
       await page.locator('#app-auto-exposure-button').click();
