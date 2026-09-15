@@ -2229,7 +2229,7 @@ describe('bootstrap app lifecycle', () => {
       viewerMode: 'panorama',
       environmentSphereMaterial: {
         diffuseReflectance: { r: 0.5, g: 0.5, b: 0.5 },
-        alpha: 0.1,
+        alpha: 0.02,
         intIor: 1.49,
         extIor: 1.000277,
         distribution: 'beckmann',

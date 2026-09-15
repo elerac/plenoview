@@ -20,8 +20,9 @@ Run `npm run dev -- --host 127.0.0.1`, then open
 `http://127.0.0.1:5173/tests/browser/panorama-gpu-check.html` in Chrome.
 The page uses production shader programs and float framebuffer readbacks. It
 checks HDR and negative values, non-finite values, alpha, Stokes selection and
-masking, mip averages, cache reuse/eviction, and the final SH diffuse response.
-All 14 checks should pass. The GPU backend and compilation times are printed.
+masking, mip averages, cache reuse/eviction, the SH diffuse response, and polished
+silver reflection in SH and path tracing (including a one-bounce limit).
+All checks should pass. The GPU backend and compilation times are printed.
 Reload timings may be much faster because the browser/driver caches programs.
 
 ## Browser regression tests on Windows

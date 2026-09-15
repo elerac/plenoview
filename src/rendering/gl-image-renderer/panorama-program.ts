@@ -82,6 +82,7 @@ export class PanoramaPrograms {
       environmentImportanceEntryCount: optional('uEnvironmentImportanceEntryCount'),
       environmentImportanceProjection: optional('uEnvironmentImportanceProjection'),
       environmentShIrradiance: optional('uEnvironmentShIrradiance[0]'),
+      environmentSphereSmoothSilver: optional('uEnvironmentSphereSmoothSilver'),
       environmentSphereDiffuseReflectance: optional('uEnvironmentSphereDiffuseReflectance'),
       environmentSphereAlpha: optional('uEnvironmentSphereAlpha'),
       environmentSphereIntIor: optional('uEnvironmentSphereIntIor'),

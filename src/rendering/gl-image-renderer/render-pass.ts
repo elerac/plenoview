@@ -385,6 +385,7 @@ function setPanoramaUniforms(
   );
   gl.uniform3fv(program.uniforms.environmentShIrradiance, state.environmentShIrradiance);
   const material = normalizeEnvironmentSphereMaterial(viewerState.environmentSphereMaterial);
+  gl.uniform1i(program.uniforms.environmentSphereSmoothSilver, material.type === 'smoothSilver' ? 1 : 0);
   gl.uniform3f(
     program.uniforms.environmentSphereDiffuseReflectance,
     material.diffuseReflectance.r,
@@ -422,6 +423,7 @@ function buildPathTracingSignature(
     viewerState.panoramaYawDeg,
     viewerState.panoramaPitchDeg,
     viewerState.panoramaHfovDeg,
+    material.type,
     material.diffuseReflectance.r,
     material.diffuseReflectance.g,
     material.diffuseReflectance.b,

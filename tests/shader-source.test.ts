@@ -286,7 +286,7 @@ describe('shader source regressions', () => {
     expect(source).toContain('sphereAlpha = uEnvironmentSphereAlpha;');
     expect(source).toContain('sceneMaterialAlpha');
     expect(source).not.toContain('lightingNormal');
-    expect(source).toContain('vec3 linear = evaluateEnvironmentRoughPlastic(');
+    expect(source).toContain('linear = evaluateEnvironmentRoughPlastic(');
     expect(source).toContain('surfaceType == ENVIRONMENT_SURFACE_FLOOR');
     expect(source).toContain('evaluateEnvironmentIrradiance(normal) *');
     expect(source).toContain('(exteriorDiffuseTransmittance / PI);');

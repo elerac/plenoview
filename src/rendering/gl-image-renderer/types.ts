@@ -60,6 +60,7 @@ export interface PanoramaUniforms extends CommonUniforms {
   environmentImportanceEntryCount: WebGLUniformLocation | null;
   environmentImportanceProjection: WebGLUniformLocation | null;
   environmentShIrradiance: WebGLUniformLocation | null;
+  environmentSphereSmoothSilver: WebGLUniformLocation | null;
   environmentSphereDiffuseReflectance: WebGLUniformLocation | null;
   environmentSphereAlpha: WebGLUniformLocation | null;
   environmentSphereIntIor: WebGLUniformLocation | null;

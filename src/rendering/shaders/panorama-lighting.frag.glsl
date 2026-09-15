@@ -42,13 +42,18 @@ void main() {
     sceneMaterialAlpha,
     surfaceType
   )) {
-    vec3 linear = evaluateEnvironmentRoughPlastic(
-      sceneNormal,
-      rayOrigin - scenePosition,
-      sceneAlbedo,
-      sceneMaterialAlpha,
-      surfaceType == ENVIRONMENT_SURFACE_FLOOR
-    ) * sceneVisibility;
+    vec3 linear;
+    if (surfaceType == ENVIRONMENT_SURFACE_SMOOTH_SILVER) {
+      linear = evaluateEnvironmentSmoothSilver(scenePosition, sceneNormal, -ray, sceneMaterialAlpha);
+    } else {
+      linear = evaluateEnvironmentRoughPlastic(
+        sceneNormal,
+        -ray,
+        sceneAlbedo,
+        sceneMaterialAlpha,
+        surfaceType == ENVIRONMENT_SURFACE_FLOOR
+      ) * sceneVisibility;
+    }
     linear *= exp2(uExposure);
     vec3 color = sanitizeDisplayColor(linearToDisplayGamma(linear));
     outColor = encodeOutputColor(screen, color, 1.0);

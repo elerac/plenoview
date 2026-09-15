@@ -1156,7 +1156,7 @@ describe('gl image renderer', () => {
       panoramaYawDeg: 15,
       environmentSphereMaterial: {
         ...state.environmentSphereMaterial,
-        alpha: 0.3
+        type: 'roughplastic' as const
       }
     };
     renderer.render(changedMaterialState);
@@ -1388,6 +1388,7 @@ describe('gl image renderer', () => {
       panoramaHfovDeg: 90,
       environmentLightingInteractive: true,
       environmentSphereMaterial: {
+        type: 'roughplastic' as const,
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
         alpha: 0.25,
         intIor: 1.6,

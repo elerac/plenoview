@@ -249,3 +249,65 @@ vec3 evaluateEnvironmentRoughPlastic(
 
   return max(diffuse + specular, vec3(0.0));
 }
+
+vec3 sampleSilverSceneRadiance(vec3 position, vec3 normal, vec3 reflectedDirection, float lod) {
+  vec3 reflectedPosition;
+  vec3 reflectedNormal;
+  vec3 reflectedAlbedo;
+  float reflectedVisibility;
+  float reflectedAlpha;
+  int reflectedSurfaceType;
+  vec3 reflectedRadiance;
+  // The center sphere is convex: its outward reflection can only hit the floor
+  // or a comparison sphere. Shade that hit with the same preview lighting.
+  if (resolveEnvironmentScene(
+    position + normal * ENVIRONMENT_RAY_EPSILON,
+    reflectedDirection,
+    reflectedPosition,
+    reflectedNormal,
+    reflectedAlbedo,
+    reflectedVisibility,
+    reflectedAlpha,
+    reflectedSurfaceType
+  )) {
+    reflectedRadiance = evaluateEnvironmentRoughPlastic(
+      reflectedNormal,
+      -reflectedDirection,
+      reflectedAlbedo,
+      reflectedAlpha,
+      reflectedSurfaceType == ENVIRONMENT_SURFACE_FLOOR
+    ) * reflectedVisibility;
+  } else {
+    reflectedRadiance = sampleEnvironmentRadiance(reflectedDirection, lod);
+  }
+  return max(reflectedRadiance, vec3(0.0));
+}
+
+vec3 evaluateEnvironmentSmoothSilver(
+  vec3 position, vec3 normal, vec3 viewDirection, float materialAlpha
+) {
+  vec3 radiance = vec3(0.0);
+  // Each scene reflection may shade another rough surface. A small quadrature
+  // budget keeps the narrow silver lobe interactive; mip filtering fills gaps.
+  int sampleCount = min(uEnvironmentSampleCounts.x, 4);
+  float maximumLod = max(log2(max(uImageSize.x, uImageSize.y)), 0.0);
+  for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
+    vec3 reflectedDirection;
+    vec3 reflectionWeight;
+    float directionPdf;
+    if (!sampleSmoothSilverReflection(
+      normal,
+      normalize(viewDirection),
+      materialAlpha,
+      roughPlasticSample2D(sampleIndex, sampleCount, 0.0),
+      reflectedDirection,
+      reflectionWeight,
+      directionPdf
+    )) {
+      continue;
+    }
+    float lod = resolveEnvironmentSampleLod(reflectedDirection, directionPdf, float(sampleCount), maximumLod);
+    radiance += sampleSilverSceneRadiance(position, normal, reflectedDirection, lod) * reflectionWeight;
+  }
+  return radiance / float(sampleCount);
+}

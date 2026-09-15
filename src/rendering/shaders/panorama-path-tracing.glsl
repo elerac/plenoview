@@ -12,7 +12,6 @@ uniform int uEnvironmentImportanceProjection;
 
 const int PATH_TRACING_PASS_ACCUMULATE = 1;
 const int ENVIRONMENT_IMPORTANCE_PROJECTION_CUBEMAP = 1;
-const float PATH_TRACING_RAY_EPSILON = 1.0e-3;
 const int PATH_TRACING_RUSSIAN_ROULETTE_START_BOUNCE = 2;
 
 uint pathTracingHash(uint value) {
@@ -469,7 +468,7 @@ bool isEnvironmentDirectionVisible(
   float ignoredMaterialAlpha;
   int ignoredSurfaceType;
   return !resolveEnvironmentScene(
-    position + normal * PATH_TRACING_RAY_EPSILON,
+    position + normal * ENVIRONMENT_RAY_EPSILON,
     direction,
     ignoredPosition,
     ignoredNormal,
@@ -537,7 +536,7 @@ vec3 traceEnvironmentPath(
     vec3 albedo;
     float ignoredVisibility;
     float materialAlpha;
-    int ignoredSurfaceType;
+    int surfaceType;
     if (!resolveEnvironmentScene(
       rayOrigin,
       rayDirection,
@@ -546,7 +545,7 @@ vec3 traceEnvironmentPath(
       albedo,
       ignoredVisibility,
       materialAlpha,
-      ignoredSurfaceType
+      surfaceType
     )) {
       float misWeight = hasPreviousBsdfSample
         ? pathTracingPowerHeuristic(
@@ -559,6 +558,29 @@ vec3 traceEnvironmentPath(
         vec3(0.0)
       ) * misWeight;
       break;
+    }
+
+    if (surfaceType == ENVIRONMENT_SURFACE_SMOOTH_SILVER) {
+      vec3 reflectedDirection;
+      vec3 reflectionWeight;
+      float ignoredReflectionPdf;
+      if (!sampleSmoothSilverReflection(
+        normal, -rayDirection, materialAlpha, nextPathTracingRandom2(randomState),
+        reflectedDirection, reflectionWeight, ignoredReflectionPdf
+      )) {
+        break;
+      }
+      throughput *= reflectionWeight;
+      rayDirection = reflectedDirection;
+      rayOrigin = position + normal * ENVIRONMENT_RAY_EPSILON;
+      // Sample the narrow silver lobe with the BSDF alone. With no environment
+      // NEE at this vertex, an escaping reflection must receive full weight.
+      hasPreviousBsdfSample = false;
+      if (bounce + 1 == uPathTracingMaxBounces &&
+          isEnvironmentDirectionVisible(position, normal, rayDirection)) {
+        radiance += throughput * max(sampleEnvironmentRadiance(rayDirection, 0.0), vec3(0.0));
+      }
+      continue;
     }
 
     radiance += throughput * samplePathTracingDirectEnvironment(
@@ -599,7 +621,7 @@ vec3 traceEnvironmentPath(
       throughput /= survivalProbability;
     }
 
-    rayOrigin = position + normal * PATH_TRACING_RAY_EPSILON;
+    rayOrigin = position + normal * ENVIRONMENT_RAY_EPSILON;
     rayDirection = nextDirection;
     previousBsdfPdf = nextBsdfPdf;
     hasPreviousBsdfSample = true;

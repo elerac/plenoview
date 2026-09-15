@@ -77,11 +77,12 @@ describe('embed params', () => {
     });
   });
 
-  it('round-trips and normalizes environment sphere material state', () => {
+  it.each(['roughplastic', 'smoothSilver'] as const)('round-trips and normalizes %s sphere material state', (type) => {
     const state = {
       panoramaDisplayMode: 'environmentLighting' as const,
       panoramaLightingMethod: 'pathTracing' as const,
       environmentSphereMaterial: {
+        type,
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
         alpha: 0.25,
         intIor: 1.6,

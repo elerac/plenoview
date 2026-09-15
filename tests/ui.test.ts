@@ -1709,6 +1709,7 @@ describe('viewer state inspector', () => {
       viewerMode: 'panorama' as const,
       panoramaDisplayMode: 'environmentLighting' as const,
       environmentSphereMaterial: {
+        type: 'roughplastic',
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
         alpha: 0.15,
         intIor: 1.6,

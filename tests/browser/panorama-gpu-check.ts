@@ -44,7 +44,7 @@ async function run(): Promise<void> {
   const sources: WebGLTexture[] = [];
   gl.bindVertexArray(vao);
 
-  async function prepare(kind: 'radiance' | 'image' | 'sphericalHarmonics'): Promise<ProgramBundle<PanoramaUniforms>> {
+  async function prepare(kind: 'radiance' | 'image' | 'sphericalHarmonics' | 'pathTracing'): Promise<ProgramBundle<PanoramaUniforms>> {
     const start = performance.now();
     for (;;) {
       const bundle = programs.get(kind);
@@ -206,6 +206,36 @@ async function run(): Promise<void> {
     });
     checkPixels(read(shaded.texture), Array.from({ length: 4 }, () => [1, 0.5, 6.75, 1]).flat(),
       'SH lighting samples the baked HDR texture with the expected diffuse response');
+
+    // At near-normal incidence, low-roughness silver in a constant environment
+    // returns radiance * 0.96 in both renderers, with no plastic diffuse term.
+    // One bounce also checks that the terminal reflection can reach the sky.
+    for (const kind of ['sphericalHarmonics', 'pathTracing'] as const) {
+      const silver = await prepare(kind);
+      gl.useProgram(silver.program);
+      const uniforms = silver.uniforms;
+      gl.uniform2f(uniforms.viewport, 2000, 2000);
+      gl.uniform2f(uniforms.screenOrigin, 999, 999);
+      gl.uniform2f(uniforms.outputSize, 2, 2);
+      gl.uniform2f(uniforms.outputPixelScale, 1, 1);
+      gl.uniform2f(uniforms.imageSize, 2, 2);
+      gl.uniform1f(uniforms.panoramaHfovDeg, 1);
+      gl.uniform1f(uniforms.displayGamma, 1);
+      gl.uniform1i(uniforms.environmentSphereSmoothSilver, 1);
+      gl.uniform3f(uniforms.environmentSphereDiffuseReflectance, 0, 0, 0);
+      gl.uniform1f(uniforms.environmentSphereAlpha, 0.02);
+      gl.uniform1i(uniforms.sourceTextureMipmapsAvailable, constantEnvironment.mipmapsAvailable ? 1 : 0);
+      for (const bounces of kind === 'pathTracing' ? [1, 6] : [1]) {
+        gl.uniform1i(uniforms.pathTracingMaxBounces, bounces);
+        const reflection = cache.getOrCreate(`silver:${kind}:${bounces}`, 2, 2, () => {
+          gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
+          gl.bindTexture(gl.TEXTURE_2D, constantEnvironment.texture);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        });
+        checkPixels(read(reflection.texture), Array.from({ length: 4 }, () => [3.84, 0.96, 8.64, 1]).flat(),
+          `${kind} polished silver reflects HDR radiance without diffuse loss or MIS dimming (${bounces} bounce limit)`);
+      }
+    }
 
     cache.deleteByPrefix('fixture:');
     check(!gl.isTexture(rgb.texture) && gl.isTexture(displayed.texture),

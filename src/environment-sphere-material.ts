@@ -7,6 +7,7 @@ export interface EnvironmentSphereDiffuseReflectance {
 }
 
 export interface EnvironmentSphereMaterial {
+  type: 'roughplastic' | 'smoothSilver';
   diffuseReflectance: EnvironmentSphereDiffuseReflectance;
   alpha: number;
   intIor: number;
@@ -32,8 +33,9 @@ const DEFAULT_DIFFUSE_REFLECTANCE: EnvironmentSphereDiffuseReflectance = {
 };
 
 export const DEFAULT_ENVIRONMENT_SPHERE_MATERIAL: Readonly<EnvironmentSphereMaterial> = Object.freeze({
+  type: 'smoothSilver',
   diffuseReflectance: Object.freeze({ ...DEFAULT_DIFFUSE_REFLECTANCE }),
-  alpha: 0.1,
+  alpha: 0.02,
   intIor: 1.49,
   extIor: 1.000277,
   distribution: 'beckmann',
@@ -49,6 +51,7 @@ export function cloneEnvironmentSphereMaterial(
 ): EnvironmentSphereMaterial {
   const resolved = material ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL;
   return {
+    type: resolved.type,
     diffuseReflectance: { ...resolved.diffuseReflectance },
     alpha: resolved.alpha,
     intIor: resolved.intIor,
@@ -64,6 +67,9 @@ export function normalizeEnvironmentSphereMaterial(
 ): EnvironmentSphereMaterial {
   const diffusePatch = patch?.diffuseReflectance;
   return {
+    type: patch?.type === 'roughplastic' || patch?.type === 'smoothSilver'
+      ? patch.type
+      : base.type,
     diffuseReflectance: {
       r: clampFinite(diffusePatch?.r, 0, 1, base.diffuseReflectance.r),
       g: clampFinite(diffusePatch?.g, 0, 1, base.diffuseReflectance.g),
@@ -105,6 +111,8 @@ export function normalizeEnvironmentSphereMaterialValue(value: unknown): Environ
     ? diffuseValue as Record<string, unknown>
     : {};
   return normalizeEnvironmentSphereMaterial({
+    // Snapshots created before material types were introduced used roughplastic.
+    type: record.type === 'smoothSilver' ? 'smoothSilver' : 'roughplastic',
     diffuseReflectance: {
       r: finiteNumberOrUndefined(diffuseRecord.r),
       g: finiteNumberOrUndefined(diffuseRecord.g),
@@ -127,6 +135,7 @@ export function sameEnvironmentSphereMaterial(
   const resolvedA = a ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL;
   const resolvedB = b ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL;
   return (
+    resolvedA.type === resolvedB.type &&
     resolvedA.diffuseReflectance.r === resolvedB.diffuseReflectance.r &&
     resolvedA.diffuseReflectance.g === resolvedB.diffuseReflectance.g &&
     resolvedA.diffuseReflectance.b === resolvedB.diffuseReflectance.b &&

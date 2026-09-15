@@ -1,4 +1,5 @@
 uniform bool uSourceTextureMipmapsAvailable;
+uniform bool uEnvironmentSphereSmoothSilver;
 uniform vec3 uEnvironmentSphereDiffuseReflectance;
 uniform float uEnvironmentSphereAlpha;
 uniform float uEnvironmentSphereIntIor;
@@ -10,6 +11,10 @@ uniform sampler2D uEnvironmentRadianceTexture;
 
 const int ENVIRONMENT_SURFACE_FLOOR = 0;
 const int ENVIRONMENT_SURFACE_SPHERE = 1;
+const int ENVIRONMENT_SURFACE_SMOOTH_SILVER = 2;
+const float ENVIRONMENT_RAY_EPSILON = 1.0e-3;
+// Neutral, high reflectance gives polished silver a mirror-like appearance.
+const vec3 ENVIRONMENT_SILVER_REFLECTANCE = vec3(0.96);
 const int MICROFACET_DISTRIBUTION_BECKMANN = 0;
 const int MICROFACET_DISTRIBUTION_GGX = 1;
 const float ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP = 4.0;
@@ -100,6 +105,9 @@ bool resolveEnvironmentScene(
   vec3 sphereCenter = ENVIRONMENT_SPHERE_CENTER;
   vec3 sphereDiffuseReflectance = uEnvironmentSphereDiffuseReflectance;
   float sphereAlpha = uEnvironmentSphereAlpha;
+  int sphereSurfaceType = uEnvironmentSphereSmoothSilver
+    ? ENVIRONMENT_SURFACE_SMOOTH_SILVER
+    : ENVIRONMENT_SURFACE_SPHERE;
   for (
     int sphereIndex = 0;
     sphereIndex < ENVIRONMENT_COMPARISON_SPHERE_COUNT;
@@ -120,6 +128,7 @@ bool resolveEnvironmentScene(
       sphereDiffuseReflectance =
         ENVIRONMENT_COMPARISON_SPHERE_DIFFUSE_REFLECTANCE[sphereIndex];
       sphereAlpha = ENVIRONMENT_COMPARISON_SPHERE_ALPHA[sphereIndex];
+      sphereSurfaceType = ENVIRONMENT_SURFACE_SPHERE;
     }
   }
   float floorDistance = intersectEnvironmentFloor(
@@ -134,7 +143,7 @@ bool resolveEnvironmentScene(
     albedo = sphereDiffuseReflectance;
     visibility = 1.0;
     materialAlpha = sphereAlpha;
-    surfaceType = ENVIRONMENT_SURFACE_SPHERE;
+    surfaceType = sphereSurfaceType;
     return true;
   }
 
@@ -299,6 +308,11 @@ float evaluateRoughPlasticMicrofacetDistribution(float normalDotMicrofacet, floa
     max(PI * alphaSquared * cosThetaFourth, 1.0e-8);
 }
 
+vec3 evaluateSmoothSilverFresnel(float cosTheta) {
+  float grazing = pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
+  return mix(ENVIRONMENT_SILVER_REFLECTANCE, vec3(1.0), grazing);
+}
+
 float evaluateDielectricFresnel(float cosThetaI, float eta) {
   float cosTheta = clamp(abs(cosThetaI), 0.0, 1.0);
   float sinThetaTSquared = max(0.0, 1.0 - cosTheta * cosTheta) / (eta * eta);
@@ -370,6 +384,46 @@ float approximateInternalDiffuseReflectance(float eta) {
     0.0,
     0.999
   );
+}
+
+bool sampleSmoothSilverReflection(
+  vec3 normal,
+  vec3 viewDirection,
+  float materialAlpha,
+  vec2 sampleValue,
+  out vec3 lightDirection,
+  out vec3 reflectionWeight,
+  out float directionPdf
+) {
+  float alpha = clamp(materialAlpha, 1.0e-3, 1.0);
+  vec3 cameraForward;
+  vec3 cameraRight;
+  vec3 cameraDown;
+  resolveEnvironmentOrbitBasis(cameraForward, cameraRight, cameraDown);
+  vec3 tangent;
+  vec3 bitangent;
+  buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);
+  vec3 microfacetNormal = roughPlasticLocalToWorld(
+    sampleRoughPlasticMicrofacetNormal(sampleValue, alpha), normal, tangent, bitangent
+  );
+  float normalDotView = dot(normal, viewDirection);
+  float viewDotMicrofacet = dot(viewDirection, microfacetNormal);
+  float normalDotMicrofacet = dot(normal, microfacetNormal);
+  lightDirection = reflect(-viewDirection, microfacetNormal);
+  reflectionWeight = vec3(0.0);
+  directionPdf = 0.0;
+  if (normalDotView <= 0.0 || viewDotMicrofacet <= 0.0 ||
+      normalDotMicrofacet <= 0.0 || dot(normal, lightDirection) <= 0.0) {
+    return false;
+  }
+  float geometry = evaluateRoughPlasticSmithG1(
+    lightDirection, microfacetNormal, normal, alpha
+  ) * evaluateRoughPlasticSmithG1(viewDirection, microfacetNormal, normal, alpha);
+  reflectionWeight = evaluateSmoothSilverFresnel(viewDotMicrofacet) *
+    (geometry * viewDotMicrofacet / max(normalDotView * normalDotMicrofacet, 1.0e-8));
+  directionPdf = evaluateRoughPlasticMicrofacetDistribution(normalDotMicrofacet, alpha) *
+    normalDotMicrofacet / max(4.0 * viewDotMicrofacet, 1.0e-8);
+  return true;
 }
 
 // The selected display channels are evaluated once into a linear HDR texture.
