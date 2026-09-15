@@ -172,10 +172,18 @@ export function renderPanoramaPass(
 ): boolean {
   const kind = resolvePanoramaProgramKind(viewerState);
   const polarizedSource = kind === 'pathTracing' ? state.activePolarizedEnvironment : null;
-  const program = state.panoramaPrograms.get(kind, Boolean(polarizedSource));
+  const material = normalizeEnvironmentSphereMaterial(viewerState.environmentSphereMaterial);
+  const program = state.panoramaPrograms.get(kind, Boolean(polarizedSource), {
+    depolarizingSphere: material.type === 'roughplastic',
+    accumulationOnly: Boolean(target && state.pathTracingFloatAccumulationSupported)
+  });
   const radianceProgram = kind === 'image' || polarizedSource ? null : state.panoramaPrograms.get('radiance');
+  // The material integrals used to block this frame for several seconds after
+  // shader linking. Prepare them in bounded slices while compilation proceeds.
+  const materialReady = kind !== 'pathTracing' || (polarizedSource && material.type !== 'roughplastic') ||
+    state.roughPlasticTransmittanceCache.prepare(material);
   // Request both programs before polling again, so their compilation can overlap.
-  if (!program || (kind !== 'image' && !polarizedSource && !radianceProgram)) {
+  if (!program || (kind !== 'image' && !polarizedSource && !radianceProgram) || !materialReady) {
     state.preparingPanorama = true;
     return true;
   }
@@ -221,6 +229,8 @@ export function renderPanoramaPass(
         target.outputRect.width,
         target.outputRect.height
       );
+      // Float allocation failed: prepare the direct-output shader instead.
+      return renderPanoramaPass(state, viewerState, options, target);
     }
   }
 

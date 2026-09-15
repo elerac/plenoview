@@ -184,13 +184,16 @@ function numericalCases(): NumericalCase[] {
   return cases;
 }
 
-for (const specialized of [false, true]) {
-test(`production ${specialized ? 'specialized' : 'dynamic'} polarized GLSL matches independent Mitsuba numerical references @smoke`, async ({ page }, testInfo) => {
+for (const variant of ['dynamic', 'polarized', 'depolarizing'] as const) {
+test(`production ${variant} polarized GLSL matches independent Mitsuba numerical references @smoke`, async ({ page }, testInfo) => {
   test.setTimeout(120_000);
-  const cases = numericalCases();
+  // A depolarizing central sphere is intentionally compiled in its own variant.
+  const cases = numericalCases().filter(entry => variant !== 'polarized' ||
+    !entry.label.startsWith('rough plastic full glossy'));
   const components = ['panorama-common.glsl', 'panorama-projection.glsl', 'panorama-lighting.glsl', 'panorama-polarization.glsl', 'panorama-path-tracing.glsl'];
   const prefix = '#version 300 es\n' +
-    (specialized ? '#define PATH_TRACING_POLARIZED_ENVIRONMENT true\n' : '') +
+    (variant === 'dynamic' ? '' : '#define PATH_TRACING_POLARIZED_ENVIRONMENT true\n' +
+      `#define PATH_TRACING_DEPOLARIZING_SPHERE ${variant === 'depolarizing'}\n`) +
     components.map(file => readFileSync(new URL(`../src/rendering/shaders/${file}`, import.meta.url), 'utf8')).join('\n') + `
 uniform sampler2D uTestTexture;
 vec4 packStokes(PolarizedStokes value) { return vec4(value.s0.r,value.s1.r,value.s2.r,value.s3.r); }

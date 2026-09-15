@@ -1,6 +1,10 @@
 // Runtime bounce bounds keep compilation independent of the requested quality.
 uniform int uPathTracingMaxBounces;
+#ifdef PATH_TRACING_ACCUMULATE_ONLY
+const int uPathTracingPass = 1;
+#else
 uniform int uPathTracingPass;
+#endif
 uniform int uPathTracingSampleIndex;
 uniform float uPathTracingBlendWeight;
 uniform sampler2D uPathTracingPreviousTexture;
@@ -571,9 +575,16 @@ bool samplePathTracingPolarizedPlastic(
 }
 
 bool usesPolarizedPlasticSurface(int surfaceType) {
+#ifdef PATH_TRACING_DEPOLARIZING_SPHERE
+  // In a polarized environment, floor/comparison spheres use polarized plastic.
+  // Conductors have already branched before this call. Only the central legacy
+  // roughplastic material can require the scalar BSDF path.
+  return !PATH_TRACING_DEPOLARIZING_SPHERE || surfaceType != ENVIRONMENT_SURFACE_SPHERE;
+#else
   if (surfaceType == ENVIRONMENT_SURFACE_SPHERE) return uEnvironmentSpherePolarizedPlastic;
   return uEnvironmentPolarized && (surfaceType == ENVIRONMENT_SURFACE_FLOOR ||
     surfaceType == ENVIRONMENT_SURFACE_COMPARISON_SPHERE);
+#endif
 }
 
 bool isEnvironmentDirectionVisible(

@@ -16,8 +16,9 @@ function writeJson(path, value) {
 
 const [mode, ...args] = process.argv.slice(2);
 if (mode === 'snapshot') {
-  if (!args[0] || (args[1] !== undefined && !['true', 'false'].includes(args[1]))) {
-    throw new Error('Use snapshot <file> [true|false]');
+  if (!args[0] || args.slice(1, 3).some(arg => !['true', 'false'].includes(arg)) ||
+    (args[3] !== undefined && args[3] !== 'accumulate')) {
+    throw new Error('Use snapshot <file> [polarized true|false] [depolarizing true|false] [accumulate]');
   }
   const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
   try {
@@ -25,7 +26,7 @@ if (mode === 'snapshot') {
     const pendingModule = await vite.ssrLoadModule('/src/rendering/gl-image-renderer/pending-program.ts');
     const snapshot = {
       vertex: readFileSync('src/rendering/shaders/fullscreen-triangle.vert.glsl', 'utf8'),
-      fragment: sourceModule.createPanoramaFragmentSource('pathTracing', args[1] === undefined ? undefined : args[1] === 'true'),
+      fragment: sourceModule.createPanoramaFragmentSource('pathTracing', args[1] === undefined ? undefined : args[1] === 'true', args[2] === undefined ? undefined : args[2] === 'true', args[3] === 'accumulate'),
       pending: pendingModule.createPendingProgram.toString()
     };
     snapshot.hash = createHash('sha256').update(snapshot.fragment).digest('hex');

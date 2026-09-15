@@ -21,7 +21,7 @@ test('explains shader preparation until ready and clears the message on mode exi
 
   const message = page.locator('.panorama-preparing');
   await expect(message).toBeVisible();
-  await expect(message).toContainText('Compiling graphics shaders. This may take a few seconds.');
+  await expect(message).toContainText('Preparing graphics shaders and material lighting. Controls remain available.');
   await page.locator('#exposure-slider').press('ArrowRight');
   await expect(page.locator('#exposure-value')).toHaveValue('0.1');
   await expect(message).toBeVisible();
@@ -61,6 +61,15 @@ test('renders each panorama program and keeps exposure controls usable @smoke', 
     'panorama-image-menu-item',
     'environment-path-tracing-menu-item'
   ].entries()) {
+    await page.evaluate(() => {
+      const probe = { last: performance.now(), maximumGap: 0, timer: 0 };
+      probe.timer = window.setInterval(() => {
+        const now = performance.now();
+        probe.maximumGap = Math.max(probe.maximumGap, now - probe.last);
+        probe.last = now;
+      }, 16);
+      Object.assign(window, { panoramaResponsivenessProbe: probe });
+    });
     await page.locator('#view-menu-button').click();
     await page.locator('#panorama-viewer-menu-item').click();
     await page.locator(`#${id}`).click();
@@ -69,6 +78,21 @@ test('renders each panorama program and keeps exposure controls usable @smoke', 
     await expect.poll(async () => Number(await page.locator('#exposure-value').inputValue()))
       .toBe((index + 1) / 10);
     await expect(page.locator('#gl-canvas')).toHaveAttribute('aria-busy', 'false', { timeout: 30_000 });
+    const maximumGap = await page.evaluate(async () => {
+      // Include the last render task even if it finishes just before this read.
+      await new Promise(resolve => setTimeout(resolve, 32));
+      const probe = (window as unknown as {
+        panoramaResponsivenessProbe: { timer: number; maximumGap: number };
+      }).panoramaResponsivenessProbe;
+      clearInterval(probe.timer);
+      return probe.maximumGap;
+    });
+    await testInfo.attach(`${id}-event-loop`, {
+      body: JSON.stringify({ maximumGapMs: maximumGap }), contentType: 'application/json'
+    });
+    // Catch the former multi-second material integration in a single render task.
+    // Leave headroom for loaded CI machines and graphics-driver scheduling.
+    expect(maximumGap).toBeLessThan(1000);
     await expect(page.locator('#error-banner')).toBeHidden();
     const state = await page.evaluate(() => {
       const gl = (document.querySelector('#gl-canvas') as HTMLCanvasElement).getContext('webgl2')!;

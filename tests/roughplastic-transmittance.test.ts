@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   computeRoughPlasticTransmittance,
   integrateRoughDielectric,
@@ -7,6 +8,20 @@ import {
 import { evaluateDielectricFresnel } from '../src/roughplastic';
 
 describe('Mitsuba rough plastic hemispherical tables', () => {
+  it('preserves all angular values from the pre-optimization Beckmann tables', () => {
+    // Captured before reusing X slopes across quadrature rows; compare every
+    // angle at both narrow and broad roughness, including internal reflection.
+    const references = JSON.parse(readFileSync(new URL('./helpers/roughplastic-transmittance-reference.json', import.meta.url), 'utf8')) as {
+      alpha: number; eta: number; externalTransmittance: number[]; internalReflectance: number;
+    }[];
+    for (const reference of references) {
+      const actual = computeRoughPlasticTransmittance({ ...reference, distribution: 'beckmann' });
+      expect(actual.externalTransmittance.length).toBe(reference.externalTransmittance.length);
+      actual.externalTransmittance.forEach((value, index) => expect(value).toBeCloseTo(reference.externalTransmittance[index], 7));
+      expect(actual.internalReflectance).toBeCloseTo(reference.internalReflectance, 12);
+    }
+  });
+
   it.each(['beckmann', 'ggx'] as const)('approaches smooth-interface Fresnel as %s roughness tends to zero', distribution => {
     for (const mu of [0.3, 0.7, 1]) {
       const input = { distribution, alpha: 1e-4, eta: 1.5 };

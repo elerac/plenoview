@@ -25,12 +25,25 @@ const quadratureCache = new Map<number, readonly QuadratureSample[]>();
 export function computeRoughPlasticTransmittance(
   input: RoughPlasticTransmittanceInput
 ): RoughPlasticTransmittance {
+  const steps = computeRoughPlasticTransmittanceSteps(input);
+  for (;;) {
+    const step = steps.next();
+    if (step.done) return step.value;
+  }
+}
+
+/** Yield between angular integrals so live preparation can budget its CPU work. */
+export function* computeRoughPlasticTransmittanceSteps(
+  input: RoughPlasticTransmittanceInput
+): Generator<void, RoughPlasticTransmittance, void> {
   const externalTransmittance = new Float32Array(ROUGH_PLASTIC_TRANSMITTANCE_RESOLUTION);
   let internalReflectance = 0;
   for (let i = 0; i < externalTransmittance.length; i += 1) {
     const mu = Math.max(1e-6, i / (externalTransmittance.length - 1));
     externalTransmittance[i] = integrateRoughDielectric(input, mu, false);
+    yield;
     internalReflectance += integrateRoughDielectric({ ...input, eta: 1 / input.eta }, mu, true) * mu;
+    yield;
   }
   return {
     externalTransmittance,
@@ -53,9 +66,18 @@ export function integrateRoughDielectric(
   const mu = Math.max(1e-6, Math.min(1, cosTheta));
   const wi: Vector3 = [Math.sqrt(Math.max(0, 1 - mu * mu)), 0, mu];
   const stretchedCos = mu / Math.hypot(alpha * wi[0], mu);
+  const samples = quadratureSamples(quadratureOrder);
+  // Beckmann's X slope depends only on the X quadrature node and view angle.
+  // Reuse it across all Y nodes instead of repeating the inverse-erf solve
+  // 32 or 128 times for each column. Summation order stays unchanged.
+  const beckmannSlopes = input.distribution === 'beckmann'
+    ? samples.slice(0, quadratureOrder).map(node => beckmannSlopeX(stretchedCos, node.x))
+    : null;
   let integral = 0;
-  for (const node of quadratureSamples(quadratureOrder)) {
-    const m = sampleVisibleNormal(stretchedCos, alpha, input.distribution, node);
+  for (let index = 0; index < samples.length; index++) {
+    const node = samples[index];
+    const m = sampleVisibleNormal(stretchedCos, alpha, input.distribution, node,
+      beckmannSlopes?.[index % quadratureOrder] ?? 0);
     const cosIncident = wi[0] * m[0] + wi[2] * m[2];
     const fresnel = dielectricFresnel(cosIncident, eta);
     let wo: Vector3;
@@ -107,22 +129,27 @@ function smithG1(v: Vector3, directionDotMicrofacet: number, alpha: number, dist
   return a >= 1.6 ? 1 : (3.535 * a + 2.181 * a * a) / (1 + 2.276 * a + 2.577 * a * a);
 }
 
-function sampleVisibleNormal(cosTheta: number, alpha: number, distribution: EnvironmentMicrofacetDistribution, sample: QuadratureSample): Vector3 {
+function beckmannSlopeX(cosTheta: number, sampleX: number): number {
+  const cotTheta = cosTheta / Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
+  const tanTheta = 1 / cotTheta;
+  const maxValue = erf(cotTheta);
+  const u = Math.min(1 - 1e-6, Math.max(1e-6, sampleX));
+  let x = maxValue - (maxValue + 1) * erf(Math.sqrt(-Math.log(u)));
+  const target = u * (1 + maxValue + tanTheta * Math.exp(-cotTheta * cotTheta) / Math.sqrt(Math.PI));
+  for (let i = 0; i < 3; i += 1) {
+    const slope = inverseErf(x);
+    const value = 1 + x + tanTheta * Math.exp(-slope * slope) / Math.sqrt(Math.PI) - target;
+    x -= value / (1 - slope * tanTheta);
+  }
+  return inverseErf(x);
+}
+
+function sampleVisibleNormal(cosTheta: number, alpha: number, distribution: EnvironmentMicrofacetDistribution,
+  sample: QuadratureSample, beckmannX: number): Vector3 {
   let slopeX: number;
   let slopeY: number;
   if (distribution === 'beckmann') {
-    const cotTheta = cosTheta / Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
-    const tanTheta = 1 / cotTheta;
-    const maxValue = erf(cotTheta);
-    const u = Math.min(1 - 1e-6, Math.max(1e-6, sample.x));
-    let x = maxValue - (maxValue + 1) * erf(Math.sqrt(-Math.log(u)));
-    const target = u * (1 + maxValue + tanTheta * Math.exp(-cotTheta * cotTheta) / Math.sqrt(Math.PI));
-    for (let i = 0; i < 3; i += 1) {
-      const slope = inverseErf(x);
-      const value = 1 + x + tanTheta * Math.exp(-slope * slope) / Math.sqrt(Math.PI) - target;
-      x -= value / (1 - slope * tanTheta);
-    }
-    slopeX = inverseErf(x);
+    slopeX = beckmannX;
     slopeY = sample.inverseErfY;
   } else {
     const sx = 2 * sample.x - 1;

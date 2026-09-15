@@ -9,6 +9,8 @@ import type { ExportImagePixels } from '../../export/export-pixels';
 import type { ChannelRecognitionNameRules } from '../../channel-recognition-name-rules';
 import type { Disposable } from '../../lifecycle';
 import type { EnvironmentImportanceSamplingTable } from '../../panorama-lighting';
+import { usesPathTracingEnvironmentLighting } from '../../panorama-lighting';
+import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
 import type { DecodedLayer, ViewerState, ViewportInfo } from '../../types';
 import type { ViewerPaneRenderInfo } from '../../viewer-pane-layout';
 import { REQUIRED_TEXTURE_UNITS } from './constants';
@@ -279,10 +281,20 @@ export class GlImageRenderer implements Disposable {
     return readExportPixels(this.state, args);
   }
 
-  preparePanoramaPrograms(state: ViewerState, signal?: AbortSignal): Promise<void> {
+  async preparePanoramaPrograms(state: ViewerState, signal?: AbortSignal): Promise<void> {
     // Capture the prepared export source before another pane can change it
     // while the shader compilation promise is pending.
-    return this.state.panoramaPrograms.prepare(state, signal, Boolean(this.state.activePolarizedEnvironment));
+    const polarized = Boolean(this.state.activePolarizedEnvironment);
+    const material = normalizeEnvironmentSphereMaterial(state.environmentSphereMaterial);
+    await this.state.panoramaPrograms.prepare(state, signal, polarized,
+      polarized && this.state.pathTracingFloatAccumulationSupported);
+    if (state.viewerMode !== 'panorama' || !usesPathTracingEnvironmentLighting(state) ||
+      (polarized && material.type !== 'roughplastic')) return;
+    for (;;) {
+      signal?.throwIfAborted();
+      if (this.state.roughPlasticTransmittanceCache.prepare(material)) return;
+      await new Promise<void>(resolve => setTimeout(resolve, 16));
+    }
   }
 
   render(state: ViewerState): boolean {

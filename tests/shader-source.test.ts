@@ -31,6 +31,17 @@ describe('shader source regressions', () => {
     expect(createPanoramaFragmentSource('image', true)).toBe(createPanoramaFragmentSource('image', false));
   });
 
+  it('restricts material specialization to polarized sources and specializes accumulation independently', () => {
+    const progressive = createPanoramaFragmentSource('pathTracing', true, false, true);
+    expect(progressive).toContain('#define PATH_TRACING_DEPOLARIZING_SPHERE false');
+    expect(progressive).toContain('#define PATH_TRACING_ACCUMULATE_ONLY');
+    const direct = createPanoramaFragmentSource('pathTracing', true, true);
+    expect(direct).toContain('#define PATH_TRACING_DEPOLARIZING_SPHERE true');
+    expect(direct).not.toContain('#define PATH_TRACING_ACCUMULATE_ONLY');
+    expect(createPanoramaFragmentSource('pathTracing', false, true))
+      .not.toContain('#define PATH_TRACING_DEPOLARIZING_SPHERE');
+  });
+
   it('compiles separate panorama modes without unrelated rendering algorithms', () => {
     const imageSource = createPanoramaFragmentSource('image');
     const pathSource = createPanoramaFragmentSource('pathTracing');

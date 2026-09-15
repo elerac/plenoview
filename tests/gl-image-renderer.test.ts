@@ -26,11 +26,74 @@ import {
   createInterleavedLayerFromChannels
 } from './helpers/state-fixtures';
 
+// These tests inspect WebGL state and scheduling. Numerical quadrature is
+// covered separately; keep material tables immediate unless a test holds them.
+vi.mock('../src/roughplastic-transmittance', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/roughplastic-transmittance')>(),
+  computeRoughPlasticTransmittanceSteps: function* () {
+    yield* [];
+    return { externalTransmittance: new Float32Array(64).fill(0.9), internalReflectance: 0.1 };
+  }
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe('gl image renderer', () => {
+  it('keeps material preparation busy after shaders link and lets the user leave panorama', () => {
+    const { renderer, gl, canvas } = createHarness();
+    const cache = getRendererState(renderer).roughPlasticTransmittanceCache;
+    const prepare = vi.spyOn(cache, 'prepare').mockReturnValueOnce(false);
+    const upload = vi.spyOn(cache, 'getOrCreate');
+    const state = createPanoramaState({ panoramaDisplayMode: 'environmentLighting' });
+
+    expect(renderer.render(state)).toBe(true);
+    expect(canvas.getAttribute('aria-busy')).toBe('true');
+    expect(gl.drawArrays).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+    expect(prepare).toHaveBeenCalledTimes(1);
+
+    expect(renderer.render({ ...state, viewerMode: 'image' })).toBe(false);
+    expect(canvas.getAttribute('aria-busy')).toBe('false');
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(renderer.render(state)).toBe(false);
+    expect(canvas.getAttribute('aria-busy')).toBe('false');
+    expect(upload).toHaveBeenCalledTimes(1);
+    renderer.dispose();
+  });
+
+  it('awaits material preparation for exports and supports aborting between CPU slices', async () => {
+    vi.useFakeTimers();
+    const { renderer } = createHarness();
+    const prepare = vi.spyOn(getRendererState(renderer).roughPlasticTransmittanceCache, 'prepare')
+      .mockReturnValue(false);
+    const state = createPanoramaState({ panoramaDisplayMode: 'environmentLighting' });
+    const controller = new AbortController();
+    try {
+      const preparation = renderer.preparePanoramaPrograms(state, controller.signal);
+      const aborted = expect(preparation).rejects.toThrow('cancel preparation');
+      await vi.advanceTimersByTimeAsync(32);
+      expect(prepare).toHaveBeenCalledTimes(3);
+      controller.abort(new Error('cancel preparation'));
+      await vi.advanceTimersByTimeAsync(16);
+      await aborted;
+      expect(prepare).toHaveBeenCalledTimes(3);
+
+      let ready = false;
+      const resumed = renderer.preparePanoramaPrograms(state).then(() => { ready = true; });
+      await vi.advanceTimersByTimeAsync(16);
+      expect(ready).toBe(false);
+      prepare.mockReturnValue(true);
+      await vi.advanceTimersByTimeAsync(16);
+      await resumed;
+      expect(ready).toBe(true);
+    } finally {
+      renderer.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps panorama frames pending without waiting for link status or drawing', () => {
     const parallelCompilation = { complete: false };
     const { renderer, gl } = createHarness({ parallelCompilation });
@@ -98,7 +161,7 @@ describe('gl image renderer', () => {
       .filter(source => source.includes('#define PATH_TRACING_POLARIZED_ENVIRONMENT '));
 
     renderer.render(state);
-    const polarizedProgram = programs.get('pathTracing', true)!.program;
+    const polarizedProgram = programs.get('pathTracing', true, { accumulationOnly: true })!.program;
     expect(gl.createProgram).toHaveBeenCalledTimes(4);
     expect(compiledVariants()).toEqual([expect.stringContaining('#define PATH_TRACING_POLARIZED_ENVIRONMENT true')]);
 
@@ -169,6 +232,49 @@ describe('gl image renderer', () => {
       renderer.dispose();
       vi.useRealTimers();
     }
+  });
+
+  it('reuses polarized plastic/conductor programs and keeps legacy roughplastic in a separate variant', () => {
+    const { renderer, gl, state } = createPolarizedHarness();
+    const cache = getRendererState(renderer).panoramaPrograms;
+    renderer.render(state);
+    const fast = cache.get('pathTracing', true, { accumulationOnly: true })!;
+    const plastic = { ...state, environmentSphereMaterial: { ...state.environmentSphereMaterial!, type: 'pplastic' as const } };
+    renderer.render(plastic);
+    expect(gl.createProgram).toHaveBeenCalledTimes(4);
+    renderer.render({ ...plastic, environmentSphereMaterial: { ...plastic.environmentSphereMaterial, type: 'roughplastic' } });
+    const legacy = cache.get('pathTracing', true, { accumulationOnly: true, depolarizingSphere: true })!;
+    expect(legacy.program).not.toBe(fast.program);
+    expect(gl.createProgram).toHaveBeenCalledTimes(5);
+    renderer.render(state);
+    expect(gl.createProgram).toHaveBeenCalledTimes(5);
+    const sources = vi.mocked(gl.shaderSource).mock.calls.map(call => call[1]);
+    expect(sources.some(source => source.includes('#define PATH_TRACING_DEPOLARIZING_SPHERE false'))).toBe(true);
+    expect(sources.some(source => source.includes('#define PATH_TRACING_DEPOLARIZING_SPHERE true'))).toBe(true);
+    renderer.dispose();
+  });
+
+  it('prepares a direct-output fallback when polarized float accumulation cannot be allocated', () => {
+    const parallelCompilation = { complete: true };
+    const { renderer, gl, state } = createPolarizedHarness({ parallelCompilation });
+    vi.mocked(gl.checkFramebufferStatus).mockImplementationOnce(() => {
+      parallelCompilation.complete = false;
+      return 0;
+    });
+    expect(renderer.render(state)).toBe(true);
+    expect(getRendererState(renderer).pathTracingFloatAccumulationSupported).toBe(false);
+    expect(gl.drawArrays).not.toHaveBeenCalled();
+    expect(gl.createProgram).toHaveBeenCalledTimes(5);
+    const sources = vi.mocked(gl.shaderSource).mock.calls.map(call => call[1])
+      .filter(source => source.includes('#define PATH_TRACING_POLARIZED_ENVIRONMENT'));
+    expect(sources[0]).toContain('#define PATH_TRACING_ACCUMULATE_ONLY');
+    expect(sources[1]).not.toContain('#define PATH_TRACING_ACCUMULATE_ONLY');
+    parallelCompilation.complete = true;
+    expect(renderer.render(state)).toBe(false);
+    expect(gl.drawArrays).toHaveBeenCalledTimes(1);
+    expect(lastUniform1iValue(gl, 'uPathTracingPass')).toBe(2);
+    expect(getRendererState(renderer).preparingPanorama).toBe(false);
+    renderer.dispose();
   });
 
   it('rebakes linear radiance for source revisions and Stokes changes, and reuses it for display adjustments', () => {

@@ -48,7 +48,10 @@ for (const realFile of [false, true]) {
         if (!this.getParameter(this.FRAMEBUFFER_BINDING)) return;
         const polarized = this.getUniformLocation(program, 'uEnvironmentStokesS1Texture');
         const pass = this.getUniformLocation(program, 'uPathTracingPass');
-        if (!polarized || !pass || this.getUniform(program, pass) !== 1) return;
+        // The optimized accumulation program has a constant pass, so the
+        // driver removes that uniform. Its blend weight still identifies it.
+        const blend = this.getUniformLocation(program, 'uPathTracingBlendWeight');
+        if (!polarized || !blend || (pass && this.getUniform(program, pass) !== 1)) return;
         const sample = this.getUniformLocation(program, 'uPathTracingSampleIndex');
         const index = Number(this.getUniform(program, sample!));
         window.__polarizedSampleIndices!.push(index);
@@ -63,12 +66,15 @@ for (const realFile of [false, true]) {
         }
         this.readBuffer(this.COLOR_ATTACHMENT0);
         const plastic = this.getUniformLocation(program, 'uEnvironmentSpherePolarizedPlastic');
+        const rough = Boolean(this.getUniform(program, this.getUniformLocation(program, 'uEnvironmentSphereRoughSilver')!));
+        const smooth = Boolean(this.getUniform(program, this.getUniformLocation(program, 'uEnvironmentSphereSmoothSilver')!));
         window.__polarizedFrames!.push({
-          index, stokes, error: this.getError(), pplastic: Boolean(plastic && this.getUniform(program, plastic)),
+          index, stokes, error: this.getError(),
+          pplastic: plastic ? Boolean(this.getUniform(program, plastic)) : !rough && !smooth,
           alpha: Number(this.getUniform(program, this.getUniformLocation(program, 'uEnvironmentSphereAlpha')!)),
           distribution: Number(this.getUniform(program, this.getUniformLocation(program, 'uEnvironmentSphereDistribution')!)),
           diffuse: Array.from(this.getUniform(program, this.getUniformLocation(program, 'uEnvironmentSphereDiffuseReflectance')!) as Float32Array),
-          conductor: Boolean(this.getUniform(program, this.getUniformLocation(program, 'uEnvironmentSphereRoughSilver')!))
+          conductor: rough
         });
       };
     });

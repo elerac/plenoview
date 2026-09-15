@@ -1,6 +1,7 @@
 import vertexSource from '../shaders/fullscreen-triangle.vert.glsl?raw';
 import { resolvePanoramaDisplayMode, resolvePanoramaLightingMethod } from '../../panorama-lighting';
 import type { ViewerRenderState } from '../../types';
+import { normalizeEnvironmentSphereMaterial } from '../../environment-sphere-material';
 import { DISPLAY_SOURCE_SLOT_COUNT } from '../../display/bindings';
 import { COLORMAP_TEXTURE_UNIT, PATH_TRACING_ACCUMULATION_TEXTURE_UNIT, PATH_TRACING_ENVIRONMENT_TABLE_TEXTURE_UNIT, ENVIRONMENT_STOKES_TEXTURE_UNITS, PATH_TRACING_STOKES_TEXTURE_UNITS } from './constants';
 import { createPendingProgram, type PendingProgram } from './pending-program';
@@ -10,7 +11,10 @@ import type { PanoramaUniforms, ProgramBundle } from './types';
 
 export const ENVIRONMENT_RADIANCE_TEXTURE_UNIT = 15;
 type ProgramKind = PanoramaProgramKind | 'radiance';
-type ProgramKey = ProgramKind | 'pathTracingPolarized';
+interface PathTracingProgramOptions {
+  depolarizingSphere?: boolean;
+  accumulationOnly?: boolean;
+}
 interface ProgramEntry {
   pending: PendingProgram;
   bundle: ProgramBundle<PanoramaUniforms> | null;
@@ -18,20 +22,24 @@ interface ProgramEntry {
 
 /** Only requested modes compile. Polling never asks the driver to wait for a link. */
 export class PanoramaPrograms {
-  private readonly entries = new Map<ProgramKey, ProgramEntry>();
+  private readonly entries = new Map<string, ProgramEntry>();
   private disposed = false;
 
   constructor(private readonly gl: WebGL2RenderingContext) {}
 
-  get(kind: ProgramKind, polarized = false): ProgramBundle<PanoramaUniforms> | null {
+  get(kind: ProgramKind, polarized = false, options: PathTracingProgramOptions = {}): ProgramBundle<PanoramaUniforms> | null {
     if (this.disposed) throw new Error('Renderer has been disposed.');
-    const key = kind === 'pathTracing' && polarized ? 'pathTracingPolarized' : kind;
+    const depolarizingSphere = Boolean(options.depolarizingSphere);
+    const accumulationOnly = Boolean(options.accumulationOnly);
+    const key = kind === 'pathTracing' && polarized
+      ? `pathTracingPolarized:${depolarizingSphere}:${accumulationOnly}` : kind;
     let entry = this.entries.get(key);
     if (!entry) {
       entry = {
         pending: createPendingProgram(this.gl, vertexSource, kind === 'radiance'
           ? environmentRadianceFragmentSource
-          : createPanoramaFragmentSource(kind, polarized)),
+          : createPanoramaFragmentSource(kind, polarized, polarized ? depolarizingSphere : undefined,
+            polarized && accumulationOnly)),
         bundle: null
       };
       this.entries.set(key, entry);
@@ -43,12 +51,13 @@ export class PanoramaPrograms {
     return entry.bundle;
   }
 
-  async prepare(state: ViewerRenderState, signal?: AbortSignal, polarized = false): Promise<void> {
+  async prepare(state: ViewerRenderState, signal?: AbortSignal, polarized = false, accumulationOnly = false): Promise<void> {
     if (state.viewerMode !== 'panorama') return;
     const kind = resolvePanoramaProgramKind(state);
+    const depolarizingSphere = normalizeEnvironmentSphereMaterial(state.environmentSphereMaterial).type === 'roughplastic';
     for (;;) {
       signal?.throwIfAborted();
-      const program = this.get(kind, polarized);
+      const program = this.get(kind, polarized, { depolarizingSphere, accumulationOnly });
       const radiance = kind === 'image' || (kind === 'pathTracing' && polarized) || this.get('radiance');
       if (program && radiance) return;
       await new Promise<void>((resolve) => setTimeout(resolve, 16));
