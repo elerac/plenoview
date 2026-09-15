@@ -4271,23 +4271,23 @@ describe('view menu', () => {
     fileButton.click();
     expectTopMenuOpen('file-menu-button', 'file-menu');
 
-    fileMenuRegion.dispatchEvent(new Event('pointerover', { bubbles: true }));
+    fileMenuRegion.dispatchEvent(new PointerEvent('pointerover', { pointerType: 'mouse', bubbles: true }));
     expectTopMenuOpen('file-menu-button', 'file-menu');
 
-    title.dispatchEvent(new Event('pointerover', { bubbles: true }));
+    title.dispatchEvent(new PointerEvent('pointerover', { pointerType: 'mouse', bubbles: true }));
     expectTopMenuClosed('file-menu-button', 'file-menu');
 
-    fileButton.dispatchEvent(new Event('pointerenter'));
+    fileButton.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expectTopMenuOpen('file-menu-button', 'file-menu');
 
-    viewButton.dispatchEvent(new Event('pointerenter'));
+    viewButton.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expectTopMenuOpen('view-menu-button', 'view-menu');
     expectTopMenuClosed('file-menu-button', 'file-menu');
 
-    title.dispatchEvent(new Event('pointerover', { bubbles: true }));
+    title.dispatchEvent(new PointerEvent('pointerover', { pointerType: 'mouse', bubbles: true }));
     expectTopMenuClosed('view-menu-button', 'view-menu');
 
-    galleryButton.dispatchEvent(new Event('pointerenter'));
+    galleryButton.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expectTopMenuOpen('gallery-menu-button', 'gallery-menu');
   });
 
@@ -4326,11 +4326,11 @@ describe('view menu', () => {
     expect(polanalyserMenu.classList.contains('hidden')).toBe(true);
     expect(polanalyserButton.getAttribute('aria-expanded')).toBe('false');
 
-    beachballRoot.dispatchEvent(new Event('pointerenter'));
+    beachballRoot.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expect(beachballMenu.classList.contains('hidden')).toBe(false);
     expect(beachballButton.getAttribute('aria-expanded')).toBe('true');
 
-    beachballRoot.dispatchEvent(new MouseEvent('pointerleave', { relatedTarget: document.body }));
+    beachballRoot.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse', relatedTarget: document.body }));
     expect(beachballMenu.classList.contains('hidden')).toBe(true);
     expect(beachballButton.getAttribute('aria-expanded')).toBe('false');
 
@@ -4343,11 +4343,11 @@ describe('view menu', () => {
     expect(beachballMenu.classList.contains('hidden')).toBe(true);
     expect(document.activeElement).toBe(beachballButton);
 
-    polyHavenRoot.dispatchEvent(new Event('pointerenter'));
+    polyHavenRoot.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expect(polyHavenMenu.classList.contains('hidden')).toBe(false);
     expect(polyHavenButton.getAttribute('aria-expanded')).toBe('true');
 
-    polyHavenRoot.dispatchEvent(new MouseEvent('pointerleave', { relatedTarget: document.body }));
+    polyHavenRoot.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse', relatedTarget: document.body }));
     expect(polyHavenMenu.classList.contains('hidden')).toBe(true);
     expect(polyHavenButton.getAttribute('aria-expanded')).toBe('false');
 
@@ -4360,11 +4360,11 @@ describe('view menu', () => {
     expect(polyHavenMenu.classList.contains('hidden')).toBe(true);
     expect(document.activeElement).toBe(polyHavenButton);
 
-    kaistRoot.dispatchEvent(new Event('pointerenter'));
+    kaistRoot.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expect(kaistMenu.classList.contains('hidden')).toBe(false);
     expect(kaistButton.getAttribute('aria-expanded')).toBe('true');
 
-    kaistRoot.dispatchEvent(new MouseEvent('pointerleave', { relatedTarget: document.body }));
+    kaistRoot.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse', relatedTarget: document.body }));
     expect(kaistMenu.classList.contains('hidden')).toBe(true);
     expect(kaistButton.getAttribute('aria-expanded')).toBe('false');
 
@@ -4377,11 +4377,11 @@ describe('view menu', () => {
     expect(kaistMenu.classList.contains('hidden')).toBe(true);
     expect(document.activeElement).toBe(kaistButton);
 
-    polanalyserRoot.dispatchEvent(new Event('pointerenter'));
+    polanalyserRoot.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
     expect(polanalyserMenu.classList.contains('hidden')).toBe(false);
     expect(polanalyserButton.getAttribute('aria-expanded')).toBe('true');
 
-    polanalyserRoot.dispatchEvent(new MouseEvent('pointerleave', { relatedTarget: document.body }));
+    polanalyserRoot.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse', relatedTarget: document.body }));
     expect(polanalyserMenu.classList.contains('hidden')).toBe(true);
     expect(polanalyserButton.getAttribute('aria-expanded')).toBe('false');
 

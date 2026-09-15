@@ -36,7 +36,7 @@ export class TopMenuController implements Disposable {
     }
 
     this.disposables.addEventListener(this.elements.appMenuBar, 'pointerover', (event) => {
-      if (this.topMenuTrackingMode !== 'pointer') {
+      if (event.pointerType !== 'mouse' || this.topMenuTrackingMode !== 'pointer') {
         return;
       }
 
@@ -109,6 +109,11 @@ export class TopMenuController implements Disposable {
 
   private isSubmenuOpen(submenu: SubmenuElements): boolean {
     return !submenu.menu.classList.contains('hidden');
+  }
+
+  private usesInlineSubmenus(): boolean {
+    // Keep this in sync with the mobile menu layout in style.css.
+    return window.matchMedia?.('(max-width: 620px), (hover: none) and (pointer: coarse)').matches ?? false;
   }
 
   private openTopMenu(
@@ -263,8 +268,8 @@ export class TopMenuController implements Disposable {
       this.toggleTopMenu(menu);
     });
 
-    this.disposables.addEventListener(menu.button, 'pointerenter', () => {
-      if (this.topMenuTrackingMode !== 'pointer' || this.isTopMenuOpen(menu)) {
+    this.disposables.addEventListener(menu.button, 'pointerenter', (event) => {
+      if (event.pointerType !== 'mouse' || this.topMenuTrackingMode !== 'pointer' || this.isTopMenuOpen(menu)) {
         return;
       }
 
@@ -338,14 +343,24 @@ export class TopMenuController implements Disposable {
   private bindSubmenu(submenu: SubmenuElements): void {
     this.disposables.addEventListener(submenu.button, 'click', (event) => {
       event.preventDefault();
+      if (this.usesInlineSubmenus() && this.isSubmenuOpen(submenu)) {
+        this.closeSubmenu(submenu);
+        return;
+      }
       this.openSubmenu(submenu);
     });
 
-    this.disposables.addEventListener(submenu.root, 'pointerenter', () => {
+    this.disposables.addEventListener(submenu.root, 'pointerenter', (event) => {
+      if (event.pointerType !== 'mouse' || this.usesInlineSubmenus()) {
+        return;
+      }
       this.openSubmenu(submenu);
     });
 
     this.disposables.addEventListener(submenu.root, 'pointerleave', (event) => {
+      if (event.pointerType !== 'mouse' || this.usesInlineSubmenus()) {
+        return;
+      }
       if (event.relatedTarget instanceof Node && submenu.root.contains(event.relatedTarget)) {
         return;
       }

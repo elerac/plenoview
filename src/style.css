@@ -710,13 +710,6 @@ output {
   overflow-y: auto;
 }
 
-@media (max-width: 620px) {
-  .app-menu-submenu-dropdown {
-    top: calc(100% - 1px);
-    left: 0;
-  }
-}
-
 .app-menu-separator {
   height: 1px;
   margin: 3px 2px;
@@ -801,6 +794,48 @@ output {
   font-size: var(--type-label-size);
   line-height: var(--type-label-line-height);
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 620px), (hover: none) and (pointer: coarse) {
+  .app-menu {
+    position: static;
+  }
+
+  .app-menu > .app-menu-dropdown {
+    right: 0;
+    min-width: 0;
+    max-height: min(70vh, 32rem);
+    max-height: min(70dvh, 32rem);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .app-menu-dropdown {
+    grid-auto-rows: max-content;
+  }
+
+  .app-menu-submenu-dropdown {
+    position: static;
+    min-width: 0;
+    max-height: none;
+    margin: 2px 0 2px 12px;
+    overflow: visible;
+    box-shadow: none;
+  }
+
+  .app-menu-item {
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .app-menu-submenu-trigger {
+    gap: 12px;
+  }
+
+  .app-menu-submenu-trigger[aria-expanded='true']::after {
+    transform: rotate(90deg);
+  }
 }
 
 .viewer-context-menu {
