@@ -36,7 +36,7 @@ interface RawExrAttribute {
   order: number;
 }
 
-interface ParsedExrHeader {
+export interface ParsedExrHeader {
   attributes: RawExrAttribute[];
   nextOffset: number;
 }
@@ -58,38 +58,34 @@ export interface ExrHeaderSummary {
 
 export function parseExrMetadata(bytes: Uint8Array): ExrMetadataEntry[][] {
   try {
-    if (bytes.byteLength < 8) {
-      return [];
-    }
-
-    const view = toDataView(bytes);
-    if (view.getUint32(0, true) !== OPENEXR_MAGIC) {
-      return [];
-    }
-
-    const versionField = view.getUint32(4, true);
-    const isMultipart = (versionField & MULTIPART_FLAG) !== 0;
-    let offset = 8;
-
-    if (!isMultipart) {
-      const header = readHeader(bytes, view, offset);
-      return [formatHeaderMetadata(header.attributes)];
-    }
-
-    const parts: ExrMetadataEntry[][] = [];
-    while (offset < bytes.byteLength) {
-      const header = readHeader(bytes, view, offset);
-      offset = header.nextOffset;
-      if (header.attributes.length === 0) {
-        break;
-      }
-      parts.push(formatHeaderMetadata(header.attributes));
-    }
-
-    return parts;
+    return readExrHeaders(bytes).headers.map((header) => formatHeaderMetadata(header.attributes));
   } catch {
     return [];
   }
+}
+
+/** Read raw headers and locate the offset tables without decoding pixel data. */
+export function readExrHeaders(bytes: Uint8Array): {
+  headers: ParsedExrHeader[];
+  versionField: number;
+  isMultipart: boolean;
+  offsetTableStart: number;
+} {
+  const view = toDataView(bytes);
+  if (bytes.byteLength < 8 || view.getUint32(0, true) !== OPENEXR_MAGIC) {
+    throw new Error('Invalid EXR header.');
+  }
+  const versionField = view.getUint32(4, true);
+  const isMultipart = (versionField & MULTIPART_FLAG) !== 0;
+  const headers: ParsedExrHeader[] = [];
+  let offset = 8;
+  do {
+    const header = readHeader(bytes, view, offset);
+    offset = header.nextOffset;
+    if (isMultipart && header.attributes.length === 0) break;
+    headers.push(header);
+  } while (isMultipart);
+  return { headers, versionField, isMultipart, offsetTableStart: offset };
 }
 
 export function summarizeExrHeader(bytes: Uint8Array): ExrHeaderSummary | null {

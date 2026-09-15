@@ -2,6 +2,7 @@ import createTinyExrWasm, {
   type TinyExrWasmModule
 } from './vendor/tinyexr_wasm.js';
 import type { FiniteValueRange } from './channel-storage';
+import { recoverExrScanlineOffsets } from './exr-offset-recovery';
 
 const MAX_EXR_INPUT_BYTES = 0x7fff_ffff;
 const MAX_EXR_NAME_BYTES = 256;
@@ -91,6 +92,18 @@ export async function decodeRawExr(bytes: Uint8Array): Promise<RawDecodedExr> {
   let imagePointer = 0;
   try {
     module.HEAPU8.set(bytes, inputPointer);
+    const recovered = recoverExrScanlineOffsets(bytes);
+    if (recovered) {
+      const table = new DataView(
+        module.HEAPU8.buffer,
+        inputPointer + recovered.tableOffset,
+        recovered.offsets.length * 8
+      );
+      recovered.offsets.forEach((offset, index) => {
+        table.setUint32(index * 8, offset, true);
+        table.setUint32(index * 8 + 4, 0, true);
+      });
+    }
     imagePointer = module._pexr_decode(inputPointer, bytes.byteLength);
   } finally {
     module._free(inputPointer);

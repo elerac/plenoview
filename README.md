@@ -7,6 +7,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
 ## Features
 
 - OpenEXR decode via a browser-safe TinyEXR v3.2.0 WASM adapter with multipart, arbitrary-channel, cropped-window, subsampled-channel, scanline, and tiled image support.
+- Scanline EXR files with missing block offsets are recovered automatically when all pixel blocks are intact, including multipart files. Recovery happens in memory and preserves the source file.
 - Local EXR load via `File > Open...` or drag/drop (drag-and-drop supports multiple files and recursive folder drops in one action).
 - Recursive folder EXR load via `File > Open Folder...`; all `.exr` files under the selected folder are appended as sessions.
 - `File > Export...` exports the full active display to PNG at display image size with configurable PNG compression and current channel/stokes, exposure/gamma, colormap, and alpha settings applied.
