@@ -165,7 +165,7 @@ export function displayReducer(
     case 'panoramaLightingMethodSet': {
       if (
         !selectActiveSession(state) ||
-        (state.sessionState.panoramaLightingMethod ?? 'sphericalHarmonics') === intent.panoramaLightingMethod
+        (state.sessionState.panoramaLightingMethod ?? 'pathTracing') === intent.panoramaLightingMethod
       ) {
         return state;
       }

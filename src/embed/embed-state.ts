@@ -313,7 +313,7 @@ function isPanoramaDisplayMode(
 function isPanoramaLightingMethod(
   value: unknown
 ): value is NonNullable<ViewerSessionState['panoramaLightingMethod']> {
-  return value === 'sphericalHarmonics' || value === 'pathTracing';
+  return value === 'pathTracing';
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

@@ -54,7 +54,6 @@ export interface PanoramaUniforms extends CommonUniforms {
   pathTracingOutputColorChannel: WebGLUniformLocation | null;
   environmentRadianceTexture: WebGLUniformLocation | null;
   sourceTextureMipmapsAvailable: WebGLUniformLocation | null;
-  environmentSampleCounts: WebGLUniformLocation | null;
   pathTracingMaxBounces: WebGLUniformLocation | null;
   panoramaYawDeg: WebGLUniformLocation | null;
   panoramaPitchDeg: WebGLUniformLocation | null;
@@ -68,7 +67,6 @@ export interface PanoramaUniforms extends CommonUniforms {
   environmentImportanceGridSize: WebGLUniformLocation | null;
   environmentImportanceEntryCount: WebGLUniformLocation | null;
   environmentImportanceProjection: WebGLUniformLocation | null;
-  environmentShIrradiance: WebGLUniformLocation | null;
   environmentSphereSmoothSilver: WebGLUniformLocation | null;
   environmentSphereDiffuseReflectance: WebGLUniformLocation | null;
   environmentSphereAlpha: WebGLUniformLocation | null;
@@ -207,7 +205,6 @@ export interface GlImageRendererState {
   environmentImportanceGridSize: { width: number; height: number };
   environmentImportanceEntryCount: number;
   environmentImportanceProjection: number;
-  environmentShIrradiance: Float32Array;
   depthProgram: ProgramBundle<DepthUniforms>;
   layerTexturesBySession: Map<string, Map<number, LayerSourceTextures>>;
   exportSourceSurface: ExportSurface | null;

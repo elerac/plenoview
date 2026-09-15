@@ -3,7 +3,6 @@ import {
   createAdaptiveDepthPointBudgetResolver,
   type DepthPointBudgetResolver
 } from '../../depth-point-budget';
-import { SPHERICAL_HARMONICS_COEFFICIENT_COUNT } from '../../panorama-lighting';
 import { REQUIRED_TEXTURE_UNITS } from './constants';
 import { createColormapTexture } from './colormap-texture';
 import { createDepthProgram } from './depth-program';
@@ -74,9 +73,6 @@ export function createGlImageRendererState(
     environmentImportanceGridSize: { width: 1, height: 1 },
     environmentImportanceEntryCount: 0,
     environmentImportanceProjection: 0,
-    environmentShIrradiance: new Float32Array(
-      SPHERICAL_HARMONICS_COEFFICIENT_COUNT * 3
-    ),
     depthProgram,
     layerTexturesBySession: new Map<string, Map<number, LayerSourceTextures>>(),
     exportSourceSurface: null,

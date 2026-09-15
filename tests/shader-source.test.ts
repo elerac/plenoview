@@ -28,30 +28,24 @@ describe('shader source regressions', () => {
       );
     }
     expect(createPanoramaFragmentSource('pathTracing')).not.toContain('#define PATH_TRACING_POLARIZED_ENVIRONMENT');
-    for (const kind of ['image', 'sphericalHarmonics'] as const) {
-      expect(createPanoramaFragmentSource(kind, true)).toBe(createPanoramaFragmentSource(kind, false));
-    }
+    expect(createPanoramaFragmentSource('image', true)).toBe(createPanoramaFragmentSource('image', false));
   });
 
   it('compiles separate panorama modes without unrelated rendering algorithms', () => {
     const imageSource = createPanoramaFragmentSource('image');
-    const shSource = createPanoramaFragmentSource('sphericalHarmonics');
     const pathSource = createPanoramaFragmentSource('pathTracing');
 
     expect(imageSource).toContain('DisplaySample readDisplaySample(');
     expect(imageSource).not.toContain('resolveEnvironmentScene(');
     expect(imageSource).not.toContain('sampleEnvironmentRadiance(');
     expect(imageSource).not.toContain('traceEnvironmentPath(');
-    expect(shSource).toContain('evaluateEnvironmentRoughPlastic(');
-    expect(shSource).not.toContain('traceEnvironmentPath(');
-    expect(shSource).not.toContain('sampleEnvironmentImportance(');
     expect(pathSource).toContain('traceEnvironmentPath(');
     expect(pathSource).not.toContain('evaluateEnvironmentRoughPlastic(');
     expect(pathSource).not.toContain('evaluateEnvironmentIrradiance(');
     expect(pathSource).not.toContain('readDisplaySample(');
     expect(pathSource).not.toContain('uSourceTextures');
 
-    for (const source of [imageSource, shSource, pathSource]) {
+    for (const source of [imageSource, pathSource]) {
       expect(source.startsWith('#version 300 es\n')).toBe(true);
       expect(source.match(/void main\(/g)).toHaveLength(1);
       expect(source).not.toContain('uPanoramaDisplayMode');
@@ -60,18 +54,16 @@ describe('shader source regressions', () => {
   });
 
   it('samples the cached HDR texture in lighting loops without evaluating display channels', () => {
-    for (const kind of ['sphericalHarmonics', 'pathTracing'] as const) {
-      const source = createPanoramaFragmentSource(kind);
-      const start = source.indexOf('vec3 sampleEnvironmentRadiance(');
-      const end = source.indexOf('\n}\n', start) + 3;
-      const samplingFunction = source.slice(start, end);
+    const source = createPanoramaFragmentSource('pathTracing');
+    const start = source.indexOf('vec3 sampleEnvironmentRadiance(');
+    const end = source.indexOf('\n}\n', start) + 3;
+    const samplingFunction = source.slice(start, end);
 
-      expect(samplingFunction).toContain('texelFetch(uEnvironmentRadianceTexture, pixel, 0)');
-      expect(samplingFunction).toContain('textureLod(uEnvironmentRadianceTexture, uv, sampleLod)');
-      expect(samplingFunction).not.toContain('readDisplaySample');
-      expect(samplingFunction).not.toContain('uSourceTextures');
-      expect(samplingFunction).not.toContain('uDisplayMode');
-    }
+    expect(samplingFunction).toContain('texelFetch(uEnvironmentRadianceTexture, pixel, 0)');
+    expect(samplingFunction).toContain('textureLod(uEnvironmentRadianceTexture, uv, sampleLod)');
+    expect(samplingFunction).not.toContain('readDisplaySample');
+    expect(samplingFunction).not.toContain('uSourceTextures');
+    expect(samplingFunction).not.toContain('uDisplayMode');
   });
 
   it('bakes sanitized linear HDR values and alpha before display transforms', () => {
@@ -186,7 +178,7 @@ describe('shader source regressions', () => {
   });
 
   it('filters power-of-two cubemap-cross lighting without sampling across face boundaries', () => {
-    const source = createPanoramaFragmentSource('sphericalHarmonics');
+    const source = createPanoramaFragmentSource('pathTracing');
 
     expect(source).toContain('bool usesMipmappedCubemapCrossProjection()');
     expect(source).toContain('uniform bool uSourceTextureMipmapsAvailable;');
@@ -200,112 +192,6 @@ describe('shader source regressions', () => {
     expect(source).toContain('sampleLod = clampedLod;');
     expect(source).toContain('return textureLod(uEnvironmentRadianceTexture, uv, sampleLod).rgb;');
     expect(source).toContain('lod <= 0.0 ||');
-  });
-
-  it('derives cubemap environment LOD from per-face texel solid angle', () => {
-    const source = createPanoramaFragmentSource('sphericalHarmonics');
-
-    expect(source).toContain(
-      'float majorAxis = max(abs(ray.x), max(abs(ray.y), abs(ray.z)));'
-    );
-    expect(source).toContain(
-      'texelSolidAngle = 4.0 * majorAxis * majorAxis * majorAxis /'
-    );
-    expect(source).toContain(
-      'resolvedMaximumLod = min(resolvedMaximumLod, log2(faceSize));'
-    );
-    expect(source).not.toContain(
-      'if (usesCubemapCrossProjection()) {\n    return 0.0;\n  }'
-    );
-  });
-
-  it('provides the spherical-harmonics sphere and floor environment-lighting scene', () => {
-    const source = createPanoramaFragmentSource('sphericalHarmonics');
-
-    expect(source).toContain('uniform vec3 uEnvironmentShIrradiance[36];');
-    expect(source).toContain('uniform vec3 uEnvironmentSphereDiffuseReflectance;');
-    expect(source).toContain('uniform float uEnvironmentSphereAlpha;');
-    expect(source).toContain('uniform float uEnvironmentSphereIntIor;');
-    expect(source).toContain('uniform float uEnvironmentSphereExtIor;');
-    expect(source).toContain('uniform int uEnvironmentSphereDistribution;');
-    expect(source).toContain('uniform bool uEnvironmentSphereNonlinear;');
-    expect(source).toContain('vec3 evaluateEnvironmentIrradiance(vec3 normal)');
-    expect(source).toContain('basis[0] = 0.28209479177387814;');
-    expect(source).toContain('basis[8] = 0.5462742152960396 * (x2 - y2);');
-    expect(source).toContain(
-      'basis[24] = 0.6258357354491761 * (x4 - 6.0 * x2 * y2 + y4);'
-    );
-    expect(source).toContain(
-      'basis[35] = 0.6563820568401701 * x * (x4 - 10.0 * x2 * y2 + 5.0 * y4);'
-    );
-    expect(source).toContain('coefficientIndex < 36');
-    expect(source).toContain(
-      'irradiance += uEnvironmentShIrradiance[coefficientIndex] * basis[coefficientIndex];'
-    );
-    expect(source).toContain('const vec3 ENVIRONMENT_SPHERE_CENTER = vec3(0.0, 0.0, 3.5);');
-    expect(source).toContain('const vec3 ENVIRONMENT_FLOOR_CENTER = vec3(0.0, 1.0, 3.5);');
-    expect(source).toContain('const float ENVIRONMENT_FLOOR_RADIUS = 2.75;');
-    expect(source).toContain('const float ENVIRONMENT_FLOOR_ALPHA = 0.7;');
-    expect(source).toContain('const float ENVIRONMENT_CAMERA_ORBIT_RADIUS = 3.5;');
-    expect(source).toContain('const float MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG = -15.0;');
-    expect(source).toContain('vec3 originToCenter = rayOrigin - center;');
-    expect(source).toContain('vec3 point = rayOrigin + rayDirection * distance;');
-    expect(source).toContain('void resolveEnvironmentOrbitCamera(');
-    expect(source).toContain('void resolveEnvironmentOrbitBasis(');
-    expect(source).toContain('right = rotateYaw(vec3(1.0, 0.0, 0.0), yaw);');
-    expect(source).toContain(
-      'rayOrigin = ENVIRONMENT_SPHERE_CENTER - forward * ENVIRONMENT_CAMERA_ORBIT_RADIUS;'
-    );
-    expect(source).toContain('resolveEnvironmentOrbitCamera(cameraRay, rayOrigin, ray);');
-    expect(source).toContain('uPanoramaPitchDeg,');
-    expect(source).toContain('MIN_ENVIRONMENT_CAMERA_ORBIT_PITCH_DEG');
-    expect(source).toContain('vec3 evaluateEnvironmentRoughPlastic(');
-    expect(source).toContain('float evaluateDielectricFresnel(float cosThetaI, float eta)');
-    expect(source).toContain('float evaluateRoughPlasticSmithG1(');
-    expect(source).toContain('float evaluateRoughPlasticMicrofacetDistribution(');
-    expect(source).toContain('float resolveEnvironmentSampleLod(');
-    expect(source).toContain('uniform ivec2 uEnvironmentSampleCounts;');
-    expect(source).toContain('int specularSampleCount = uEnvironmentSampleCounts.x;');
-    expect(source).toContain('int diffuseSampleCount = uEnvironmentSampleCounts.y;');
-    expect(source).toContain('sampleIndex < specularSampleCount');
-    expect(source).toContain('sampleIndex < diffuseSampleCount');
-    expect(source).toContain('specular /= float(specularSampleCount);');
-    expect(source).toContain('transmittedIrradiance /= float(diffuseSampleCount);');
-    expect(source).toContain('ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP /');
-    expect(source).toContain('vec3 sampleRoughPlasticMicrofacetNormal(vec2 sampleValue, float alpha)');
-    expect(source).toContain(
-      'specular += sampleEnvironmentRadiance(wi, environmentLod) * sampleWeight;'
-    );
-    expect(source).toContain(
-      'transmittedIrradiance += sampleEnvironmentRadiance(wi, environmentLod)'
-    );
-    expect(source).toContain('vec2 equirectangularDirectionToUv(vec3 direction)');
-    expect(source).toContain('return texelFetch(uEnvironmentRadianceTexture, pixel, 0).rgb;');
-    expect(source).toContain('roughPlasticRadicalInverse(sampleIndex) + offset');
-    expect(source).toContain(
-      'buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);'
-    );
-    expect(source).not.toContain('0.6180339887498949');
-    expect(source).not.toContain('abs(normal.z) < 0.999');
-    expect(source).toContain('textureLod(uEnvironmentRadianceTexture, uv, sampleLod)');
-    expect(source).toContain('materialAlpha = ENVIRONMENT_FLOOR_ALPHA;');
-    expect(source).toContain(
-      'ENVIRONMENT_COMPARISON_SPHERE_DIFFUSE_REFLECTANCE[sphereIndex]'
-    );
-    expect(source).toContain('const int ENVIRONMENT_COMPARISON_SPHERE_COUNT = 6;');
-    expect(source).toContain('const float ENVIRONMENT_COMPARISON_SPHERE_RADIUS = 0.3;');
-    expect(source).toContain('const float ENVIRONMENT_COMPARISON_SPHERE_ALPHA[6]');
-    expect(source).toContain('sphereAlpha = uEnvironmentSphereAlpha;');
-    expect(source).toContain('sceneMaterialAlpha');
-    expect(source).not.toContain('lightingNormal');
-    expect(source).toContain('linear = evaluateEnvironmentRoughPlastic(');
-    expect(source).toContain('surfaceType == ENVIRONMENT_SURFACE_FLOOR');
-    expect(source).toContain('evaluateEnvironmentIrradiance(normal) *');
-    expect(source).toContain('(exteriorDiffuseTransmittance / PI);');
-    expect(source).toContain(') * sceneVisibility;');
-    expect(source).not.toContain('samplePathTracingLambertDirection');
-    expect(source).toContain('albedo = mix(vec3(0.34), vec3(0.43), checker);');
-    expect(source).not.toContain('radialFade');
   });
 
   it('provides progressive multi-bounce path tracing with environment NEE and MIS', () => {

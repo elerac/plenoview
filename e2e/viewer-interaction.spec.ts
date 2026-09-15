@@ -245,7 +245,7 @@ test('orbits panorama view with global w/a/s/d keys while keeping the probe in s
   }).toBe(true);
 });
 
-test('switches the panorama viewer between image, SH, and path-traced lighting', async ({ page }) => {
+test('switches the panorama viewer between image and path-traced lighting', async ({ page }) => {
   test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);
@@ -253,7 +253,6 @@ test('switches the panorama viewer between image, SH, and path-traced lighting',
   const viewMenuButton = page.locator('#view-menu-button');
   const panoramaViewerMenuItem = page.locator('#panorama-viewer-menu-item');
   const panoramaImageMenuItem = page.locator('#panorama-image-menu-item');
-  const environmentLightingMenuItem = page.locator('#environment-lighting-menu-item');
   const environmentPathTracingMenuItem = page.locator(
     '#environment-path-tracing-menu-item'
   );
@@ -261,11 +260,11 @@ test('switches the panorama viewer between image, SH, and path-traced lighting',
   await viewMenuButton.click();
   await panoramaViewerMenuItem.click();
   await expect(panoramaImageMenuItem).toBeVisible();
-  await expect(environmentLightingMenuItem).toBeVisible();
-  await environmentLightingMenuItem.click();
-  await waitForE2ERenderIdle(page);
+  await expect(environmentPathTracingMenuItem).toBeVisible();
+  await environmentPathTracingMenuItem.click();
+  await expect(page.locator('#gl-canvas')).toHaveAttribute('aria-busy', 'false', { timeout: 30_000 });
 
-  await expect(environmentLightingMenuItem).toHaveAttribute('aria-checked', 'true');
+  await expect(environmentPathTracingMenuItem).toHaveAttribute('aria-checked', 'true');
   await expect.poll(async () => page.evaluate(() => {
     return window.__openExrViewerE2E?.snapshot().panoramaDisplayMode;
   })).toBe('environmentLighting');
@@ -283,23 +282,18 @@ test('switches the panorama viewer between image, SH, and path-traced lighting',
   await page.evaluate(async () => {
     await window.__openExrViewerE2E?.waitForFrames(1);
   });
-  expect(await page.evaluate(() => (
-    window.__openExrViewerE2E?.snapshot().environmentLightingInteractive
-  ))).toBe(true);
-  await page.mouse.up();
-  await expect.poll(async () => page.evaluate(() => (
-    window.__openExrViewerE2E?.snapshot().environmentLightingInteractive
-  )), { timeout: 30_000 }).toBe(false);
-
-  await viewMenuButton.click();
-  await panoramaViewerMenuItem.click();
-  await environmentPathTracingMenuItem.click();
-
   await expect(environmentPathTracingMenuItem).toHaveAttribute('aria-checked', 'true');
   await expect.poll(async () => page.evaluate(() => {
     return window.__openExrViewerE2E?.snapshot().panoramaLightingMethod;
   })).toBe('pathTracing');
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__openExrViewerE2E?.snapshot().panoramaYawDeg)).not.toBe(0);
 
+  await viewMenuButton.click();
+  await panoramaViewerMenuItem.click();
+  await panoramaImageMenuItem.click();
+  await expect(panoramaImageMenuItem).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(() => page.evaluate(() => window.__openExrViewerE2E?.snapshot().panoramaDisplayMode)).toBe('image');
 });
 
 test('disables the top-bar auto-fit toggle while panorama view is active', async ({ page }) => {

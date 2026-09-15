@@ -27,7 +27,7 @@ describe('viewer store', () => {
       top: true
     });
     expect(createInitialState().stokesAolpDegreeModulationMode).toBe('value');
-    expect(createInitialState().panoramaLightingMethod).toBe('sphericalHarmonics');
+    expect(createInitialState().panoramaLightingMethod).toBe('pathTracing');
     expect(createInitialState().pathTracingMaxSamples).toBe(65_536);
     expect(createInitialState().environmentSphereMaterial).toEqual({
       type: 'roughSilver',

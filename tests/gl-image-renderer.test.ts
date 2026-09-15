@@ -64,14 +64,14 @@ describe('gl image renderer', () => {
     renderer.render(lightingState);
     expect(gl.createProgram).toHaveBeenCalledTimes(6);
     renderer.render({ ...lightingState, panoramaLightingMethod: 'pathTracing' });
-    expect(gl.createProgram).toHaveBeenCalledTimes(7);
+    expect(gl.createProgram).toHaveBeenCalledTimes(6);
 
     renderer.render(state);
     renderer.render(lightingState);
     renderer.render({ ...lightingState, panoramaLightingMethod: 'pathTracing' });
-    expect(gl.createProgram).toHaveBeenCalledTimes(7);
+    expect(gl.createProgram).toHaveBeenCalledTimes(6);
     renderer.dispose();
-    expect(gl.deleteProgram).toHaveBeenCalledTimes(7);
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(6);
   });
 
   it('requests lighting and radiance compilation together and disposes pending programs', () => {
@@ -203,14 +203,16 @@ describe('gl image renderer', () => {
 
     gl.deleteTexture.mockClear();
     renderer.discardLayerSourceTextures('session-1', 0);
-    expect(gl.deleteTexture).toHaveBeenCalledTimes(getDisplaySourceBindingChannelNames(binding).length + 4);
+    // Four baked radiance textures and two accumulation targets are discarded.
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(getDisplaySourceBindingChannelNames(binding).length + 6);
     renderer.ensureLayerChannelsResident('session-1', 0, 1, 1, layer, getDisplaySourceBindingChannelNames(binding));
     renderer.setDisplaySelectionBindings('session-1', 0, 1, 1, binding, 'revision-1');
     renderer.render(state);
     expect(mipmaps).toHaveBeenCalledTimes(5);
     gl.deleteTexture.mockClear();
     renderer.dispose();
-    expect(gl.deleteTexture).toHaveBeenCalledTimes(getDisplaySourceBindingChannelNames(binding).length + 4);
+    // Shared textures, the new bake, two accumulation targets, and the material LUT.
+    expect(gl.deleteTexture).toHaveBeenCalledTimes(getDisplaySourceBindingChannelNames(binding).length + 7);
   });
 
   it('refuses screenshot readback until the requested panorama program is ready', async () => {
@@ -1213,7 +1215,6 @@ describe('gl image renderer', () => {
 
     expect(renderer.render(state)).toBe(true);
     expect(readRootPathTracingSampleCount(renderer)).toBe(1);
-    expect(lastUniform2iValue(gl, 'uEnvironmentSampleCounts')).toEqual([128, 256]);
     expect(lastUniform1iValue(gl, 'uPathTracingMaxBounces')).toBe(6);
     expect(lastUniform2iValue(gl, 'uEnvironmentImportanceGridSize')).toEqual([2, 1]);
     expect(lastUniform1iValue(gl, 'uEnvironmentImportanceEntryCount')).toBe(2);
@@ -1618,7 +1619,6 @@ describe('gl image renderer', () => {
       panoramaYawDeg: 17,
       panoramaPitchDeg: 90,
       panoramaHfovDeg: 90,
-      environmentLightingInteractive: true,
       environmentSphereMaterial: {
         type: 'roughplastic' as const,
         diffuseReflectance: { r: 0.2, g: 0.3, b: 0.4 },
@@ -1642,12 +1642,6 @@ describe('gl image renderer', () => {
       2,
       buildDisplaySourceBinding(layer, state.displaySelection)
     );
-    const environmentShIrradiance = Float32Array.from(
-      { length: 108 },
-      (_, index) => index + 0.25
-    );
-    renderer.setEnvironmentShIrradiance(environmentShIrradiance);
-
     renderer.readExportPixels({
       state,
       sourceWidth: 2,
@@ -1668,11 +1662,7 @@ describe('gl image renderer', () => {
     expect(lastUniform1fValue(gl, 'uPanoramaHfovDeg')).toBe(90);
     expect(lastUniform1iValue(gl, 'uPanoramaDisplayMode')).toBeUndefined();
     expect(lastUniform1iValue(gl, 'uSourceTextureMipmapsAvailable')).toBe(1);
-    expect(lastUniform2iValue(gl, 'uEnvironmentSampleCounts')).toEqual([64, 64]);
     expect(lastUniform1iValue(gl, 'uPathTracingMaxBounces')).toBe(6);
-    expect(lastUniform3fvValue(gl, 'uEnvironmentShIrradiance[0]')).toEqual(
-      environmentShIrradiance
-    );
     expect(lastUniform3fValue(gl, 'uEnvironmentSphereDiffuseReflectance')).toEqual([
       0.2,
       0.3,
@@ -1910,7 +1900,7 @@ function createPanoramaState(overrides: Partial<ViewerState> = {}): ViewerState 
     ...createInitialState(),
     viewerMode: 'panorama',
     panoramaDisplayMode: 'image',
-    panoramaLightingMethod: 'sphericalHarmonics',
+    panoramaLightingMethod: 'pathTracing',
     hoveredPixel: null,
     draftRoi: null,
     roiInteraction: createEmptyRoiInteractionState(),
@@ -2055,17 +2045,6 @@ function lastUniform3fValue(
     return undefined;
   }
   return [lastCall[1] as number, lastCall[2] as number, lastCall[3] as number];
-}
-
-function lastUniform3fvValue(
-  gl: ReturnType<typeof createWebGlContextMock>,
-  uniformName: string
-): Float32Array | undefined {
-  const calls = gl.uniform3fv.mock.calls.filter((call) => {
-    const [location] = call as [{ name?: string } | null, ...unknown[]];
-    return location?.name === uniformName;
-  });
-  return calls.at(-1)?.[1] as Float32Array | undefined;
 }
 
 function lastUniform2iValue(

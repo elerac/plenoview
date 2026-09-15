@@ -18,7 +18,7 @@ describe('path tracing render loop', () => {
     const pathTraced = createRenderSource({ pathTracing: true });
     const ordinary = createRenderSource({ path: [1], pathTracing: false });
     harness.renderer.renderImagePane.mockImplementation((_pane, state) => (
-      state.panoramaLightingMethod === 'pathTracing'
+      state.viewerMode === 'panorama' && state.panoramaDisplayMode === 'environmentLighting'
     ));
 
     loop.sync([pathTraced, ordinary]);
@@ -27,7 +27,7 @@ describe('path tracing render loop', () => {
     expect(harness.renderer.beginProgressiveImageRender).toHaveBeenCalledTimes(1);
     expect(harness.renderCache.prepareActiveSession).toHaveBeenCalledTimes(2);
     expect(harness.renderer.renderImagePane.mock.calls.filter((call) => (
-      call[1].panoramaLightingMethod === 'pathTracing'
+      call[1].viewerMode === 'panorama' && call[1].panoramaDisplayMode === 'environmentLighting'
     ))).toHaveLength(1);
     expect(harness.renderer.renderImagePane).toHaveBeenCalledWith(
       createPane([1], 100, false),
@@ -237,7 +237,7 @@ function createRenderSource(options: {
     ...createInitialState(),
     viewerMode: options.pathTracing || options.panorama ? 'panorama' : 'image',
     panoramaDisplayMode: options.pathTracing ? 'environmentLighting' : 'image',
-    panoramaLightingMethod: options.pathTracing ? 'pathTracing' : 'sphericalHarmonics'
+    panoramaLightingMethod: 'pathTracing'
   } as const;
   const renderState = mergeRenderState(
     sessionState,

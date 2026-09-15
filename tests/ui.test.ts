@@ -3747,7 +3747,6 @@ describe('view menu', () => {
     const imageItem = document.getElementById('image-viewer-menu-item') as HTMLButtonElement;
     const panoramaItem = document.getElementById('panorama-viewer-menu-item') as HTMLButtonElement;
     const panoramaImageItem = document.getElementById('panorama-image-menu-item') as HTMLButtonElement;
-    const environmentLightingItem = document.getElementById('environment-lighting-menu-item') as HTMLButtonElement;
     const environmentPathTracingItem = document.getElementById(
       'environment-path-tracing-menu-item'
     ) as HTMLButtonElement;
@@ -3755,7 +3754,6 @@ describe('view menu', () => {
     expect(imageItem.disabled).toBe(true);
     expect(panoramaItem.disabled).toBe(true);
     expect(panoramaImageItem.disabled).toBe(true);
-    expect(environmentLightingItem.disabled).toBe(true);
     expect(environmentPathTracingItem.disabled).toBe(true);
 
     ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
@@ -3763,7 +3761,6 @@ describe('view menu', () => {
     expect(imageItem.disabled).toBe(false);
     expect(panoramaItem.disabled).toBe(false);
     expect(panoramaImageItem.disabled).toBe(false);
-    expect(environmentLightingItem.disabled).toBe(false);
     expect(environmentPathTracingItem.disabled).toBe(false);
   });
 
@@ -3783,7 +3780,7 @@ describe('view menu', () => {
     expect(previewItem.disabled).toBe(false);
   });
 
-  it('tracks and dispatches panorama image, SH, and path-traced lighting choices', () => {
+  it('tracks and dispatches panorama image and path-traced lighting choices', () => {
     installUiFixture();
 
     const onViewerModeChange = vi.fn();
@@ -3800,36 +3797,29 @@ describe('view menu', () => {
     const imageItem = document.getElementById('image-viewer-menu-item') as HTMLButtonElement;
     const panoramaItem = document.getElementById('panorama-viewer-menu-item') as HTMLButtonElement;
     const panoramaImageItem = document.getElementById('panorama-image-menu-item') as HTMLButtonElement;
-    const environmentLightingItem = document.getElementById('environment-lighting-menu-item') as HTMLButtonElement;
     const environmentPathTracingItem = document.getElementById(
       'environment-path-tracing-menu-item'
     ) as HTMLButtonElement;
     expect(imageItem.getAttribute('aria-checked')).toBe('false');
     expect(panoramaItem.getAttribute('aria-current')).toBe('true');
     expect(panoramaImageItem.getAttribute('aria-checked')).toBe('true');
-    expect(environmentLightingItem.getAttribute('aria-checked')).toBe('false');
     expect(environmentPathTracingItem.getAttribute('aria-checked')).toBe('false');
 
     ui.setPanoramaDisplayMode('environmentLighting');
     expect(panoramaImageItem.getAttribute('aria-checked')).toBe('false');
-    expect(environmentLightingItem.getAttribute('aria-checked')).toBe('true');
 
     ui.setPanoramaLightingMethod('pathTracing');
-    expect(environmentLightingItem.getAttribute('aria-checked')).toBe('false');
     expect(environmentPathTracingItem.getAttribute('aria-checked')).toBe('true');
 
     environmentPathTracingItem.click();
     expect(onPanoramaLightingMethodChange).toHaveBeenLastCalledWith('pathTracing');
     expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('environmentLighting');
 
-    environmentLightingItem.click();
-    expect(onPanoramaLightingMethodChange).toHaveBeenLastCalledWith('sphericalHarmonics');
-    expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('environmentLighting');
     expect(onViewerModeChange).toHaveBeenCalledWith('panorama');
 
     panoramaImageItem.click();
     expect(onPanoramaDisplayModeChange).toHaveBeenLastCalledWith('image');
-    expect(onViewerModeChange).toHaveBeenCalledTimes(3);
+    expect(onViewerModeChange).toHaveBeenCalledTimes(2);
   });
 
   it('preserves source thumbnails and hides locked source probes while showing path-traced results', () => {
@@ -3923,7 +3913,7 @@ describe('view menu', () => {
     expect(dialog.open).toBe(false);
     ui.executeDesktopCommand('pathTracingMaxSamples');
     expect(dialogInput.value).toBe('131072');
-    ui.setPanoramaLightingMethod('sphericalHarmonics');
+    ui.setPanoramaDisplayMode('image');
     expect(dialog.open).toBe(false);
     expect(input.disabled).toBe(true);
     expect(menuItem.disabled).toBe(true);
@@ -4044,7 +4034,7 @@ describe('view menu', () => {
     expect(material.value).toBe('roughConductor');
     expect(roughness.value).toBe('0.01');
     expect(roughness.disabled).toBe(false);
-    ui.setPanoramaLightingMethod('sphericalHarmonics');
+    ui.setPanoramaDisplayMode('image');
     expect(fields.classList.contains('hidden')).toBe(true);
     expect(roughness.disabled).toBe(true);
     ui.dispose();

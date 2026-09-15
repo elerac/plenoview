@@ -469,7 +469,7 @@ export class ViewerUi implements Disposable {
   private invalidValueWarningEnabled = DEFAULT_INVALID_VALUE_WARNING_ENABLED;
   private viewerMode: ViewerMode = 'image';
   private panoramaDisplayMode: PanoramaDisplayMode = 'image';
-  private panoramaLightingMethod: PanoramaLightingMethod = 'sphericalHarmonics';
+  private panoramaLightingMethod: PanoramaLightingMethod = 'pathTracing';
   private environmentSphereMaterial = createDefaultEnvironmentSphereMaterial();
   private pathTracingMaxSamples = DEFAULT_PATH_TRACING_MAX_SAMPLES;
   private threeDModeAvailable = false;
@@ -1967,13 +1967,6 @@ export class ViewerUi implements Disposable {
           this.callbacks.onViewerModeChange('panorama');
         }
         return;
-      case 'viewerModeEnvironmentLighting':
-        if (!this.elements.environmentLightingMenuItem.disabled) {
-          this.callbacks.onPanoramaLightingMethodChange?.('sphericalHarmonics');
-          this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
-          this.callbacks.onViewerModeChange('panorama');
-        }
-        return;
       case 'viewerModeEnvironmentPathTracing':
         if (!this.elements.environmentPathTracingMenuItem.disabled) {
           this.callbacks.onPanoramaLightingMethodChange?.('pathTracing');
@@ -2035,7 +2028,6 @@ export class ViewerUi implements Disposable {
       metadata: !this.elements.appMetadataButton.disabled,
       viewerModeImage: !this.elements.imageViewerMenuItem.disabled,
       viewerModePanorama: !this.elements.panoramaViewerMenuItem.disabled,
-      viewerModeEnvironmentLighting: !this.elements.environmentLightingMenuItem.disabled,
       viewerModeEnvironmentPathTracing: !this.elements.environmentPathTracingMenuItem.disabled,
       pathTracingMaxSamples: !this.elements.pathTracingMaxSamplesMenuItem.disabled,
       viewerMode3d: !this.elements.threeDViewerMenuItem.disabled,
@@ -2846,7 +2838,6 @@ export class ViewerUi implements Disposable {
     this.elements.imageViewerMenuItem.disabled = disabled;
     this.elements.panoramaViewerMenuItem.disabled = disabled;
     this.elements.panoramaImageMenuItem.disabled = disabled;
-    this.elements.environmentLightingMenuItem.disabled = disabled;
     this.elements.environmentPathTracingMenuItem.disabled = disabled;
     this.elements.threeDViewerMenuItem.disabled = disabled || !this.threeDModeAvailable;
     this.updateEnvironmentMaterialControls();
@@ -2860,12 +2851,6 @@ export class ViewerUi implements Disposable {
     this.elements.panoramaImageMenuItem.setAttribute(
       'aria-checked',
       panoramaActive && this.panoramaDisplayMode === 'image' ? 'true' : 'false'
-    );
-    this.elements.environmentLightingMenuItem.setAttribute(
-      'aria-checked',
-      panoramaActive &&
-        this.panoramaDisplayMode === 'environmentLighting' &&
-        this.panoramaLightingMethod === 'sphericalHarmonics' ? 'true' : 'false'
     );
     this.elements.environmentPathTracingMenuItem.setAttribute(
       'aria-checked',
@@ -3157,17 +3142,6 @@ export class ViewerUi implements Disposable {
 
       this.topMenuController.closeAll();
       this.callbacks.onPanoramaDisplayModeChange?.('image');
-      this.callbacks.onViewerModeChange('panorama');
-    });
-
-    this.disposables.addEventListener(this.elements.environmentLightingMenuItem, 'click', () => {
-      if (this.elements.environmentLightingMenuItem.disabled) {
-        return;
-      }
-
-      this.topMenuController.closeAll();
-      this.callbacks.onPanoramaLightingMethodChange?.('sphericalHarmonics');
-      this.callbacks.onPanoramaDisplayModeChange?.('environmentLighting');
       this.callbacks.onViewerModeChange('panorama');
     });
 

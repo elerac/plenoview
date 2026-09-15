@@ -74,7 +74,7 @@ export function createInitialState(): ViewerSessionState {
     channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
     viewerMode: 'image',
     panoramaDisplayMode: 'image',
-    panoramaLightingMethod: 'sphericalHarmonics',
+    panoramaLightingMethod: 'pathTracing',
     pathTracingMaxSamples: DEFAULT_PATH_TRACING_MAX_SAMPLES,
     environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',

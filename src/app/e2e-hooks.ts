@@ -20,7 +20,6 @@ interface E2EStateSnapshot {
   panoramaDisplayMode: NonNullable<ViewerAppState['sessionState']['panoramaDisplayMode']>;
   panoramaLightingMethod: NonNullable<ViewerAppState['sessionState']['panoramaLightingMethod']>;
   pathTracingMaxSamples: number;
-  environmentLightingInteractive: boolean;
   panoramaYawDeg: number;
   depthYawDeg: number;
   depthPitchDeg: number;
@@ -187,10 +186,8 @@ function createSnapshot(state: ViewerAppState, appReady: boolean): E2EStateSnaps
     thumbnailPendingCount: countPendingThumbnails(state),
     viewerMode: state.sessionState.viewerMode,
     panoramaDisplayMode: state.sessionState.panoramaDisplayMode ?? 'image',
-    panoramaLightingMethod: state.sessionState.panoramaLightingMethod ?? 'sphericalHarmonics',
+    panoramaLightingMethod: state.sessionState.panoramaLightingMethod ?? 'pathTracing',
     pathTracingMaxSamples: normalizePathTracingMaxSamples(state.sessionState.pathTracingMaxSamples),
-    environmentLightingInteractive:
-      state.interactionState.environmentLightingInteractive === true,
     panoramaYawDeg: state.interactionState.view.panoramaYawDeg,
     depthYawDeg: state.interactionState.view.depthYawDeg,
     depthPitchDeg: state.interactionState.view.depthPitchDeg

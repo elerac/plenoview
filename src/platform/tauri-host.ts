@@ -74,7 +74,6 @@ interface NativeMenuState {
     panorama: {
       trigger: NativeMenuItemState;
       image: NativeMenuItemState;
-      environmentLighting: NativeMenuItemState;
       environmentPathTracing: NativeMenuItemState;
       maxSamples: NativeMenuItemState;
     };
@@ -541,10 +540,6 @@ async function installNativeMenu(callbacks: DesktopCommandCallbacks, options: { 
         items: [
           await checkedCommandItem('viewerModePanorama', menuState.view.panorama.image),
           await checkedCommandItem(
-            'viewerModeEnvironmentLighting',
-            menuState.view.panorama.environmentLighting
-          ),
-          await checkedCommandItem(
             'viewerModeEnvironmentPathTracing',
             menuState.view.panorama.environmentPathTracing
           ),
@@ -647,10 +642,6 @@ function readNativeMenuState(): NativeMenuState {
       panorama: {
         trigger: readButtonState('panorama-viewer-menu-item', 'Panorama viewer'),
         image: readButtonState('panorama-image-menu-item', 'Panorama image'),
-        environmentLighting: readButtonState(
-          'environment-lighting-menu-item',
-          'Environment lighting (SH)'
-        ),
         environmentPathTracing: readButtonState(
           'environment-path-tracing-menu-item',
           'Environment lighting (path tracing)'

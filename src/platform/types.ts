@@ -113,7 +113,6 @@ export type DesktopCommandId =
   | 'metadata'
   | 'viewerModeImage'
   | 'viewerModePanorama'
-  | 'viewerModeEnvironmentLighting'
   | 'viewerModeEnvironmentPathTracing'
   | 'pathTracingMaxSamples'
   | 'viewerMode3d'

@@ -139,35 +139,6 @@ describe('viewer app lanes', () => {
     expect(hasRenderFlag(renderFlags, ViewerRenderInvalidationFlags.RenderRulerOverlay)).toBe(false);
   });
 
-  it('invalidates panorama UI and rendering when the environment lighting method changes', () => {
-    const initialState = createActiveState();
-    const state: ViewerAppState = {
-      ...initialState,
-      sessionState: {
-        ...initialState.sessionState,
-        viewerMode: 'panorama',
-        panoramaDisplayMode: 'environmentLighting',
-        panoramaLightingMethod: 'sphericalHarmonics'
-      }
-    };
-    const nextState: ViewerAppState = {
-      ...state,
-      sessionState: {
-        ...state.sessionState,
-        panoramaLightingMethod: 'pathTracing'
-      }
-    };
-
-    expect(hasUiFlag(
-      createUiFlags(state, nextState),
-      ViewerUiInvalidationFlags.ViewerMode
-    )).toBe(true);
-    expect(hasRenderFlag(
-      createRenderFlags(state, nextState),
-      ViewerRenderInvalidationFlags.RenderImage
-    )).toBe(true);
-  });
-
   it('refreshes the sample control and resumes rendering without rebaking resources when its limit changes', () => {
     const initialState = createActiveState();
     const state: ViewerAppState = {
@@ -188,38 +159,6 @@ describe('viewer app lanes', () => {
     expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderImage)).toBe(true);
     expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.ViewerStateReadout)).toBe(true);
     expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.ResourcePrepare)).toBe(false);
-  });
-
-  it('rerenders SH environment lighting when interaction quality settles', () => {
-    const initialState = createActiveState();
-    const settledState: ViewerAppState = {
-      ...initialState,
-      sessionState: {
-        ...initialState.sessionState,
-        viewerMode: 'panorama',
-        panoramaDisplayMode: 'environmentLighting',
-        panoramaLightingMethod: 'sphericalHarmonics'
-      }
-    };
-    const interactiveState: ViewerAppState = {
-      ...settledState,
-      interactionState: {
-        ...settledState.interactionState,
-        environmentLightingInteractive: true
-      }
-    };
-
-    const interactiveFlags = createRenderFlags(settledState, interactiveState);
-    const settledFlags = createRenderFlags(interactiveState, settledState);
-
-    expect(hasRenderFlag(
-      interactiveFlags,
-      ViewerRenderInvalidationFlags.RenderImage
-    )).toBe(true);
-    expect(hasRenderFlag(
-      settledFlags,
-      ViewerRenderInvalidationFlags.RenderImage
-    )).toBe(true);
   });
 
   it('rerenders the environment sphere material without preparing image resources', () => {

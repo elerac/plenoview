@@ -186,19 +186,6 @@ export class GlImageRenderer implements Disposable {
     this.state.invalidValueWarningPhase = phase >= 0.5 ? 1 : 0;
   }
 
-  setEnvironmentShIrradiance(coefficients: ArrayLike<number>): void {
-    if (this.state.disposed) {
-      return;
-    }
-
-    this.state.environmentShIrradiance.fill(0);
-    const length = Math.min(this.state.environmentShIrradiance.length, coefficients.length);
-    for (let index = 0; index < length; index += 1) {
-      const value = coefficients[index];
-      this.state.environmentShIrradiance[index] = Number.isFinite(value) ? value : 0;
-    }
-  }
-
   setEnvironmentImportanceSampling(table: EnvironmentImportanceSamplingTable): void {
     if (this.state.disposed) {
       return;
@@ -266,7 +253,6 @@ export class GlImageRenderer implements Disposable {
     this.state.activeSourceRevisionKey = '';
     this.state.activePolarizedEnvironment = null;
     this.state.activeSourceTextures = [];
-    this.state.environmentShIrradiance.fill(0);
     clearEnvironmentImportanceTextureState(this.state);
     clearPathTracingSurfaces(this.state);
     this.clearFramebuffer();
@@ -335,7 +321,6 @@ export class GlImageRenderer implements Disposable {
     this.state.activeSourceRevisionKey = '';
     this.state.activePolarizedEnvironment = null;
     this.state.activeSourceTextures = [];
-    this.state.environmentShIrradiance.fill(0);
     clearEnvironmentImportanceTextureState(this.state);
     clearPathTracingSurfaces(this.state);
     deleteExportSurface(this.state.gl, this.state.exportSourceSurface);

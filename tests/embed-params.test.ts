@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
+import { resolvePanoramaLightingMethod, usesPathTracingEnvironmentLighting } from '../src/panorama-lighting';
 import { buildFullViewerUrl, parseViewerBootstrapParams } from '../src/embed/embed-params';
 import { decodeEmbedViewerState, encodeEmbedViewerState } from '../src/embed/embed-state';
 
@@ -108,6 +109,18 @@ describe('embed params', () => {
       alpha: 0.001,
       intIor: 4
     });
+  });
+
+  it.each([undefined, 'sphericalHarmonics'])('uses path tracing for a saved environment with method %s', (method) => {
+    const snapshot = decodeEmbedViewerState(encodeURIComponent(JSON.stringify({
+      viewerMode: 'panorama',
+      panoramaDisplayMode: 'environmentLighting',
+      panoramaLightingMethod: method
+    })))!;
+
+    expect(snapshot.panoramaLightingMethod).toBeUndefined();
+    expect(resolvePanoramaLightingMethod(snapshot.panoramaLightingMethod)).toBe('pathTracing');
+    expect(usesPathTracingEnvironmentLighting({ ...snapshot, viewerMode: 'panorama' })).toBe(true);
   });
 
   it('round-trips and normalizes shared sample ceilings without changing older snapshots', () => {

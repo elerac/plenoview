@@ -385,12 +385,6 @@ function setPanoramaUniforms(
     program.uniforms.sourceTextureMipmapsAvailable,
     state.smoothFloatMinification && !polarized ? 1 : 0
   );
-  const interactive = viewerState.environmentLightingInteractive === true;
-  gl.uniform2i(
-    program.uniforms.environmentSampleCounts,
-    interactive ? 64 : 128,
-    interactive ? 64 : 256
-  );
   gl.uniform1i(program.uniforms.pathTracingMaxBounces, 6);
   gl.uniform1f(program.uniforms.panoramaYawDeg, viewerState.panoramaYawDeg);
   gl.uniform1f(
@@ -421,7 +415,6 @@ function setPanoramaUniforms(
     program.uniforms.environmentImportanceProjection,
     polarized ? 2 : state.environmentImportanceProjection
   );
-  gl.uniform3fv(program.uniforms.environmentShIrradiance, state.environmentShIrradiance);
   const material = normalizeEnvironmentSphereMaterial(viewerState.environmentSphereMaterial);
   if (usesPathTracingEnvironmentLighting(viewerState)) {
     gl.activeTexture(gl.TEXTURE0 + ROUGH_PLASTIC_TRANSMITTANCE_TEXTURE_UNIT);

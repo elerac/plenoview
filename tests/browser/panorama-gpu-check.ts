@@ -45,7 +45,7 @@ async function run(): Promise<void> {
   const sources: WebGLTexture[] = [];
   gl.bindVertexArray(vao);
 
-  async function prepare(kind: 'radiance' | 'image' | 'sphericalHarmonics' | 'pathTracing'): Promise<ProgramBundle<PanoramaUniforms>> {
+  async function prepare(kind: 'radiance' | 'image' | 'pathTracing'): Promise<ProgramBundle<PanoramaUniforms>> {
     const start = performance.now();
     for (;;) {
       const bundle = programs.get(kind);
@@ -183,64 +183,36 @@ async function run(): Promise<void> {
     gl.uniform1i(u.displayMode, 1);
     gl.uniform1i(u.useImageAlpha, 0);
     const constantEnvironment = get('fixture:constant-hdr');
-    const sh = await prepare('sphericalHarmonics');
-    gl.useProgram(sh.program);
-    const shUniforms = sh.uniforms;
-    gl.uniform2f(shUniforms.viewport, 2, 2);
-    gl.uniform2f(shUniforms.outputSize, 2, 2);
-    gl.uniform2f(shUniforms.outputPixelScale, 1, 1);
-    gl.uniform2f(shUniforms.imageSize, 2, 2);
-    gl.uniform1f(shUniforms.panoramaHfovDeg, 10);
-    gl.uniform1f(shUniforms.displayGamma, 1);
-    gl.uniform2i(shUniforms.environmentSampleCounts, 1, 1);
-    gl.uniform1i(shUniforms.sourceTextureMipmapsAvailable, constantEnvironment.mipmapsAvailable ? 1 : 0);
-    gl.uniform3f(shUniforms.environmentSphereDiffuseReflectance, 0.25, 0.5, 0.75);
-    gl.uniform1f(shUniforms.environmentSphereAlpha, 0.1);
-    gl.uniform1f(shUniforms.environmentSphereIntIor, 1);
-    gl.uniform1f(shUniforms.environmentSphereExtIor, 1);
-    // Equal IOR eliminates Fresnel reflection and transmission losses. With a
-    // constant environment the quadrature reduces exactly to radiance * albedo.
-    const shaded = cache.getOrCreate('sh-display-check', 2, 2, () => {
-      gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
-      gl.bindTexture(gl.TEXTURE_2D, constantEnvironment.texture);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-    });
-    checkPixels(read(shaded.texture), Array.from({ length: 4 }, () => [1, 0.5, 6.75, 1]).flat(),
-      'SH lighting samples the baked HDR texture with the expected diffuse response');
-
-    // Path tracing uses measured Ag Fresnel; the SH preview retains its 0.96 fit.
     // One bounce also checks that the terminal reflection can reach the sky.
-    for (const kind of ['sphericalHarmonics', 'pathTracing'] as const) {
-      const silver = await prepare(kind);
-      gl.useProgram(silver.program);
-      const uniforms = silver.uniforms;
-      gl.uniform2f(uniforms.viewport, 2000, 2000);
-      gl.uniform2f(uniforms.screenOrigin, 999, 999);
-      gl.uniform2f(uniforms.outputSize, 2, 2);
-      gl.uniform2f(uniforms.outputPixelScale, 1, 1);
-      gl.uniform2f(uniforms.imageSize, 2, 2);
-      gl.uniform1f(uniforms.panoramaHfovDeg, 1);
-      gl.uniform1f(uniforms.displayGamma, 1);
-      gl.uniform1i(uniforms.environmentSphereSmoothSilver, 1);
-      gl.uniform3f(uniforms.conductorEta, ...MITSUBA_SILVER_ETA);
-      gl.uniform3f(uniforms.conductorK, ...MITSUBA_SILVER_K);
-      gl.uniform3f(uniforms.environmentSphereDiffuseReflectance, 0, 0, 0);
-      gl.uniform1f(uniforms.environmentSphereAlpha, 0.02);
-      gl.uniform1i(uniforms.sourceTextureMipmapsAvailable, constantEnvironment.mipmapsAvailable ? 1 : 0);
-      for (const bounces of kind === 'pathTracing' ? [1, 6] : [1]) {
-        gl.uniform1i(uniforms.pathTracingMaxBounces, bounces);
-        const reflection = cache.getOrCreate(`silver:${kind}:${bounces}`, 2, 2, () => {
-          gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
-          gl.bindTexture(gl.TEXTURE_2D, constantEnvironment.texture);
-          gl.drawArrays(gl.TRIANGLES, 0, 3);
-        });
-        const reflected = [4, 1, 9].map((value, channel) => {
-          const eta = MITSUBA_SILVER_ETA[channel], k = MITSUBA_SILVER_K[channel];
-          return value * (kind === 'pathTracing' ? ((eta - 1) ** 2 + k * k) / ((eta + 1) ** 2 + k * k) : 0.96);
-        });
-        checkPixels(read(reflection.texture), Array.from({ length: 4 }, () => [...reflected, 1]).flat(),
-          `${kind} polished silver reflects HDR radiance without diffuse loss or MIS dimming (${bounces} bounce limit)`);
-      }
+    const silver = await prepare('pathTracing');
+    gl.useProgram(silver.program);
+    const uniforms = silver.uniforms;
+    gl.uniform2f(uniforms.viewport, 2000, 2000);
+    gl.uniform2f(uniforms.screenOrigin, 999, 999);
+    gl.uniform2f(uniforms.outputSize, 2, 2);
+    gl.uniform2f(uniforms.outputPixelScale, 1, 1);
+    gl.uniform2f(uniforms.imageSize, 2, 2);
+    gl.uniform1f(uniforms.panoramaHfovDeg, 1);
+    gl.uniform1f(uniforms.displayGamma, 1);
+    gl.uniform1i(uniforms.environmentSphereSmoothSilver, 1);
+    gl.uniform3f(uniforms.conductorEta, ...MITSUBA_SILVER_ETA);
+    gl.uniform3f(uniforms.conductorK, ...MITSUBA_SILVER_K);
+    gl.uniform3f(uniforms.environmentSphereDiffuseReflectance, 0, 0, 0);
+    gl.uniform1f(uniforms.environmentSphereAlpha, 0.02);
+    gl.uniform1i(uniforms.sourceTextureMipmapsAvailable, constantEnvironment.mipmapsAvailable ? 1 : 0);
+    for (const bounces of [1, 6]) {
+      gl.uniform1i(uniforms.pathTracingMaxBounces, bounces);
+      const reflection = cache.getOrCreate(`silver:${bounces}`, 2, 2, () => {
+        gl.activeTexture(gl.TEXTURE0 + ENVIRONMENT_RADIANCE_TEXTURE_UNIT);
+        gl.bindTexture(gl.TEXTURE_2D, constantEnvironment.texture);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      });
+      const reflected = [4, 1, 9].map((value, channel) => {
+        const eta = MITSUBA_SILVER_ETA[channel], k = MITSUBA_SILVER_K[channel];
+        return value * ((eta - 1) ** 2 + k * k) / ((eta + 1) ** 2 + k * k);
+      });
+      checkPixels(read(reflection.texture), Array.from({ length: 4 }, () => [...reflected, 1]).flat(),
+        `Path-traced polished silver reflects HDR radiance without diffuse loss or MIS dimming (${bounces} bounce limit)`);
     }
 
     cache.deleteByPrefix('fixture:');

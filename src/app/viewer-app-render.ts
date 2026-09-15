@@ -849,7 +849,7 @@ function buildViewerStateReadout(
     hasActiveImage: Boolean(activeSession),
     viewerMode: renderState.viewerMode,
     panoramaDisplayMode: renderState.panoramaDisplayMode ?? 'image',
-    panoramaLightingMethod: renderState.panoramaLightingMethod ?? 'sphericalHarmonics',
+    panoramaLightingMethod: renderState.panoramaLightingMethod ?? 'pathTracing',
     pathTracingMaxSamples: normalizePathTracingMaxSamples(renderState.pathTracingMaxSamples),
     environmentSphereMaterial: renderState.environmentSphereMaterial,
     view: {
@@ -1005,11 +1005,9 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
   const sharesCommonInputs = (
     previous.viewerMode === next.viewerMode &&
     (previous.panoramaDisplayMode ?? 'image') === (next.panoramaDisplayMode ?? 'image') &&
-    (previous.panoramaLightingMethod ?? 'sphericalHarmonics') ===
-      (next.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    (previous.panoramaLightingMethod ?? 'pathTracing') ===
+      (next.panoramaLightingMethod ?? 'pathTracing') &&
     normalizePathTracingMaxSamples(previous.pathTracingMaxSamples) === normalizePathTracingMaxSamples(next.pathTracingMaxSamples) &&
-    (previous.environmentLightingInteractive === true) ===
-      (next.environmentLightingInteractive === true) &&
     sameEnvironmentSphereMaterial(
       previous.environmentSphereMaterial,
       next.environmentSphereMaterial
@@ -1117,11 +1115,9 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.viewerBackground === b.viewerBackground &&
     a.viewerMode === b.viewerMode &&
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
-    (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
-      (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    (a.panoramaLightingMethod ?? 'pathTracing') ===
+      (b.panoramaLightingMethod ?? 'pathTracing') &&
     normalizePathTracingMaxSamples(a.pathTracingMaxSamples) === normalizePathTracingMaxSamples(b.pathTracingMaxSamples) &&
-    (a.environmentLightingInteractive === true) ===
-      (b.environmentLightingInteractive === true) &&
     sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.visualizationMode === b.visualizationMode &&
     a.activeColormapId === b.activeColormapId &&
@@ -1162,7 +1158,7 @@ function stateLikeSessionState(): ViewerAppState['sessionState'] {
     channelThumbnailDisplayGamma: DEFAULT_DISPLAY_GAMMA,
     viewerMode: 'image',
     panoramaDisplayMode: 'image',
-    panoramaLightingMethod: 'sphericalHarmonics',
+    panoramaLightingMethod: 'pathTracing',
     pathTracingMaxSamples: DEFAULT_PATH_TRACING_MAX_SAMPLES,
     environmentSphereMaterial: createDefaultEnvironmentSphereMaterial(),
     visualizationMode: 'rgb',

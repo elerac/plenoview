@@ -33,8 +33,8 @@ export function sameViewerSessionState(a: ViewerSessionState, b: ViewerSessionSt
     a.channelThumbnailDisplayGamma === b.channelThumbnailDisplayGamma &&
     a.viewerMode === b.viewerMode &&
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
-    (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
-      (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    (a.panoramaLightingMethod ?? 'pathTracing') ===
+      (b.panoramaLightingMethod ?? 'pathTracing') &&
     normalizePathTracingMaxSamples(a.pathTracingMaxSamples) === normalizePathTracingMaxSamples(b.pathTracingMaxSamples) &&
     sameEnvironmentSphereMaterial(a.environmentSphereMaterial, b.environmentSphereMaterial) &&
     a.visualizationMode === b.visualizationMode &&
@@ -304,8 +304,8 @@ export function sameViewerStateReadout(
     a.hasActiveImage === b.hasActiveImage &&
     a.viewerMode === b.viewerMode &&
     (a.panoramaDisplayMode ?? 'image') === (b.panoramaDisplayMode ?? 'image') &&
-    (a.panoramaLightingMethod ?? 'sphericalHarmonics') ===
-      (b.panoramaLightingMethod ?? 'sphericalHarmonics') &&
+    (a.panoramaLightingMethod ?? 'pathTracing') ===
+      (b.panoramaLightingMethod ?? 'pathTracing') &&
     normalizePathTracingMaxSamples(a.pathTracingMaxSamples) === normalizePathTracingMaxSamples(b.pathTracingMaxSamples) &&
     sameEnvironmentSphereMaterial(
       a.environmentSphereMaterial ?? DEFAULT_ENVIRONMENT_SPHERE_MATERIAL,

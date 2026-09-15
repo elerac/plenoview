@@ -448,7 +448,6 @@ describe('tauri host', () => {
     ]);
     expect(readMenuItemLabels(findMenuItem(viewMenuOptions, 'Panorama viewer'))).toEqual([
       'Panorama image',
-      'Environment lighting (SH)',
       'Environment lighting (path tracing)',
       'Maximum SPP…'
     ]);
@@ -508,8 +507,7 @@ describe('tauri host', () => {
     invokeMock.mockResolvedValueOnce([]);
     setMenuCheckedState('image-viewer-menu-item', false);
     setMenuCheckedState('panorama-image-menu-item', false);
-    setMenuCheckedState('environment-lighting-menu-item', true);
-    setMenuCheckedState('environment-path-tracing-menu-item', false);
+    setMenuCheckedState('environment-path-tracing-menu-item', true);
     setMenuCheckedState('rulers-menu-item', true);
     setMenuCheckedState('window-normal-menu-item', false);
     setMenuCheckedState('window-full-screen-preview-menu-item', true);
@@ -523,8 +521,7 @@ describe('tauri host', () => {
 
     expect(findCheckItem(checkItems, 'Image viewer').checked).toBe(false);
     expect(findCheckItem(checkItems, 'Panorama image').checked).toBe(false);
-    expect(findCheckItem(checkItems, 'Environment lighting (SH)').checked).toBe(true);
-    expect(findCheckItem(checkItems, 'Environment lighting (path tracing)').checked).toBe(false);
+    expect(findCheckItem(checkItems, 'Environment lighting (path tracing)').checked).toBe(true);
     expect(findCheckItem(checkItems, 'Rulers').checked).toBe(true);
     expect(findCheckItem(checkItems, 'Normal').checked).toBe(false);
     expect(findCheckItem(checkItems, 'Full Screen Preview').checked).toBe(true);

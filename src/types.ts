@@ -13,7 +13,7 @@ export type VisualizationMode = 'rgb' | 'colormap';
 export type ColormapRangeMode = 'alwaysAuto' | 'oneTime';
 export type ViewerMode = 'image' | 'panorama' | '3d';
 export type PanoramaDisplayMode = 'image' | 'environmentLighting';
-export type PanoramaLightingMethod = 'sphericalHarmonics' | 'pathTracing';
+export type PanoramaLightingMethod = 'pathTracing';
 export type OpenedImageDropPlacement = 'before' | 'after';
 export type ViewerKeyboardNavigationDirection = 'up' | 'left' | 'down' | 'right';
 export type ViewerKeyboardZoomDirection = 'in' | 'out';
@@ -198,7 +198,6 @@ export interface ViewerInteractionState {
   hoveredPixel: ImagePixel | null;
   draftRoi: ImageRoi | null;
   roiInteraction: ViewerRoiInteractionState;
-  environmentLightingInteractive?: boolean;
 }
 
 export interface ViewerRenderState extends ViewerSessionState {
@@ -209,7 +208,6 @@ export interface ViewerRenderState extends ViewerSessionState {
   channelRecognitionNameRules?: ChannelRecognitionNameRules;
   invalidValueWarningEnabled?: boolean;
   invalidValueWarningPhase?: number;
-  environmentLightingInteractive?: boolean;
   hoveredPixel: ImagePixel | null;
   draftRoi: ImageRoi | null;
   roiInteraction: ViewerRoiInteractionState;

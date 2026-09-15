@@ -10,7 +10,7 @@ rotations, and Mueller/Fresnel equations are unchanged.
 
 Screenshot preparation captures the source's variant before awaiting compilation
 and skips the radiance-bake program for polarized environments, matching the live
-render path. Image panorama and SH programs retain their existing behavior.
+render path. The image panorama program retains its existing behavior.
 
 ## Results: September 15, 2026
 

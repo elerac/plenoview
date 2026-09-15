@@ -74,9 +74,7 @@ export function syncInteractionCoordinator(
     sameViewState(coordinatorState.view, nextInteractionState.view) &&
     samePixel(coordinatorState.hoveredPixel, nextInteractionState.hoveredPixel) &&
     sameRoi(coordinatorState.draftRoi, nextInteractionState.draftRoi) &&
-    sameRoiInteractionState(coordinatorState.roiInteraction, nextInteractionState.roiInteraction) &&
-    (coordinatorState.environmentLightingInteractive === true) ===
-      (nextInteractionState.environmentLightingInteractive === true)
+    sameRoiInteractionState(coordinatorState.roiInteraction, nextInteractionState.roiInteraction)
   ) {
     return;
   }

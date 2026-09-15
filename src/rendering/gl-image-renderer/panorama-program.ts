@@ -76,7 +76,6 @@ export class PanoramaPrograms {
       pathTracingOutputColorChannel: optional('uPathTracingOutputColorChannel'),
       environmentRadianceTexture: optional('uEnvironmentRadianceTexture'),
       sourceTextureMipmapsAvailable: optional('uSourceTextureMipmapsAvailable'),
-      environmentSampleCounts: optional('uEnvironmentSampleCounts'),
       pathTracingMaxBounces: optional('uPathTracingMaxBounces'),
       panoramaYawDeg: optional('uPanoramaYawDeg'),
       panoramaPitchDeg: optional('uPanoramaPitchDeg'),
@@ -90,7 +89,6 @@ export class PanoramaPrograms {
       environmentImportanceGridSize: optional('uEnvironmentImportanceGridSize'),
       environmentImportanceEntryCount: optional('uEnvironmentImportanceEntryCount'),
       environmentImportanceProjection: optional('uEnvironmentImportanceProjection'),
-      environmentShIrradiance: optional('uEnvironmentShIrradiance[0]'),
       environmentSphereSmoothSilver: optional('uEnvironmentSphereSmoothSilver'),
       environmentSphereDiffuseReflectance: optional('uEnvironmentSphereDiffuseReflectance'),
       environmentSphereAlpha: optional('uEnvironmentSphereAlpha'),
@@ -102,7 +100,7 @@ export class PanoramaPrograms {
     // These variants deliberately omit unused uniforms; WebGL ignores null writes.
     const required = kind === 'radiance' ? ['uDisplayMode']
       : ['uPanoramaYawDeg', 'uPanoramaPitchDeg', 'uPanoramaHfovDeg'];
-    if (kind === 'sphericalHarmonics' || kind === 'pathTracing') required.push('uEnvironmentRadianceTexture');
+    if (kind === 'pathTracing') required.push('uEnvironmentRadianceTexture');
     for (const name of required) getRequiredUniformLocation(gl, program, name);
     gl.useProgram(program);
     gl.uniform1iv(optional('uSourceTextures[0]'), Int32Array.from({ length: DISPLAY_SOURCE_SLOT_COUNT }, (_, index) => index));

@@ -59,7 +59,6 @@ test('renders each panorama program and keeps exposure controls usable @smoke', 
   }
   for (const [index, id] of [
     'panorama-image-menu-item',
-    'environment-lighting-menu-item',
     'environment-path-tracing-menu-item'
   ].entries()) {
     await page.locator('#view-menu-button').click();

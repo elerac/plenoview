@@ -3,16 +3,14 @@ import displaySource from '../shaders/panorama-display.glsl?raw';
 import displayColorsSource from '../shaders/display-colors.glsl?raw';
 import projectionSource from '../shaders/panorama-projection.glsl?raw';
 import lightingSource from '../shaders/panorama-lighting.glsl?raw';
-import sphericalHarmonicsSource from '../shaders/panorama-sh-lighting.glsl?raw';
 import pathTracingSource from '../shaders/panorama-path-tracing.glsl?raw';
 import pathTracingDisplaySource from '../shaders/path-tracing-display.glsl?raw';
 import polarizationSource from '../shaders/panorama-polarization.glsl?raw';
 import imageMainSource from '../shaders/panorama-image.frag.glsl?raw';
-import sphericalHarmonicsMainSource from '../shaders/panorama-lighting.frag.glsl?raw';
 import pathTracingMainSource from '../shaders/panorama-path-tracing.frag.glsl?raw';
 import environmentRadianceMainSource from '../shaders/environment-radiance.frag.glsl?raw';
 
-export type PanoramaProgramKind = 'image' | 'sphericalHarmonics' | 'pathTracing';
+export type PanoramaProgramKind = 'image' | 'pathTracing';
 
 function fragmentSource(...parts: string[]): string {
   return ['#version 300 es', ...parts].join('\n');
@@ -23,16 +21,6 @@ export function createPanoramaFragmentSource(kind: PanoramaProgramKind, polarize
   switch (kind) {
     case 'image':
       return fragmentSource(commonSource, displayColorsSource, displaySource, projectionSource, imageMainSource);
-    case 'sphericalHarmonics':
-      return fragmentSource(
-        commonSource,
-        displayColorsSource,
-        displaySource,
-        projectionSource,
-        lightingSource,
-        sphericalHarmonicsSource,
-        sphericalHarmonicsMainSource
-      );
     case 'pathTracing':
       return fragmentSource(
         '#define PATH_TRACED_STOKES',

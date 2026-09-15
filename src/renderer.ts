@@ -18,13 +18,11 @@ import type { ViewerPaneRenderInfo } from './viewer-pane-layout';
 import type { ReadExportPixelsArgs } from './rendering/gl-image-renderer';
 import {
   computeEnvironmentMapImportanceSampling,
-  computeEnvironmentMapIrradiance,
   resolvePanoramaDisplayMode,
   type EnvironmentImportanceSamplingTable
 } from './panorama-lighting';
 
 interface CachedEnvironmentLighting {
-  irradiance: Float32Array;
   importanceSampling: EnvironmentImportanceSamplingTable;
 }
 
@@ -152,12 +150,10 @@ export class WebGlExrRenderer implements Disposable {
         channelRecognitionNameRules
       };
       environmentLighting = {
-        irradiance: computeEnvironmentMapIrradiance(environmentSource),
         importanceSampling: computeEnvironmentMapImportanceSampling(environmentSource)
       };
       this.environmentLightingCache.set(environmentCacheKey, environmentLighting);
     }
-    this.imageRenderer.setEnvironmentShIrradiance(environmentLighting.irradiance);
     this.imageRenderer.setEnvironmentImportanceSampling(environmentLighting.importanceSampling);
     const displaySize = resolveDisplayImageSize(width, height, selection);
     this.overlayRenderer.setDisplaySelectionContext(width, height, layer, selection, visualizationMode, {

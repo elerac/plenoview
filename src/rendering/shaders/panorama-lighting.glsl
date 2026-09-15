@@ -16,11 +16,7 @@ const int ENVIRONMENT_SURFACE_SPHERE = 1;
 const int ENVIRONMENT_SURFACE_SMOOTH_SILVER = 2;
 const int ENVIRONMENT_SURFACE_COMPARISON_SPHERE = 3;
 const float ENVIRONMENT_RAY_EPSILON = 1.0e-3;
-// Neutral, high reflectance gives polished silver a mirror-like appearance.
-const vec3 ENVIRONMENT_SILVER_REFLECTANCE = vec3(0.96);
-const int MICROFACET_DISTRIBUTION_BECKMANN = 0;
 const int MICROFACET_DISTRIBUTION_GGX = 1;
-const float ROUGH_PLASTIC_SAMPLE_FILTER_OVERLAP = 4.0;
 const vec3 ENVIRONMENT_SPHERE_CENTER = vec3(0.0, 0.0, 3.5);
 const float ENVIRONMENT_SPHERE_RADIUS = 1.0;
 const int ENVIRONMENT_COMPARISON_SPHERE_COUNT = 6;
@@ -284,38 +280,6 @@ vec3 sampleCosineHemisphere(vec2 sampleValue) {
   );
 }
 
-vec3 sampleRoughPlasticMicrofacetNormal(vec2 sampleValue, float alpha) {
-  float u = min(sampleValue.x, 1.0 - 1.0e-6);
-  float alphaSquared = alpha * alpha;
-  float tangentThetaSquared = uEnvironmentSphereDistribution == MICROFACET_DISTRIBUTION_GGX
-    ? alphaSquared * u / max(1.0 - u, 1.0e-6)
-    : -alphaSquared * log(max(1.0 - u, 1.0e-6));
-  float cosTheta = inversesqrt(1.0 + tangentThetaSquared);
-  float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
-  float phi = 2.0 * PI * sampleValue.y;
-  return vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
-}
-
-float evaluateRoughPlasticMicrofacetDistribution(float normalDotMicrofacet, float alpha) {
-  float cosThetaSquared = max(normalDotMicrofacet * normalDotMicrofacet, 1.0e-8);
-  float tanThetaSquared = max(0.0, 1.0 - cosThetaSquared) / cosThetaSquared;
-  float alphaSquared = alpha * alpha;
-  float cosThetaFourth = cosThetaSquared * cosThetaSquared;
-
-  if (uEnvironmentSphereDistribution == MICROFACET_DISTRIBUTION_GGX) {
-    float denominator = alphaSquared + tanThetaSquared;
-    return alphaSquared / max(PI * cosThetaFourth * denominator * denominator, 1.0e-8);
-  }
-
-  return exp(-tanThetaSquared / alphaSquared) /
-    max(PI * alphaSquared * cosThetaFourth, 1.0e-8);
-}
-
-vec3 evaluateSmoothSilverFresnel(float cosTheta) {
-  float grazing = pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
-  return mix(ENVIRONMENT_SILVER_REFLECTANCE, vec3(1.0), grazing);
-}
-
 float evaluateDielectricFresnel(float cosThetaI, float eta) {
   float cosTheta = clamp(abs(cosThetaI), 0.0, 1.0);
   float sinThetaTSquared = max(0.0, 1.0 - cosTheta * cosTheta) / (eta * eta);
@@ -331,102 +295,6 @@ float evaluateDielectricFresnel(float cosThetaI, float eta) {
   float rs = rsNumerator / max(abs(rsDenominator), 1.0e-6);
   float rp = rpNumerator / max(abs(rpDenominator), 1.0e-6);
   return clamp(0.5 * (rs * rs + rp * rp), 0.0, 1.0);
-}
-
-float evaluateRoughPlasticSmithG1(
-  vec3 direction,
-  vec3 microfacetNormal,
-  vec3 surfaceNormal,
-  float alpha
-) {
-  float cosTheta = dot(direction, surfaceNormal);
-  if (cosTheta <= 0.0 || dot(direction, microfacetNormal) * cosTheta <= 0.0) {
-    return 0.0;
-  }
-
-  float sinThetaSquared = max(0.0, 1.0 - cosTheta * cosTheta);
-  float tanThetaAlphaSquared = alpha * alpha * sinThetaSquared /
-    max(cosTheta * cosTheta, 1.0e-8);
-  if (tanThetaAlphaSquared <= 1.0e-8) {
-    return 1.0;
-  }
-
-  if (uEnvironmentSphereDistribution == MICROFACET_DISTRIBUTION_GGX) {
-    return 2.0 / (1.0 + sqrt(1.0 + tanThetaAlphaSquared));
-  }
-
-  float a = inversesqrt(tanThetaAlphaSquared);
-  if (a >= 1.6) {
-    return 1.0;
-  }
-  float aSquared = a * a;
-  return (3.535 * a + 2.181 * aSquared) /
-    (1.0 + 2.276 * a + 2.577 * aSquared);
-}
-
-float approximateInternalDiffuseReflectance(float eta) {
-  float clampedEta = max(eta, 1.0e-3);
-  if (abs(clampedEta - 1.0) <= 1.0e-4) {
-    return 0.0;
-  }
-  if (clampedEta < 1.0) {
-    float inverseEta = 1.0 / clampedEta;
-    float inverseEtaSquared = inverseEta * inverseEta;
-    return clamp(
-      -0.4399 + 0.7099 * inverseEta - 0.3319 * inverseEtaSquared +
-      0.0636 * inverseEtaSquared * inverseEta,
-      0.0,
-      0.999
-    );
-  }
-
-  float inverseEta = 1.0 / clampedEta;
-  return clamp(
-    -1.4399 * inverseEta * inverseEta + 0.7099 * inverseEta +
-    0.6681 + 0.0636 * clampedEta,
-    0.0,
-    0.999
-  );
-}
-
-bool sampleSmoothSilverReflection(
-  vec3 normal,
-  vec3 viewDirection,
-  float materialAlpha,
-  vec2 sampleValue,
-  out vec3 lightDirection,
-  out vec3 reflectionWeight,
-  out float directionPdf
-) {
-  float alpha = clamp(materialAlpha, 1.0e-3, 1.0);
-  vec3 cameraForward;
-  vec3 cameraRight;
-  vec3 cameraDown;
-  resolveEnvironmentOrbitBasis(cameraForward, cameraRight, cameraDown);
-  vec3 tangent;
-  vec3 bitangent;
-  buildRoughPlasticFrame(normal, cameraRight, cameraDown, tangent, bitangent);
-  vec3 microfacetNormal = roughPlasticLocalToWorld(
-    sampleRoughPlasticMicrofacetNormal(sampleValue, alpha), normal, tangent, bitangent
-  );
-  float normalDotView = dot(normal, viewDirection);
-  float viewDotMicrofacet = dot(viewDirection, microfacetNormal);
-  float normalDotMicrofacet = dot(normal, microfacetNormal);
-  lightDirection = reflect(-viewDirection, microfacetNormal);
-  reflectionWeight = vec3(0.0);
-  directionPdf = 0.0;
-  if (normalDotView <= 0.0 || viewDotMicrofacet <= 0.0 ||
-      normalDotMicrofacet <= 0.0 || dot(normal, lightDirection) <= 0.0) {
-    return false;
-  }
-  float geometry = evaluateRoughPlasticSmithG1(
-    lightDirection, microfacetNormal, normal, alpha
-  ) * evaluateRoughPlasticSmithG1(viewDirection, microfacetNormal, normal, alpha);
-  reflectionWeight = evaluateSmoothSilverFresnel(viewDotMicrofacet) *
-    (geometry * viewDotMicrofacet / max(normalDotView * normalDotMicrofacet, 1.0e-8));
-  directionPdf = evaluateRoughPlasticMicrofacetDistribution(normalDotMicrofacet, alpha) *
-    normalDotMicrofacet / max(4.0 * viewDotMicrofacet, 1.0e-8);
-  return true;
 }
 
 // The selected display channels are evaluated once into a linear HDR texture.

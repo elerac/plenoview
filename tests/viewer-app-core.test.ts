@@ -78,7 +78,7 @@ describe('viewer app core', () => {
     core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });
 
     expect(core.getState().sessionState.panoramaDisplayMode).toBe('image');
-    expect(core.getState().sessionState.panoramaLightingMethod).toBe('sphericalHarmonics');
+    expect(core.getState().sessionState.panoramaLightingMethod).toBe('pathTracing');
 
     core.dispatch({ type: 'panoramaDisplayModeSet', panoramaDisplayMode: 'environmentLighting' });
     core.dispatch({ type: 'panoramaLightingMethodSet', panoramaLightingMethod: 'pathTracing' });

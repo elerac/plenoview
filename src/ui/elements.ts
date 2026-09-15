@@ -56,7 +56,6 @@ export interface Elements {
   imageViewerMenuItem: HTMLButtonElement;
   panoramaViewerMenuItem: HTMLButtonElement;
   panoramaImageMenuItem: HTMLButtonElement;
-  environmentLightingMenuItem: HTMLButtonElement;
   environmentPathTracingMenuItem: HTMLButtonElement;
   pathTracingMaxSamplesMenuItem: HTMLButtonElement;
   pathTracingMaxSamplesDialog: HTMLDialogElement;
@@ -648,7 +647,6 @@ export function resolveElements(): Elements {
     imageViewerMenuItem: requireElement('image-viewer-menu-item', HTMLButtonElement),
     panoramaViewerMenuItem: requireElement('panorama-viewer-menu-item', HTMLButtonElement),
     panoramaImageMenuItem: requireElement('panorama-image-menu-item', HTMLButtonElement),
-    environmentLightingMenuItem: requireElement('environment-lighting-menu-item', HTMLButtonElement),
     environmentPathTracingMenuItem: requireElement('environment-path-tracing-menu-item', HTMLButtonElement),
     pathTracingMaxSamplesMenuItem: requireElement('path-tracing-max-samples-menu-item', HTMLButtonElement),
     pathTracingMaxSamplesDialog: requireElement('path-tracing-max-samples-dialog', HTMLDialogElement),
