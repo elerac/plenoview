@@ -5,7 +5,7 @@
 1. Open `public/penvmap.exr` through **File > Open** (or drop the file into the viewer).
 2. Choose **View > Panorama viewer > Environment lighting (path tracing)**.
 3. Select **Rough Conductor**, **Rough Plastic (White)**, or **Rough Plastic (Black)** in the right-hand **View** panel. Selecting a material sets microfacet roughness `alpha` to **0.01** for the conductor or **0.1** for either plastic. The Roughness field stays editable and reflects the active value. All three use Beckmann; there is no distribution menu. Both plastic presets use the polarized `pplastic` implementation.
-4. Select `S0.RGB`, `S1.RGB`, `S2.RGB`, `S3.RGB`, or a derived Stokes channel such as `DoLP.RGB` or `AoLP.RGB` in the channel strip. Selecting a channel shows its rendered Stokes result in the main viewport. Root RGB shows rendered S0. The small thumbnail images preview the source EXR; the strip labels them accordingly. The source-pixel Probe panel is hidden during path tracing.
+4. Select `S0.RGB`, `S1.RGB`, `S2.RGB`, `S3.RGB`, or a derived Stokes channel such as `DoLP.RGB` or `AoLP.RGB` in the channel strip. Selecting a channel shows its rendered Stokes result in the main viewport. Root RGB shows rendered S0. The small thumbnail images preview the source EXR. The source-pixel Probe panel is hidden during path tracing.
 
 Enable **Auto exposure** for an intensity preview of the supplied HDR map (roughly −8.3 EV). The initial 0 EV display clips much of its high radiance to white.
 

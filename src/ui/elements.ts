@@ -15,7 +15,6 @@ export interface Elements {
   bottomPanel: HTMLElement;
   bottomPanelContent: HTMLElement;
   channelThumbnailStrip: HTMLElement;
-  channelThumbnailSourceHint: HTMLElement;
   imagePanel: HTMLElement;
   imagePanelContent: HTMLElement;
   imagePanelCollapseButton: HTMLButtonElement;
@@ -598,7 +597,6 @@ export function resolveElements(): Elements {
     bottomPanel: requireElement('bottom-panel', HTMLElement),
     bottomPanelContent: requireElement('bottom-panel-content', HTMLElement),
     channelThumbnailStrip: requireElement('channel-thumbnail-strip', HTMLElement),
-    channelThumbnailSourceHint: requireElement('channel-thumbnail-source-hint', HTMLElement),
     imagePanel: requireElement('image-panel', HTMLElement),
     imagePanelContent: requireElement('image-panel-content', HTMLElement),
     imagePanelCollapseButton: requireElement('image-panel-collapse-button', HTMLButtonElement),

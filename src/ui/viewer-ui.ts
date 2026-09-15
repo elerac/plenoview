@@ -2823,7 +2823,7 @@ export class ViewerUi implements Disposable {
 
   private updatePanoramaDisplayModeMenuItems(): void {
     this.updateEnvironmentMaterialControls();
-    this.updateRenderedSourceContext();
+    this.updateProbePanelVisibility();
     const panoramaActive = this.viewerMode === 'panorama';
     this.elements.panoramaImageMenuItem.setAttribute(
       'aria-checked',
@@ -2855,16 +2855,10 @@ export class ViewerUi implements Disposable {
     this.elements.environmentRoughnessInput.value = String(material.alpha);
   }
 
-  private updateRenderedSourceContext(): void {
+  private updateProbePanelVisibility(): void {
     const pathTracing = this.viewerMode === 'panorama' && this.panoramaDisplayMode === 'environmentLighting' &&
       this.panoramaLightingMethod === 'pathTracing';
-    this.elements.channelThumbnailSourceHint.classList.toggle('hidden', !pathTracing);
     this.elements.probePanel.classList.toggle('hidden', pathTracing);
-    if (pathTracing) {
-      this.elements.channelThumbnailStrip.setAttribute('aria-describedby', this.elements.channelThumbnailSourceHint.id);
-    } else {
-      this.elements.channelThumbnailStrip.removeAttribute('aria-describedby');
-    }
   }
 
   private updateWindowPaneMenuItemsDisabled(): void {

@@ -2740,14 +2740,6 @@ body.is-resizing-panel-rows * {
   display: flex;
 }
 
-.channel-thumbnail-source-hint {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 6px 8px 0;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
 .bottom-panel-shell.is-collapsed,
 .side-panel.is-collapsed,
 .image-panel.is-collapsed {
@@ -2783,7 +2775,6 @@ body.is-resizing-panel-rows * {
   padding: 0 0.58rem;
 }
 
-.bottom-panel.is-collapsed .channel-thumbnail-source-hint,
 .bottom-panel.is-collapsed .channel-thumbnail-tile-preview {
   display: none;
 }

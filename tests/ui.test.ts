@@ -3832,11 +3832,10 @@ describe('view menu', () => {
     expect(onViewerModeChange).toHaveBeenCalledTimes(3);
   });
 
-  it('identifies source thumbnails and hides locked source probes while showing path-traced results', () => {
+  it('preserves source thumbnails and hides locked source probes while showing path-traced results', () => {
     installUiFixture();
     const onRgbGroupChange = vi.fn();
     const ui = new ViewerUi(createUiCallbacks({ onRgbGroupChange }));
-    const hint = document.getElementById('channel-thumbnail-source-hint')!;
     const strip = document.getElementById('channel-thumbnail-strip')!;
     const probe = document.getElementById('probe-panel')!;
     const channels = ['S0.R', 'S0.G', 'S0.B', 'S1.R', 'S1.G', 'S1.B', 'S2.R', 'S2.G', 'S2.B'];
@@ -3851,30 +3850,21 @@ describe('view menu', () => {
       displayValues: [{ label: 'R', value: '7' }]
     });
     const sourcePreview = strip.querySelector('img')!;
-    expect(hint.classList.contains('hidden')).toBe(true);
     expect(probe.classList.contains('hidden')).toBe(false);
 
     ui.setViewerMode('panorama');
     ui.setPanoramaDisplayMode('environmentLighting');
-    expect(hint.classList.contains('hidden')).toBe(true);
     ui.setPanoramaLightingMethod('pathTracing');
-    expect(hint.classList.contains('hidden')).toBe(false);
-    expect(hint.textContent).toContain('Source EXR previews');
-    expect(hint.textContent).toContain('rendered result in the main viewport');
-    expect(strip.getAttribute('aria-describedby')).toBe(hint.id);
     expect(probe.classList.contains('hidden')).toBe(true);
     expect(strip.querySelector('img')).toBe(sourcePreview);
     (strip.querySelector('.channel-thumbnail-tile[aria-selected="false"]') as HTMLButtonElement).click();
     expect(onRgbGroupChange).toHaveBeenCalled();
 
     ui.setPanoramaDisplayMode('image');
-    expect(hint.classList.contains('hidden')).toBe(true);
     expect(probe.classList.contains('hidden')).toBe(false);
-    expect(strip.hasAttribute('aria-describedby')).toBe(false);
     ui.setPanoramaDisplayMode('environmentLighting');
     expect(probe.classList.contains('hidden')).toBe(true);
     ui.setViewerMode('image');
-    expect(hint.classList.contains('hidden')).toBe(true);
     expect(probe.classList.contains('hidden')).toBe(false);
     expect(document.getElementById('probe-color-values')!.textContent).toContain('7');
     ui.dispose();
