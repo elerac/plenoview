@@ -110,8 +110,11 @@ test('loads scalar Stokes channels and applies derived-channel defaults @smoke',
   await expect(stokesAolpValueButton).toHaveAttribute('aria-pressed', 'true');
   await expect(stokesAolpSaturationButton).toHaveAttribute('aria-pressed', 'false');
   await stokesDegreeModulationButton.click();
+  // Modulation changes schedule a shader render that can block browser reads on CI.
+  await waitForE2ERenderIdle(page);
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'true');
   await stokesAolpSaturationButton.click();
+  await waitForE2ERenderIdle(page);
   await expect(stokesAolpValueButton).toHaveAttribute('aria-pressed', 'false');
   await expect(stokesAolpSaturationButton).toHaveAttribute('aria-pressed', 'true');
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'true');
@@ -165,6 +168,7 @@ test('loads scalar Stokes channels and applies derived-channel defaults @smoke',
   await expect(stokesAolpModeControl).toBeHidden();
   await expectColormapZeroCentered(page, true);
   await stokesDegreeModulationButton.click();
+  await waitForE2ERenderIdle(page);
   await expect(stokesDegreeModulationButton).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => Number(await colormapVminInput.inputValue())).toBeCloseTo(-Math.PI / 4, 6);
   await expect.poll(async () => Number(await colormapVmaxInput.inputValue())).toBeCloseTo(Math.PI / 4, 6);
