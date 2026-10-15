@@ -276,6 +276,7 @@ export function buildChannelThumbnailItems(
       displayGamma: state.sessionState.channelThumbnailDisplayGamma,
       stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
       stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+      stokesAolpDegreeModulationGamma: state.sessionState.stokesAolpDegreeModulationGamma,
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       channelRecognitionSettings: state.channelRecognitionSettings,
       channelRecognitionNameRules: state.channelRecognitionNameRules
@@ -312,7 +313,8 @@ export function selectStokesDegreeModulationControl(
     label: getStokesDegreeModulationLabel(selection.parameter) ?? 'Degree Modulation',
     enabled: sessionState.stokesDegreeModulation[selection.parameter],
     showAolpMode: selection.parameter === 'aolp',
-    aolpMode: sessionState.stokesAolpDegreeModulationMode
+    aolpMode: sessionState.stokesAolpDegreeModulationMode,
+    aolpGamma: sessionState.stokesAolpDegreeModulationGamma
   };
 }
 

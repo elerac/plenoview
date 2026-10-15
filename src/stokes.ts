@@ -972,3 +972,20 @@ function isSpectralStokesSuffixValue(
 function resolveCompiledNameRules(config: StokesDisplayOptionsConfig): CompiledChannelRecognitionNameRules {
   return config.compiledChannelRecognitionNameRules ?? compileChannelRecognitionNameRules(config.channelRecognitionNameRules);
 }
+
+/** Gamma affects AoLP's DoLP modulation before HSV conversion. */
+export function resolveStokesDegreeModulationGamma(
+  selection: DisplaySelection | null,
+  aolpGamma: number
+): number {
+  return isStokesAngleSelection(selection) && selection.parameter === 'aolp'
+    && Number.isFinite(aolpGamma) && aolpGamma > 0 ? aolpGamma : 1;
+}
+
+export function applyStokesDegreeModulationGamma(
+  value: number,
+  selection: DisplaySelection | null,
+  aolpGamma: number
+): number {
+  return clampStokesDegreeModulationValue(value) ** (1 / resolveStokesDegreeModulationGamma(selection, aolpGamma));
+}

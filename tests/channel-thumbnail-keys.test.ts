@@ -4,7 +4,7 @@ import {
   serializeChannelThumbnailRequestKey
 } from '../src/channel-thumbnail-keys';
 import { createDefaultStokesDegreeModulation } from '../src/stokes';
-import { createChannelRgbSelection } from './helpers/state-fixtures';
+import { createChannelRgbSelection, createStokesSelection } from './helpers/state-fixtures';
 
 describe('channel thumbnail keys', () => {
   it('includes normal-map color mapping in thumbnail selection keys', () => {
@@ -23,4 +23,19 @@ describe('channel thumbnail keys', () => {
       stokesAolpDegreeModulationMode: 'value'
     })).toContain('selection:channelRgb:normal.X:normal.Y:normal.Z::normalMap|exposure:4|gamma:4');
   });
+
+  it('invalidates AoLP thumbnails when DoLP gamma changes', () => {
+    const args = {
+      sessionId: 'session-1',
+      activeLayer: 0,
+      selection: createStokesSelection('aolp'),
+      exposureEv: 0,
+      displayGamma: 1,
+      stokesDegreeModulation: createDefaultStokesDegreeModulation(),
+      stokesAolpDegreeModulationMode: 'value' as const
+    };
+    expect(serializeChannelThumbnailRequestKey({ ...args, stokesAolpDegreeModulationGamma: 2 }))
+      .not.toBe(serializeChannelThumbnailRequestKey({ ...args, stokesAolpDegreeModulationGamma: 1 }));
+  });
+
 });

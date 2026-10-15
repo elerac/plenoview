@@ -127,7 +127,8 @@ export function buildProbeReadoutModel(args: BuildProbePresentationArgs): ProbeR
         colormapZeroCentered: args.sessionState.colormapZeroCentered,
         colormapReversed: args.sessionState.colormapReversed,
         stokesDegreeModulation: args.sessionState.stokesDegreeModulation,
-        stokesAolpDegreeModulationMode: args.sessionState.stokesAolpDegreeModulationMode
+        stokesAolpDegreeModulationMode: args.sessionState.stokesAolpDegreeModulationMode,
+        stokesAolpDegreeModulationGamma: args.sessionState.stokesAolpDegreeModulationGamma
       }
     ),
     imageSize

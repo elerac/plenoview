@@ -115,6 +115,7 @@ export interface ScreenshotReproductionMetadataV2 {
     colormapReversed: boolean;
     stokesDegreeModulation: ViewerState['stokesDegreeModulation'];
     stokesAolpDegreeModulationMode: ViewerState['stokesAolpDegreeModulationMode'];
+    stokesAolpDegreeModulationGamma: number;
   };
 }
 
@@ -195,6 +196,7 @@ export function buildScreenshotReproductionMetadata({
       colormapZeroCentered: renderState.colormapZeroCentered,
       colormapReversed: renderState.colormapReversed,
       stokesDegreeModulation: { ...renderState.stokesDegreeModulation },
+      stokesAolpDegreeModulationGamma: renderState.stokesAolpDegreeModulationGamma,
       stokesAolpDegreeModulationMode: renderState.stokesAolpDegreeModulationMode
     }
   };

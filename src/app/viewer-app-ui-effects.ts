@@ -76,7 +76,8 @@ export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransiti
       snapshot.stokesDegreeModulationControl?.label ?? null,
       snapshot.stokesDegreeModulationControl?.enabled ?? false,
       snapshot.stokesDegreeModulationControl?.showAolpMode ?? false,
-      snapshot.stokesDegreeModulationControl?.aolpMode ?? 'value'
+      snapshot.stokesDegreeModulationControl?.aolpMode ?? 'value',
+      snapshot.stokesDegreeModulationControl?.aolpGamma ?? 1
     );
   }
 

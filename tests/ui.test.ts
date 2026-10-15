@@ -1358,6 +1358,44 @@ describe('top bar and display controls', () => {
     expect(onColormapGammaChange).toHaveBeenLastCalledWith(5);
   });
 
+  it('adjusts DoLP gamma only for active AoLP modulation and resets to one', () => {
+    installUiFixture();
+    const onStokesAolpDegreeModulationGammaChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onStokesAolpDegreeModulationGammaChange }));
+    const control = document.getElementById('stokes-aolp-modulation-gamma-control')!;
+    const slider = document.getElementById('stokes-aolp-modulation-gamma-slider') as HTMLInputElement;
+    const value = document.getElementById('stokes-aolp-modulation-gamma-value') as HTMLInputElement;
+    ui.setOpenedImageOptions([{ id: 'session-1', label: 'image.exr' }], 'session-1');
+    ui.setVisualizationMode('colormap');
+    ui.setStokesDegreeModulationControl('DoLP', false, true, 'value', 1);
+    expect(control.classList.contains('hidden')).toBe(false);
+    expect(slider.disabled).toBe(true);
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(onStokesAolpDegreeModulationGammaChange).not.toHaveBeenCalled();
+
+    ui.setStokesDegreeModulationControl('DoLP', true, true, 'saturation', 1.5);
+    expect(slider.disabled).toBe(false);
+    expect(slider.value).toBe('1.5');
+    expect(value.value).toBe('1.5');
+    slider.value = '2';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(onStokesAolpDegreeModulationGammaChange).toHaveBeenLastCalledWith(2);
+    expect(value.value).toBe('2');
+    value.value = '8';
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onStokesAolpDegreeModulationGammaChange).toHaveBeenLastCalledWith(4);
+    expect(slider.value).toBe('4');
+    document.querySelector('label[for="stokes-aolp-modulation-gamma-slider"]')!
+      .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(onStokesAolpDegreeModulationGammaChange).toHaveBeenLastCalledWith(1);
+    expect(slider.value).toBe('1');
+
+    ui.setStokesDegreeModulationControl('DoP', true, false);
+    expect(control.classList.contains('hidden')).toBe(true);
+    expect(slider.disabled).toBe(true);
+    expect(value.disabled).toBe(true);
+  });
+
   it('resets EV and gamma controls when their labels are double-clicked', () => {
     installUiFixture();
 
@@ -12587,6 +12625,7 @@ function createUiCallbacksBase() {
     onColormapZeroCenterToggle: () => {},
     onColormapReverseToggle: () => {},
     onStokesDegreeModulationToggle: () => {},
+    onStokesAolpDegreeModulationGammaChange: () => {},
     onStokesAolpDegreeModulationModeChange: () => {},
     onStokesDefaultSettingChange: () => {},
     onStokesParameterVisibilityChange: () => {},

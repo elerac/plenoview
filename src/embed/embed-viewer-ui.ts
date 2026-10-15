@@ -417,7 +417,8 @@ export class EmbedViewerUi implements ViewerRuntimeUi {
     _label: string | null,
     _enabled = false,
     _showAolpMode = false,
-    _aolpMode: StokesAolpDegreeModulationMode = 'value'
+    _aolpMode: StokesAolpDegreeModulationMode = 'value',
+    _aolpGamma = 1
   ): void {}
   setActiveColormap(_activeId: string | null): void {}
   setColormapOptions(_items: Array<{ id: string; label: string }>, _activeId: string | null): void {}

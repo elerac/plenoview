@@ -15,6 +15,7 @@ uniform bool uWarnInvalidValues;
 uniform float uInvalidValueWarningPhase;
 uniform bool uUseStokesDegreeModulation;
 uniform int uStokesDegreeModulationMode;
+uniform float uStokesDegreeModulationGamma;
 uniform bool uUseImageAlpha;
 
 const int DISPLAY_MODE_EMPTY = 0;

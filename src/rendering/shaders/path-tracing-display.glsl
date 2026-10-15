@@ -42,6 +42,7 @@ vec4 encodePathTracingStokes(
     if (uUseStokesDegreeModulation && uStokesParameter >= 0) {
       vec3 hsv = rgbToHsv(color);
       float degree = computeStokesDegreeModulationDisplayValue(uStokesParameter, scalar.x, scalar.y, scalar.z, scalar.w);
+      degree = pow(degree, 1.0 / uStokesDegreeModulationGamma);
       if (uStokesDegreeModulationMode == STOKES_DEGREE_MODULATION_MODE_SATURATION) hsv.y *= degree;
       else hsv.z *= degree;
       color = hsvToRgb(hsv);

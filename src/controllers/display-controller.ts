@@ -841,6 +841,13 @@ export class DisplayController implements Disposable {
     });
   }
 
+  setStokesAolpDegreeModulationGamma(gamma: number): void {
+    if (this.disposed) {
+      return;
+    }
+    this.core.dispatch({ type: 'stokesAolpDegreeModulationGammaSet', gamma });
+  }
+
   setActiveLayer(layerIndex: number): void {
     if (this.disposed) {
       return;

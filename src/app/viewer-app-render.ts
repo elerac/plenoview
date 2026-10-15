@@ -369,6 +369,7 @@ function createProbeReadoutSelector(): (
   let previousActiveColormapLut: ViewerRenderSnapshot['activeColormapLut'] = null;
   let previousStokesDegreeModulation = { aolp: false, cop: false, top: false };
   let previousStokesAolpDegreeModulationMode: ViewerAppState['sessionState']['stokesAolpDegreeModulationMode'] = 'value';
+  let previousStokesAolpDegreeModulationGamma = 1;
   let previousMaskInvalidStokesVectors = true;
   let previousSpectralRgbGroupingEnabled = true;
   let previousChannelRecognitionSettings = stateLikeRecognitionSettings();
@@ -424,7 +425,8 @@ function createProbeReadoutSelector(): (
           nextStokesDegreeModulation.aolp === previousStokesDegreeModulation.aolp &&
           nextStokesDegreeModulation.cop === previousStokesDegreeModulation.cop &&
           nextStokesDegreeModulation.top === previousStokesDegreeModulation.top &&
-          state.sessionState.stokesAolpDegreeModulationMode === previousStokesAolpDegreeModulationMode
+          state.sessionState.stokesAolpDegreeModulationMode === previousStokesAolpDegreeModulationMode &&
+          state.sessionState.stokesAolpDegreeModulationGamma === previousStokesAolpDegreeModulationGamma
         )
       );
 
@@ -451,6 +453,7 @@ function createProbeReadoutSelector(): (
     previousActiveColormapLut = activeColormapLut;
     previousStokesDegreeModulation = nextStokesDegreeModulation;
     previousStokesAolpDegreeModulationMode = state.sessionState.stokesAolpDegreeModulationMode;
+    previousStokesAolpDegreeModulationGamma = state.sessionState.stokesAolpDegreeModulationGamma;
     previousMaskInvalidStokesVectors = state.maskInvalidStokesVectors;
     previousSpectralRgbGroupingEnabled = state.spectralRgbGroupingEnabled;
     previousChannelRecognitionSettings = state.channelRecognitionSettings;
@@ -1052,6 +1055,7 @@ function samePaneImageInput(a: ViewerPaneRenderSource, b: ViewerPaneRenderSource
     previous.stokesDegreeModulation.cop === next.stokesDegreeModulation.cop &&
     previous.stokesDegreeModulation.top === next.stokesDegreeModulation.top &&
     previous.stokesAolpDegreeModulationMode === next.stokesAolpDegreeModulationMode &&
+    previous.stokesAolpDegreeModulationGamma === next.stokesAolpDegreeModulationGamma &&
     a.colormapLut === b.colormapLut
   );
 }
@@ -1131,6 +1135,7 @@ function sameViewerRenderState(a: ViewerRenderState, b: ViewerRenderState): bool
     a.stokesDegreeModulation.cop === b.stokesDegreeModulation.cop &&
     a.stokesDegreeModulation.top === b.stokesDegreeModulation.top &&
     a.stokesAolpDegreeModulationMode === b.stokesAolpDegreeModulationMode &&
+    a.stokesAolpDegreeModulationGamma === b.stokesAolpDegreeModulationGamma &&
     a.maskInvalidStokesVectors === b.maskInvalidStokesVectors &&
     a.spectralRgbGroupingEnabled === b.spectralRgbGroupingEnabled &&
     sameOptionalChannelRecognitionSettings(a.channelRecognitionSettings, b.channelRecognitionSettings) &&
@@ -1171,6 +1176,7 @@ function stateLikeSessionState(): ViewerAppState['sessionState'] {
     colormapReversed: false,
     stokesDegreeModulation: { aolp: false, cop: false, top: false },
     stokesAolpDegreeModulationMode: 'value',
+    stokesAolpDegreeModulationGamma: 1,
     zoom: 1,
     panX: 0,
     panY: 0,

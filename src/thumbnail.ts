@@ -30,7 +30,7 @@ import {
 import { resolveDisplaySelectionForLayer } from './display-selection';
 import type { ChannelRecognitionSettings } from './channel-recognition-settings';
 import type { ChannelRecognitionNameRules } from './channel-recognition-name-rules';
-import { isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from './stokes';
+import { applyStokesDegreeModulationGamma, isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from './stokes';
 import {
   DecodedExrImage,
   DecodedLayer,
@@ -69,6 +69,7 @@ export interface ThumbnailPreviewOptions {
   colormapReversed?: boolean;
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode?: StokesAolpDegreeModulationMode;
+  stokesAolpDegreeModulationGamma?: number;
   maskInvalidStokesVectors?: boolean;
   spectralRgbGroupingEnabled?: boolean;
 }
@@ -262,7 +263,15 @@ export function buildDisplaySelectionThumbnailPixels(
           }
         );
         if (useStokesDegreeModulation) {
-          rgb = modulateRgbBytesHsv(rgb, sample.a, stokesDegreeModulationMode);
+          rgb = modulateRgbBytesHsv(
+            rgb,
+            applyStokesDegreeModulationGamma(
+              sample.a,
+              effectiveSelection,
+              colormapPreview.stokesAolpDegreeModulationGamma ?? state.stokesAolpDegreeModulationGamma ?? 1
+            ),
+            stokesDegreeModulationMode
+          );
         }
 
         const alpha = useImageAlpha ? clamp01(sample.a) : 1;

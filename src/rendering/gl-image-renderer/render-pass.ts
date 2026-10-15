@@ -1,6 +1,7 @@
 import {
   DEFAULT_MASK_INVALID_STOKES_VECTORS,
   isStokesDegreeModulationEnabled,
+  resolveStokesDegreeModulationGamma,
   resolveStokesDegreeModulationMode
 } from '../../stokes';
 import {
@@ -706,6 +707,10 @@ function setCommonUniforms(
       viewerState.displaySelection,
       viewerState.stokesAolpDegreeModulationMode
     ) === 'saturation' ? 1 : 0
+  );
+  gl.uniform1f(
+    uniforms.stokesDegreeModulationGamma,
+    resolveStokesDegreeModulationGamma(viewerState.displaySelection, viewerState.stokesAolpDegreeModulationGamma)
   );
   gl.uniform1i(uniforms.useImageAlpha, state.activeBinding.usesImageAlpha ? 1 : 0);
   gl.uniform1i(uniforms.backgroundMode, resolveBackgroundModeUniformValue(options.backgroundMode));

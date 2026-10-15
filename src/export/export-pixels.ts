@@ -6,7 +6,7 @@ import {
   type ColormapLut
 } from '../colormaps';
 import { isNormalMapSelection, selectionUsesImageAlpha } from '../display-model';
-import { isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from '../stokes';
+import { applyStokesDegreeModulationGamma, isStokesDegreeModulationEnabled, resolveStokesDegreeModulationMode } from '../stokes';
 import type { ExportColormapOrientation, ViewerSessionState } from '../types';
 
 type ExportVisualizationState = Pick<
@@ -22,7 +22,7 @@ type ExportVisualizationState = Pick<
   | 'stokesAolpDegreeModulationMode'
   | 'stokesDegreeModulation'
   | 'visualizationMode'
->;
+> & { stokesAolpDegreeModulationGamma?: number };
 
 export interface ExportImagePixels {
   width: number;
@@ -97,7 +97,11 @@ export function buildExportImagePixels({
         }
       );
       if (useStokesDegreeModulation) {
-        rgb = modulateRgbBytesHsv(rgb, rawAlpha, stokesDegreeModulationMode);
+        rgb = modulateRgbBytesHsv(
+          rgb,
+          applyStokesDegreeModulationGamma(rawAlpha, state.displaySelection, state.stokesAolpDegreeModulationGamma ?? 1),
+          stokesDegreeModulationMode
+        );
       }
     } else {
       rgb = [

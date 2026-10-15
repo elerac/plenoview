@@ -37,6 +37,7 @@ interface ColormapPanelCallbacks {
   onColormapZeroCenterToggle: () => void;
   onColormapReverseToggle: () => void;
   onStokesDegreeModulationToggle: () => void;
+  onStokesAolpDegreeModulationGammaChange: (gamma: number) => void;
   onStokesAolpDegreeModulationModeChange: (mode: StokesAolpDegreeModulationMode) => void;
 }
 
@@ -104,6 +105,23 @@ export class ColormapPanel implements Disposable {
     });
     this.bindStokesAolpModulationModeButton(this.elements.stokesAolpModulationValueButton, 'value');
     this.bindStokesAolpModulationModeButton(this.elements.stokesAolpModulationSaturationButton, 'saturation');
+    const gammaSlider = this.elements.stokesAolpModulationGammaSlider;
+    const gammaValue = this.elements.stokesAolpModulationGammaValue;
+    const commitGamma = (control: HTMLInputElement): void => {
+      if (control.disabled || !Number.isFinite(control.valueAsNumber)) {
+        return;
+      }
+      const gamma = clamp(control.valueAsNumber, 0.1, 4);
+      this.setStokesAolpModulationGamma(gamma);
+      this.callbacks.onStokesAolpDegreeModulationGammaChange(gamma);
+    };
+    this.disposables.addEventListener(gammaSlider, 'input', () => commitGamma(gammaSlider));
+    this.disposables.addEventListener(gammaValue, 'change', () => commitGamma(gammaValue));
+    this.bindResettableControlLabel(gammaSlider, () => {
+      this.setStokesAolpModulationGamma(1);
+      this.callbacks.onStokesAolpDegreeModulationGammaChange(1);
+    }, 'Double-click to reset DoLP gamma');
+
 
     this.disposables.addEventListener(this.elements.colormapVminSlider, 'input', () => {
       this.commitColormapMin(Number(this.elements.colormapVminSlider.value));
@@ -333,7 +351,8 @@ export class ColormapPanel implements Disposable {
     label: string | null,
     enabled = false,
     showAolpMode = false,
-    aolpMode: StokesAolpDegreeModulationMode = 'value'
+    aolpMode: StokesAolpDegreeModulationMode = 'value',
+    aolpGamma = 1
   ): void {
     if (this.disposed) {
       return;
@@ -346,8 +365,16 @@ export class ColormapPanel implements Disposable {
       this.elements.stokesDegreeModulationButton.textContent = `${label} Modulation`;
     }
     this.elements.stokesDegreeModulationButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    this.elements.stokesAolpModulationGammaControl.classList.toggle('hidden', !visible || !showAolpMode);
+    this.setStokesAolpModulationGamma(aolpGamma);
     this.setStokesAolpModulationMode(aolpMode);
     this.updateStokesDegreeModulationDisabled();
+  }
+
+  private setStokesAolpModulationGamma(gamma: number): void {
+    const value = String(Number.isFinite(gamma) ? clamp(gamma, 0.1, 4) : 1);
+    this.elements.stokesAolpModulationGammaSlider.value = value;
+    this.elements.stokesAolpModulationGammaValue.value = value;
   }
 
   private bindStokesAolpModulationModeButton(
@@ -482,6 +509,11 @@ export class ColormapPanel implements Disposable {
     const visible = !this.elements.stokesDegreeModulationControl.classList.contains('hidden');
     const disabled = !visible || this.isLoading || this.openedImageCount === 0 || !this.isColormapEnabled;
     this.elements.stokesDegreeModulationButton.disabled = disabled;
+    const gammaDisabled = disabled ||
+      this.elements.stokesAolpModulationGammaControl.classList.contains('hidden') ||
+      this.elements.stokesDegreeModulationButton.getAttribute('aria-pressed') !== 'true';
+    this.elements.stokesAolpModulationGammaSlider.disabled = gammaDisabled;
+    this.elements.stokesAolpModulationGammaValue.disabled = gammaDisabled;
     this.setStokesAolpModulationModeButtonsDisabled(
       disabled || this.elements.stokesAolpModulationModeControl.classList.contains('hidden')
     );

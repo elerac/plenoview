@@ -71,6 +71,16 @@ export function stokesReducer(
         stokesAolpDegreeModulationMode: intent.mode
       });
     }
+    case 'stokesAolpDegreeModulationGammaSet': {
+      const selection = state.sessionState.displaySelection;
+      if (!isStokesSelection(selection) || selection.parameter !== 'aolp' || !Number.isFinite(intent.gamma)) {
+        return state;
+      }
+      const gamma = Math.min(4, Math.max(0.1, intent.gamma));
+      return state.sessionState.stokesAolpDegreeModulationGamma === gamma
+        ? state
+        : patchSessionState(state, { stokesAolpDegreeModulationGamma: gamma });
+    }
     case 'stokesColormapDefaultsSet':
       return sameStokesColormapDefaultSettings(state.stokesColormapDefaults, intent.settings)
         ? state

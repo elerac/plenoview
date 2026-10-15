@@ -423,6 +423,9 @@ export function createViewerUi({
     onStokesDegreeModulationToggle: () => {
       getDisplayController().toggleStokesDegreeModulation();
     },
+    onStokesAolpDegreeModulationGammaChange: (gamma) => {
+      getDisplayController().setStokesAolpDegreeModulationGamma(gamma);
+    },
     onStokesAolpDegreeModulationModeChange: (mode) => {
       getDisplayController().setStokesAolpDegreeModulationMode(mode);
     },
@@ -496,6 +499,7 @@ export function promoteActiveChannelThumbnail(
     displayGamma: state.sessionState.channelThumbnailDisplayGamma,
     stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
     stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+    stokesAolpDegreeModulationGamma: state.sessionState.stokesAolpDegreeModulationGamma,
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
     spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
     channelRecognitionSettings: state.channelRecognitionSettings,

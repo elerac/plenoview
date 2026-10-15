@@ -288,6 +288,7 @@ export function createImageExportPixelsResolver({
           colormapReversed: state.sessionState.colormapReversed,
           stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
           stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+          stokesAolpDegreeModulationGamma: state.sessionState.stokesAolpDegreeModulationGamma,
           maskInvalidStokesVectors: state.maskInvalidStokesVectors,
           spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
         },
@@ -1152,6 +1153,7 @@ async function resolveBatchEntryPreviewPixels({
       colormapReversed: exportState.state.colormapReversed,
       stokesDegreeModulation: exportState.state.stokesDegreeModulation,
       stokesAolpDegreeModulationMode: exportState.state.stokesAolpDegreeModulationMode,
+      stokesAolpDegreeModulationGamma: exportState.state.stokesAolpDegreeModulationGamma,
       maskInvalidStokesVectors: appState.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: appState.spectralRgbGroupingEnabled
     },
@@ -1265,6 +1267,7 @@ async function resolveBatchEntryExportState({
     colormapReversed,
     stokesDegreeModulation,
     stokesAolpDegreeModulationMode,
+    stokesAolpDegreeModulationGamma: currentState.stokesAolpDegreeModulationGamma,
     lockedPixel: null,
     roi: null
   };

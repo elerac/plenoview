@@ -18,6 +18,7 @@ import {
   type StokesDegreeModulationState
 } from './display-model';
 import {
+  applyStokesDegreeModulationGamma,
   clampStokesDegreeModulationValue,
   createDefaultStokesDegreeModulation,
   getStokesDegreeModulationLabel,
@@ -54,6 +55,7 @@ export interface ProbeVisualizationOptions {
   colormapReversed?: boolean;
   stokesDegreeModulation?: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode?: StokesAolpDegreeModulationMode;
+  stokesAolpDegreeModulationGamma?: number;
 }
 
 export function resolveActiveProbePixel(
@@ -131,7 +133,11 @@ export function buildProbeColorPreview(
     if (isStokesDegreeModulationEnabled(selection, stokesDegreeModulation)) {
       bytes = modulateRgbBytesHsv(
         bytes,
-        readProbeStokesDegreeModulationValue(sample, selection),
+        applyStokesDegreeModulationGamma(
+          readProbeStokesDegreeModulationValue(sample, selection),
+          selection,
+          resolvedVisualization.stokesAolpDegreeModulationGamma ?? 1
+        ),
         resolveStokesDegreeModulationMode(
           selection,
           resolvedVisualization.stokesAolpDegreeModulationMode ?? 'value'

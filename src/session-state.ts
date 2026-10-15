@@ -74,6 +74,7 @@ export function cloneViewerSessionState(state: ViewerSessionState): ViewerSessio
     colormapReversed: state.colormapReversed,
     stokesDegreeModulation: { ...state.stokesDegreeModulation },
     stokesAolpDegreeModulationMode: state.stokesAolpDegreeModulationMode,
+    stokesAolpDegreeModulationGamma: state.stokesAolpDegreeModulationGamma,
     zoom: state.zoom,
     panX: state.panX,
     panY: state.panY,

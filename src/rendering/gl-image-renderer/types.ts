@@ -33,6 +33,7 @@ export interface CommonUniforms {
   invalidValueWarningPhase: WebGLUniformLocation | null;
   useStokesDegreeModulation: WebGLUniformLocation | null;
   stokesDegreeModulationMode: WebGLUniformLocation | null;
+  stokesDegreeModulationGamma: WebGLUniformLocation | null;
   useImageAlpha: WebGLUniformLocation | null;
   backgroundMode: WebGLUniformLocation | null;
   backgroundColor: WebGLUniformLocation | null;

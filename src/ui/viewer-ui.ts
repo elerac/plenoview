@@ -375,6 +375,7 @@ export interface UiCallbacks {
   onColormapZeroCenterToggle: () => void;
   onColormapReverseToggle: () => void;
   onStokesDegreeModulationToggle: () => void;
+  onStokesAolpDegreeModulationGammaChange: (gamma: number) => void;
   onStokesAolpDegreeModulationModeChange: (mode: StokesAolpDegreeModulationMode) => void;
   onStokesDefaultSettingChange: (group: StokesColormapDefaultGroup, setting: StokesColormapDefaultSetting) => void;
   onStokesParameterVisibilityChange: (group: StokesColormapDefaultGroup, enabled: boolean) => void;
@@ -593,6 +594,9 @@ export class ViewerUi implements Disposable {
       },
       onStokesDegreeModulationToggle: () => {
         this.callbacks.onStokesDegreeModulationToggle();
+      },
+      onStokesAolpDegreeModulationGammaChange: (gamma) => {
+        this.callbacks.onStokesAolpDegreeModulationGammaChange(gamma);
       },
       onStokesAolpDegreeModulationModeChange: (mode) => {
         this.callbacks.onStokesAolpDegreeModulationModeChange(mode);
@@ -1429,13 +1433,14 @@ export class ViewerUi implements Disposable {
     label: string | null,
     enabled = false,
     showAolpMode = false,
-    aolpMode: StokesAolpDegreeModulationMode = 'value'
+    aolpMode: StokesAolpDegreeModulationMode = 'value',
+    aolpGamma = 1
   ): void {
     if (this.disposed) {
       return;
     }
 
-    this.colormapPanel.setStokesDegreeModulationControl(label, enabled, showAolpMode, aolpMode);
+    this.colormapPanel.setStokesDegreeModulationControl(label, enabled, showAolpMode, aolpMode, aolpGamma);
   }
 
   setOpenedImageOptions(items: OpenedImageOptionItem[], activeId: string | null): void {

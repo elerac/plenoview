@@ -38,6 +38,7 @@ export function serializeChannelThumbnailRequestKey(args: {
   displayGamma: number;
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode: StokesAolpDegreeModulationMode;
+  stokesAolpDegreeModulationGamma?: number;
   maskInvalidStokesVectors?: boolean;
   spectralRgbGroupingEnabled?: boolean;
   channelRecognitionSettings?: ChannelRecognitionSettings;
@@ -57,7 +58,7 @@ export function serializeChannelThumbnailRequestKey(args: {
     !sameChannelRecognitionNameRules(args.channelRecognitionNameRules, createDefaultChannelRecognitionNameRules())
     ? `|recognitionRules:${serializeChannelRecognitionNameRulesKey(args.channelRecognitionNameRules)}`
     : '';
-  return `${serializeChannelThumbnailContextKey(args.sessionId, args.activeLayer, args.selection)}|exposure:${serializeFiniteNumber(args.exposureEv, 0)}|gamma:${serializeFiniteNumber(args.displayGamma, DEFAULT_DISPLAY_GAMMA)}|modulation:${serializeStokesDegreeModulationKey(args.stokesDegreeModulation)}|aolpModulation:${args.stokesAolpDegreeModulationMode}${maskKey}${spectralKey}${recognitionKey}${recognitionRulesKey}`;
+  return `${serializeChannelThumbnailContextKey(args.sessionId, args.activeLayer, args.selection)}|exposure:${serializeFiniteNumber(args.exposureEv, 0)}|gamma:${serializeFiniteNumber(args.displayGamma, DEFAULT_DISPLAY_GAMMA)}|modulation:${serializeStokesDegreeModulationKey(args.stokesDegreeModulation)}|aolpModulation:${args.stokesAolpDegreeModulationMode}|aolpModulationGamma:${serializeFiniteNumber(args.stokesAolpDegreeModulationGamma ?? 1, 1)}${maskKey}${spectralKey}${recognitionKey}${recognitionRulesKey}`;
 }
 
 export function buildChannelThumbnailSessionPrefix(sessionId: string): string {

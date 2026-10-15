@@ -52,6 +52,7 @@ void main() {
         displaySample.invalidValue = true;
       }
       float modulation = isFiniteValue(modulationValue) ? clamp(modulationValue, 0.0, 1.0) : 0.0;
+      modulation = pow(modulation, 1.0 / uStokesDegreeModulationGamma);
       if (uStokesDegreeModulationMode == STOKES_DEGREE_MODULATION_MODE_SATURATION) {
         hsv.y *= modulation;
       } else {

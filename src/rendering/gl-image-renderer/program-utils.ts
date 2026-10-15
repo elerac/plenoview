@@ -53,6 +53,7 @@ export function getCommonUniforms(
     invalidValueWarningPhase: location(gl, program, 'uInvalidValueWarningPhase'),
     useStokesDegreeModulation: location(gl, program, 'uUseStokesDegreeModulation'),
     stokesDegreeModulationMode: location(gl, program, 'uStokesDegreeModulationMode'),
+    stokesDegreeModulationGamma: location(gl, program, 'uStokesDegreeModulationGamma'),
     useImageAlpha: location(gl, program, 'uUseImageAlpha'),
     backgroundMode: location(gl, program, 'uBackgroundMode'),
     backgroundColor: location(gl, program, 'uBackgroundColor'),

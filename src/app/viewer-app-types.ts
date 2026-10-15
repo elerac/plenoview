@@ -146,6 +146,7 @@ export interface StokesDegreeModulationControlModel {
   enabled: boolean;
   showAolpMode: boolean;
   aolpMode: StokesAolpDegreeModulationMode;
+  aolpGamma: number;
 }
 
 export interface ViewerResourceTarget {
@@ -264,6 +265,7 @@ export type ViewerIntent =
   | { type: 'colormapReverseToggled' }
   | { type: 'stokesDegreeModulationToggled' }
   | { type: 'stokesAolpDegreeModulationModeSet'; mode: StokesAolpDegreeModulationMode }
+  | { type: 'stokesAolpDegreeModulationGammaSet'; gamma: number }
   | { type: 'stokesColormapDefaultsSet'; settings: StokesColormapDefaultSettings }
   | { type: 'stokesColormapDefaultSettingSet'; group: StokesColormapDefaultGroup; setting: StokesColormapDefaultSetting }
   | { type: 'stokesActiveColormapDefaultApplied'; setting: StokesColormapDefaultSetting }

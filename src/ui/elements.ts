@@ -161,6 +161,9 @@ export interface Elements {
   colormapGammaValue: HTMLInputElement;
   stokesDegreeModulationControl: HTMLDivElement;
   stokesDegreeModulationButton: HTMLButtonElement;
+  stokesAolpModulationGammaControl: HTMLDivElement;
+  stokesAolpModulationGammaSlider: HTMLInputElement;
+  stokesAolpModulationGammaValue: HTMLInputElement;
   stokesAolpModulationModeControl: HTMLDivElement;
   stokesAolpModulationValueButton: HTMLButtonElement;
   stokesAolpModulationSaturationButton: HTMLButtonElement;
@@ -322,6 +325,9 @@ export type ColormapPanelElements = Pick<
   | 'colormapGammaValue'
   | 'stokesDegreeModulationControl'
   | 'stokesDegreeModulationButton'
+  | 'stokesAolpModulationGammaControl'
+  | 'stokesAolpModulationGammaSlider'
+  | 'stokesAolpModulationGammaValue'
   | 'stokesAolpModulationModeControl'
   | 'stokesAolpModulationValueButton'
   | 'stokesAolpModulationSaturationButton'
@@ -758,6 +764,9 @@ export function resolveElements(): Elements {
     colormapGammaValue: requireElement('colormap-gamma-value', HTMLInputElement),
     stokesDegreeModulationControl: requireElement('stokes-degree-modulation-control', HTMLDivElement),
     stokesDegreeModulationButton: requireElement('stokes-degree-modulation-button', HTMLButtonElement),
+    stokesAolpModulationGammaControl: requireElement('stokes-aolp-modulation-gamma-control', HTMLDivElement),
+    stokesAolpModulationGammaSlider: requireElement('stokes-aolp-modulation-gamma-slider', HTMLInputElement),
+    stokesAolpModulationGammaValue: requireElement('stokes-aolp-modulation-gamma-value', HTMLInputElement),
     stokesAolpModulationModeControl: requireElement('stokes-aolp-modulation-mode-control', HTMLDivElement),
     stokesAolpModulationValueButton: requireElement('stokes-aolp-modulation-value-button', HTMLButtonElement),
     stokesAolpModulationSaturationButton: requireElement('stokes-aolp-modulation-saturation-button', HTMLButtonElement),

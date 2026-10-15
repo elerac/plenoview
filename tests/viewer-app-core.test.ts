@@ -73,6 +73,23 @@ function createImageStats(): ImageStats {
 }
 
 describe('viewer app core', () => {
+  it('updates AoLP DoLP gamma, clamps inputs, and ignores other parameters', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({ type: 'sessionLoaded', session: createSession('gamma', createDecodedImage(['S0', 'S1', 'S2', 'S3'])) });
+    core.dispatch({ type: 'displaySelectionSet', displaySelection: createStokesSelection('aolp') });
+    core.dispatch({ type: 'stokesAolpDegreeModulationGammaSet', gamma: 2 });
+    expect(core.getState().sessionState.stokesAolpDegreeModulationGamma).toBe(2);
+    core.dispatch({ type: 'stokesAolpDegreeModulationGammaSet', gamma: Number.NaN });
+    expect(core.getState().sessionState.stokesAolpDegreeModulationGamma).toBe(2);
+    core.dispatch({ type: 'stokesAolpDegreeModulationGammaSet', gamma: 0 });
+    expect(core.getState().sessionState.stokesAolpDegreeModulationGamma).toBe(0.1);
+    core.dispatch({ type: 'stokesAolpDegreeModulationGammaSet', gamma: 10 });
+    expect(core.getState().sessionState.stokesAolpDegreeModulationGamma).toBe(4);
+    core.dispatch({ type: 'displaySelectionSet', displaySelection: createStokesSelection('dolp') });
+    core.dispatch({ type: 'stokesAolpDegreeModulationGammaSet', gamma: 1 });
+    expect(core.getState().sessionState.stokesAolpDegreeModulationGamma).toBe(4);
+  });
+
   it('stores the selected panorama display and lighting methods independently of viewer mode', () => {
     const core = new ViewerAppCore();
     core.dispatch({ type: 'sessionLoaded', session: createSession('session-1') });

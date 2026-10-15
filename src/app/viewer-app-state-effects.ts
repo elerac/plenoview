@@ -236,6 +236,7 @@ function scheduleActiveChannelThumbnailGeneration(
       displayGamma: state.sessionState.channelThumbnailDisplayGamma,
       stokesDegreeModulation: state.sessionState.stokesDegreeModulation,
       stokesAolpDegreeModulationMode: state.sessionState.stokesAolpDegreeModulationMode,
+      stokesAolpDegreeModulationGamma: state.sessionState.stokesAolpDegreeModulationGamma,
       maskInvalidStokesVectors: state.maskInvalidStokesVectors,
       spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled,
       channelRecognitionSettings: state.channelRecognitionSettings,
@@ -315,6 +316,7 @@ function shouldRefreshActiveChannelThumbnails(transition: ViewerStateTransition)
     transition.previousState.sessionState.stokesDegreeModulation.cop !== transition.state.sessionState.stokesDegreeModulation.cop ||
     transition.previousState.sessionState.stokesDegreeModulation.top !== transition.state.sessionState.stokesDegreeModulation.top ||
     transition.previousState.sessionState.stokesAolpDegreeModulationMode !== transition.state.sessionState.stokesAolpDegreeModulationMode ||
+    transition.previousState.sessionState.stokesAolpDegreeModulationGamma !== transition.state.sessionState.stokesAolpDegreeModulationGamma ||
     transition.previousState.maskInvalidStokesVectors !== transition.state.maskInvalidStokesVectors ||
     transition.previousState.spectralRgbGroupingEnabled !== transition.state.spectralRgbGroupingEnabled ||
     !sameChannelRecognitionSettings(

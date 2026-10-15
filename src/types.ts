@@ -184,6 +184,7 @@ export interface ViewerSessionState extends ViewerViewState {
   colormapReversed: boolean;
   stokesDegreeModulation: StokesDegreeModulationState;
   stokesAolpDegreeModulationMode: StokesAolpDegreeModulationMode;
+  stokesAolpDegreeModulationGamma: number;
   activeLayer: number;
   displaySelection: DisplaySelectionModel | null;
   depthChannel: string | null;

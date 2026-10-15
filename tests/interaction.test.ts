@@ -50,6 +50,7 @@ const state: ViewerState = {
   colormapReversed: false,
   stokesDegreeModulation: { aolp: false, cop: true, top: true },
   stokesAolpDegreeModulationMode: 'value',
+  stokesAolpDegreeModulationGamma: 1,
   maskInvalidStokesVectors: true,
   zoom: 16,
   panX: 100,

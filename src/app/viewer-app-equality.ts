@@ -49,6 +49,7 @@ export function sameViewerSessionState(a: ViewerSessionState, b: ViewerSessionSt
     a.stokesDegreeModulation.cop === b.stokesDegreeModulation.cop &&
     a.stokesDegreeModulation.top === b.stokesDegreeModulation.top &&
     a.stokesAolpDegreeModulationMode === b.stokesAolpDegreeModulationMode &&
+    a.stokesAolpDegreeModulationGamma === b.stokesAolpDegreeModulationGamma &&
     sameViewState(a, b) &&
     a.activeLayer === b.activeLayer &&
     sameDisplaySelection(a.displaySelection, b.displaySelection) &&
@@ -179,7 +180,8 @@ export function sameStokesControl(
     a.label === b.label &&
     a.enabled === b.enabled &&
     a.showAolpMode === b.showAolpMode &&
-    a.aolpMode === b.aolpMode
+    a.aolpMode === b.aolpMode &&
+    a.aolpGamma === b.aolpGamma
   );
 }
 

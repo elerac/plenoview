@@ -509,6 +509,7 @@ async function resolveChannelThumbnailPreview(args: {
     colormapReversed: false,
     stokesDegreeModulation: { ...args.stateSnapshot.stokesDegreeModulation },
     stokesAolpDegreeModulationMode: args.stateSnapshot.stokesAolpDegreeModulationMode,
+    stokesAolpDegreeModulationGamma: args.stateSnapshot.stokesAolpDegreeModulationGamma,
     maskInvalidStokesVectors: args.maskInvalidStokesVectors,
     spectralRgbGroupingEnabled: args.spectralRgbGroupingEnabled
   };

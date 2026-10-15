@@ -174,6 +174,7 @@ export function createClearedViewerState(_defaultColormapId: string): ViewerSess
     colormapReversed: false,
     stokesDegreeModulation: createDefaultStokesDegreeModulation(),
     stokesAolpDegreeModulationMode: DEFAULT_STOKES_AOLP_DEGREE_MODULATION_MODE,
+    stokesAolpDegreeModulationGamma: 1,
     zoom: 1,
     panX: 0,
     panY: 0,
@@ -357,6 +358,7 @@ export function buildSwitchedSessionState(
       depthPointSizePx: currentState.depthPointSizePx,
       stokesDegreeModulation: { ...currentState.stokesDegreeModulation },
       stokesAolpDegreeModulationMode: currentState.stokesAolpDegreeModulationMode,
+      stokesAolpDegreeModulationGamma: currentState.stokesAolpDegreeModulationGamma,
       lockedPixel,
       roi
     },

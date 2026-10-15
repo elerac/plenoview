@@ -245,6 +245,40 @@ describe('export image pixels', () => {
     expect(Array.from(pixels.data)).toEqual([255, 128, 128, 255]);
   });
 
+  it.each(['value', 'saturation'] as const)('applies DoLP gamma before AoLP %s modulation', (mode) => {
+    const pixels = buildExportImagePixels({
+      displayTexture: new Float32Array([0, 0, 0, 0.25]),
+      width: 1,
+      height: 1,
+      state: {
+        exposureEv: 0,
+        displayGamma: DEFAULT_DISPLAY_GAMMA,
+        visualizationMode: 'colormap',
+        colormapExposureEv: 0,
+        colormapGamma: 1,
+        colormapZeroCentered: false,
+        colormapReversed: false,
+        colormapRange: { min: 0, max: 1 },
+        displaySelection: {
+          kind: 'stokesAngle',
+          parameter: 'aolp',
+          source: { kind: 'scalar' }
+        },
+        stokesDegreeModulation: { aolp: true, cop: true, top: true },
+        stokesAolpDegreeModulationMode: mode,
+        stokesAolpDegreeModulationGamma: 2
+      },
+      colormapLut: {
+        id: '0',
+        label: 'Test',
+        entryCount: 2,
+        rgba8: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255])
+      }
+    });
+
+    expect(Array.from(pixels.data)).toEqual(mode === 'value' ? [128, 0, 0, 255] : [255, 128, 128, 255]);
+  });
+
   it('exports Mueller matrix selections at their 4x grid dimensions', () => {
     const selection = createMuellerMatrixSelection();
     const layer = createLayerFromChannels(Object.fromEntries(

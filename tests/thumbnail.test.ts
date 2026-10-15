@@ -39,6 +39,7 @@ function createThumbnailState(
     colormapReversed: false,
     stokesDegreeModulation: createDefaultStokesDegreeModulation(),
     stokesAolpDegreeModulationMode: 'value',
+    stokesAolpDegreeModulationGamma: 1,
     zoom: 1,
     panX: 0,
     panY: 0,
@@ -580,6 +581,33 @@ describe('thumbnail rendering', () => {
     );
 
     expect(readPixel(thumbnail.data, thumbnail.width, 20, 20)).toEqual([255, 128, 128, 255]);
+  });
+  it.each(['value', 'saturation'] as const)('applies DoLP gamma to thumbnail %s modulation', (mode) => {
+    const layer = createLayerFromChannels({
+      S0: [4],
+      S1: [1],
+      S2: [0],
+      S3: [0]
+    }, 'stokes');
+
+    const thumbnail = buildDisplaySelectionThumbnailPixels(
+      layer,
+      1,
+      1,
+      createThumbnailState(),
+      createStokesSelection('aolp'),
+      40,
+      {
+        visualizationMode: 'colormap',
+        colormapRange: { min: 0, max: 1 },
+        colormapLut: redBlackGreenLut,
+        stokesDegreeModulation: { aolp: true, cop: true, top: true },
+        stokesAolpDegreeModulationMode: mode,
+        stokesAolpDegreeModulationGamma: 2
+      }
+    );
+
+    expect(readPixel(thumbnail.data, thumbnail.width, 20, 20)).toEqual(mode === 'value' ? [128, 0, 0, 255] : [255, 128, 128, 255]);
   });
 });
 

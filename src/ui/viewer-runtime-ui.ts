@@ -108,7 +108,8 @@ export interface ViewerRuntimeUi extends Disposable {
     label: string | null,
     enabled?: boolean,
     showAolpMode?: boolean,
-    aolpMode?: StokesAolpDegreeModulationMode
+    aolpMode?: StokesAolpDegreeModulationMode,
+    aolpGamma?: number
   ): void;
   setActiveColormap(activeId: string | null): void;
   setColormapOptions(items: Array<{ id: string; label: string }>, activeId: string | null): void;
