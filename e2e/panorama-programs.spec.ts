@@ -43,7 +43,7 @@ test('explains shader preparation until ready and clears the message on mode exi
   await expect(page.locator('#error-banner')).toBeHidden();
 });
 
-test('renders each panorama program and keeps exposure controls usable @smoke', async ({ page }, testInfo) => {
+test('renders each panorama program and keeps exposure controls usable @smoke @gpu-timing', async ({ page }, testInfo) => {
   test.slow();
   await gotoViewerApp(page);
   await openGalleryCbox(page);

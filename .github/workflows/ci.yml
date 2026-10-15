@@ -62,11 +62,22 @@ jobs:
         env:
           PLAYWRIGHT_PREBUILT: 'true'
           PLAYWRIGHT_WORKERS: '2'
-        run: npm run test:e2e:ci
+        run: npm run test:e2e:ci -- --grep-invert @gpu-timing
+
+      # SwiftShader shares the runner CPU. Concurrent shader tests distort the
+      # event-loop budget, so retain its strict limit in an isolated invocation.
+      - name: Run panorama responsiveness smoke test
+        env:
+          PLAYWRIGHT_PREBUILT: 'true'
+          PLAYWRIGHT_WORKERS: '1'
+          PLAYWRIGHT_JSON_OUTPUT: 'test-results/gpu-timing-results.json'
+        run: npm run test:e2e -- --grep @gpu-timing --output test-results/gpu-timing
 
       - name: Summarize Playwright timings
         if: always()
-        run: npm run test:e2e:timing
+        run: |
+          npm run test:e2e:timing
+          npm run test:e2e:timing -- test-results/gpu-timing-results.json
 
       - name: Upload Playwright artifacts
         if: failure()
