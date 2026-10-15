@@ -1,3 +1,4 @@
+import { DEFAULT_EXPOSURE_RANGE } from '../exposure-settings';
 import { AUTO_EXPOSURE_PERCENTILE } from '../analysis/auto-exposure';
 import { idleResource } from '../async-resource';
 import { createDefaultChannelRecognitionSettings } from '../channel-recognition-settings';
@@ -72,6 +73,7 @@ export function createInitialViewerAppState(): ViewerAppState {
     autoFitImageOnSelect: false,
     autoExposureEnabled: false,
     autoExposurePercentile: AUTO_EXPOSURE_PERCENTILE,
+    exposureRange: { ...DEFAULT_EXPOSURE_RANGE },
     rulersVisible: false,
     viewerPaneLayout: createSinglePaneLayout()
   };

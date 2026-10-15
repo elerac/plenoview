@@ -1,4 +1,5 @@
-import { normalizeAutoExposurePercentile } from '../../analysis/auto-exposure';
+import { clampExposureEv, normalizeExposureRange } from '../../exposure-settings';
+import { computeAutoExposureEvFromScalar, normalizeAutoExposurePercentile } from '../../analysis/auto-exposure';
 import { idleResource } from '../../async-resource';
 import {
   createDefaultChannelRecognitionSettings,
@@ -52,6 +53,33 @@ export function uiPreferencesReducer(
         autoExposurePercentile: percentile,
         autoExposureResource: idleResource()
       };
+    }
+    case 'exposureRangeSet': {
+      const exposureRange = normalizeExposureRange(intent.range);
+      if (state.exposureRange.minEv === exposureRange.minEv && state.exposureRange.maxEv === exposureRange.maxEv) {
+        return state;
+      }
+      const clampSession = (session: ViewerAppState['sessionState']): ViewerAppState['sessionState'] => ({
+        ...session,
+        exposureEv: clampExposureEv(session.exposureEv, exposureRange),
+        channelThumbnailExposureEv: clampExposureEv(session.channelThumbnailExposureEv, exposureRange),
+        colormapExposureEv: clampExposureEv(session.colormapExposureEv, exposureRange)
+      });
+      const nextState: ViewerAppState = {
+        ...state,
+        exposureRange,
+        sessions: state.sessions.map((session) => ({ ...session, state: clampSession(session.state) })),
+        stokesDisplayRestoreStates: Object.fromEntries(Object.entries(state.stokesDisplayRestoreStates).map(
+          ([key, restore]) => [key, { ...restore, colormapExposureEv: clampExposureEv(restore.colormapExposureEv, exposureRange) }]
+        ))
+      };
+      const sessionState = clampSession(state.sessionState);
+      if (state.autoExposureEnabled && state.sessionState.visualizationMode === 'rgb' && state.autoExposureResource.status === 'success') {
+        const exposureEv = computeAutoExposureEvFromScalar(state.autoExposureResource.value?.scalar ?? 1, exposureRange);
+        sessionState.exposureEv = exposureEv;
+        sessionState.channelThumbnailExposureEv = exposureEv;
+      }
+      return patchSessionState(nextState, sessionState);
     }
     case 'rulersVisibleSet':
       return state.rulersVisible === intent.enabled ? state : {

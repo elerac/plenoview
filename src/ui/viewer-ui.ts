@@ -108,6 +108,13 @@ import { SpectralPlotPanel } from './spectral-plot-panel';
 import { ThemeController } from './theme-controller';
 import { SettingsDialogController } from './settings-dialog';
 import {
+  DEFAULT_EXPOSURE_RANGE,
+  normalizeExposureRange,
+  readStoredExposureRange,
+  saveStoredExposureRange,
+  type ExposureRange
+} from '../exposure-settings';
+import {
   STOKES_COLORMAP_DEFAULT_GROUPS,
   DEFAULT_MASK_INVALID_STOKES_VECTORS,
   cloneStokesColormapDefaultSetting,
@@ -352,6 +359,7 @@ export interface UiCallbacks {
   onAutoFitImage: () => void;
   onAutoExposureChange: (enabled: boolean) => void;
   onAutoExposurePercentileChange: (percentile: number) => void;
+  onExposureRangeChange: (range: ExposureRange) => void;
   onImageLoadWorkersChange: (workerCount: number) => void;
   onRulersVisibleChange: (enabled: boolean) => void;
   onViewerBackgroundChange: (background: ViewerBackgroundId) => void;
@@ -477,6 +485,7 @@ export class ViewerUi implements Disposable {
   private autoFitImageOnSelect = false;
   private autoExposureEnabled = false;
   private autoExposurePercentile = AUTO_EXPOSURE_PERCENTILE;
+  private exposureRange: ExposureRange = { ...DEFAULT_EXPOSURE_RANGE };
   private imageLoadWorkers = getDefaultImageLoadWorkers();
   private rulersVisible = false;
   private viewerBackground: ViewerBackgroundId = DEFAULT_VIEWER_BACKGROUND_ID;
@@ -820,6 +829,8 @@ export class ViewerUi implements Disposable {
     this.setViewerMode('image');
     this.setAutoFitImageOnSelect(readStoredAutoFitImageOnSelect(), false);
     this.callbacks.onAutoFitImageOnSelectChange(this.autoFitImageOnSelect);
+    this.setExposureRange(readStoredExposureRange());
+    this.callbacks.onExposureRangeChange(this.exposureRange);
     this.setAutoExposureEnabled(readStoredAutoExposure(), false);
     this.callbacks.onAutoExposureChange(this.autoExposureEnabled);
     this.setAutoExposurePercentile(readStoredAutoExposurePercentile(), false);
@@ -1158,6 +1169,19 @@ export class ViewerUi implements Disposable {
       x: clientX - rect.left,
       y: clientY - rect.top
     }) ?? createFallbackViewerPaneRenderInfo(this.readViewerViewport());
+  }
+
+  setExposureRange(range: ExposureRange, persist = false): void {
+    if (this.disposed) {
+      return;
+    }
+    this.exposureRange = normalizeExposureRange(range);
+    this.elements.exposureMinInput.value = String(this.exposureRange.minEv);
+    this.elements.exposureMaxInput.value = String(this.exposureRange.maxEv);
+    this.colormapPanel.setExposureRange(this.exposureRange);
+    if (persist) {
+      saveStoredExposureRange(this.exposureRange);
+    }
   }
 
   setExposure(exposureEv: number): void {
@@ -3325,6 +3349,20 @@ export class ViewerUi implements Disposable {
       this.callbacks.onViewerBackgroundChange(this.viewerBackground);
     });
 
+    for (const input of [this.elements.exposureMinInput, this.elements.exposureMaxInput]) {
+      this.disposables.addEventListener(input, 'change', () => {
+        const minEv = this.elements.exposureMinInput.valueAsNumber;
+        const maxEv = this.elements.exposureMaxInput.valueAsNumber;
+        if (!Number.isFinite(minEv) || !Number.isFinite(maxEv) || minEv > 0 || maxEv < 0 || minEv >= maxEv ||
+            Number(minEv.toFixed(1)) >= Number(maxEv.toFixed(1))) {
+          this.setExposureRange(this.exposureRange);
+          return;
+        }
+        this.setExposureRange({ minEv, maxEv }, true);
+        this.callbacks.onExposureRangeChange(this.exposureRange);
+      });
+    }
+
     this.disposables.addEventListener(this.elements.autoExposurePercentileInput, 'change', () => {
       const percentile = parseAutoExposurePercentile(this.elements.autoExposurePercentileInput.value);
       this.setAutoExposurePercentile(percentile, true);
@@ -3343,6 +3381,8 @@ export class ViewerUi implements Disposable {
       this.setViewerBackground(DEFAULT_VIEWER_BACKGROUND_ID);
       this.callbacks.onViewerBackgroundChange(this.viewerBackground);
       clearLegacySpectrumLatticeMotionPreference();
+      this.setExposureRange({ ...DEFAULT_EXPOSURE_RANGE }, true);
+      this.callbacks.onExposureRangeChange(this.exposureRange);
       this.setAutoExposurePercentile(AUTO_EXPOSURE_PERCENTILE, true);
       this.callbacks.onAutoExposurePercentileChange(this.autoExposurePercentile);
       this.setImageLoadWorkers(getDefaultImageLoadWorkers(), true);

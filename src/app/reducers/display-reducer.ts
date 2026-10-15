@@ -1,3 +1,4 @@
+import { clampExposureEv } from '../../exposure-settings';
 import {
   getColormapAsset,
   type ColormapAsset
@@ -79,7 +80,7 @@ export function displayReducer(
         ? clearPendingColormapActivation(state)
         : state;
     case 'exposureSet':
-      return patchSessionState(state, { exposureEv: intent.exposureEv });
+      return patchSessionState(state, { exposureEv: clampExposureEv(intent.exposureEv, state.exposureRange) });
     case 'exposureCommitted':
       return patchSessionState(state, { channelThumbnailExposureEv: state.sessionState.exposureEv });
     case 'displayGammaSet':
@@ -87,7 +88,7 @@ export function displayReducer(
     case 'displayGammaCommitted':
       return patchSessionState(state, { channelThumbnailDisplayGamma: state.sessionState.displayGamma });
     case 'colormapExposureSet':
-      return patchSessionState(state, { colormapExposureEv: clampFinite(intent.exposureEv, -10, 10, 0) });
+      return patchSessionState(state, { colormapExposureEv: clampExposureEv(intent.exposureEv, state.exposureRange) });
     case 'colormapGammaSet':
       return patchSessionState(state, { colormapGamma: clampFinite(intent.gamma, COLORMAP_GAMMA_MIN, COLORMAP_GAMMA_MAX, 1) });
     case 'activeSessionDisplayReset': {

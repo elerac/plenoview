@@ -1,3 +1,4 @@
+import { clampExposureEv, DEFAULT_EXPOSURE_RANGE, type ExposureRange } from '../exposure-settings';
 import { isNormalMapSelection, type DisplaySelection } from '../display-model';
 import { resolveDisplayImageSize } from '../display-size';
 import type { DecodedLayer, VisualizationMode } from '../types';
@@ -22,8 +23,8 @@ export const AUTO_EXPOSURE_PERCENTILE_MIN = 1;
 export const AUTO_EXPOSURE_PERCENTILE_MAX = 100;
 export const AUTO_EXPOSURE_PERCENTILE_STEP = 0.1;
 export const AUTO_EXPOSURE_SOURCE = 'rgbAbsMax' as const;
-export const AUTO_EXPOSURE_MIN_EV = -10;
-export const AUTO_EXPOSURE_MAX_EV = 10;
+export const AUTO_EXPOSURE_MIN_EV = DEFAULT_EXPOSURE_RANGE.minEv;
+export const AUTO_EXPOSURE_MAX_EV = DEFAULT_EXPOSURE_RANGE.maxEv;
 export const AUTO_EXPOSURE_PREVIEW_MAX_EDGE = 256;
 
 export interface AutoExposureResult {
@@ -35,32 +36,35 @@ export interface AutoExposureResult {
 
 export function createAutoExposureResult(
   scalar: number,
-  percentile = AUTO_EXPOSURE_PERCENTILE
+  percentile = AUTO_EXPOSURE_PERCENTILE,
+  exposureRange: ExposureRange = DEFAULT_EXPOSURE_RANGE
 ): AutoExposureResult {
   const normalizedScalar = normalizeAutoExposureScalar(scalar);
   return {
     scalar: normalizedScalar,
-    exposureEv: computeAutoExposureEvFromScalar(normalizedScalar),
+    exposureEv: computeAutoExposureEvFromScalar(normalizedScalar, exposureRange),
     percentile,
     source: AUTO_EXPOSURE_SOURCE
   };
 }
 
-export function computeAutoExposureEvFromScalar(scalar: number): number {
+export function computeAutoExposureEvFromScalar(
+  scalar: number,
+  exposureRange: ExposureRange = DEFAULT_EXPOSURE_RANGE
+): number {
   const normalizedScalar = normalizeAutoExposureScalar(scalar);
   if (normalizedScalar === 1) {
     return 0;
   }
 
-  return clampAutoExposureEv(-Math.log2(normalizedScalar));
+  return clampAutoExposureEv(-Math.log2(normalizedScalar), exposureRange);
 }
 
-export function clampAutoExposureEv(exposureEv: number): number {
-  if (!Number.isFinite(exposureEv)) {
-    return 0;
-  }
-
-  return Math.min(AUTO_EXPOSURE_MAX_EV, Math.max(AUTO_EXPOSURE_MIN_EV, exposureEv));
+export function clampAutoExposureEv(
+  exposureEv: number,
+  exposureRange: ExposureRange = DEFAULT_EXPOSURE_RANGE
+): number {
+  return clampExposureEv(exposureEv, exposureRange);
 }
 
 export function normalizeAutoExposurePercentile(value: number): number {

@@ -748,6 +748,21 @@
                 </table>
               </div>
             </div>
+            <div id="exposure-min-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="exposure-min-input">Minimum EV</label>
+              <div class="app-menu-setting-row">
+                <input id="exposure-min-input" class="app-menu-setting-input" type="number" max="0" step="0.1" value="-10" aria-describedby="exposure-range-explanation" />
+                <span class="app-menu-setting-unit">EV</span>
+              </div>
+            </div>
+            <div id="exposure-max-control" class="app-menu-setting-group">
+              <label class="app-menu-setting-label" for="exposure-max-input">Maximum EV</label>
+              <div class="app-menu-setting-row">
+                <input id="exposure-max-input" class="app-menu-setting-input" type="number" min="0" step="0.1" value="10" aria-describedby="exposure-range-explanation" />
+                <span class="app-menu-setting-unit">EV</span>
+              </div>
+              <p id="exposure-range-explanation" class="app-menu-setting-help">Limits for exposure and colormap EV. The range must include 0.</p>
+            </div>
             <div id="auto-exposure-percentile-control" class="app-menu-setting-group">
               <label class="app-menu-setting-label" for="auto-exposure-percentile-input">Auto Exposure Percentile</label>
               <div class="app-menu-setting-row">

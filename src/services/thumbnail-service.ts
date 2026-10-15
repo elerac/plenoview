@@ -1,3 +1,4 @@
+import { normalizeExposureRange } from '../exposure-settings';
 import { cloneDisplayLuminanceRange } from '../colormap-range';
 import { cloneDisplaySelection } from '../display-model';
 import { createAbortError, isAbortError, throwIfAborted, type Disposable } from '../lifecycle';
@@ -357,6 +358,9 @@ function cloneThumbnailOptions(options: OpenedImageThumbnailOptions): OpenedImag
   }
   if (Number.isFinite(options.autoExposurePercentile)) {
     cloned.autoExposurePercentile = options.autoExposurePercentile;
+  }
+  if (options.exposureRange) {
+    cloned.exposureRange = normalizeExposureRange(options.exposureRange);
   }
   if (options.maskInvalidStokesVectors !== undefined) {
     cloned.maskInvalidStokesVectors = options.maskInvalidStokesVectors === true;

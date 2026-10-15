@@ -200,6 +200,23 @@ describe('thumbnail rendering', () => {
     expect(readPixel(colormapThumbnail.data, colormapThumbnail.width, 20, 20)).toEqual([128, 128, 255, 255]);
   });
 
+  it('applies configured auto EV bounds to dark opened RGB thumbnails', () => {
+    const layer = createLayerFromChannels({ R: [2 ** -15], G: [0], B: [0] }, 'beauty');
+    const state = createThumbnailState({ displaySelection: createChannelRgbSelection('R', 'G', 'B') });
+    const expanded = buildOpenedImageThumbnailPixels(layer, 1, 1, state, {
+      autoExposureEnabled: true,
+      exposureRange: { minEv: -20, maxEv: 20 }
+    });
+    const narrowed = buildOpenedImageThumbnailPixels(layer, 1, 1, state, {
+      autoExposureEnabled: true,
+      exposureRange: { minEv: -5, maxEv: 5 }
+    });
+    expect(readPixel(expanded.data, expanded.width, 20, 20)).toEqual([255, 0, 0, 255]);
+    expect(readPixel(narrowed.data, narrowed.width, 20, 20)).toEqual([
+      linearToDisplayGammaByte(2 ** -10), 0, 0, 255
+    ]);
+  });
+
   it('applies sampled auto exposure to opened rgb thumbnails without using the outlier max', () => {
     const layer = createLayerFromChannels({
       R: [1, 2, 4, 8, 1000],

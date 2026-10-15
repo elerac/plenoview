@@ -191,6 +191,15 @@ describe('viewer app lanes', () => {
     expect(hasRenderFlag(flags, ViewerRenderInvalidationFlags.RenderRulerOverlay)).toBe(false);
   });
 
+  it('updates exposure controls when only configured EV bounds change', () => {
+    const state = createActiveState();
+    const nextState = { ...state, exposureRange: { minEv: -20, maxEv: 20 } };
+    const selectUiSnapshot = createViewerUiSnapshotSelector();
+    expect(selectUiSnapshot(nextState).exposureRange).toEqual({ minEv: -20, maxEv: 20 });
+    expect(hasUiFlag(createUiFlags(state, nextState), ViewerUiInvalidationFlags.Exposure)).toBe(true);
+    expect(createRenderFlags(state, nextState)).toBe(ViewerRenderInvalidationFlags.None);
+  });
+
   it('exposes auto-fit selection mode through the UI lane only', () => {
     const state = createActiveState();
     const nextState = {

@@ -6,6 +6,14 @@ import { buildFullViewerUrl, parseViewerBootstrapParams } from '../src/embed/emb
 import { decodeEmbedViewerState, encodeEmbedViewerState } from '../src/embed/embed-state';
 
 describe('embed params', () => {
+  it('round-trips configured EV bounds and normalizes invalid ranges', () => {
+    const snapshot = { exposureEv: 15, colormapExposureEv: -15, exposureRange: { minEv: -20, maxEv: 20 } };
+    expect(decodeEmbedViewerState(encodeEmbedViewerState(snapshot))).toMatchObject(snapshot);
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ exposureRange: { minEv: 5, maxEv: -5 } }))?.exposureRange)
+      .toEqual({ minEv: -10, maxEv: 10 });
+    expect(decodeEmbedViewerState(encodeEmbedViewerState({ exposureEv: 1 }))?.exposureRange).toBeUndefined();
+  });
+
   it('parses embed source, handoff, view, and serialized state', () => {
     const state = {
       viewerMode: 'panorama' as const,

@@ -244,6 +244,11 @@ describe('viewer app state effects', () => {
     core.dispatch({ type: 'autoExposurePercentileSet', percentile: 97.5 });
 
     expect(enqueue).not.toHaveBeenCalled();
+
+    core.dispatch({ type: 'exposureRangeSet', range: { minEv: -15, maxEv: 15 } });
+    expect(enqueue).toHaveBeenCalledTimes(2);
+    expect(enqueue.mock.calls.every((call) => call[3]?.exposureRange?.maxEv === 15)).toBe(true);
+
   });
 
   it('requeues opened image thumbnails when channel recognition settings change', () => {

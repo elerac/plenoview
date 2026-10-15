@@ -48,6 +48,7 @@ import {
 } from '../src/channel-recognition-settings';
 import { createDefaultChannelRecognitionNameRules } from '../src/channel-recognition-name-rules';
 import { AUTO_EXPOSURE_PERCENTILE } from '../src/auto-exposure';
+import { EXPOSURE_RANGE_STORAGE_KEY } from '../src/exposure-settings';
 import {
   getDefaultImageLoadWorkers,
   IMAGE_LOAD_WORKERS_STORAGE_KEY
@@ -951,6 +952,84 @@ describe('top bar and display controls', () => {
     ui.setInvalidValueWarningEnabled(false);
 
     expect(button.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('persists EV limits, updates both exposure controls, and restores them on reload', () => {
+    installUiFixture();
+    const onExposureRangeChange = vi.fn();
+    const onExposureChange = vi.fn();
+    const onColormapExposureChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onExposureRangeChange, onExposureChange, onColormapExposureChange }));
+    const minInput = document.getElementById('exposure-min-input') as HTMLInputElement;
+    const maxInput = document.getElementById('exposure-max-input') as HTMLInputElement;
+
+    expect(onExposureRangeChange).toHaveBeenLastCalledWith({ minEv: -10, maxEv: 10 });
+    minInput.value = '-24';
+    minInput.dispatchEvent(new Event('change', { bubbles: true }));
+    maxInput.value = '18';
+    maxInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(onExposureRangeChange).toHaveBeenLastCalledWith({ minEv: -24, maxEv: 18 });
+    expect(JSON.parse(window.localStorage.getItem(EXPOSURE_RANGE_STORAGE_KEY)!)).toEqual({ minEv: -24, maxEv: 18 });
+    for (const id of ['exposure-slider', 'exposure-value', 'colormap-exposure-slider', 'colormap-exposure-value']) {
+      const input = document.getElementById(id) as HTMLInputElement;
+      expect(input.min).toBe('-24');
+      expect(input.max).toBe('18');
+    }
+
+    const exposureValue = document.getElementById('exposure-value') as HTMLInputElement;
+    exposureValue.value = '-20';
+    exposureValue.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onExposureChange).toHaveBeenLastCalledWith(-20);
+    const colormapExposureValue = document.getElementById('colormap-exposure-value') as HTMLInputElement;
+    colormapExposureValue.value = '16';
+    colormapExposureValue.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onColormapExposureChange).toHaveBeenLastCalledWith(16);
+
+    ui.dispose();
+    installUiFixture();
+    const restoredCallback = vi.fn();
+    const restoredUi = new ViewerUi(createUiCallbacks({ onExposureRangeChange: restoredCallback }));
+    expect(restoredCallback).toHaveBeenLastCalledWith({ minEv: -24, maxEv: 18 });
+    expect((document.getElementById('exposure-min-input') as HTMLInputElement).value).toBe('-24');
+    expect((document.getElementById('exposure-max-input') as HTMLInputElement).value).toBe('18');
+    restoredUi.dispose();
+  });
+
+  it('keeps valid EV limits after invalid edits, clamps controls when narrowed, and resets defaults', () => {
+    installUiFixture();
+    const onExposureRangeChange = vi.fn();
+    const ui = new ViewerUi(createUiCallbacks({ onExposureRangeChange }));
+    const minInput = document.getElementById('exposure-min-input') as HTMLInputElement;
+    const maxInput = document.getElementById('exposure-max-input') as HTMLInputElement;
+    ui.setExposure(-8);
+    ui.setColormapExposure(8);
+    minInput.value = '-4.24';
+    minInput.dispatchEvent(new Event('change', { bubbles: true }));
+    maxInput.value = '5';
+    maxInput.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(minInput.value).toBe('-4.2');
+    expect((document.getElementById('exposure-value') as HTMLInputElement).value).toBe('-4.2');
+    expect((document.getElementById('colormap-exposure-value') as HTMLInputElement).value).toBe('5');
+
+    onExposureRangeChange.mockClear();
+    for (const value of ['', '2']) {
+      minInput.value = value;
+      minInput.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(minInput.value).toBe('-4.2');
+    }
+    maxInput.value = '-5';
+    maxInput.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(maxInput.value).toBe('5');
+    expect(onExposureRangeChange).not.toHaveBeenCalled();
+
+    document.getElementById('reset-settings-button')!.click();
+    expect(onExposureRangeChange).toHaveBeenLastCalledWith({ minEv: -10, maxEv: 10 });
+    expect(window.localStorage.getItem(EXPOSURE_RANGE_STORAGE_KEY)).toBeNull();
+    expect(minInput.value).toBe('-10');
+    expect(maxInput.value).toBe('10');
+    expect((document.getElementById('colormap-exposure-slider') as HTMLInputElement).max).toBe('10');
+    ui.dispose();
   });
 
   it('persists and dispatches the auto exposure percentile setting', () => {
@@ -3339,6 +3418,8 @@ describe('view menu', () => {
       'Background',
       'Channel Recognition',
       'Stokes Defaults',
+      'Minimum EV',
+      'Maximum EV',
       'Auto Exposure Percentile',
       'Image Load Workers',
       'Display Cache Budget'
@@ -4604,6 +4685,8 @@ describe('view menu', () => {
       normalizedVmin,
       normalizedVmax,
       normalizedZeroCenter,
+      document.getElementById('exposure-min-input'),
+      document.getElementById('exposure-max-input'),
       autoExposurePercentileInput,
       imageLoadWorkersInput,
       budgetModeInput,
@@ -12594,6 +12677,7 @@ function createUiCallbacksBase() {
     onAutoFitImage: () => {},
     onAutoExposureChange: () => {},
     onAutoExposurePercentileChange: () => {},
+    onExposureRangeChange: () => {},
     onImageLoadWorkersChange: () => {},
     onRulersVisibleChange: () => {},
     onViewerBackgroundChange: () => {},

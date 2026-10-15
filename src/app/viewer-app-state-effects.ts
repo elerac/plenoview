@@ -1,3 +1,4 @@
+import { DEFAULT_EXPOSURE_RANGE } from '../exposure-settings';
 import { buildChannelViewItems, type ChannelViewItem } from '../channel-view-items';
 import {
   serializeChannelThumbnailContextKey,
@@ -164,6 +165,9 @@ function buildOpenedImageThumbnailOptions(
     maskInvalidStokesVectors: state.maskInvalidStokesVectors,
     spectralRgbGroupingEnabled: state.spectralRgbGroupingEnabled
   };
+  if (state.exposureRange.minEv !== DEFAULT_EXPOSURE_RANGE.minEv || state.exposureRange.maxEv !== DEFAULT_EXPOSURE_RANGE.maxEv) {
+    options.exposureRange = state.exposureRange;
+  }
   if (!sameChannelRecognitionSettings(state.channelRecognitionSettings, createDefaultChannelRecognitionSettings())) {
     options.channelRecognitionSettings = state.channelRecognitionSettings;
   }
@@ -333,6 +337,10 @@ function shouldRefreshActiveChannelThumbnails(transition: ViewerStateTransition)
 function shouldRefreshOpenedImageThumbnails(transition: ViewerStateTransition): boolean {
   if (transition.state.sessions.length === 0) {
     return false;
+  }
+
+  if (transition.intent.type === 'exposureRangeSet') {
+    return transition.previousState.exposureRange !== transition.state.exposureRange;
   }
 
   if (transition.intent.type === 'autoExposureSet') {

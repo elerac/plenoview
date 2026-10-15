@@ -110,6 +110,7 @@ export function createViewerUiSnapshotSelector(): (state: ViewerAppState) => Vie
       ),
       autoFitImageOnSelect: state.autoFitImageOnSelect,
       autoExposureEnabled: state.autoExposureEnabled,
+      exposureRange: state.exposureRange,
       rulersVisible: state.rulersVisible,
       activeSessionId: state.activeSessionId,
       openedImageOptions: selectOpenedImageOptions(state),
@@ -221,7 +222,9 @@ export function computeViewerUiInvalidation(
     flags |= ViewerUiInvalidationFlags.RulersVisible;
   }
 
-  if (previous.exposureEv !== next.exposureEv) {
+  if (previous.exposureEv !== next.exposureEv ||
+      previous.exposureRange.minEv !== next.exposureRange.minEv ||
+      previous.exposureRange.maxEv !== next.exposureRange.maxEv) {
     flags |= ViewerUiInvalidationFlags.Exposure;
   }
 
@@ -585,6 +588,8 @@ function sameViewerUiSnapshot(a: ViewerUiSnapshot, b: ViewerUiSnapshot): boolean
     sameOpenedImageOptions(a.openedImageOptions, b.openedImageOptions) &&
     sameExportTarget(a.exportTarget, b.exportTarget) &&
     sameExportBatchTarget(a.exportBatchTarget, b.exportBatchTarget) &&
+    a.exposureRange.minEv === b.exposureRange.minEv &&
+    a.exposureRange.maxEv === b.exposureRange.maxEv &&
     a.exposureEv === b.exposureEv &&
     a.displayGamma === b.displayGamma &&
     a.colormapExposureEv === b.colormapExposureEv &&

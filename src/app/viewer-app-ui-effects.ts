@@ -45,6 +45,7 @@ export function applyUiEffects(ui: ViewerRuntimeUi, transition: ViewerUiTransiti
   }
 
   if (invalidation & ViewerUiInvalidationFlags.Exposure) {
+    ui.setExposureRange?.(snapshot.exposureRange);
     ui.setExposure(snapshot.exposureEv);
     ui.setColormapExposure(snapshot.colormapExposureEv);
   }

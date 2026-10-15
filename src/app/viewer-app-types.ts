@@ -1,3 +1,4 @@
+import type { ExposureRange } from '../exposure-settings';
 import type { ChannelViewThumbnailItem } from '../channel-view-items';
 import type { ImageDownloadProgress } from '../download-image';
 import type { AsyncResource, ViewerError } from '../async-resource';
@@ -218,6 +219,7 @@ export interface ViewerAppState {
   autoFitImageOnSelect: boolean;
   autoExposureEnabled: boolean;
   autoExposurePercentile: number;
+  exposureRange: ExposureRange;
   rulersVisible: boolean;
   viewerPaneLayout: ViewerPaneLayoutState;
 }
@@ -229,6 +231,7 @@ export type ViewerIntent =
   | { type: 'autoFitImageOnSelectSet'; enabled: boolean }
   | { type: 'autoExposureSet'; enabled: boolean }
   | { type: 'autoExposurePercentileSet'; percentile: number }
+  | { type: 'exposureRangeSet'; range: ExposureRange }
   | { type: 'rulersVisibleSet'; enabled: boolean }
   | { type: 'viewerPaneReset' }
   | { type: 'viewerPaneActivated'; path: ViewerPanePath }
@@ -399,6 +402,7 @@ export interface ViewerUiSnapshot {
   isDisplayOverlayLoading: boolean;
   autoFitImageOnSelect: boolean;
   autoExposureEnabled: boolean;
+  exposureRange: ExposureRange;
   rulersVisible: boolean;
   activeSessionId: string | null;
   openedImageOptions: ViewerOpenedImageOption[];

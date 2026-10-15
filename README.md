@@ -36,7 +36,7 @@ Plenoview is a multichannel image viewer for computational imaging, rendering, a
   - Shows bounds, size, total pixels, per-channel valid sample counts, and `min` / `mean` / `max` for the active display selection.
   - ROI survives view-mode switches, carries across image switches and new loads, clamps to the target image bounds when needed, and can be cleared from the Inspector.
 - Display controls:
-  - `None` is the default RGB display path and exposes Exposure and Gamma controls. Exposure uses slider + numeric input (`-10` to `+10` EV, step `0.1`).
+  - `None` is the default RGB display path and exposes Exposure and Gamma controls. Exposure uses slider + numeric input (default `-10` to `+10` EV, step `0.1`). Edit Min EV and Max EV in Settings to change the bounds for RGB exposure, colormap EV, and auto exposure.
   - `Colormap` maps current display luminance over the full active image through the selected NumPy LUT palette.
   - Built-in palettes are listed in `public/colormaps/manifest.json` and stored as static `.npy` files in the same directory.
   - The app accepts LUT arrays with shape `(N, 3)` or `(N, 4)` and dtype `float32`, `float64`, or `uint8`.

@@ -278,6 +278,9 @@ export function createViewerUi({
     onAutoExposurePercentileChange: (percentile) => {
       core.dispatch({ type: 'autoExposurePercentileSet', percentile });
     },
+    onExposureRangeChange: (range) => {
+      core.dispatch({ type: 'exposureRangeSet', range });
+    },
     onImageLoadWorkersChange: (workerCount) => {
       onImageLoadWorkersChange(workerCount);
     },

@@ -2,6 +2,7 @@ import { buildZeroCenteredColormapRange } from '../colormap-range';
 import { DEFAULT_DISPLAY_GAMMA, normalizeDisplayGamma } from '../color';
 import { ColormapLut, sampleColormapRgbBytes } from '../colormaps';
 import { DisposableBag, type Disposable } from '../lifecycle';
+import { clampExposureEv, type ExposureRange } from '../exposure-settings';
 import type { DisplayLuminanceRange, StokesAolpDegreeModulationMode, VisualizationMode } from '../types';
 import type { ColormapPanelElements } from './elements';
 import { syncSelectOptions } from './render-helpers';
@@ -196,6 +197,26 @@ export class ColormapPanel implements Disposable {
     this.openedImageCount = count;
     this.updateDisabledStates();
     this.updateStokesDegreeModulationDisabled();
+  }
+
+  setExposureRange(range: ExposureRange): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const exposureEv = Number(this.elements.exposureValue.value);
+    const colormapExposureEv = Number(this.elements.colormapExposureValue.value);
+    for (const input of [
+      this.elements.exposureSlider,
+      this.elements.exposureValue,
+      this.elements.colormapExposureSlider,
+      this.elements.colormapExposureValue
+    ]) {
+      input.min = String(range.minEv);
+      input.max = String(range.maxEv);
+    }
+    this.setExposure(clampExposureEv(exposureEv, range));
+    this.setColormapExposure(clampExposureEv(colormapExposureEv, range));
   }
 
   setExposure(exposureEv: number): void {

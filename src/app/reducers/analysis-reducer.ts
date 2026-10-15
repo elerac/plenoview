@@ -1,3 +1,4 @@
+import { computeAutoExposureEvFromScalar } from '../../analysis/auto-exposure';
 import {
   resolveColormapAutoRange,
   sameDisplayLuminanceRange
@@ -205,8 +206,8 @@ function reduceAutoExposureResolved(
     ...nextState,
     autoExposureResource: successResource(intent.requestKey, intent.autoExposure)
   }, {
-    exposureEv: intent.autoExposure?.exposureEv ?? 0,
-    channelThumbnailExposureEv: intent.autoExposure?.exposureEv ?? 0
+    exposureEv: computeAutoExposureEvFromScalar(intent.autoExposure?.scalar ?? 1, state.exposureRange),
+    channelThumbnailExposureEv: computeAutoExposureEvFromScalar(intent.autoExposure?.scalar ?? 1, state.exposureRange)
   });
 }
 
@@ -232,7 +233,7 @@ function reduceAutoExposurePreviewResolved(
   }
 
   return patchSessionState(state, {
-    exposureEv: intent.autoExposure?.exposureEv ?? 0,
-    channelThumbnailExposureEv: intent.autoExposure?.exposureEv ?? 0
+    exposureEv: computeAutoExposureEvFromScalar(intent.autoExposure?.scalar ?? 1, state.exposureRange),
+    channelThumbnailExposureEv: computeAutoExposureEvFromScalar(intent.autoExposure?.scalar ?? 1, state.exposureRange)
   });
 }

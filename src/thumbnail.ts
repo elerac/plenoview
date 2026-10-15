@@ -1,3 +1,4 @@
+import { DEFAULT_EXPOSURE_RANGE, type ExposureRange } from './exposure-settings';
 import {
   AUTO_EXPOSURE_PERCENTILE,
   createAutoExposureResult,
@@ -52,6 +53,7 @@ export interface OpenedImageThumbnailPixels {
 export interface OpenedImageThumbnailOptions {
   autoExposureEnabled?: boolean;
   autoExposurePercentile?: number;
+  exposureRange?: ExposureRange;
   maskInvalidStokesVectors?: boolean;
   spectralRgbGroupingEnabled?: boolean;
   channelRecognitionSettings?: ChannelRecognitionSettings;
@@ -221,7 +223,8 @@ export function buildDisplaySelectionThumbnailPixels(
         evaluator,
         displaySize.width,
         displaySize.height,
-        options.autoExposurePercentile ?? AUTO_EXPOSURE_PERCENTILE
+        options.autoExposurePercentile ?? AUTO_EXPOSURE_PERCENTILE,
+        options.exposureRange ?? DEFAULT_EXPOSURE_RANGE
       )
     : null;
   const exposureScale = sampledAutoExposure
@@ -374,12 +377,13 @@ function computeSampledThumbnailAutoExposure(
   evaluator: ReturnType<typeof resolveDisplaySelectionEvaluator>,
   width: number,
   height: number,
-  percentile: number
+  percentile: number,
+  exposureRange: ExposureRange
 ): AutoExposureResult {
   const pixelCount = Math.max(0, width * height);
   const normalizedPercentile = normalizeAutoExposurePercentile(percentile);
   if (pixelCount === 0) {
-    return createAutoExposureResult(1, normalizedPercentile);
+    return createAutoExposureResult(1, normalizedPercentile, exposureRange);
   }
 
   const sampleStep = resolveThumbnailSampleStep(pixelCount);
@@ -394,13 +398,13 @@ function computeSampledThumbnailAutoExposure(
   }
 
   if (scalars.length === 0) {
-    return createAutoExposureResult(1, normalizedPercentile);
+    return createAutoExposureResult(1, normalizedPercentile, exposureRange);
   }
 
   scalars.sort((left, right) => left - right);
   const percentile01 = Math.min(1, Math.max(0, normalizedPercentile / 100));
   const percentileIndex = Math.floor((scalars.length - 1) * percentile01);
-  return createAutoExposureResult(scalars[percentileIndex] ?? 1, normalizedPercentile);
+  return createAutoExposureResult(scalars[percentileIndex] ?? 1, normalizedPercentile, exposureRange);
 }
 
 function resolveThumbnailSampleStep(pixelCount: number): number {

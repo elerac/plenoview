@@ -73,6 +73,51 @@ function createImageStats(): ImageStats {
 }
 
 describe('viewer app core', () => {
+  it('uses configured EV limits and clamps active and inactive sessions when they shrink', () => {
+    const core = new ViewerAppCore();
+    core.dispatch({ type: 'exposureRangeSet', range: { minEv: -20, maxEv: 20 } });
+    core.dispatch({ type: 'sessionLoaded', session: createSession('first') });
+    core.dispatch({ type: 'exposureSet', exposureEv: -15 });
+    core.dispatch({ type: 'exposureCommitted' });
+    core.dispatch({ type: 'colormapExposureSet', exposureEv: 15 });
+    expect(core.getState().sessionState).toMatchObject({ exposureEv: -15, colormapExposureEv: 15 });
+    core.dispatch({ type: 'sessionLoaded', session: createSession('second') });
+    core.dispatch({ type: 'exposureSet', exposureEv: 50 });
+    core.dispatch({ type: 'colormapExposureSet', exposureEv: -50 });
+    expect(core.getState().sessionState).toMatchObject({ exposureEv: 20, colormapExposureEv: -20 });
+    core.dispatch({ type: 'exposureRangeSet', range: { minEv: -5, maxEv: 6 } });
+    expect(core.getState().sessionState).toMatchObject({ exposureEv: 6, colormapExposureEv: -5 });
+    expect(core.getState().sessions.find((session) => session.id === 'first')?.state).toMatchObject({
+      exposureEv: -5, channelThumbnailExposureEv: -5, colormapExposureEv: 6
+    });
+    core.dispatch({ type: 'activeSessionSwitched', sessionId: 'first' });
+    expect(core.getState().sessionState).toMatchObject({ exposureEv: 6, colormapExposureEv: -5 });
+  });
+
+  it('recomputes auto EV from its scalar when configured bounds change and clamps pending previews', () => {
+    const core = new ViewerAppCore();
+    const session = createSession('auto-range');
+    core.dispatch({ type: 'sessionLoaded', session });
+    core.dispatch({ type: 'autoExposureSet', enabled: true });
+    const result = {
+      sessionId: session.id,
+      activeLayer: 0,
+      visualizationMode: 'rgb' as const,
+      displaySelection: core.getState().sessionState.displaySelection,
+      autoExposure: { scalar: 2 ** -15, exposureEv: 10, percentile: 99.5, source: 'rgbAbsMax' as const }
+    };
+    core.dispatch({ type: 'autoExposureResolved', requestId: null, requestKey: 'auto', ...result });
+    expect(core.getState().sessionState.exposureEv).toBe(10);
+    core.dispatch({ type: 'exposureRangeSet', range: { minEv: -20, maxEv: 20 } });
+    expect(core.getState().sessionState.exposureEv).toBe(15);
+    expect(core.getState().sessionState.channelThumbnailExposureEv).toBe(15);
+    core.dispatch({ type: 'exposureRangeSet', range: { minEv: -2, maxEv: 3 } });
+    expect(core.getState().sessionState.exposureEv).toBe(3);
+    core.dispatch({ type: 'autoExposureRequestStarted', requestId: 1, requestKey: 'preview' });
+    core.dispatch({ type: 'autoExposurePreviewResolved', requestId: 1, requestKey: 'preview', ...result });
+    expect(core.getState().sessionState.exposureEv).toBe(3);
+  });
+
   it('updates AoLP DoLP gamma, clamps inputs, and ignores other parameters', () => {
     const core = new ViewerAppCore();
     core.dispatch({ type: 'sessionLoaded', session: createSession('gamma', createDecodedImage(['S0', 'S1', 'S2', 'S3'])) });
@@ -223,6 +268,20 @@ describe('viewer app core', () => {
 
     core.dispatch({ type: 'lockedPixelSet', pixel: null });
     expect(core.getState().sessionState.lockedPixel).toBeNull();
+  });
+
+  it('preserves configured EV limits and values when sharing an embed snapshot', () => {
+    const source = new ViewerAppCore();
+    source.dispatch({ type: 'sessionLoaded', session: createSession('source') });
+    source.dispatch({ type: 'exposureRangeSet', range: { minEv: -20, maxEv: 20 } });
+    source.dispatch({ type: 'exposureSet', exposureEv: 15 });
+    source.dispatch({ type: 'colormapExposureSet', exposureEv: -15 });
+    const snapshot = decodeEmbedViewerState(encodeEmbedViewerState(createEmbedViewerStateSnapshot(source.getState())));
+    const target = new ViewerAppCore();
+    target.dispatch({ type: 'sessionLoaded', session: createSession('target') });
+    applyEmbedViewerStateSnapshot(target, snapshot);
+    expect(target.getState().exposureRange).toEqual({ minEv: -20, maxEv: 20 });
+    expect(target.getState().sessionState).toMatchObject({ exposureEv: 15, channelThumbnailExposureEv: 15, colormapExposureEv: -15 });
   });
 
   it('applies serialized depth settings and locked pixels deterministically', () => {

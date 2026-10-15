@@ -43,6 +43,7 @@ import type {
 import type { Disposable } from '../lifecycle';
 import type { DesktopCommandId } from '../platform';
 import type { ViewerBackgroundId } from '../viewer-background-settings';
+import type { ExposureRange } from '../exposure-settings';
 import type { DisplayCacheBudgetPreference } from '../display-cache';
 import type { MemoryUsageSnapshot } from '../memory/memory-accounting';
 
@@ -94,6 +95,7 @@ export interface ViewerRuntimeUi extends Disposable {
   setExportTarget(target: ExportImageTarget | null): void;
   setExportBatchTarget(target: ExportImageBatchTarget | null): void;
   setExposure(exposureEv: number): void;
+  setExposureRange?(range: ExposureRange): void;
   setDisplayGamma(displayGamma: number): void;
   setColormapExposure(exposureEv: number): void;
   setColormapGamma(gamma: number): void;

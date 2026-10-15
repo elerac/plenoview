@@ -1,3 +1,4 @@
+import { normalizeExposureRange, type ExposureRange } from '../exposure-settings';
 import type { ViewerAppCore } from '../app/viewer-app-core';
 import type { ViewerAppState } from '../app/viewer-app-types';
 import { normalizePathTracingMaxSamples } from '../path-tracing-settings';
@@ -24,6 +25,7 @@ export interface EmbedViewerStateSnapshot {
   activeLayer?: number;
   displaySelection?: DisplaySelection | null;
   exposureEv?: number;
+  exposureRange?: ExposureRange;
   displayGamma?: number;
   activeColormapId?: string | null;
   colormapExposureEv?: number;
@@ -51,6 +53,7 @@ export function createEmbedViewerStateSnapshot(state: ViewerAppState): EmbedView
     activeLayer: session.activeLayer,
     displaySelection: cloneJsonValue(session.displaySelection),
     exposureEv: session.exposureEv,
+    exposureRange: { ...state.exposureRange },
     displayGamma: session.displayGamma,
     activeColormapId: session.activeColormapId,
     colormapExposureEv: session.colormapExposureEv,
@@ -112,6 +115,9 @@ export function applyEmbedViewerStateSnapshot(
     return;
   }
 
+  if (snapshot.exposureRange) {
+    core.dispatch({ type: 'exposureRangeSet', range: normalizeExposureRange(snapshot.exposureRange) });
+  }
   if (isViewerMode(snapshot.viewerMode)) {
     core.dispatch({ type: 'viewerModeSet', viewerMode: snapshot.viewerMode });
   }
@@ -227,6 +233,7 @@ function normalizeEmbedViewerStateSnapshot(value: unknown): EmbedViewerStateSnap
     activeLayer: isNonNegativeInteger(record.activeLayer) ? record.activeLayer : undefined,
     displaySelection: normalizeDisplaySelection(record.displaySelection),
     exposureEv: isFiniteNumber(record.exposureEv) ? record.exposureEv : undefined,
+    exposureRange: record.exposureRange === undefined ? undefined : normalizeExposureRange(record.exposureRange),
     displayGamma: isFiniteNumber(record.displayGamma) && record.displayGamma > 0 ? record.displayGamma : undefined,
     activeColormapId: typeof record.activeColormapId === 'string' || record.activeColormapId === null
       ? record.activeColormapId

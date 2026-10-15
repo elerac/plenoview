@@ -50,6 +50,8 @@ export interface Elements {
   channelRecognitionCancelRulesButton: HTMLButtonElement;
   imageLoadWorkersInput: HTMLInputElement;
   autoExposurePercentileInput: HTMLInputElement;
+  exposureMinInput: HTMLInputElement;
+  exposureMaxInput: HTMLInputElement;
   stokesInvalidVectorMaskCheckbox: HTMLInputElement;
   stokesDefaultSettingsTable: HTMLTableElement;
   resetSettingsButton: HTMLButtonElement;
@@ -647,6 +649,8 @@ export function resolveElements(): Elements {
     channelRecognitionCancelRulesButton: requireElement('channel-recognition-cancel-rules-button', HTMLButtonElement),
     imageLoadWorkersInput: requireElement('image-load-workers-input', HTMLInputElement),
     autoExposurePercentileInput: requireElement('auto-exposure-percentile-input', HTMLInputElement),
+    exposureMinInput: requireElement('exposure-min-input', HTMLInputElement),
+    exposureMaxInput: requireElement('exposure-max-input', HTMLInputElement),
     stokesInvalidVectorMaskCheckbox: requireElement('stokes-invalid-vector-mask-checkbox', HTMLInputElement),
     stokesDefaultSettingsTable: requireElement('stokes-default-settings-table', HTMLTableElement),
     resetSettingsButton: requireElement('reset-settings-button', HTMLButtonElement),
